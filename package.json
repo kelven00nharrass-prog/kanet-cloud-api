@@ -2,10 +2,10 @@
   "name": "kanet-cloud-api",
   "version": "2.0.0",
   "description": "Ka-Net Cloud API & Firebase Realtime Order Dispatcher for Render",
-  "main": "src/server.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
