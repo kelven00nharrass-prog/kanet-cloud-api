@@ -1,0 +1,16 @@
+﻿services:
+  - type: web
+    name: kanet-cloud-api
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MASTER_TOKEN
+        value: KaNetKelven2026Secure
+      - key: FIREBASE_DATABASE_URL
+        value: https://ka-net-math.firebaseio.com
