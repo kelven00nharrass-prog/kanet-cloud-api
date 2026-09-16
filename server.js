@@ -150,19 +150,27 @@ app.get('/api/devices', async (req, res) => {
 
 app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   const port = Number(req.params.port);
-  const dev = inMemoryDevices[port] || {
-    status: 'ok',
-    online: true,
-    porta: port,
-    saldo_mb: 10240,
-    saldo: 10240,
-    sem_saldo: false,
-    livre: true,
-    is_busy: false,
-    bateria: 100,
-    carrier: 'Vodacom'
-  };
-  return res.json({ status: 'ok', online: true, ...dev });
+  const dev = inMemoryDevices[port];
+  if (!dev) {
+    return res.json({
+      status: 'offline',
+      online: false,
+      porta: port,
+      saldo_mb: 0,
+      sem_saldo: true,
+      livre: false,
+      is_busy: false,
+      mensagem: `Nenhum celular conectado na porta ${port}`
+    });
+  }
+  const now = Date.now();
+  const lastSeen = new Date(dev.lastSeen || 0).getTime();
+  const isOnline = (now - lastSeen) < 180000; // 3 min window
+  return res.json({
+    status: isOnline ? 'ok' : 'offline',
+    online: isOnline,
+    ...dev
+  });
 });
 
 app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, res) => {
@@ -583,6 +591,152 @@ app.get('/qr', (req, res) => {
 </body>
 </html>
   `);
+});
+
+// ════════════════════════════════════════════════════════════════
+// 8. SMS PAYMENT RECEIVER (M-Pesa / e-Mola → Auto Transfer)
+// ════════════════════════════════════════════════════════════════
+
+// Tabela de preços: valor_pago_MT → MB a enviar
+const PRICE_TABLE = [
+  { valor: 10,  mb: 250  },
+  { valor: 15,  mb: 400  },
+  { valor: 20,  mb: 600  },
+  { valor: 25,  mb: 800  },
+  { valor: 30,  mb: 1024 },
+  { valor: 40,  mb: 1500 },
+  { valor: 50,  mb: 2048 },
+  { valor: 100, mb: 5120 },
+  { valor: 200, mb: 10240 }
+];
+
+// Anti-duplicação: armazena txn_ids já processados (máx 1000 itens em memória)
+const inMemoryPayments = new Map();
+
+function getMbFromValor(valor) {
+  const v = parseFloat(String(valor).replace(',', '.'));
+  // Match exato primeiro
+  const exact = PRICE_TABLE.find(p => p.valor === v);
+  if (exact) return exact.mb;
+  // Senão, o maior plano com valor <= pago
+  const match = [...PRICE_TABLE].reverse().find(p => p.valor <= v);
+  return match ? match.mb : null;
+}
+
+function findAvailablePort() {
+  const now = Date.now();
+  for (const [port, dev] of Object.entries(inMemoryDevices)) {
+    const lastSeen = new Date(dev.lastSeen || 0).getTime();
+    const isOnline = (now - lastSeen) < 180000;
+    if (isOnline && !dev.pending_order) {
+      return Number(port);
+    }
+  }
+  return null;
+}
+
+app.post('/api/sms/payment', (req, res) => {
+  try {
+    const { txn_id, valor, remetente, metodo, raw_sms, timestamp } = req.body;
+
+    if (!txn_id || !valor || !remetente) {
+      return res.status(400).json({
+        success: false,
+        mensagem: 'Campos obrigatórios: txn_id, valor, remetente'
+      });
+    }
+
+    // Anti-fraude: verificar duplicação
+    if (inMemoryPayments.has(txn_id)) {
+      console.warn(`⚠️ [SMS PAYMENT] Transação duplicada ignorada: ${txn_id}`);
+      return res.json({
+        success: false,
+        duplicado: true,
+        mensagem: `Transação ${txn_id} já foi processada`
+      });
+    }
+
+    // Limpar cache se crescer demais
+    if (inMemoryPayments.size > 1000) {
+      const firstKey = inMemoryPayments.keys().next().value;
+      inMemoryPayments.delete(firstKey);
+    }
+
+    // Guardar como processado
+    inMemoryPayments.set(txn_id, {
+      txn_id,
+      valor,
+      remetente,
+      metodo: metodo || 'mpesa',
+      processedAt: new Date().toISOString()
+    });
+
+    // Determinar quantos MB enviar
+    const mbAEnviar = getMbFromValor(valor);
+    if (!mbAEnviar) {
+      console.warn(`⚠️ [SMS PAYMENT] Valor ${valor} MT não corresponde a nenhum plano. Txn: ${txn_id}`);
+      return res.json({
+        success: false,
+        mensagem: `Valor ${valor} MT não corresponde a nenhum plano disponível`,
+        planos_disponiveis: PRICE_TABLE.map(p => p.valor + ' MT = ' + p.mb + ' MB')
+      });
+    }
+
+    // Encontrar celular disponível para disparar o USSD
+    const targetPort = findAvailablePort();
+    const orderId = 'SMS-' + txn_id + '-' + Date.now();
+
+    const order = {
+      id: orderId,
+      orderId,
+      numero: String(remetente).replace(/\D/g, ''),
+      quantidade: mbAEnviar,
+      modo: 'diario',
+      fonte: 'sms_payment',
+      metodo: metodo || 'mpesa',
+      txn_id,
+      valor_pago: valor,
+      timestamp: Date.now()
+    };
+
+    if (targetPort && inMemoryDevices[targetPort]) {
+      inMemoryDevices[targetPort].pending_order = order;
+      console.log(`💳 [SMS PAYMENT] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT → ${mbAEnviar} MB para ${remetente} via Celular ${targetPort}`);
+      return res.json({
+        success: true,
+        orderId,
+        mb_a_enviar: mbAEnviar,
+        porta_usada: targetPort,
+        mensagem: `Pagamento ${valor} MT confirmado. Enviando ${mbAEnviar} MB para ${remetente}`
+      });
+    } else {
+      // Sem celular disponível — guardar como pedido normal para processamento posterior
+      inMemoryOrders.set(orderId, {
+        ...order,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      console.warn(`⚠️ [SMS PAYMENT] Nenhum celular disponível. Pedido ${orderId} em fila de espera.`);
+      return res.json({
+        success: true,
+        orderId,
+        mb_a_enviar: mbAEnviar,
+        porta_usada: null,
+        em_fila: true,
+        mensagem: `Pagamento confirmado mas nenhum celular disponível agora. Em fila.`
+      });
+    }
+  } catch (err) {
+    console.error('❌ [SMS PAYMENT ERRO]:', err);
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
+});
+
+// Listar pagamentos já processados (debug)
+app.get('/api/sms/payments', (req, res) => {
+  const list = [...inMemoryPayments.values()];
+  return res.json({ success: true, count: list.length, payments: list.slice(-50) });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
