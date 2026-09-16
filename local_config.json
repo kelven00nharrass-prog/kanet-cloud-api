@@ -1,0 +1,58 @@
+{
+  "nome_sistema": "Ka-Net System",
+  "master_number": "856116039,850401416",
+  "mpesa_number": "856268811",
+  "mpesa_name": "Kelven Junior Anabela Nharrava",
+  "emola_number": "864882152",
+  "emola_name": "Catia Anabela Nharrava",
+  "mesnal_serial": "WOZTG6X455DMXG99",
+  "telefones": [
+    {
+      "id": 1785360000000,
+      "serial": "NXTDU16818007046",
+      "porta": 8024,
+      "sim1": "258840000000",
+      "sim2": "",
+      "nome": "Celular 8024",
+      "modelo": "NXTDU16818007046",
+      "adicionado_em": "2026-07-30T18:00:00.000Z"
+    },
+    {
+      "id": 1785360000001,
+      "serial": "WOZTG6X455DMXG99",
+      "porta": 8077,
+      "sim1": "258840000001",
+      "sim2": "",
+      "nome": "Celular 8077",
+      "modelo": "WOZTG6X455DMXG99",
+      "adicionado_em": "2026-07-30T18:00:00.000Z"
+    },
+    {
+      "id": 1785360000003,
+      "serial": "WOZTG6X455DMXG99",
+      "porta": 8777,
+      "sim1": "258840000001",
+      "sim2": "",
+      "nome": "Celular 8777",
+      "modelo": "WOZTG6X455DMXG99",
+      "adicionado_em": "2026-07-30T18:00:00.000Z"
+    },
+    {
+      "id": 1785360000002,
+      "serial": "GSL0217320001841",
+      "porta": 8023,
+      "sim1": "258840000002",
+      "sim2": "",
+      "nome": "Celular 8023",
+      "modelo": "GSL0217320001841",
+      "adicionado_em": "2026-08-04T23:42:00.000Z"
+    }
+  ],
+  "vip_group_jid": "120363430083576872@g.us",
+  "vip_price": 100,
+  "wa_license_key": "",
+  "painel_port": 3027,
+  "grupo_notificacoes": "120363409903708446@g.us",
+  "grupo_erros": "120363408450329444@g.us",
+  "grupo_estudantes": "120363424819563179@g.us"
+}

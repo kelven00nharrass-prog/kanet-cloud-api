@@ -181,6 +181,33 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     lastSeen: new Date().toISOString()
   };
 
+  // Notificar cliente no WhatsApp assim que o celular finalizar o envio USSD
+  if (req.body.last_result && req.body.last_result.id) {
+    const resId = req.body.last_result.id;
+    const order = inMemoryOrders.get(resId);
+    if (order && order.jid && !order.notified && baileysEngine) {
+      order.notified = true;
+      if (req.body.last_result.success) {
+        baileysEngine.sendTextMessage(order.jid,
+          `🎉 *TRANSFERÊNCIA REALIZADA COM SUCESSO!*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `📦 Pacote: *${order.quantidade} MB*\n` +
+          `📱 Destino: *${order.numero}*\n` +
+          `⚡ O seu pacote já foi ativado com sucesso!\n\n` +
+          `_Obrigado por comprar no Ka-Net System!_ 🚀`
+        );
+        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${order.jid} notificado de SUCESSO no pedido ${resId}`);
+      } else {
+        baileysEngine.sendTextMessage(order.jid,
+          `⚠️ *AVISO DE ENVIO*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `📱 Destino: *${order.numero}*\n` +
+          `Houve uma instabilidade na operadora ao tentar ativar os megas.\n` +
+          `O sistema tentará reenviar automaticamente!`
+        );
+        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${order.jid} notificado de FALHA no pedido ${resId}`);
+      }
+    }
+  }
+
   if (db) {
     db.collection('devices').doc(String(port)).set(inMemoryDevices[port], { merge: true }).catch(() => {});
   }
@@ -442,8 +469,17 @@ try {
   baileysEngine = require('./baileys_engine');
   baileysEngine.startWhatsApp((order) => {
     console.log(`📱 [WHATSAPP NUVEM] Nova ordem recebida via WhatsApp: ${order.orderId} (${order.quantidade}MB para ${order.numero})`);
-    // Despacha para o canal em tempo real do celular
-    const targetPort = 8023;
+    
+    const orderDoc = {
+      ...order,
+      id: order.orderId,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    inMemoryOrders.set(order.orderId, orderDoc);
+
+    // Despacha para qualquer celular online disponível (fallback para 8023)
+    const targetPort = findAvailablePort() || 8023;
     if (inMemoryDevices[targetPort]) {
       inMemoryDevices[targetPort].pending_order = {
         id: order.orderId,
@@ -455,6 +491,8 @@ try {
         timestamp: Date.now()
       };
       console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue ao canal do Celular ${targetPort}`);
+    } else {
+      console.warn(`⚠️ [WHATSAPP NUVEM] Nenhum celular conectado para a ordem ${order.orderId}. Ordem mantida na fila.`);
     }
   });
 } catch(e) {
