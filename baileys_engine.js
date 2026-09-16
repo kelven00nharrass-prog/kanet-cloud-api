@@ -516,21 +516,81 @@ function isComprovativo(texto) {
     return temIndicador && temValor;
 }
 
+function getNumerosSistema() {
+    const list = new Set([
+        '856268811', // M-Pesa principal
+        '864882152', // e-Mola principal
+        '856116039', // Master / Suporte
+        '850401416', // Master
+        '841636072', // Master
+        '876692062'  // Sistema
+    ]);
+    try {
+        const pay = getPaymentDetails();
+        if (pay.mpesa_num) {
+            const c = String(pay.mpesa_num).replace(/\D/g, '').slice(-9);
+            if (c.length === 9) list.add(c);
+        }
+        if (pay.emola_num) {
+            const c = String(pay.emola_num).replace(/\D/g, '').slice(-9);
+            if (c.length === 9) list.add(c);
+        }
+        getMasterNumbers().forEach(n => {
+            const c = String(n).replace(/\D/g, '').slice(-9);
+            if (c.length === 9) list.add(c);
+        });
+    } catch (e) {}
+    return list;
+}
+
+function isNumeroSistema(num) {
+    if (!num) return false;
+    const clean = String(num).replace(/\D/g, '').slice(-9);
+    return getNumerosSistema().has(clean);
+}
+
 function extrairNumeroDestino(texto) {
     if (!texto) return null;
-    const lines = texto.trim().split(/\r?\n/);
-    // Prioridade 1: Da última linha para cima (onde os clientes costumam colocar o número)
-    for (let i = lines.length - 1; i >= 0; i--) {
-        const l = lines[i].trim();
-        const m = l.match(/\b(?:258)?(8[4-5]\d{7})\b/);
-        if (m) {
-            return m[1].replace(/^258/, '');
+    const clean = String(texto).trim();
+    const digitsOnly = clean.replace(/[^\d]/g, '');
+
+    // Se o texto for exatamente um número de telefone com ou sem 258
+    if (/^(?:258)?(8[4-5]\d{7})$/.test(digitsOnly)) {
+        const num = digitsOnly.slice(-9);
+        if (!isNumeroSistema(num)) return num;
+        return null;
+    }
+
+    // Buscar qualquer número Vodacom (84 ou 85) de 9 dígitos no texto
+    const regex = /(?:^|[^\d])(?:258)?(8[4-5]\s*\d{3}\s*\d{4}|8[4-5]\d{7})(?=[^\d]|$)/g;
+    let match;
+    let candidates = [];
+    while ((match = regex.exec(clean)) !== null) {
+        const rawNum = match[1].replace(/\s+/g, '');
+        if (/^8[4-5]\d{7}$/.test(rawNum) && !isNumeroSistema(rawNum)) {
+            candidates.push(rawNum);
         }
     }
-    // Prioridade 2: Qualquer ocorrência no texto todo (último número Vodacom encontrado)
-    const allMatches = texto.match(/\b(?:258)?(8[4-5]\d{7})\b/g);
-    if (allMatches && allMatches.length > 0) {
-        return allMatches[allMatches.length - 1].replace(/^258/, '');
+    return candidates.length > 0 ? candidates[candidates.length - 1] : null;
+}
+
+function extrairNumeroDestinoAbaixoDoComprovativo(texto) {
+    if (!texto) return null;
+    const lines = String(texto).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    // Se só tem 1 linha, o cliente enviou apenas o comprovativo sem número abaixo
+    if (lines.length < 2) return null;
+
+    // Verificar da última linha para cima até a segunda linha
+    for (let i = lines.length - 1; i >= 1; i--) {
+        const l = lines[i];
+        // Se a linha contém termos da operadora, faz parte do comprovativo
+        if (/(?:confirmado|transferiste|recebeste|recebeu|transferiu|saldo|taxa foi|liga 100|m-pesa|e-mola|vodacom|movitel|em caso de duvida)/i.test(l)) {
+            continue;
+        }
+        const num = extrairNumeroDestino(l);
+        if (num && !isNumeroSistema(num)) {
+            return num;
+        }
     }
     return null;
 }
@@ -734,6 +794,10 @@ async function startWhatsApp(orderCallback) {
                                 }
                                 continue;
                             } else {
+                                if (isNumeroSistema(text)) {
+                                    await reply(`⚠️ O número digitado (*${text.trim()}*) é o número de depósito do sistema.\n\nPor favor, envie o seu *próprio número Vodacom* (ex: *84XXXXXXX* ou *85XXXXXXX*) para onde deseja receber a recarga.`);
+                                    continue;
+                                }
                                 // Se for em grupo e o texto não parecer minimamente um número (ex: conversa normal), ignora
                                 const pareceNumero = /\d{4,}/.test(text);
                                 if (pareceNumero || !jid.endsWith('@g.us')) {
@@ -1018,7 +1082,7 @@ async function startWhatsApp(orderCallback) {
                         }
 
                         const { supportNum } = getSuporteDetails();
-                        const numDestinoInline = extrairNumeroDestino(text);
+                        const numDestinoInline = extrairNumeroDestinoAbaixoDoComprovativo(text);
                         if (numDestinoInline) {
                             const orderId = 'WA-' + txn_id + '-' + Date.now();
                             await reply(
