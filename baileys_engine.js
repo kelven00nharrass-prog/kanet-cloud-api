@@ -1018,6 +1018,7 @@ async function startWhatsApp(orderCallback) {
                         }
 
                         const { supportNum } = getSuporteDetails();
+                        const numDestinoInline = extrairNumeroDestino(text);
                         if (numDestinoInline) {
                             const orderId = 'WA-' + txn_id + '-' + Date.now();
                             await reply(
