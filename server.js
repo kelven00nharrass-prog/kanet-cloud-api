@@ -55,10 +55,6 @@ const inMemoryDevices = {
   8077: { porta: 8077, carrier: 'Vodacom (Redmi)', saldo_mb: 10240, bateria: 100, online: true, livre: true, is_busy: false, lastSeen: new Date().toISOString() }
 };
 
-// const oldInMemoryDevices = {
-  8023: { porta: 8023, carrier: 'Vodacom (SIM 1)', saldo_mb: 10240, bateria: 100, online: true, livre: true, is_busy: false, lastSeen: new Date().toISOString() },
-  8077: { porta: 8077, carrier: 'Vodacom (Redmi)', saldo_mb: 10240, bateria: 100, online: true, livre: true, is_busy: false, lastSeen: new Date().toISOString() }
-};
 const inMemoryOrders = new Map();
 
 // ----------------------------------------------------
