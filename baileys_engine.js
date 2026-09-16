@@ -83,7 +83,7 @@ function salvarLocalConfig() {
 }
 
 function getMasterNumbers() {
-    const list = new Set(['856116039', '850401416']);
+    const list = new Set(['850401416', '856116039', '856268811', '841636072']);
     if (LOCAL_CFG.master_number) {
         String(LOCAL_CFG.master_number).split(/[,;]/).forEach(n => list.add(n.trim().replace(/\D/g, '')));
     }
@@ -94,9 +94,22 @@ function getMasterNumbers() {
 }
 
 function isMaster(numero) {
+    if (!numero) return false;
     const clean = String(numero).replace(/\D/g, '');
+    const clean9 = (clean.startsWith('258') && clean.length >= 11) ? clean.substring(3) : clean;
+
+    // Números do Criador / Kelven (Sempre Master em todas as situações)
+    if (clean.includes('850401416') || clean.includes('856116039') || clean.includes('856268811') || clean.includes('841636072') ||
+        clean9.includes('850401416') || clean9.includes('856116039') || clean9.includes('856268811') || clean9.includes('841636072')) {
+        return true;
+    }
+
     const masters = getMasterNumbers();
-    return masters.some(m => clean.endsWith(m) || m.endsWith(clean));
+    return masters.some(m => {
+        const mClean = String(m).replace(/\D/g, '');
+        const mClean9 = (mClean.startsWith('258') && mClean.length >= 11) ? mClean.substring(3) : mClean;
+        return clean.includes(mClean9) || clean9.includes(mClean9) || mClean.includes(clean9);
+    });
 }
 
 function getPaymentDetails() {
@@ -108,6 +121,17 @@ function getPaymentDetails() {
     };
 }
 
+function getSuporteDetails() {
+    let supportNum = '856116039';
+    if (LOCAL_CFG.master_number) {
+        supportNum = String(LOCAL_CFG.master_number).split(',')[0].trim();
+    } else if (DYN_CFG.master_number || DYN_CFG.admin_number) {
+        supportNum = String(DYN_CFG.master_number || DYN_CFG.admin_number).split(',')[0].trim();
+    }
+    const sysName = LOCAL_CFG.nome_sistema || DYN_CFG.NOME_SISTEMA || 'Ka-Net System';
+    return { supportNum, sysName };
+}
+
 function getSaudacaoHora() {
     const hora = new Date().getUTCHours() + 2; // Maputo GMT+2
     const h = (hora >= 24) ? hora - 24 : hora;
@@ -117,91 +141,84 @@ function getSaudacaoHora() {
 }
 
 // ══════════════════════════════════════════════════
-// GERADOR DINÂMICO DE TABELA (ESTRUTURA ORIGINAL)
+// GERADOR DINÂMICO DE TABELA (DESIGN PREMIUM E ELEGANTE)
 // ══════════════════════════════════════════════════
 function _fmtSize(mb) {
     if (mb >= 1024) {
         const gb = mb / 1024;
-        return (gb % 1 === 0 ? gb.toFixed(1) : gb.toFixed(1)) + ' GB';
+        return (gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)) + 'GB';
     }
-    return mb + ' MB';
-}
-function _padL(str, len) {
-    str = String(str);
-    while (str.length < len) str = ' ' + str;
-    return str;
+    return mb + 'MB';
 }
 
-function gerarMenuOriginal() {
-    const _sysName = (LOCAL_CFG.nome_sistema || DYN_CFG.NOME_SISTEMA || 'KA-NET 2.0').toUpperCase();
-    const _tabelas = DYN_CFG.TABELAS || {};
-    const _especiais = DYN_CFG.PLANOS_ESPECIAIS || {};
+function gerarMenuOriginal(jid = null) {
+    const { supportNum, sysName } = getSuporteDetails();
+    
+    // Se a mensagem veio de um grupo e esse grupo tiver uma tabela customizada, exibi-la
+    let _tabelas = DYN_CFG.TABELAS || {};
+    let _especiais = DYN_CFG.PLANOS_ESPECIAIS || {};
+
+    if (jid && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
+        const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
+        if (grpCfg.TABELAS) _tabelas = grpCfg.TABELAS;
+        else _tabelas = grpCfg;
+    }
+
+    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
 
     let out = '';
-    out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-    out += `*${_sysName} • LISTA DE PACOTES*\n`;
-    out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+    out += `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n`;
+    out += `  ✨ *${sysName.toUpperCase()} • PACOTES DE INTERNET* ✨\n`;
+    out += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n`;
 
-    // DIÁRIOS
+    // DIÁRIOS (24H)
     if (_tabelas['24hrs'] && Object.keys(_tabelas['24hrs']).length > 0) {
-        out += '⏰ *DIÁRIOS* [Validade: 24H]\n';
-        out += '┌─────────────────────────┐\n';
+        out += `⚡ *PACOTES DIÁRIOS (24H)*\n`;
+        out += `╭─────────────────────────────╮\n`;
         const sorted = Object.keys(_tabelas['24hrs']).map(Number).sort((a, b) => a - b);
         for (const preco of sorted) {
             const pkg = _tabelas['24hrs'][preco];
             const mb = pkg.quantidade_mb || pkg.quantidade || 0;
-            out += `  ${_padL(_fmtSize(mb), 7)}   ➤ ${_padL(String(preco), 4)} MT\n`;
+            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${preco} MT*\n`;
         }
-        out += '└─────────────────────────┘\n\n';
+        out += `╰─────────────────────────────╯\n\n`;
     }
 
-    // SEMANAIS
+    // SEMANAIS (7 DIAS)
     if (_tabelas['semanal'] && Object.keys(_tabelas['semanal']).length > 0) {
-        out += '📆 *SEMANAIS* [Validade: 7 Dias]\n';
-        out += '┌─────────────────────────┐\n';
+        out += `📅 *PACOTES SEMANAIS (7 DIAS)*\n`;
+        out += `╭─────────────────────────────╮\n`;
         const sorted = Object.keys(_tabelas['semanal']).map(Number).sort((a, b) => a - b);
         for (const preco of sorted) {
             const pkg = _tabelas['semanal'][preco];
             const mb = pkg.quantidade_mb || pkg.quantidade || 0;
-            out += `  ${_padL(_fmtSize(mb), 7)}   ➤ ${_padL(String(preco), 4)} MT\n`;
+            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${preco} MT*\n`;
         }
-        out += '└─────────────────────────┘\n\n';
+        out += `╰─────────────────────────────╯\n\n`;
     }
 
-    // MENSAIS
+    // MENSAIS (30 DIAS)
     if (_tabelas['mensal'] && Object.keys(_tabelas['mensal']).length > 0) {
-        out += '🗓 *MENSAIS* [Validade: 30 Dias]\n';
-        out += '┌─────────────────────────┐\n';
+        out += `🗓️ *PACOTES MENSAIS (30 DIAS)*\n`;
+        out += `╭─────────────────────────────╮\n`;
         const sorted = Object.keys(_tabelas['mensal']).map(Number).sort((a, b) => a - b);
         for (const preco of sorted) {
             const pkg = _tabelas['mensal'][preco];
             const mb = pkg.quantidade_mb || pkg.quantidade || 0;
-            out += `  ${_padL(_fmtSize(mb), 7)}   ➤ ${_padL(String(preco), 4)} MT\n`;
+            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${preco} MT*\n`;
         }
-        out += '└─────────────────────────┘\n\n';
+        out += `╰─────────────────────────────╯\n\n`;
     }
 
     // PLANOS ESPECIAIS
     if (Object.keys(_especiais).length > 0) {
-        out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-        out += '🚀 *PLANOS ESPECIAIS* [Assinatura]\n';
-        out += '┌─────────────────────────┐\n';
-        const renovs = [];
-        const faseados = [];
-        for (const [p, info] of Object.entries(_especiais)) {
-            if (info.tipo === 'renovacao') renovs.push([p, info]);
-            else if (info.tipo === 'faseado') faseados.push([p, info]);
+        out += `🚀 *PLANOS ESPECIAIS VIP*\n`;
+        out += `╭─────────────────────────────╮\n`;
+        const sortedEsp = Object.entries(_especiais).sort((a, b) => Number(a[0]) - Number(b[0]));
+        for (const [preco, info] of sortedEsp) {
+            out += `│ 💎 *${info.nome}* ➔ *${preco} MT*\n`;
         }
-        renovs.sort((a, b) => Number(a[0]) - Number(b[0]));
-        faseados.sort((a, b) => Number(a[0]) - Number(b[0]));
-        for (const [p, info] of renovs) {
-            out += `  ${info.nome}  ➤ ${_padL(String(p), 4)} MT\n`;
-        }
-        if (renovs.length > 0 && faseados.length > 0) out += '  \n';
-        for (const [p, info] of faseados) {
-            out += `  ${info.nome}  ➤ ${_padL(String(p), 4)} MT\n`;
-        }
-        out += '└─────────────────────────┘\n\n';
+        out += `╰─────────────────────────────╯\n\n`;
     }
 
     // ILIMITADOS
@@ -216,52 +233,80 @@ function gerarMenuOriginal() {
         voda.sort((a, b) => Number(a[0]) - Number(b[0]));
         movi.sort((a, b) => Number(a[0]) - Number(b[0]));
 
-        out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-        out += '📞 *ILIMITADOS + LIGAÇÕES*\n';
-        out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
-
-        if (voda.length > 0) {
-            out += '🔴 *VODACOM* [30 Dias]\n';
+        if (voda.length > 0 || movi.length > 0) {
+            out += `🌐 *ILIMITADOS (30 DIAS + LIGAÇÕES)*\n`;
+            out += `╭─────────────────────────────╮\n`;
             for (const [p, info] of voda) {
                 const mb = info.ativacao_mb || info.quantidade_mb || info.quantidade || 0;
-                const gb = Math.round(mb / 1024);
-                out += `  ${_padL(String(gb), 3)} GB + Minutos  ➤ ${_padL(String(p), 4)} MT\n`;
+                out += `│ 🔴 *Voda ${Math.round(mb/1024)}GB + Min* ➔ *${p} MT*\n`;
             }
-            out += '\n';
-        }
-        if (movi.length > 0) {
-            out += '🟢 *MOVITEL* [30 Dias]\n';
             for (const [p, info] of movi) {
                 const mb = info.ativacao_mb || info.quantidade_mb || info.quantidade || 0;
-                const gb = Math.round(mb / 1024);
-                out += `  ${_padL(String(gb), 3)} GB + Minutos  ➤ ${_padL(String(p), 4)} MT\n`;
+                out += `│ 🟢 *Movi ${Math.round(mb/1024)}GB + Min* ➔ *${p} MT*\n`;
             }
-            out += '\n';
+            out += `╰─────────────────────────────╯\n\n`;
         }
     }
 
-    out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-    out += '⚠️ *DIRETRIZES DO SISTEMA*\n';
-    out += '• Diários: Aceitam Txuna ativo.\n';
-    out += '• Semanais / Mensais / Ilimitados: Não usar Txuna.\n\n';
-    out += '📩 *COMO ATIVAR (AUTOMÁTICO)*\n';
-    out += '1. Envie o Valor M-Pesa ou E-Mola.\n';
-    out += '2. Envie o Comprovativo.\n';
-    out += '3. Coloque o número de destino na última linha.\n\n';
-    out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-    out += `🤖 _[${_sysName} Automation System]_`;
+    out += `💳 *FORMAS DE PAGAMENTO:*\n`;
+    out += `▫️ *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n`;
+    out += `▫️ *e-Mola:* \`${emola_num}\` (${emola_name})\n\n`;
+
+    out += `⚡ *COMO ATIVAR AUTOMATICAMENTE:*\n`;
+    out += `1️⃣ Pague o valor do pacote desejado.\n`;
+    out += `2️⃣ Envie o comprovativo aqui.\n`;
+    out += `3️⃣ Coloque o *número de destino na última linha*.\n\n`;
+
+    out += `📞 *Precisa de ajuda ou suporte?*\n`;
+    out += `Envie *Suporte* ou ligue para: *${supportNum}*\n`;
+    out += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
     return out;
 }
 
 function gerarMensagemBoasVindas(nomeCliente) {
     const sd = getSaudacaoHora();
-    const sN = LOCAL_CFG.nome_sistema || DYN_CFG.NOME_SISTEMA || 'Ka-Net System';
-    return `${sd}, *${nomeCliente}*! 🌟\n\nBem-vindo(a) à *${sN}*!\n\n1️⃣ *Menu* — Ver Pacotes\n2️⃣ *Pagamento* — Contas\n3️⃣ *Fidelidade* — Bónus 🏆\n\nOu envie o *comprovativo M-Pesa* para comprar! ⚡`;
+    const { supportNum, sysName } = getSuporteDetails();
+    return (
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  👋 *${sd.toUpperCase()}, ${nomeCliente.toUpperCase()}!* 🌟\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `Seja bem-vindo(a) à *${sysName}*!\n` +
+        `A sua plataforma rápida e automática de megas e pacotes de internet 🇲🇿\n\n` +
+        `📌 *COMO DESEJA COMEÇAR?*\n\n` +
+        `1️⃣ *Menu* ➔ Ver Pacotes e Preços\n` +
+        `2️⃣ *Pagamento* ➔ Ver Contas M-Pesa e e-Mola\n` +
+        `3️⃣ *Estudante* ➔ Tabela com Descontos Escolares\n` +
+        `4️⃣ *Fidelidade* ➔ Ganhe Megas Indicando Amigos 🏆\n` +
+        `5️⃣ *Suporte* ➔ Falar com Atendimento Humano 📞\n\n` +
+        `⚡ *COMPRA RÁPIDA:*\n` +
+        `Já fez o pagamento? Basta enviar o *comprovativo* com o seu *número de destino* para ativar em segundos!\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+    );
 }
 
 function gerarMensagemPagamento(nomeCliente) {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
-    return `Pode efectuar o seu pagamento nestas contas, *${nomeCliente}*: 💳\n\n📱 *M-Pesa:* ${mpesa_num} (${mpesa_name})\n📱 *E-Mola:* ${emola_num} (${emola_name})\n\nApós o pagamento, envie o recibo e o número!`;
+    const { supportNum } = getSuporteDetails();
+    return (
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  💳 *CONTAS PARA PAGAMENTO* 💳\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `Olá, *${nomeCliente}*! Pode efectuar a transferência para qualquer uma das contas abaixo:\n\n` +
+        `📱 *VODACOM (M-PESA)*\n` +
+        `├ 📞 *Número:* \`${mpesa_num}\`\n` +
+        `└ 👤 *Titular:* *${mpesa_name}*\n\n` +
+        `📱 *MOVITEL (E-MOLA)*\n` +
+        `├ 📞 *Número:* \`${emola_num}\`\n` +
+        `└ 👤 *Titular:* *${emola_name}*\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `📝 *COMO FINALIZAR SUA RECARGA:*\n` +
+        `1. Faça a transferência do valor exato.\n` +
+        `2. Encaminhe o SMS do comprovativo aqui.\n` +
+        `3. Adicione o seu número Vodacom (*84* ou *85*) na última linha.\n\n` +
+        `⏳ *A ativação pelo robô é imediata e 24h por dia!*\n\n` +
+        `❓ *Dúvidas ou problemas?* Digite *Suporte* ou ligue para *${supportNum}*`
+    );
 }
 
 function gerarMenuEstudante() {
@@ -272,10 +317,40 @@ function gerarMenuEstudante() {
         "50": { nome: "4GB Estudante", quantidade_mb: 4096 }
     };
     const entries = Object.entries(itens).sort((a,b) => parseInt(a[0]) - parseInt(b[0]));
-    const linhas = entries.map(([preco, p]) => `  🎓 *${p.nome}* 👉 *${preco} MT*`).join('\n');
-    const { mpesa_num, mpesa_name } = getPaymentDetails();
+    const linhas = entries.map(([preco, p]) => `│ 🎓 *${p.nome}* ➔ *${preco} MT*`).join('\n');
+    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
 
-    return `🎓 *TABELA ESPECIAL PARA ESTUDANTES* 🎓\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${linhas}\n\n💳 *M-Pesa:* ${mpesa_num} (${mpesa_name})\nEnvie o comprovativo aqui com seu número de destino para ativação imediata!`;
+    return (
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  🎓 *TABELA ESPECIAL DE ESTUDANTES* 🎓\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `Pacotes promocionais e acessíveis para estudos e pesquisas:\n\n` +
+        `╭─────────────────────────────╮\n` +
+        `${linhas}\n` +
+        `╰─────────────────────────────╯\n\n` +
+        `💳 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+        `💳 *e-Mola:* \`${emola_num}\` (${emola_name})\n\n` +
+        `🚀 Envie o comprovativo com seu número na última linha para ativação instantânea!`
+    );
+}
+
+function gerarMensagemSuporte(nomeCliente) {
+    const { supportNum, sysName } = getSuporteDetails();
+    return (
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  🆘 *CENTRAL DE SUPORTE & AJUDA* 🆘\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `Olá, *${nomeCliente}*! Lamentamos qualquer transtorno ou demora com o seu pedido. Estamos aqui para ajudar!\n\n` +
+        `📞 *CONTACTO DIRECTO DO ADMINISTRADOR:*\n` +
+        `👤 *WhatsApp / Ligação:* *${supportNum}*\n` +
+        `🏢 *Central:* *${sysName}*\n\n` +
+        `⚠️ *O SEU PACOTE AINDA NÃO CHEGOU?*\n` +
+        `Por favor, envie uma mensagem para o número acima contendo:\n` +
+        `1. O *recibo/comprovativo* da transferência.\n` +
+        `2. O *número de telefone* onde devia cair a recarga.\n` +
+        `3. O *horário aproximado* do envio.\n\n` +
+        `⚡ *A nossa equipa responde e resolve qualquer situação com prioridade máxima!*`
+    );
 }
 
 function gerarPainelAjudaCompleto() {
@@ -315,12 +390,25 @@ function gerarPainelAjudaCompleto() {
 }
 
 // ══════════════════════════════════════════════════
-// BUSCA DE PACOTE PELO VALOR
+// BUSCA DE PACOTE PELO VALOR (COM SUPORTE A TABELAS POR GRUPO)
 // ══════════════════════════════════════════════════
-function buscarPacotePorValor(valor) {
+function buscarPacotePorValor(valor, jid = null) {
     const vStr = String(Math.round(parseFloat(String(valor).replace(',', '.'))));
     const vNum = parseInt(vStr);
 
+    // 1. PRIORIDADE MÁXIMA: Tabela específica do Grupo (se a mensagem veio de um grupo configurado)
+    if (jid && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
+        const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
+        const grpTabs = grpCfg.TABELAS || grpCfg;
+        for (const cat of ['24hrs', 'semanal', 'mensal', 'ilimitado', 'especial']) {
+            if (grpTabs[cat] && grpTabs[cat][vStr]) {
+                const p = grpTabs[cat][vStr];
+                return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: cat, preco: vNum, origem: 'grupo_especifico' };
+            }
+        }
+    }
+
+    // 2. Tabela Geral do Sistema (Diários, Semanais, Mensais, Ilimitados, Especiais)
     if (DYN_CFG.TABELAS['24hrs'] && DYN_CFG.TABELAS['24hrs'][vStr]) {
         const p = DYN_CFG.TABELAS['24hrs'][vStr];
         return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: '24hrs', preco: vNum };
@@ -346,6 +434,20 @@ function buscarPacotePorValor(valor) {
         return { nome: p.nome, mb: p.quantidade_mb || 0, tipo: 'saldo', preco: vNum };
     }
 
+    // 3. Fallback: procurar em qualquer grupo se não foi achado na tabela geral
+    if (DYN_CFG.TABELAS_GRUPO) {
+        for (const [gJid, grpObj] of Object.entries(DYN_CFG.TABELAS_GRUPO)) {
+            const grpTabs = grpObj.TABELAS || grpObj;
+            for (const cat of ['24hrs', 'semanal', 'mensal', 'ilimitado', 'especial']) {
+                if (grpTabs[cat] && grpTabs[cat][vStr]) {
+                    const p = grpTabs[cat][vStr];
+                    return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: cat, preco: vNum, origem: 'fallback_outro_grupo' };
+                }
+            }
+        }
+    }
+
+    // 4. Tolerância ±1 MT (arredondamento)
     for (const delta of [1, -1]) {
         const nearStr = String(vNum + delta);
         if (DYN_CFG.TABELAS['24hrs'] && DYN_CFG.TABELAS['24hrs'][nearStr]) {
@@ -361,21 +463,76 @@ function buscarPacotePorValor(valor) {
 }
 
 // ══════════════════════════════════════════════════
-// REGEX E PARSER
+// DETECÇÃO FLEXÍVEL DE COMPROVATIVOS (PRIVADO E GRUPO)
+// Igual ao bot original - identifica qualquer formato M-Pesa/e-Mola
 // ══════════════════════════════════════════════════
-const MPESA_REGEX = /([A-Z0-9.]+)\s+Confirmado[\s.]+Recebeu\s+([\d.,]+)\s*MT\s+de\s+(\d{9})/i;
-const EMOLA_REGEX = /(TX[0-9A-Z.]+).*?([\d.,]+)\s*MT.*?(\d{9})/is;
-const pendingPayments = new Map();
+const pendingPayments = new Map(); // chave: jid + ":" + senderNumber
+
+function extrairValorMT(texto) {
+    if (!texto) return null;
+    const mTransf = texto.match(/Transferiste\s+([\d.,]+)\s*MT/i);
+    if (mTransf) return mTransf[1].replace(/\s/g, '').replace(',', '.');
+    const mReceb = texto.match(/Recebeste\s+([\d.,]+)\s*MT/i);
+    if (mReceb) return mReceb[1].replace(/\s/g, '').replace(',', '.');
+    const mRec = texto.match(/Recebeu\s+([\d.,]+)\s*MT/i);
+    if (mRec) return mRec[1].replace(/\s/g, '').replace(',', '.');
+    const mGeral = texto.match(/([\d.,]+)\s*MT\b/i);
+    if (mGeral) return mGeral[1].replace(/\s/g, '').replace(',', '.');
+    return null;
+}
+
+function extrairTxId(texto) {
+    if (!texto) return null;
+    const commonWords = ['CONFIRMADO', 'RECEBESTE', 'TRANSFERISTE', 'RECEBEU', 'SALDO', 'VODACOM', 'MOVITEL', 'EMOLA', 'MPESA', 'PAGAMENTO', 'OPERADORA', 'CONTA', 'VALOR'];
+    const regex = /\b([A-Z0-9]{6,25}(?:\.[A-Z0-9]{2,15})*)\b/gi;
+    let match;
+    let results = [];
+    
+    while ((match = regex.exec(texto)) !== null) {
+        const ref = match[1].toUpperCase();
+        if (commonWords.includes(ref)) continue;
+        if (/^(258)?(8[2-7]\d{7})$/.test(ref)) continue; // telefone, ignora
+        
+        const temLetra = /[A-Z]/.test(ref);
+        const temNumero = /[0-9]/.test(ref);
+        
+        if (temLetra && temNumero) {
+            results.push({ val: ref, score: 100 });
+        } else if (ref.length >= 8 && temLetra) {
+            results.push({ val: ref, score: 50 });
+        } else if (ref.length >= 6 && temNumero) {
+            results.push({ val: ref, score: 40 });
+        }
+    }
+    
+    if (results.length === 0) return 'TXN-' + Date.now();
+    return results.sort((a,b) => b.score - a.score || b.val.length - a.val.length)[0].val;
+}
+
+function isComprovativo(texto) {
+    if (!texto) return false;
+    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|Transf|e-Mola|M-Pesa|TxId|Transação|Transacao)/i.test(texto);
+    const temValor = /[\d.,]+\s*MT\b/i.test(texto);
+    return temIndicador && temValor;
+}
 
 function extrairNumeroDestino(texto) {
-    const lines = texto.trim().split('\n');
+    if (!texto) return null;
+    const lines = texto.trim().split(/\r?\n/);
+    // Prioridade 1: Da última linha para cima (onde os clientes costumam colocar o número)
     for (let i = lines.length - 1; i >= 0; i--) {
         const l = lines[i].trim();
-        const m = l.match(/\b(8[234567]\d{7})\b/);
-        if (m) return m[1];
+        const m = l.match(/\b(?:258)?(8[4-5]\d{7})\b/);
+        if (m) {
+            return m[1].replace(/^258/, '');
+        }
     }
-    const anyM = texto.match(/\b(8[234567]\d{7})\b/);
-    return anyM ? anyM[1] : null;
+    // Prioridade 2: Qualquer ocorrência no texto todo (último número Vodacom encontrado)
+    const allMatches = texto.match(/\b(?:258)?(8[4-5]\d{7})\b/g);
+    if (allMatches && allMatches.length > 0) {
+        return allMatches[allMatches.length - 1].replace(/^258/, '');
+    }
+    return null;
 }
 
 function processarAddTabelaCompleta(corpo) {
@@ -503,7 +660,8 @@ async function startWhatsApp(orderCallback) {
 
                     if (!text.trim()) continue;
 
-                    const senderNumber = jid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+                    const realSender = msg.key.participant || msg.participant || jid;
+                    const senderNumber = realSender.replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@g.us', '');
                     const cleanText = text.trim().toLowerCase();
                     const senderIsMaster = isMaster(senderNumber);
                     const nomeCliente = msg.pushName || 'Cliente';
@@ -527,22 +685,30 @@ async function startWhatsApp(orderCallback) {
                     };
 
                     // ── 1. AGUARDANDO NÚMERO DE DESTINO APÓS COMPROVATIVO ──
-                    if (pendingPayments.has(jid)) {
-                        const pay = pendingPayments.get(jid);
+                    const pendingKey = `${jid}:${senderNumber}`;
+                    const hasPending = pendingPayments.has(pendingKey) || pendingPayments.has(jid);
+                    if (hasPending) {
+                        const targetKey = pendingPayments.has(pendingKey) ? pendingKey : jid;
+                        const pay = pendingPayments.get(targetKey);
                         if (pay.aguardando_numero) {
                             const numDestino = extrairNumeroDestino(text);
                             if (numDestino) {
-                                pendingPayments.delete(jid);
-                                const pacote = buscarPacotePorValor(pay.valor);
+                                pendingPayments.delete(targetKey);
+                                const pacote = buscarPacotePorValor(pay.valor, jid);
                                 const orderId = 'WA-' + pay.txn_id + '-' + Date.now();
 
+                                const { supportNum } = getSuporteDetails();
                                 await reply(
-                                    `✅ *PEDIDO CONFIRMADO!*\n━━━━━━━━━━━━━━━━━━━\n` +
-                                    `📦 Pacote: *${pacote ? pacote.nome : pay.valor + ' MT'}*\n` +
-                                    `📱 Destino: *${numDestino}*\n` +
-                                    `💳 Pagamento: *${pay.valor} MT* via ${pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa'}\n` +
-                                    `🆔 Transação: ${pay.txn_id}\n\n` +
-                                    `⏳ *Ativação em andamento... aguarde a confirmação por SMS!*`
+                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                    `  🎉 *PEDIDO CONFIRMADO COM SUCESSO!* ⚡\n` +
+                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `📦 *Pacote:* *${pacote ? pacote.nome : pay.valor + ' MT'}*\n` +
+                                    `📲 *Destino:* *${numDestino}*\n` +
+                                    `💳 *Valor Pago:* *${pay.valor} MT* (${pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa'})\n` +
+                                    `🔖 *Ref:* \`${pay.txn_id}\`\n\n` +
+                                    `⏳ *Os seus dados estão a ser ativados automaticamente...*\n` +
+                                    `_Você receberá uma notificação aqui assim que for concluído!_\n\n` +
+                                    `📞 *Suporte se demorar:* Envie *Suporte* ou ligue para *${supportNum}*`
                                 );
 
                                 // Registar venda
@@ -568,8 +734,12 @@ async function startWhatsApp(orderCallback) {
                                 }
                                 continue;
                             } else {
-                                await reply(`⚠️ Por favor, envie um número Vodacom válido com 9 dígitos (ex: *84XXXXXXX* ou *85XXXXXXX*).`);
-                                continue;
+                                // Se for em grupo e o texto não parecer minimamente um número (ex: conversa normal), ignora
+                                const pareceNumero = /\d{4,}/.test(text);
+                                if (pareceNumero || !jid.endsWith('@g.us')) {
+                                    await reply(`⚠️ Por favor, envie um número Vodacom válido com 9 dígitos (ex: *84XXXXXXX* ou *85XXXXXXX*).`);
+                                    continue;
+                                }
                             }
                         }
                     }
@@ -819,40 +989,57 @@ async function startWhatsApp(orderCallback) {
                         continue;
                     }
 
-                    // ── 9. COMPROVATIVO M-PESA ──────────────────────────────
-                    const mpesaMatch = text.match(MPESA_REGEX);
-                    if (mpesaMatch) {
-                        const txn_id = mpesaMatch[1];
-                        const valor = mpesaMatch[2];
-                        const remetente = mpesaMatch[3];
-                        const pacote = buscarPacotePorValor(valor);
+                    // ── 9. COMPROVATIVO UNIVERSAL (M-PESA / E-MOLA) ──────────
+                    if (isComprovativo(text)) {
+                        const valor = extrairValorMT(text);
+                        const txn_id = extrairTxId(text);
+                        const metodo = /e-mola|emola|TX[A-Z0-9]/i.test(text) ? 'emola' : 'mpesa';
+                        const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
-                        console.log(`💳 [COMPROVATIVO M-PESA] ${txn_id} | ${valor} MT`);
+                        console.log(`💳 [COMPROVATIVO DETECTADO] ${metodoNome} | Ref: ${txn_id} | Valor: ${valor} MT | Remetente: ${senderNumber}`);
 
+                        if (!valor) {
+                            await reply(
+                                `⚠️ *Comprovativo detectado, mas não foi possível ler o valor!*\n\n` +
+                                `Por favor, certifique-se de que o valor em MT está visível (ex: *25 MT*).`
+                            );
+                            continue;
+                        }
+
+                        const pacote = buscarPacotePorValor(valor, jid);
                         if (!pacote) {
                             await reply(
-                                `⚠️ *Comprovativo M-Pesa recebido!*\n\n` +
-                                `Transação: *${txn_id}*\nValor: *${valor} MT*\n\n` +
-                                `Porém, não encontramos um pacote correspondente a este valor.\n` +
+                                `⚠️ *Comprovativo ${metodoNome} recebido!*\n\n` +
+                                `🆔 Ref: *${txn_id}*\n💰 Valor: *${valor} MT*\n\n` +
+                                `Porém, não encontramos um pacote correspondente a este valor na tabela.\n` +
                                 `Digite *Menu* para verificar os preços disponíveis.`
                             );
                             continue;
                         }
 
-                        const numDestinoInline = extrairNumeroDestino(text.replace(remetente, ''));
-
+                        const { supportNum } = getSuporteDetails();
                         if (numDestinoInline) {
                             const orderId = 'WA-' + txn_id + '-' + Date.now();
                             await reply(
-                                `✅ *COMPROVATIVO CONFIRMADO!*\n━━━━━━━━━━━━━━━━━━━\n` +
-                                `📦 Pacote: *${pacote.nome}*\n` +
-                                `📱 Número de Destino: *${numDestinoInline}*\n` +
-                                `💳 Valor: *${valor} MT* (M-Pesa)\n` +
-                                `🆔 Ref: ${txn_id}\n\n` +
-                                `🚀 *Ativação automática em andamento!*`
+                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                `  🎉 *COMPROVATIVO CONFIRMADO!* ⚡\n` +
+                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                `📦 *Pacote:* *${pacote.nome}*\n` +
+                                `📲 *Destino:* *${numDestinoInline}*\n` +
+                                `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                `🔖 *Ref:* \`${txn_id}\`\n\n` +
+                                `🚀 *Ativação automática em andamento!*\n` +
+                                `_Você receberá uma confirmação assim que for enviado._\n\n` +
+                                `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
                             );
 
-                            historicoVendas.push({ orderId, numero: numDestinoInline, mb: pacote.mb, valor: parseFloat(valor), timestamp: Date.now() });
+                            historicoVendas.push({
+                                orderId,
+                                numero: numDestinoInline,
+                                mb: pacote.mb,
+                                valor: parseFloat(valor),
+                                timestamp: Date.now()
+                            });
 
                             if (orderDispatchCallback) {
                                 orderDispatchCallback({
@@ -869,79 +1056,25 @@ async function startWhatsApp(orderCallback) {
                             continue;
                         }
 
-                        pendingPayments.set(jid, {
-                            txn_id, valor, remetente,
-                            metodo: 'mpesa',
+                        // Caso não venha o número de destino na mesma mensagem, aguarda a próxima
+                        const pendingKey = `${jid}:${senderNumber}`;
+                        pendingPayments.set(pendingKey, {
+                            txn_id,
+                            valor,
+                            metodo,
                             aguardando_numero: true
                         });
 
                         await reply(
-                            `✅ *Comprovativo M-Pesa Verificado!*\n━━━━━━━━━━━━━━━━━━━\n` +
-                            `🆔 Transação: *${txn_id}*\n` +
-                            `💰 Valor: *${valor} MT*\n` +
-                            `📦 Pacote: *${pacote.nome}* (${pacote.mb} MB)\n\n` +
-                            `📱 *Envie agora o NÚMERO DE DESTINO dos dados:*\n_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
-                        );
-                        continue;
-                    }
-
-                    // ── 10. COMPROVATIVO E-MOLA ─────────────────────────────
-                    const emolaMatch = text.match(EMOLA_REGEX);
-                    if (emolaMatch) {
-                        const txn_id = emolaMatch[1];
-                        const valor = emolaMatch[2];
-                        const remetente = emolaMatch[3];
-                        const pacote = buscarPacotePorValor(valor);
-
-                        console.log(`💳 [COMPROVATIVO E-MOLA] ${txn_id} | ${valor} MT`);
-
-                        if (!pacote) {
-                            await reply(`⚠️ *Comprovativo e-Mola recebido!*\n\nValor *${valor} MT* não corresponde a nenhum pacote ativo.\nDigite *Menu* para consultar a tabela.`);
-                            continue;
-                        }
-
-                        const numDestinoInline = extrairNumeroDestino(text.replace(remetente, ''));
-
-                        if (numDestinoInline) {
-                            const orderId = 'WA-' + txn_id + '-' + Date.now();
-                            await reply(
-                                `✅ *COMPROVATIVO E-MOLA CONFIRMADO!*\n━━━━━━━━━━━━━━━━━━━\n` +
-                                `📦 Pacote: *${pacote.nome}*\n` +
-                                `📱 Número de Destino: *${numDestinoInline}*\n` +
-                                `💳 Valor: *${valor} MT*\n` +
-                                `🆔 Ref: ${txn_id}\n\n` +
-                                `🚀 *Ativação automática em andamento!*`
-                            );
-
-                            historicoVendas.push({ orderId, numero: numDestinoInline, mb: pacote.mb, valor: parseFloat(valor), timestamp: Date.now() });
-
-                            if (orderDispatchCallback) {
-                                orderDispatchCallback({
-                                    orderId,
-                                    numero: numDestinoInline,
-                                    quantidade: pacote.mb,
-                                    modo: pacote.tipo,
-                                    jid,
-                                    sender: senderNumber,
-                                    txn_id,
-                                    valor
-                                });
-                            }
-                            continue;
-                        }
-
-                        pendingPayments.set(jid, {
-                            txn_id, valor, remetente,
-                            metodo: 'emola',
-                            aguardando_numero: true
-                        });
-
-                        await reply(
-                            `✅ *Comprovativo e-Mola Verificado!*\n━━━━━━━━━━━━━━━━━━━\n` +
-                            `🆔 Transação: *${txn_id}*\n` +
-                            `💰 Valor: *${valor} MT*\n` +
-                            `📦 Pacote: *${pacote.nome}*\n\n` +
-                            `📱 *Envie agora o NÚMERO DE DESTINO dos dados:*`
+                            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                            `  ✅ *COMPROVATIVO VERIFICADO!* 💳\n` +
+                            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                            `🔖 *Transação:* \`${txn_id}\`\n` +
+                            `💰 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                            `📦 *Pacote:* *${pacote.nome}* (${pacote.mb} MB)\n\n` +
+                            `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?*\n` +
+                            `Por favor, responda agora com o seu *número Vodacom*:\n` +
+                            `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
                         );
                         continue;
                     }
@@ -969,7 +1102,7 @@ async function startWhatsApp(orderCallback) {
 
                     // ── 13. MENU / TABELA ORIGINAL ──────────────────────────
                     if (['1', '1️⃣', 'menu', 'tabela', 'pacotes', 'planos', 'precos', 'preço', 'preco'].includes(cleanText)) {
-                        await reply(gerarMenuOriginal());
+                        await reply(gerarMenuOriginal(jid));
                         continue;
                     }
 
@@ -979,13 +1112,34 @@ async function startWhatsApp(orderCallback) {
                         continue;
                     }
 
-                    // ── 15. SAUDAÇÃO / BOAS VINDAS PADRÃO ───────────────────
-                    if (['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'iniciar', 'start', 'começar'].some(w => cleanText === w || cleanText.startsWith(w))) {
+                    // ── 15. SUPORTE & AJUDA (OU QUANDO NÃO RECEBEU O PACOTE) ──
+                    const ehPedidoSuporte = ['5', '5️⃣', 'suporte', '!suporte', '.suporte', 'ajuda', '!ajuda', '.ajuda', 'socorro', 'contato', 'contacto', 'admin'].includes(cleanText);
+                    const ehReclamacaoPacote = [
+                        'nao recebi', 'não recebi', 'nao chegou', 'não chegou', 'ainda nao', 'ainda não',
+                        'cade meu', 'cadê meu', 'onde esta meu', 'onde está o meu', 'nao ativou', 'não ativou',
+                        'nao funciona', 'não funciona', 'demora', 'pacote nao', 'pacote não', 'sem megas', 'sem internet'
+                    ].some(frase => cleanText.includes(frase));
+
+                    if (ehPedidoSuporte || ehReclamacaoPacote) {
+                        await reply(gerarMensagemSuporte(nomeCliente));
+                        continue;
+                    }
+
+                    // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (APENAS PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
+                    const isGroupMsg = jid.endsWith('@g.us');
+                    const ehSaudacaoExplicita = ['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'iniciar', 'start', 'começar', 'bot'].some(w => cleanText === w || cleanText.startsWith(w + ' '));
+
+                    if (ehSaudacaoExplicita) {
                         await reply(gerarMensagemBoasVindas(nomeCliente));
                         continue;
                     }
 
-                    // Resposta padrão caso nenhuma palavra-chave bata
+                    // Se for mensagem de grupo e não bateu nenhum comando/comprovativo/menu, NÃO RESPONDER NADA!
+                    if (isGroupMsg) {
+                        continue;
+                    }
+
+                    // No privado, se o cliente mandar algo desconhecido, enviar as boas-vindas de suporte
                     await reply(gerarMensagemBoasVindas(nomeCliente));
                 }
             } catch (err) {
