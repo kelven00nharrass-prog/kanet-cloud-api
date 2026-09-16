@@ -189,19 +189,27 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       order.notified = true;
       if (req.body.last_result.success) {
         baileysEngine.sendTextMessage(order.jid,
-          `🎉 *TRANSFERÊNCIA REALIZADA COM SUCESSO!*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `📦 Pacote: *${order.quantidade} MB*\n` +
-          `📱 Destino: *${order.numero}*\n` +
-          `⚡ O seu pacote já foi ativado com sucesso!\n\n` +
-          `_Obrigado por comprar no Ka-Net System!_ 🚀`
+          `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `📲 *Destino:* *${order.numero}*\n` +
+          `📦 *Volume:* *${order.quantidade < 1024 ? order.quantidade + ' MB' : (order.quantidade / 1024) + ' GB'}*\n` +
+          `🔖 *Ref:* \`${resId}\`\n\n` +
+          `⚡ *A sua recarga já está pronta para uso!*\n` +
+          `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
+          `📞 *Suporte / Dúvidas:* Envie *Suporte*`
         );
         console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${order.jid} notificado de SUCESSO no pedido ${resId}`);
       } else {
         baileysEngine.sendTextMessage(order.jid,
-          `⚠️ *AVISO DE ENVIO*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `📱 Destino: *${order.numero}*\n` +
-          `Houve uma instabilidade na operadora ao tentar ativar os megas.\n` +
-          `O sistema tentará reenviar automaticamente!`
+          `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  ⚠️ *AVISO DE ENVIO DE DADOS* ⚠️\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `📲 *Destino:* *${order.numero}*\n` +
+          `📦 *Volume:* *${order.quantidade} MB*\n\n` +
+          `Detectamos uma instabilidade temporária na rede da operadora ao processar a recarga.\n` +
+          `⚡ O sistema tentará reenviar automaticamente em instantes!\n\n` +
+          `📞 Caso precise de assistência imediata, envie *Suporte*!`
         );
         console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${order.jid} notificado de FALHA no pedido ${resId}`);
       }
@@ -507,6 +515,9 @@ app.get('/api/whatsapp/status', (req, res) => {
   return res.json({ status: 'offline', hasQr: false });
 });
 
+// Alias /wa/qr → /qr (para acesso direto via browser)
+app.get('/wa/qr', (req, res) => res.redirect('/qr'));
+
 app.get('/qr', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -653,10 +664,34 @@ const inMemoryPayments = new Map();
 
 function getMbFromValor(valor) {
   const v = parseFloat(String(valor).replace(',', '.'));
-  // Match exato primeiro
+  if (isNaN(v) || v <= 0) return null;
+
+  // 1. Tentar ler do bot_config.js
+  try {
+    const cfg = require('./bot_config.js');
+    const tabelas = cfg.TABELAS || {};
+    const vStr = String(Math.round(v));
+
+    if (tabelas['24hrs'] && tabelas['24hrs'][vStr]) {
+      return tabelas['24hrs'][vStr].quantidade_mb || tabelas['24hrs'][vStr].quantidade;
+    }
+    if (tabelas['semanal'] && tabelas['semanal'][vStr]) {
+      return tabelas['semanal'][vStr].quantidade_mb || tabelas['semanal'][vStr].quantidade;
+    }
+    if (tabelas['mensal'] && tabelas['mensal'][vStr]) {
+      return tabelas['mensal'][vStr].quantidade_mb || tabelas['mensal'][vStr].quantidade;
+    }
+    if (tabelas['ilimitado'] && tabelas['ilimitado'][vStr]) {
+      return tabelas['ilimitado'][vStr].quantidade_mb || tabelas['ilimitado'][vStr].quantidade;
+    }
+    if (cfg.PLANOS_ESPECIAIS && cfg.PLANOS_ESPECIAIS[vStr]) {
+      return cfg.PLANOS_ESPECIAIS[vStr].quantidade_mb || cfg.PLANOS_ESPECIAIS[vStr].quantidade || 1024;
+    }
+  } catch (e) {}
+
+  // 2. Fallback pela PRICE_TABLE
   const exact = PRICE_TABLE.find(p => p.valor === v);
   if (exact) return exact.mb;
-  // Senão, o maior plano com valor <= pago
   const match = [...PRICE_TABLE].reverse().find(p => p.valor <= v);
   return match ? match.mb : null;
 }
