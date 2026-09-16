@@ -817,5 +817,26 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 [KA-NET CLOUD API] Servidor Online na porta ${PORT}`);
   console.log(`📱 [WHATSAPP QR CODE] Aceda a http://localhost:${PORT}/qr para conectar`);
   console.log('==================================================================');
+
+  // ── KEEP-ALIVE: evita que o Render adormeça no plano gratuito ──
+  // O Render dorme após 15 min de inatividade → auto-ping a cada 14 min
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  const PING_INTERVAL_MS = 14 * 60 * 1000; // 14 minutos
+
+  setInterval(() => {
+    try {
+      const urlStr = `${SELF_URL}/health`;
+      const client = urlStr.startsWith('https') ? require('https') : require('http');
+      client.get(urlStr, (res) => {
+        console.log(`💓 [KEEP-ALIVE] Auto-ping → ${urlStr} | HTTP ${res.statusCode}`);
+      }).on('error', (e) => {
+        console.warn(`⚠️ [KEEP-ALIVE] Falha no ping: ${e.message}`);
+      });
+    } catch (e) {
+      console.warn(`⚠️ [KEEP-ALIVE] Erro: ${e.message}`);
+    }
+  }, PING_INTERVAL_MS);
+
+  console.log(`💓 [KEEP-ALIVE] Auto-ping activo a cada 14 min → ${SELF_URL}/health`);
 });
 
