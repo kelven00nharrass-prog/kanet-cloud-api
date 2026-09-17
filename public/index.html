@@ -183,6 +183,10 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
   </div>
 
   <div class="header-right">
+    <!-- BOTÃO MANUTENÇÃO GLOBAL -->
+    <button id="btnManutencao" class="btn btn-sm" onclick="toggleMaintenance()" style="font-weight:700;min-width:180px;background:#e53935;border:none;color:#fff;cursor:pointer;" title="Fecha vendas em grupos E no privado para todos os clientes">
+      <i class="fa-solid fa-triangle-exclamation"></i> <span id="manutencaoLabel">🟢 Sistema Online</span>
+    </button>
     <div class="wa-status loading" id="waStatus"><div class="dot"></div><span id="waStatusText">A verificar...</span></div>
     <span class="refresh-info" id="lastRefresh">A actualizar...</span>
   </div>
@@ -436,11 +440,51 @@ async function loadWAStatus() {
       el.className = 'wa-status offline';
       tx.textContent = '❌ WhatsApp Desconectado';
     }
+    // Atualizar botão de manutenção com o estado real
+    updateManutencaoBtn(!!d.modoManutencao);
   } catch(e) {
     document.getElementById('waStatus').className = 'wa-status offline';
     document.getElementById('waStatusText').textContent = '❌ Desconectado';
   }
 }
+
+function updateManutencaoBtn(ativo) {
+  const btn = document.getElementById('btnManutencao');
+  const lbl = document.getElementById('manutencaoLabel');
+  if (!btn || !lbl) return;
+  if (ativo) {
+    btn.style.background = '#b71c1c';
+    lbl.textContent = '🛑 Em Manutenção';
+    btn.title = 'Clique para voltar ao estado ONLINE (liberar vendas)';
+  } else {
+    btn.style.background = '#2e7d32';
+    lbl.textContent = '🟢 Sistema Online';
+    btn.title = 'Clique para ativar MANUTENÇÃO (bloquear vendas em grupos e privado)';
+  }
+  btn._modoAtivo = ativo;
+}
+
+async function toggleMaintenance() {
+  const btn = document.getElementById('btnManutencao');
+  const novoEstado = !btn._modoAtivo;
+  try {
+    btn.disabled = true;
+    document.getElementById('manutencaoLabel').textContent = '⏳ A processar...';
+    const d = await fetchAPI('/api/maintenance', { method: 'POST', body: JSON.stringify({ ativo: novoEstado }) });
+    if (d.success) {
+      updateManutencaoBtn(d.modoManutencao);
+      showToast(d.mensagem || (d.modoManutencao ? '🛑 Manutenção ativada' : '🟢 Sistema online'));
+    } else {
+      showToast('❌ Erro: ' + (d.error || 'Falha na operação'));
+    }
+  } catch(e) {
+    showToast('❌ Erro: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+
 
 async function loadDevices() {
   try {
@@ -859,27 +903,42 @@ function exportSalesCSV() {
 // -------------------------------------------------------------------
 // 4. GRUPOS WHATSAPP & TABELAS DE PREÇOS
 // -------------------------------------------------------------------
+let _gruposFechados = [];
+
 async function loadGroups() {
   try {
     const d = await fetchAPI('/api/groups');
     const grid = document.getElementById('groupsGrid');
     const groups = d.groups || [];
+    _gruposFechados = d.gruposFechados || [];
+
     if (groups.length === 0) {
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted)">Nenhum grupo registado</div>';
       return;
     }
     grid.innerHTML = groups.map(g => {
       const membros = g.membros || '?';
+      const fechado = _gruposFechados.includes(g.jid);
+      const btnStyle = fechado
+        ? 'background:#e53935;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.78rem;font-weight:700'
+        : 'background:#2e7d32;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.78rem;font-weight:700';
+      const btnLabel = fechado ? '🔒 Grupo Fechado' : '🔓 Grupo Aberto';
+      const statusBadge = fechado
+        ? '<span class="badge" style="background:#e53935;color:#fff">🔒 Fechado</span>'
+        : '<span class="badge online">🟢 Ativo</span>';
       return `
-        <div class="group-card">
+        <div class="group-card" id="gcard-${g.jid.replace(/[^a-z0-9]/gi,'_')}">
           <div class="group-name"><i class="fa-brands fa-whatsapp"></i> ${g.nome || 'Grupo WhatsApp'}</div>
           <div class="group-jid">${g.jid}</div>
           <div class="group-meta">
             <span style="color:var(--cyan);font-weight:600">${g.tipo || 'Grupo Autorizado'}</span>
-            <span class="badge online">🟢 Autorizado</span>
+            ${statusBadge}
           </div>
           <div style="font-size:.75rem;color:var(--muted);margin-top:4px">
             👥 Membros: <b>${membros}</b> • Tabela: <span style="color:var(--green);font-weight:600">${g.tabela_ativa || 'Padrão'}</span>
+          </div>
+          <div style="margin-top:10px">
+            <button style="${btnStyle}" onclick="toggleGrupo('${g.jid}', this)">${btnLabel}</button>
           </div>
         </div>`;
     }).join('');
@@ -887,6 +946,20 @@ async function loadGroups() {
     document.getElementById('groupsGrid').innerHTML = '<div style="grid-column:1/-1;color:var(--red);padding:20px">Erro ao carregar grupos: ' + e.message + '</div>';
   }
 }
+
+async function toggleGrupo(jid, btn) {
+  try {
+    btn.disabled = true;
+    btn.textContent = '⏳ A processar...';
+    const d = await fetchAPI('/api/groups/' + encodeURIComponent(jid) + '/fechar', { method: 'POST' });
+    showToast(d.mensagem || (d.fechado ? '🔒 Grupo fechado' : '🔓 Grupo aberto'));
+    await loadGroups(); // Recarregar para refletir estado
+  } catch(e) {
+    showToast('❌ Erro: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Erro — Tentar novamente'; }
+  }
+}
+
 
 async function loadPriceTables() {
   try {
