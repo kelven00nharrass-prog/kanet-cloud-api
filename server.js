@@ -1141,82 +1141,33 @@ app.post('/api/sms/payment', (req, res) => {
       });
     }
 
-    // Encontrar celular disponível para disparar o USSD
-    const targetPort = findAvailablePort();
-    const orderId = 'SMS-' + txn_id + '-' + Date.now();
+    // Notificar Grupo de Notificações e aguardar que o cliente envie o comprovativo no WhatsApp com o número de destino
+    const volStr = mbAEnviar < 1024 ? `${mbAEnviar} MB` : `${mbAEnviar / 1024} GB`;
+    const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
 
-    const order = {
-      id: orderId,
-      orderId,
-      numero: String(remetente).replace(/\D/g, ''),
-      quantidade: mbAEnviar,
-      modo: 'diario',
-      fonte: 'sms_payment',
-      metodo: metodo || 'mpesa',
-      txn_id,
-      valor_pago: valor,
-      timestamp: Date.now()
-    };
+    console.log(`💰 [SMS PAYMENT RECEBIDO] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT (${volStr}) de ${remetente}. Aguardando cliente enviar número de destino.`);
 
-    if (targetPort && inMemoryDevices[targetPort]) {
-      inMemoryDevices[targetPort].pending_order = order;
-      console.log(`💳 [SMS PAYMENT] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT → ${mbAEnviar} MB para ${remetente} via Celular ${targetPort}`);
-
-      if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
-        const volStr = mbAEnviar < 1024 ? `${mbAEnviar} MB` : `${mbAEnviar / 1024} GB`;
-        baileysEngine.enviarNotificacaoGrupo(
-          `💰 *PAGAMENTO SMS CONFIRMADO* ⚡\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `📋 *Txn:* \`${txn_id}\`\n` +
-          `📲 *Remetente:* *${remetente}*\n` +
-          `💳 *Valor:* *${valor} MT* (${metodo || 'M-Pesa'})\n` +
-          `📦 *Pacote:* *${volStr}*\n` +
-          `🔌 *Porta:* Celular ${targetPort}\n` +
-          `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `🚀 *Status:* Disparo USSD iniciado automaticamente`
-        );
-      }
-
-      return res.json({
-        success: true,
-        orderId,
-        mb_a_enviar: mbAEnviar,
-        porta_usada: targetPort,
-        mensagem: `Pagamento ${valor} MT confirmado. Enviando ${mbAEnviar} MB para ${remetente}`
-      });
-    } else {
-      // Sem celular disponível — guardar como pedido normal para processamento posterior
-      inMemoryOrders.set(orderId, {
-        ...order,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      console.warn(`⚠️ [SMS PAYMENT] Nenhum celular disponível. Pedido ${orderId} em fila de espera.`);
-
-      if (baileysEngine && typeof baileysEngine.enviarErroGrupo === 'function') {
-        baileysEngine.enviarErroGrupo(
-          `⚠️ *NENHUM CELULAR DISPONÍVEL* ⚠️\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `📋 *Txn:* \`${txn_id}\`\n` +
-          `📲 *Remetente:* *${remetente}*\n` +
-          `💳 *Valor:* *${valor} MT*\n` +
-          `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `⚠️ *Status:* Pedido colocado em fila de espera`
-        );
-      }
-
-      return res.json({
-        success: true,
-        orderId,
-        mb_a_enviar: mbAEnviar,
-        porta_usada: null,
-        em_fila: true,
-        mensagem: `Pagamento confirmado mas nenhum celular disponível agora. Em fila.`
-      });
+    if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+      baileysEngine.enviarNotificacaoGrupo(
+        `💰 *PAGAMENTO RECEBIDO (${(metodo || 'M-Pesa').toUpperCase()})* 💰\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `📋 *Ref / Txn:* \`${txn_id}\`\n` +
+        `💳 *Valor Pago:* *${valor} MT*\n` +
+        `📦 *Pacote:* *${volStr}*\n` +
+        `👤 *Remetente:* *${remetente}*\n` +
+        `🕒 *Hora:* ${horaAgora}\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `⏳ *Status:* Registado. A aguardar que o cliente envie o comprovativo com o número de destino no WhatsApp.`
+      );
     }
+
+    return res.json({
+      success: true,
+      txn_id,
+      mb_correspondente: mbAEnviar,
+      status: 'aguardando_cliente',
+      mensagem: `Pagamento ${txn_id} de ${valor} MT (${volStr}) registado. A aguardar número de destino pelo cliente.`
+    });
   } catch (err) {
     console.error('❌ [SMS PAYMENT ERRO]:', err);
     return res.status(500).json({ success: false, mensagem: err.message });
