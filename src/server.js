@@ -169,9 +169,21 @@ function isDeviceApto(dev) {
   const isOnline = (now - lastSeen) < 180000;
   if (!isOnline) return false;
   if (dev.pending_order) return false;
+  if (dev.livre === false) return false;
+
+  const port = Number(dev.porta);
+
+  // ── PORTAS ESPECIAIS (8077 - Semanais/Mensais/Ilimitados e 8777 - Saldo/Crédito) ──
+  // Não utilizam o limite de 10 transferências de dados por chip nem dependem de pacotes diários
+  if (port === 8077 || port === 8777) {
+    if (dev.sem_saldo === true) return false;
+    if (dev.saldo_mt !== undefined && dev.saldo_mt <= 0) return false;
+    return true;
+  }
+
+  // ── PORTAS DIÁRIAS (8023, 8024) ──
   if (dev.sem_saldo === true) return false;
   if (dev.limite_atingido === true) return false;
-  if (dev.livre === false) return false;
   if (dev.transfers_available !== undefined && dev.transfers_available <= 0) return false;
   const s1 = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : 10240;
   const s2 = dev.sim2_saldo_mb !== undefined ? dev.sim2_saldo_mb : 10240;
