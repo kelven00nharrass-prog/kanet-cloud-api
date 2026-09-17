@@ -104,6 +104,8 @@ async function handleTransfer(req, res) {
       modo,
       targetPort: porta ? Number(porta) : null,
       remetente,
+      jid: req.body.jid || null,
+      input_val: req.body.input_val || '',
       status: 'pending',
       createdAt: timestamp,
       updatedAt: timestamp
@@ -187,8 +189,26 @@ function isDeviceApto(dev) {
   if (dev.transfers_available !== undefined && dev.transfers_available <= 0) return false;
   const s1 = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : 10240;
   const s2 = dev.sim2_saldo_mb !== undefined ? dev.sim2_saldo_mb : 10240;
-  if (s1 < 100 && s2 < 100) return false;
+  if (s1 < 50 && s2 < 50) return false;
   return true;
+}
+
+const MIN_TRANSFER_MB = 50;
+
+function getDeviceAvailableMb(dev) {
+  if (!dev) return 0;
+  const port = Number(dev.porta);
+  if (port === 8077 || port === 8777) return 102400; // Planos ilimitados/semanais/mensais/saldo
+
+  const slot = dev.active_sim_slot || 1;
+  const slotSaldo = slot === 2 ? dev.sim2_saldo_mb : dev.sim1_saldo_mb;
+  if (slotSaldo !== undefined && Number(slotSaldo) > 0) {
+    return Number(slotSaldo);
+  }
+  if (dev.saldo_mb !== undefined && Number(dev.saldo_mb) > 0) {
+    return Number(dev.saldo_mb);
+  }
+  return 10240;
 }
 
 app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
@@ -221,6 +241,8 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   // - SÓ atribui pedidos se o celular estiver 100% APTO (com saldo e sem ter atingido limite diário)
   if (isDeviceApto(dev)) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
+        if (order.status !== 'pending') continue;
+
         let isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
         if (!isCompatible && port === 8077 && (order.modo === 'diario' || !order.modo)) {
           // Se nenhuma porta diária (8023, 8024) estiver apta/online, a porta 8077 assume para não deixar o cliente à espera!
@@ -231,6 +253,115 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
         }
         if (isCompatible) {
+          const orderMb = Number(order.quantidade) || 0;
+          const availableMb = getDeviceAvailableMb(dev);
+          const isDataMode = (order.modo || 'diario').toLowerCase().trim() !== 'saldo' && (order.modo || 'diario').toLowerCase().trim() !== 'credito';
+
+          // ── DIVISÃO INTELIGENTE DE PACOTE (SPLIT-TRANSFER ENTRE PORTAS) ──
+          // Se a porta tem menos que o pedido, mas >= 50MB, e o restante também é >= 50MB,
+          // e há outra porta compatível online para assumir a segunda parte:
+          const canSplit = !order.isSplit &&
+                           isDataMode &&
+                           orderMb > availableMb &&
+                           availableMb >= MIN_TRANSFER_MB &&
+                           (orderMb - availableMb) >= MIN_TRANSFER_MB;
+
+          if (canSplit) {
+            const otherCandidateOnline = Object.values(inMemoryDevices).some(d => {
+              if (Number(d.porta) === port) return false;
+              const now = Date.now();
+              const lastSeen = new Date(d.lastSeen || 0).getTime();
+              const isOnline = (now - lastSeen) < 180000;
+              return isOnline && !d.sem_saldo && !d.limite_atingido && isPortCompatibleWithModo(Number(d.porta), order.modo);
+            });
+
+            if (otherCandidateOnline) {
+              const totalMb = orderMb;
+              const parte1 = Math.floor(availableMb);
+              const parte2 = totalMb - parte1;
+              const parentId = order.id || order.orderId || orderId;
+              const part2Id = `${parentId}-P2`;
+
+              // Configurar Parte 1 nesta ordem
+              order.isSplit = true;
+              order.splitPart = 1;
+              order.splitTotalParts = 2;
+              order.splitTotalMb = totalMb;
+              order.splitOtherPartMb = parte2;
+              order.part2Id = part2Id;
+              order.quantidade = parte1;
+              order.status = 'assigned';
+              order.targetPort = port;
+              order.assignedToPort = port;
+              order.processingAt = new Date().toISOString();
+
+              // Criar Parte 2 aguardando a conclusão da Parte 1
+              const orderPart2 = {
+                id: part2Id,
+                orderId: part2Id,
+                parentOrderId: parentId,
+                numero: order.numero,
+                quantidade: parte2,
+                modo: order.modo || 'diario',
+                input_val: order.input_val || '',
+                jid: order.jid || null,
+                remetente: order.remetente || 'Bot',
+                targetPort: null,
+                isSplit: true,
+                splitPart: 2,
+                splitTotalParts: 2,
+                splitTotalMb: totalMb,
+                splitOtherPartMb: parte1,
+                status: 'waiting_part1',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                notified: false,
+                groupNotified: false
+              };
+              inMemoryOrders.set(part2Id, orderPart2);
+              saveOrdersToCache();
+
+              dev.pending_order = {
+                id: order.id || order.orderId || orderId,
+                orderId: order.id || order.orderId || orderId,
+                numero: order.numero,
+                quantidade: parte1,
+                modo: order.modo || 'diario',
+                input_val: order.input_val || '',
+                jid: order.jid || null,
+                timestamp: Date.now()
+              };
+
+              console.log(`🔀 [ENVIO INTELIGENTE DIVIDIDO] Pedido ${parentId} de ${totalMb}MB dividido em 2 partes:`);
+              console.log(`   👉 Parte 1: ${parte1}MB atribuído à Porta ${port}`);
+              console.log(`   👉 Parte 2: ${parte2}MB aguardando conclusão da Parte 1 para despacho por outra porta.`);
+
+              // Notificar cliente via WhatsApp sobre a divisão
+              let clientJid = order.jid;
+              if (!clientJid && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
+                clientJid = baileysEngine.getJidForOrder(parentId);
+              }
+              if (clientJid && baileysEngine && !order.splitAnnounced) {
+                order.splitAnnounced = true;
+                baileysEngine.sendTextMessage(clientJid,
+                  `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                  `  📦 *ENVIO DE PACOTE EM 2 PARTES* 📶\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                  `Olá! Para agilizar a entrega do seu pacote de *${totalMb} MB*, ele será transferido em *2 partes* usando as nossas linhas disponíveis:\n\n` +
+                  `1️⃣ *1ª Parte:* *${parte1} MB* (A enviar agora...)\n` +
+                  `2️⃣ *2ª Parte:* *${parte2} MB* (A enviar logo a seguir por outra linha)\n\n` +
+                  `📲 *Destino:* *${order.numero}*\n` +
+                  `✨ *Total:* *${totalMb} MB*\n\n` +
+                  `⚡ _Você receberá a confirmação de cada parte assim que for concluída!_`
+                );
+                console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} informado sobre divisão em 2 partes do pedido ${parentId}`);
+              }
+
+              break;
+            }
+          }
+
+          // Atribuição padrão (sem divisão)
           order.status = 'assigned';
           order.targetPort = port;
           order.assignedToPort = port;
@@ -417,18 +548,47 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     if (clientJid && (!order || !order.notified) && baileysEngine) {
       if (order) order.notified = true;
       if (success) {
-        baileysEngine.sendTextMessage(clientJid,
-          `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-          `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
-          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-          `📲 *Destino:* *${targetNum}*\n` +
-          `📦 *Volume:* *${volStr}*\n` +
-          `🔖 *Ref:* \`${resId}\`\n\n` +
-          `⚡ *A sua recarga já está pronta para uso!*\n` +
-          `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
-          `📞 *Suporte / Dúvidas:* Envie *Suporte*`
-        );
-        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${resId}`);
+        if (order && order.isSplit && order.splitPart === 1) {
+          baileysEngine.sendTextMessage(clientJid,
+            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+            `  ✅ *1ª PARTE ENTREGUE COM SUCESSO!* (1/2) 📶\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
+            `📦 *Transferido agora:* *${volStr}* (1ª parte)\n` +
+            `🔖 *Ref:* \`${resId}\`\n\n` +
+            `⚡ *A 1ª parte já está na sua conta!*\n` +
+            `⏳ *A enviar a 2ª parte de ${order.splitOtherPartMb} MB por outra linha disponível...*\n\n` +
+            `📞 *Suporte / Dúvidas:* Envie *Suporte*`
+          );
+          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO na Parte 1 do pedido ${resId}`);
+        } else if (order && order.isSplit && order.splitPart === 2) {
+          baileysEngine.sendTextMessage(clientJid,
+            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+            `  🎉 *PACOTE 100% CONCLUÍDO!* (2/2) 📶\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
+            `📦 *2ª Parte entregue:* *${volStr}*\n` +
+            `✨ *Total recebido:* *${order.splitTotalMb} MB*\n` +
+            `🔖 *Ref:* \`${resId}\`\n\n` +
+            `⚡ *Todas as partes do seu pacote foram entregues com sucesso e já estão prontas para uso!*\n` +
+            `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
+            `📞 *Suporte / Dúvidas:* Envie *Suporte*`
+          );
+          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de CONCLUSÃO TOTAL (Parte 2) do pedido ${resId}`);
+        } else {
+          baileysEngine.sendTextMessage(clientJid,
+            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+            `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
+            `📦 *Volume:* *${volStr}*\n` +
+            `🔖 *Ref:* \`${resId}\`\n\n` +
+            `⚡ *A sua recarga já está pronta para uso!*\n` +
+            `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
+            `📞 *Suporte / Dúvidas:* Envie *Suporte*`
+          );
+          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${resId}`);
+        }
       } else {
         baileysEngine.sendTextMessage(clientJid,
           `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
@@ -451,6 +611,16 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.completedAt = new Date().toISOString();
         order.lastError = null;
         console.log(`🎉 [PEDIDO SUCESSO] Pedido ${resId} concluído com sucesso pelo Celular Porta ${port}!`);
+
+        // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
+        if (order.isSplit && order.splitPart === 1 && order.part2Id) {
+          const part2Order = inMemoryOrders.get(order.part2Id);
+          if (part2Order && part2Order.status === 'waiting_part1') {
+            part2Order.status = 'pending';
+            part2Order.updatedAt = new Date().toISOString();
+            console.log(`🚀 [PARTE 2 LIBERADA] Parte 2 (${part2Order.id} - ${part2Order.quantidade}MB) liberada para envio imediato por outra porta!`);
+          }
+        }
       } else {
         const errorMsg = (req.body.last_result && req.body.last_result.error) || 'Falha USSD / Timeout';
         order.lastError = errorMsg;
@@ -470,6 +640,17 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           order.status = 'failed';
           order.completedAt = new Date().toISOString();
           console.warn(`🛑 [PEDIDO ESGOTADO] Pedido ${resId} atingiu o limite de 5 tentativas. Marcado como falhado.`);
+
+          // Se a Parte 1 falhou definitivamente, cancelar a Parte 2
+          if (order.isSplit && order.splitPart === 1 && order.part2Id) {
+            const part2Order = inMemoryOrders.get(order.part2Id);
+            if (part2Order && part2Order.status === 'waiting_part1') {
+              part2Order.status = 'cancelled';
+              part2Order.completedAt = new Date().toISOString();
+              part2Order.lastError = 'Cancelado devido a falha permanente na Parte 1';
+              console.warn(`🛑 [PARTE 2 CANCELADA] Parte 2 ${part2Order.id} cancelada devido à falha permanente da Parte 1.`);
+            }
+          }
         }
       }
       saveOrdersToCache();
@@ -480,17 +661,43 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       if (order) order.groupNotified = true;
       if (success) {
         if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
-          baileysEngine.enviarNotificacaoGrupo(
-            `✅ *PACOTE ATIVADO COM SUCESSO!* 🎉\n` +
-            `━━━━━━━━━━━━━━━━━━\n` +
-            `📋 *Ref:* \`${resId}\`\n` +
-            `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Volume:* *${volStr}*\n` +
-            `🔌 *Porta:* Celular ${port}\n` +
-            `🕒 *Hora:* ${horaAgora}\n` +
-            `━━━━━━━━━━━━━━━━━━\n` +
-            `✨ *Status:* Concluído e confirmado pela operadora`
-          );
+          if (order && order.isSplit && order.splitPart === 1) {
+            baileysEngine.enviarNotificacaoGrupo(
+              `✅ *1ª PARTE ENTREGUE (1/2)* 📦\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📋 *Ref:* \`${resId}\`\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
+              `📦 *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
+              `🔌 *Porta:* Celular ${port}\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `⏳ *Status:* 1ª parte entregue! 2ª parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
+            );
+          } else if (order && order.isSplit && order.splitPart === 2) {
+            baileysEngine.enviarNotificacaoGrupo(
+              `🎉 *PACOTE 100% CONCLUÍDO (2/2)* 📦\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📋 *Ref:* \`${resId}\`\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
+              `📦 *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
+              `🔌 *Porta:* Celular ${port}\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `✨ *Status:* Pedido dividido totalmente finalizado com sucesso!`
+            );
+          } else {
+            baileysEngine.enviarNotificacaoGrupo(
+              `✅ *PACOTE ATIVADO COM SUCESSO!* 🎉\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📋 *Ref:* \`${resId}\`\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
+              `📦 *Volume:* *${volStr}*\n` +
+              `🔌 *Porta:* Celular ${port}\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `✨ *Status:* Concluído e confirmado pela operadora`
+            );
+          }
         }
       } else {
         if (typeof baileysEngine.enviarErroGrupo === 'function') {
@@ -500,7 +707,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             `━━━━━━━━━━━━━━━━━━\n` +
             `📋 *Referência:* \`${resId}\`\n` +
             `📞 *Número:* *${targetNum}*\n` +
-            `📊 *Tipo:* ${(order && order.modo) || 'diario'}\n` +
+            `📊 *Tipo:* ${(order && order.modo) || 'diario'}${order && order.isSplit ? ` (Parte ${order.splitPart}/2)` : ''}\n` +
             `🔌 *Porta:* Celular ${port}\n` +
             `📦 *Volume:* ${volStr}\n` +
             `🕒 *Data/Hora:* ${horaAgora}\n` +
