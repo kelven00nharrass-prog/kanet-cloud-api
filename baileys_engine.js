@@ -138,6 +138,12 @@ function salvarBotConfig() {
     } catch (e) {
         console.error('❌ Erro ao salvar bot_config.js:', e.message);
     }
+    // ✅ Persistência definitiva no Firestore (sobrevive a reinícios e deploys no Render)
+    if (firestoreDbInstance) {
+        firestoreDbInstance.collection('bot_settings').doc('pricing_tables').set(DYN_CFG, { merge: true })
+            .then(() => console.log('☁️ [FIRESTORE] Tabelas salvas na nuvem com sucesso!'))
+            .catch(e => console.warn('⚠️ [FIRESTORE] Erro ao salvar tabelas no Firestore:', e.message));
+    }
 }
 
 function salvarLocalConfig() {
@@ -145,6 +151,12 @@ function salvarLocalConfig() {
         fs.writeFileSync(LOCAL_CONFIG_PATH, JSON.stringify(LOCAL_CFG, null, 2), 'utf8');
     } catch (e) {
         console.error('❌ Erro ao salvar local_config.json:', e.message);
+    }
+    // ✅ Persistência definitiva no Firestore
+    if (firestoreDbInstance) {
+        firestoreDbInstance.collection('bot_settings').doc('local_config').set(LOCAL_CFG, { merge: true })
+            .then(() => console.log('☁️ [FIRESTORE] Config local salva na nuvem com sucesso!'))
+            .catch(e => console.warn('⚠️ [FIRESTORE] Erro ao salvar local_config no Firestore:', e.message));
     }
 }
 
@@ -823,6 +835,42 @@ async function restoreAuthFromFirestore(db) {
     }
 }
 
+async function restoreConfigsFromFirestore(db) {
+    if (!db) return;
+    try {
+        const doc = await db.collection('bot_settings').doc('pricing_tables').get();
+        if (doc.exists) {
+            const data = doc.data();
+            if (data && data.TABELAS) {
+                DYN_CFG = { ...DYN_CFG, ...data };
+                if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
+                console.log('📥 [FIRESTORE CONFIG] Tabelas de preços restauradas com sucesso do Firestore!');
+                try {
+                    const content = '// GERADO PELO SISTEMA KA-NET CLOUD (CACHE FIRESTORE)\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
+                    fs.writeFileSync(BOT_CONFIG_PATH, content, 'utf8');
+                } catch (_) {}
+            }
+        } else {
+            console.log('📤 [FIRESTORE CONFIG] Fazendo upload inicial das tabelas padrão para o Firestore...');
+            await db.collection('bot_settings').doc('pricing_tables').set(DYN_CFG, { merge: true });
+        }
+
+        const locDoc = await db.collection('bot_settings').doc('local_config').get();
+        if (locDoc.exists) {
+            const locData = locDoc.data();
+            if (locData) {
+                LOCAL_CFG = { ...LOCAL_CFG, ...locData };
+                console.log('📥 [FIRESTORE CONFIG] Configurações locais restauradas do Firestore!');
+                try {
+                    fs.writeFileSync(LOCAL_CONFIG_PATH, JSON.stringify(LOCAL_CFG, null, 2), 'utf8');
+                } catch (_) {}
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️ [FIRESTORE CONFIG] Falha ao sincronizar configurações do Firestore:', err.message);
+    }
+}
+
 // ══════════════════════════════════════════════════
 // MOTOR PRINCIPAL BAILEYS
 // ══════════════════════════════════════════════════
@@ -833,6 +881,7 @@ async function startWhatsApp(orderCallback, db = null) {
     try {
         if (firestoreDbInstance) {
             await restoreAuthFromFirestore(firestoreDbInstance);
+            await restoreConfigsFromFirestore(firestoreDbInstance);
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -885,7 +934,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     reconnectAttempts++;
                     const delay = Math.min(5000 * Math.pow(2, reconnectAttempts - 1), 60000);
                     console.log(`⏳ [BAILEYS] Aguardando ${delay / 1000}s antes de reconectar (tentativa #${reconnectAttempts})...`);
-                    setTimeout(() => startWhatsApp(orderDispatchCallback), delay);
+                    setTimeout(() => startWhatsApp(orderDispatchCallback, firestoreDbInstance), delay);
                 } else {
                     console.warn('🚪 [BAILEYS] Sessão encerrada (loggedOut). Precisa escanear novo QR Code.');
                     reconnectAttempts = 0;
