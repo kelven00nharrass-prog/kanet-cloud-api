@@ -1,0 +1,437 @@
+﻿<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ka-Net Cloud Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root{--bg:#060913;--card:rgba(16,23,41,0.7);--border:rgba(255,255,255,0.07);--cyan:#00f0ff;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--purple:#a855f7;--text:#f3f4f6;--muted:#9ca3af}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Outfit',sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh}
+body::before{content:'';position:fixed;width:500px;height:500px;border-radius:50%;background:var(--cyan);filter:blur(180px);opacity:.06;top:-100px;left:-100px;pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%;background:var(--purple);filter:blur(180px);opacity:.06;bottom:-100px;right:-100px;pointer-events:none;z-index:0}
+.header{background:rgba(10,14,26,.9);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px)}
+.logo{display:flex;align-items:center;gap:12px;font-size:1.2rem;font-weight:700;color:var(--cyan)}
+.logo i{font-size:1.4rem}
+.wa-status{display:flex;align-items:center;gap:8px;font-size:.85rem;padding:6px 14px;border-radius:20px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);transition:all .3s}
+.wa-status.offline{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red)}
+.wa-status.loading{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:var(--yellow)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.container{max-width:1400px;margin:0 auto;padding:24px;position:relative;z-index:1}
+.section-title{font-size:.7rem;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.grid-devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px;margin-bottom:28px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;transition:border-color .3s}
+.card:hover{border-color:rgba(0,240,255,.2)}
+.stat-card{display:flex;flex-direction:column;gap:6px}
+.stat-label{font-size:.75rem;color:var(--muted);font-weight:500}
+.stat-val{font-size:1.8rem;font-weight:800;color:var(--text)}
+.stat-val.cyan{color:var(--cyan)}
+.stat-val.green{color:var(--green)}
+.stat-val.red{color:var(--red)}
+.stat-val.yellow{color:var(--yellow)}
+.stat-sub{font-size:.75rem;color:var(--muted)}
+.device-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.device-name{font-size:.95rem;font-weight:700}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:20px}
+.badge.online{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.badge.offline{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.badge.apto{background:rgba(0,240,255,.1);color:var(--cyan);border:1px solid rgba(0,240,255,.25)}
+.badge.inapto{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.device-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.device-stat{background:rgba(0,0,0,.2);border-radius:10px;padding:10px}
+.device-stat-label{font-size:.68rem;color:var(--muted);margin-bottom:2px}
+.device-stat-val{font-size:.95rem;font-weight:700}
+.progress-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:4px}
+.progress-fill{height:100%;border-radius:3px;transition:width .5s}
+.progress-fill.green{background:var(--green)}
+.progress-fill.yellow{background:var(--yellow)}
+.progress-fill.red{background:var(--red)}
+.pending-order{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:10px;margin-top:10px;font-size:.8rem}
+.pending-label{color:var(--purple);font-weight:700;font-size:.7rem;margin-bottom:4px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;border:none;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:rgba(0,240,255,.15);color:var(--cyan);border:1px solid rgba(0,240,255,.3)}
+.btn-primary:hover{background:rgba(0,240,255,.25)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.btn-danger:hover{background:rgba(239,68,68,.25)}
+.btn-success{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.btn-success:hover{background:rgba(16,185,129,.25)}
+.btn-warn{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.btn-warn:hover{background:rgba(245,158,11,.25)}
+.btn-sm{padding:6px 12px;font-size:.76rem}
+.actions-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
+.order-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:rgba(0,0,0,.2);margin-bottom:8px;font-size:.82rem}
+.order-ref{font-family:monospace;color:var(--cyan);font-size:.75rem}
+.order-status{padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:600}
+.status-pending{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.status-assigned{background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
+.status-completed{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.status-failed{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.qr-area{text-align:center;padding:30px}
+.qr-area img{max-width:220px;border-radius:12px;border:3px solid var(--cyan)}
+.qr-area p{color:var(--muted);margin-top:12px;font-size:.85rem}
+.refresh-info{font-size:.72rem;color:var(--muted);margin-left:auto}
+.log-box{background:rgba(0,0,0,.4);border-radius:10px;padding:14px;font-family:monospace;font-size:.75rem;max-height:200px;overflow-y:auto;color:#64748b}
+.log-box span.ok{color:var(--green)}
+.log-box span.err{color:var(--red)}
+.log-box span.info{color:var(--cyan)}
+#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast-msg{padding:12px 18px;border-radius:10px;font-size:.83rem;font-weight:600;animation:slideIn .3s ease;border:1px solid}
+.toast-msg.ok{background:rgba(16,185,129,.15);color:var(--green);border-color:rgba(16,185,129,.3)}
+.toast-msg.err{background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3)}
+@keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+.send-form{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-label{font-size:.72rem;color:var(--muted);font-weight:600}
+.form-input,.form-select{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:inherit;font-size:.85rem;outline:none;transition:border-color .2s}
+.form-input:focus,.form-select:focus{border-color:rgba(0,240,255,.4)}
+.form-select option{background:#0a0e1a}
+.no-devices{text-align:center;padding:40px;color:var(--muted);font-size:.9rem}
+@media(max-width:900px){.grid-4{grid-template-columns:repeat(2,1fr)}.send-form{grid-template-columns:1fr 1fr}.grid-2{grid-template-columns:1fr}}
+@media(max-width:600px){.grid-4{grid-template-columns:1fr}.actions-row{flex-direction:column}.send-form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo"><i class="fa-solid fa-tower-broadcast"></i> Ka-Net Cloud Panel</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="wa-status loading" id="waStatus"><div class="dot"></div><span id="waStatusText">A verificar...</span></div>
+    <span class="refresh-info" id="lastRefresh">A actualizar...</span>
+  </div>
+</div>
+
+<div class="container">
+  <!-- METRICS ROW -->
+  <div class="section-title"><i class="fa-solid fa-chart-simple"></i> Métricas em Tempo Real</div>
+  <div class="grid-4" id="metricsRow">
+    <div class="card stat-card"><div class="stat-label">Celulares Online</div><div class="stat-val cyan" id="mDevices">--</div><div class="stat-sub">de todos registados</div></div>
+    <div class="card stat-card"><div class="stat-label">Pedidos Pendentes</div><div class="stat-val yellow" id="mPending">--</div><div class="stat-sub">na fila da nuvem</div></div>
+    <div class="card stat-card"><div class="stat-label">Transferências Hoje</div><div class="stat-val green" id="mToday">--</div><div class="stat-sub">concluídas com sucesso</div></div>
+    <div class="card stat-card"><div class="stat-label">Total Envios Disponíveis</div><div class="stat-val" id="mAvail">--</div><div class="stat-sub">somando todos os celulares</div></div>
+  </div>
+
+  <!-- ACTION BUTTONS -->
+  <div class="section-title"><i class="fa-solid fa-bolt"></i> Ações Rápidas</div>
+  <div class="actions-row">
+    <button class="btn btn-primary" onclick="reloadDevices()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+    <button class="btn btn-warn" onclick="showQr()"><i class="fa-brands fa-whatsapp"></i> Ver QR Code WhatsApp</button>
+    <button class="btn btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Limpar Fila</button>
+    <button class="btn btn-success" onclick="document.getElementById('sendPanel').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-paper-plane"></i> Envio Manual</button>
+    <button class="btn btn-primary" onclick="restartBot()"><i class="fa-solid fa-power-off"></i> Reiniciar Bot</button>
+  </div>
+
+  <!-- DEVICES -->
+  <div class="section-title"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Gateway</div>
+  <div class="grid-devices" id="devicesGrid"><div class="no-devices"><i class="fa-solid fa-spinner fa-spin"></i> A carregar dispositivos...</div></div>
+
+  <!-- QUEUE -->
+  <div class="grid-2">
+    <div>
+      <div class="section-title"><i class="fa-solid fa-list-check"></i> Fila de Pedidos</div>
+      <div class="card" id="queuePanel" style="max-height:340px;overflow-y:auto">
+        <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></div>
+      </div>
+    </div>
+    <div id="sendPanel">
+      <div class="section-title"><i class="fa-solid fa-paper-plane"></i> Envio Manual de Dados</div>
+      <div class="card">
+        <div class="send-form">
+          <div class="form-group">
+            <label class="form-label">Número de Destino</label>
+            <input class="form-input" type="tel" id="sendNumero" placeholder="84XXXXXXX">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantidade (MB)</label>
+            <input class="form-input" type="number" id="sendQtd" placeholder="500" value="500">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo de Pacote</label>
+            <select class="form-select" id="sendModo">
+              <option value="diario">📦 Diário (24hrs)</option>
+              <option value="semanal">📅 Semanal</option>
+              <option value="mensal">📆 Mensal</option>
+              <option value="ilimitado">♾️ Ilimitado</option>
+              <option value="saldo">💰 Saldo / Crédito</option>
+            </select>
+          </div>
+          <button class="btn btn-success" onclick="enviarManual()" style="height:42px"><i class="fa-solid fa-paper-plane"></i> Enviar</button>
+        </div>
+        <div id="sendResult" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR PANEL (hidden) -->
+  <div id="qrPanel" style="display:none;margin-bottom:28px">
+    <div class="section-title"><i class="fa-brands fa-whatsapp"></i> QR Code WhatsApp</div>
+    <div class="card qr-area" id="qrContent">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--muted)"></i>
+      <p>A carregar QR Code...</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = 'https://kanet-cloud-api.onrender.com';
+const TOKEN = 'KaNetKelven2026Secure';
+const headers = { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' };
+let allOrders = [];
+
+function toast(msg, type='ok') {
+  const el = document.createElement('div');
+  el.className = 'toast-msg ' + type;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+async function fetchAPI(path, opts={}) {
+  const r = await fetch(API + path, { headers, ...opts });
+  return r.json();
+}
+
+async function loadWAStatus() {
+  try {
+    const d = await fetchAPI('/api/bot-status');
+    const el = document.getElementById('waStatus');
+    const tx = document.getElementById('waStatusText');
+    if (d.connected) {
+      el.className = 'wa-status';
+      tx.textContent = '📱 WhatsApp Conectado: ' + (d.phone || d.number || 'Ativo');
+    } else if (d.qr_pending) {
+      el.className = 'wa-status loading';
+      tx.textContent = '⏳ Aguardando QR Code';
+    } else {
+      el.className = 'wa-status offline';
+      tx.textContent = '❌ WhatsApp Desconectado';
+    }
+  } catch(e) {
+    document.getElementById('waStatus').className = 'wa-status offline';
+    document.getElementById('waStatusText').textContent = '❌ Offline';
+  }
+}
+
+async function loadDevices() {
+  try {
+    const d = await fetchAPI('/api/devices');
+    const devices = d.devices || [];
+    const grid = document.getElementById('devicesGrid');
+    
+    if (devices.length === 0) {
+      grid.innerHTML = '<div class="no-devices"><i class="fa-solid fa-mobile-screen-button" style="font-size:2rem;margin-bottom:10px;display:block;color:var(--muted)"></i>Nenhum celular registado ainda.<br>Abra o Ka-Net Gateway nos celulares.</div>';
+      return devices;
+    }
+    
+    grid.innerHTML = devices.map(dev => {
+      const online = dev.online;
+      const apto = dev.is_apto;
+      const bat = dev.bateria || 0;
+      const batColor = bat > 50 ? 'green' : bat > 20 ? 'yellow' : 'red';
+      const saldo = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
+      const saldo2 = dev.sim2_saldo_mb !== undefined ? dev.sim2_saldo_mb : 0;
+      const saldoColor = saldo > 500 ? 'green' : saldo > 100 ? 'yellow' : 'red';
+      const avail = dev.transfers_available !== undefined ? dev.transfers_available : '?';
+      const total = dev.total_envios || 0;
+      const pct = Math.min(100, (total / 20) * 100);
+      const pctColor = pct < 50 ? 'green' : pct < 80 ? 'yellow' : 'red';
+      const tipoPorta = dev.porta === 8023 || dev.porta === 8024 ? '📦 Diários' : dev.porta === 8077 ? '📅 Semanais/Mensais' : dev.porta === 8777 ? '💰 Saldo/Crédito' : '📦 Multi-Pacote';
+      
+      const pendingHtml = dev.pending_order ? `
+        <div class="pending-order">
+          <div class="pending-label"><i class="fa-solid fa-spinner fa-spin"></i> EM PROCESSAMENTO</div>
+          <div>📲 ${dev.pending_order.numero} • ${dev.pending_order.quantidade}MB • ${dev.pending_order.modo || 'diario'}</div>
+        </div>` : '';
+      
+      const lastResult = dev.last_result ? `
+        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">
+          Último: ${dev.last_result.success ? '✅' : '❌'} ${dev.last_result.numero || ''} ${dev.last_result.quantidade || ''}MB
+        </div>` : '';
+      
+      return `
+        <div class="card">
+          <div class="device-header">
+            <div>
+              <div class="device-name">📱 Porta ${dev.porta}</div>
+              <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${dev.carrier || 'Vodacom'} • ${tipoPorta}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+              <span class="badge ${online ? 'online' : 'offline'}">${online ? '● Online' : '● Offline'}</span>
+              <span class="badge ${apto ? 'apto' : 'inapto'}">${apto ? '✓ Apto' : '⚠ Inapto'}</span>
+            </div>
+          </div>
+          <div class="device-grid">
+            <div class="device-stat">
+              <div class="device-stat-label">🔋 Bateria</div>
+              <div class="device-stat-val" style="color:var(--${batColor})">${bat}%</div>
+              <div class="progress-bar"><div class="progress-fill ${batColor}" style="width:${bat}%"></div></div>
+            </div>
+            <div class="device-stat">
+              <div class="device-stat-label">📡 SIM 1 Saldo</div>
+              <div class="device-stat-val" style="color:var(--${saldoColor})">${saldo >= 1024 ? (saldo/1024).toFixed(1)+'GB' : saldo+'MB'}</div>
+              ${saldo2 > 0 ? `<div style="font-size:.68rem;color:var(--muted)">SIM 2: ${saldo2 >= 1024 ? (saldo2/1024).toFixed(1)+'GB' : saldo2+'MB'}</div>` : ''}
+            </div>
+            <div class="device-stat">
+              <div class="device-stat-label">📤 Envios Hoje</div>
+              <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">/ 20</span></div>
+              <div class="progress-bar"><div class="progress-fill ${pctColor}" style="width:${pct}%"></div></div>
+            </div>
+            <div class="device-stat">
+              <div class="device-stat-label">✅ Disponíveis</div>
+              <div class="device-stat-val" style="color:var(--${avail > 5 ? 'green' : avail > 0 ? 'yellow' : 'red'})">${avail}</div>
+              <div style="font-size:.68rem;color:var(--muted)">SIM1: ${dev.sim1_envios||0} | SIM2: ${dev.sim2_envios||0}</div>
+            </div>
+          </div>
+          ${pendingHtml}
+          ${lastResult}
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary btn-sm" onclick="pingDevice(${dev.porta})"><i class="fa-solid fa-heartbeat"></i> Ping</button>
+            <button class="btn btn-warn btn-sm" onclick="forceDispatch(${dev.porta})"><i class="fa-solid fa-bolt"></i> Forçar</button>
+          </div>
+        </div>`;
+    }).join('');
+    return devices;
+  } catch(e) {
+    document.getElementById('devicesGrid').innerHTML = '<div class="no-devices"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao carregar: ' + e.message + '</div>';
+    return [];
+  }
+}
+
+async function loadQueue() {
+  try {
+    const d = await fetchAPI('/api/orders');
+    const orders = d.orders || d || [];
+    allOrders = Array.isArray(orders) ? orders : Object.values(orders);
+    const panel = document.getElementById('queuePanel');
+    
+    if (allOrders.length === 0) {
+      panel.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:.85rem"><i class="fa-solid fa-inbox"></i><br>Fila vazia</div>';
+      return;
+    }
+    
+    const recent = allOrders.slice(-20).reverse();
+    panel.innerHTML = recent.map(o => {
+      const st = o.status || 'pending';
+      const qty = o.quantidade || 0;
+      const vol = qty < 1024 ? qty+'MB' : (qty/1024).toFixed(1)+'GB';
+      return `<div class="order-item">
+        <div>
+          <div class="order-ref">${(o.orderId||o.id||'?').slice(-14)}</div>
+          <div style="margin-top:2px"><b>${o.numero||'?'}</b> • ${vol} • ${o.modo||'diario'}</div>
+        </div>
+        <span class="order-status status-${st}">${st}</span>
+      </div>`;
+    }).join('');
+    
+    const pending = allOrders.filter(o => o.status === 'pending').length;
+    document.getElementById('mPending').textContent = pending;
+  } catch(e) {
+    document.getElementById('queuePanel').innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;font-size:.85rem">Erro: ' + e.message + '</div>';
+  }
+}
+
+async function reloadDevices() {
+  document.getElementById('lastRefresh').textContent = 'A actualizar...';
+  const devices = await loadDevices();
+  await loadQueue();
+  await loadWAStatus();
+  
+  const online = devices.filter(d => d.online).length;
+  const avail = devices.reduce((a, d) => a + (d.transfers_available || 0), 0);
+  const today = devices.reduce((a, d) => a + (d.total_envios || 0), 0);
+  
+  document.getElementById('mDevices').textContent = online + '/' + devices.length;
+  document.getElementById('mAvail').textContent = avail;
+  document.getElementById('mToday').textContent = today;
+  document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+}
+
+async function pingDevice(porta) {
+  try {
+    const d = await fetchAPI('/api/devices/' + porta + '/health');
+    toast('Porta ' + porta + ': ' + (d.online ? '✅ Online' : '❌ Offline'), d.online ? 'ok' : 'err');
+  } catch(e) { toast('Erro ao pingar: ' + e.message, 'err'); }
+}
+
+async function forceDispatch(porta) {
+  toast('A forçar despacho na Porta ' + porta + '...', 'ok');
+  await pingDevice(porta);
+}
+
+async function clearQueue() {
+  if (!confirm('Confirma limpar toda a fila de pedidos?')) return;
+  try {
+    await fetchAPI('/api/orders/clear', { method: 'POST' });
+    toast('Fila limpa com sucesso!', 'ok');
+    await loadQueue();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+async function enviarManual() {
+  const numero = document.getElementById('sendNumero').value.trim();
+  const quantidade = parseInt(document.getElementById('sendQtd').value);
+  const modo = document.getElementById('sendModo').value;
+  
+  if (!numero || !quantidade) { toast('Preencha o número e a quantidade!', 'err'); return; }
+  
+  const res = document.getElementById('sendResult');
+  res.innerHTML = '<span style="color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A enviar pedido...</span>';
+  
+  try {
+    const d = await fetchAPI('/api/transferir', {
+      method: 'POST',
+      body: JSON.stringify({ numero, quantidade, modo, remetente: 'Painel-Admin' })
+    });
+    if (d.success || d.status === 'sucesso') {
+      res.innerHTML = '<span style="color:var(--green)">✅ Pedido enviado! Ref: <b>' + (d.orderId || '?') + '</b></span>';
+      toast('Pedido enviado com sucesso!', 'ok');
+      setTimeout(loadQueue, 3000);
+    } else {
+      res.innerHTML = '<span style="color:var(--red)">❌ Erro: ' + (d.mensagem || 'Falha') + '</span>';
+    }
+  } catch(e) {
+    res.innerHTML = '<span style="color:var(--red)">❌ ' + e.message + '</span>';
+  }
+}
+
+async function restartBot() {
+  try {
+    toast('A reiniciar o bot...', 'ok');
+    await fetchAPI('/api/admin/restart-bot', { method: 'POST' });
+    setTimeout(loadWAStatus, 5000);
+  } catch(e) { toast('Comando enviado!', 'ok'); }
+}
+
+async function showQr() {
+  const panel = document.getElementById('qrPanel');
+  const content = document.getElementById('qrContent');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') {
+    content.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--muted)"></i><p>A carregar QR Code...</p>';
+    try {
+      const d = await fetchAPI('/qr');
+      if (d.qr_image) {
+        content.innerHTML = '<img src="' + d.qr_image + '" alt="QR Code"><p>Escaneie com o WhatsApp no celular do Bot</p>';
+      } else if (d.connected) {
+        content.innerHTML = '<i class="fa-solid fa-circle-check" style="font-size:3rem;color:var(--green)"></i><p style="color:var(--green)">✅ WhatsApp já está conectado!</p>';
+      } else {
+        content.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;color:var(--yellow)"></i><p>QR Code não disponível no momento</p>';
+      }
+    } catch(e) {
+      content.innerHTML = '<p style="color:var(--red)">Erro: ' + e.message + '</p>';
+    }
+  }
+}
+
+// Init
+reloadDevices();
+setInterval(reloadDevices, 10000);
+</script>
+</body>
+</html>
