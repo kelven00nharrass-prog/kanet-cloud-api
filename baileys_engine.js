@@ -833,10 +833,14 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     if (!text.trim()) continue;
 
-                    const realSender = msg.key.participant || msg.participant || jid;
-                    const senderNumber = realSender.replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@g.us', '');
+                    let realSender = msg.key.participant || msg.participant || msg.key.remoteJidAlt || jid;
+                    if (String(realSender).endsWith('@lid') && msg.key.remoteJidAlt) {
+                        realSender = msg.key.remoteJidAlt;
+                    }
+                    const senderClean = String(realSender).split('@')[0].split(':')[0].replace(/\D/g, '');
+                    const senderNumber = senderClean || String(realSender).replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@g.us', '');
                     const cleanText = text.trim().toLowerCase();
-                    const senderIsMaster = isMaster(senderNumber);
+                    const senderIsMaster = isMaster(senderNumber) || isMaster(realSender);
                     const nomeCliente = msg.pushName || 'Cliente';
 
                     // Registar Lead
@@ -1043,7 +1047,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     // ── 4. COMANDO .enviar (ENVIO MANUAL DIRETO) ────────────
                     if (cleanText.startsWith('.enviar') || cleanText.startsWith('!enviar') || cleanText.startsWith('/enviar') || cleanText.startsWith('comprar ')) {
                         if (!senderIsMaster) {
-                            await reply('🚫 *ACESSO NEGADO*\n━━━━━━━━━━━━━━━━━━━\n⚠️ Comando restrito ao Administrador Master.');
+                            await reply(`🚫 *ACESSO NEGADO*\n━━━━━━━━━━━━━━━━━━━\n⚠️ Comando restrito ao Administrador Master.\n\n📱 _Seu número detectado:_ *${senderNumber}*`);
                             continue;
                         }
 
