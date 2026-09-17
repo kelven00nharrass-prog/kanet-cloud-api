@@ -38,6 +38,7 @@ if (!fs.existsSync(AUTH_DIR)) {
 // ══════════════════════════════════════════════════
 const BOT_CONFIG_PATH = path.join(__dirname, 'bot_config.js');
 const LOCAL_CONFIG_PATH = path.join(__dirname, 'local_config.json');
+const TRANSACOES_DB_PATH = path.join(__dirname, 'transacoes_db.json');
 
 let DYN_CFG = {};
 let LOCAL_CFG = {};
@@ -45,6 +46,34 @@ const banidosSet = new Set();
 const clientesLeads = new Set();
 const historicoVendas = [];
 const transacoesProcessadas = new Set();
+const transacoesProcessadasMap = new Map(); // txn_id -> { sender, jid, status: 'locked'|'completed', valor, timestamp }
+
+function carregarTransacoes() {
+    try {
+        if (fs.existsSync(TRANSACOES_DB_PATH)) {
+            const data = JSON.parse(fs.readFileSync(TRANSACOES_DB_PATH, 'utf8'));
+            for (const [id, val] of Object.entries(data)) {
+                transacoesProcessadasMap.set(id, val);
+                transacoesProcessadas.add(id);
+            }
+            console.log(`🔒 [ANTI-FRAUDE] ${transacoesProcessadasMap.size} transações carregadas do banco de proteção.`);
+        }
+    } catch (e) {
+        console.error('❌ Erro ao carregar transacoes_db.json:', e.message);
+    }
+}
+
+function salvarTransacoes() {
+    try {
+        const obj = {};
+        for (const [id, val] of transacoesProcessadasMap.entries()) {
+            obj[id] = val;
+        }
+        fs.writeFileSync(TRANSACOES_DB_PATH, JSON.stringify(obj, null, 2), 'utf8');
+    } catch (e) {
+        console.error('❌ Erro ao salvar transacoes_db.json:', e.message);
+    }
+}
 
 function carregarConfigs() {
     try {
@@ -62,6 +91,8 @@ function carregarConfigs() {
 
     if (!DYN_CFG.TABELAS) DYN_CFG.TABELAS = { '24hrs': {}, 'semanal': {}, 'mensal': {}, 'ilimitado': {}, 'saldo': {} };
     if (!DYN_CFG.PLANOS_ESPECIAIS) DYN_CFG.PLANOS_ESPECIAIS = {};
+    
+    carregarTransacoes();
 }
 
 carregarConfigs();
@@ -861,7 +892,20 @@ async function startWhatsApp(orderCallback, db = null) {
                                     valor: parseFloat(pay.valor),
                                     timestamp: Date.now()
                                 });
-                                if (pay.txn_id) transacoesProcessadas.add(pay.txn_id);
+                                if (pay.txn_id) {
+                                    transacoesProcessadas.add(pay.txn_id);
+                                    const reg = transacoesProcessadasMap.get(pay.txn_id) || {};
+                                    transacoesProcessadasMap.set(pay.txn_id, {
+                                        ...reg,
+                                        sender: senderNumber,
+                                        jid,
+                                        numeroDestino: numDestino,
+                                        valor: parseFloat(pay.valor),
+                                        status: 'completed',
+                                        completedAt: Date.now()
+                                    });
+                                    salvarTransacoes();
+                                }
 
                                 // Notificar Grupo de Notificações
                                 enviarNotificacaoGrupo(
@@ -1124,6 +1168,8 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (cleanText === '/limpar' && senderIsMaster) {
                         pendingPayments.clear();
                         transacoesProcessadas.clear();
+                        transacoesProcessadasMap.clear();
+                        salvarTransacoes();
                         await reply('🧹 *Fila de pagamentos pendentes e registos anti-duplicação limpos com sucesso!*');
                         continue;
                     }
@@ -1208,14 +1254,40 @@ async function startWhatsApp(orderCallback, db = null) {
                         const metodo = /e-mola|emola|TX[A-Z0-9]/i.test(text) ? 'emola' : 'mpesa';
                         const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
-                        // ── REGRA 1: ANTI-DUPLICAÇÃO / TRANSAÇÃO ÚNICA ──
-                        if (txn_id && transacoesProcessadas.has(txn_id)) {
-                            await reply(
-                                `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
-                                `❌ Esta transação (\`${txn_id}\`) já foi processada anteriormente no sistema.\n\n` +
-                                `⏳ Cada comprovativo só é válido para uma única ativação de pacote.`
-                            );
-                            continue;
+                        // ── REGRA 1: SEGURANÇA MÁXIMA ANTI-DUPLICAÇÃO E LOCK EXCLUSIVO ──
+                        if (txn_id) {
+                            const registoExistente = transacoesProcessadasMap.get(txn_id);
+                            if (registoExistente) {
+                                if (registoExistente.status === 'completed') {
+                                    await reply(
+                                        `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
+                                        `❌ Esta transação (\`${txn_id}\`) já foi utilizada anteriormente no sistema e não pode ser reutilizada.\n\n` +
+                                        `⏳ Cada comprovativo só é válido para uma única ativação de pacote.`
+                                    );
+                                    continue;
+                                } else if (registoExistente.sender && registoExistente.sender !== senderNumber) {
+                                    await reply(
+                                        `🚫 *CONFIRMAÇÃO BLOQUEADA*\n━━━━━━━━━━━━━━━━━━\n` +
+                                        `❌ Esta transação (\`${txn_id}\`) já foi submetida por outro cliente e está protegida!\n\n` +
+                                        `🔒 Por questões de segurança, nenhuma confirmação pode ser compartilhada ou utilizada por duas contas diferentes.`
+                                    );
+                                    continue;
+                                } else if (registoExistente.status === 'locked') {
+                                    await reply(
+                                        `ℹ️ *AGUARDANDO O SEU NÚMERO*\n━━━━━━━━━━━━━━━━━━\n` +
+                                        `Você já submeteu esta confirmação (\`${txn_id}\`).\n\n` +
+                                        `📲 Por favor, envie agora apenas o seu *número Vodacom* que deve receber os megas (ex: *84XXXXXXX* ou *85XXXXXXX*).`
+                                    );
+                                    continue;
+                                }
+                            } else if (transacoesProcessadas.has(txn_id)) {
+                                await reply(
+                                    `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
+                                    `❌ Esta transação (\`${txn_id}\`) já foi processada anteriormente no sistema.\n\n` +
+                                    `⏳ Cada comprovativo só é válido para uma única ativação de pacote.`
+                                );
+                                continue;
+                            }
                         }
 
                         console.log(`💳 [COMPROVATIVO DETECTADO] ${metodoNome} | Ref: ${txn_id} | Valor: ${valor} MT | Remetente: ${senderNumber}`);
@@ -1263,7 +1335,18 @@ async function startWhatsApp(orderCallback, db = null) {
                                 valor: parseFloat(valor),
                                 timestamp: Date.now()
                             });
-                            if (txn_id) transacoesProcessadas.add(txn_id);
+                            if (txn_id) {
+                                transacoesProcessadas.add(txn_id);
+                                transacoesProcessadasMap.set(txn_id, {
+                                    sender: senderNumber,
+                                    jid,
+                                    numeroDestino: numDestinoInline,
+                                    valor: parseFloat(valor),
+                                    status: 'completed',
+                                    timestamp: Date.now()
+                                });
+                                salvarTransacoes();
+                            }
 
                             // Notificar Grupo de Notificações
                             enviarNotificacaoGrupo(
@@ -1294,7 +1377,19 @@ async function startWhatsApp(orderCallback, db = null) {
                             continue;
                         }
 
-                        // Caso não venha o número de destino na mesma mensagem, aguarda a próxima
+                        // Caso não venha o número de destino na mesma mensagem, bloqueia imediatamente para este cliente e aguarda o número
+                        if (txn_id) {
+                            transacoesProcessadas.add(txn_id);
+                            transacoesProcessadasMap.set(txn_id, {
+                                sender: senderNumber,
+                                jid,
+                                valor: parseFloat(valor),
+                                status: 'locked',
+                                timestamp: Date.now()
+                            });
+                            salvarTransacoes();
+                        }
+
                         const pendingKey = `${jid}:${senderNumber}`;
                         pendingPayments.set(pendingKey, {
                             txn_id,
