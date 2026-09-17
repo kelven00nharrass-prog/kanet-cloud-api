@@ -705,13 +705,17 @@ function processarAddTabelaCompleta(corpo) {
     }
 
     if (contador > 0) {
+        const resumo = [];
+        const catNomes = { '24hrs': '📦 24hrs', 'semanal': '📅 Semanal', 'mensal': '📆 Mensal', 'ilimitado': '🌐 Ilimitado', 'saldo': '💳 Saldo' };
         for (const cat of Object.keys(newTabelas)) {
             if (Object.keys(newTabelas[cat]).length > 0) {
-                DYN_CFG.TABELAS[cat] = { ...DYN_CFG.TABELAS[cat], ...newTabelas[cat] };
+                // FULL REPLACE — remove all stale old entries for this category
+                DYN_CFG.TABELAS[cat] = newTabelas[cat];
+                resumo.push(`${catNomes[cat] || cat}: *${Object.keys(newTabelas[cat]).length} pacotes*`);
             }
         }
         salvarBotConfig();
-        return `✅ *TABELA ATUALIZADA COM SUCESSO!*\n\nForam processados e integrados *${contador} pacotes* no sistema.`;
+        return `✅ *TABELA ATUALIZADA COM SUCESSO!*\n\n${resumo.join('\n')}\n\n_Total: ${contador} pacotes substituídos._`;
     }
 
     return `⚠️ Não foi possível identificar pacotes na tabela colada.\nUse o formato:\n*1GB 24h - 23 MT*`;
@@ -1509,6 +1513,24 @@ async function sendTextMessage(jid, text) {
     return false;
 }
 
+async function getGroups() {
+    if (sock && connectionStatus === 'connected') {
+        try {
+            const groups = await sock.groupFetchAllParticipating();
+            return Object.values(groups).map(g => ({
+                jid: g.id,
+                name: g.subject || 'Grupo Sem Nome',
+                participants_count: (g.participants || []).length,
+                creation: g.creation,
+                owner: g.owner || g.subjectOwner
+            }));
+        } catch(e) {
+            console.error('⚠️ [BAILEYS] Erro ao buscar grupos participantes:', e.message);
+        }
+    }
+    return [];
+}
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -1516,5 +1538,6 @@ module.exports = {
     enviarNotificacaoGrupo, 
     enviarErroGrupo, 
     getGrupoNotificacoes, 
-    getGrupoErros 
+    getGrupoErros,
+    getGroups
 };
