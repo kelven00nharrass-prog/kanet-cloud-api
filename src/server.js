@@ -685,6 +685,187 @@ app.get('/api/bot-status', (req, res) => {
     return res.json({ success: false, connected: false, qr_pending: false, error: e.message });
   }
 });
+// ── RELATÓRIOS FINANCEIROS E VENDAS PARA O PAINEL ──
+app.get('/api/reports', async (req, res) => {
+  try {
+    let all = Array.from(inMemoryOrders.values());
+    if (db) {
+      try {
+        const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(150).get();
+        const fbOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const map = new Map();
+        all.forEach(o => map.set(o.orderId || o.id, o));
+        fbOrders.forEach(o => {
+          const id = o.orderId || o.id;
+          if (id) map.set(id, { ...(map.get(id) || {}), ...o });
+        });
+        all = Array.from(map.values());
+      } catch(err) {
+        // Firestore fallback
+      }
+    }
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const monthStr = now.toISOString().slice(0, 7);
+
+    // Vendas concluídas
+    const completed = all.filter(o => o.status === 'completed' || o.success === true);
+
+    // Vendas de hoje
+    const todaySales = completed.filter(o => (o.createdAt || o.completedAt || '').startsWith(todayStr));
+    const todayTotalMt = todaySales.reduce((acc, o) => acc + (Number(o.valor_pago || o.valor) || 0), 0);
+    const todayTotalMb = todaySales.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
+
+    // Vendas do mês
+    const monthSales = completed.filter(o => (o.createdAt || o.completedAt || '').startsWith(monthStr));
+    const monthTotalMt = monthSales.reduce((acc, o) => acc + (Number(o.valor_pago || o.valor) || 0), 0);
+    const monthTotalMb = monthSales.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
+
+    // Valores recebidos via SMS (M-Pesa vs e-Mola)
+    let payments = Array.from(inMemoryPayments.values());
+    if (db) {
+      try {
+        const snapP = await db.collection('sms_payments').orderBy('processedAt', 'desc').limit(150).get();
+        const fbP = snapP.docs.map(d => ({ id: d.id, ...d.data() }));
+        const mapP = new Map();
+        payments.forEach(p => mapP.set(p.txn_id || p.id, p));
+        fbP.forEach(p => {
+          const tid = p.txn_id || p.id;
+          if (tid) mapP.set(tid, { ...(mapP.get(tid) || {}), ...p });
+        });
+        payments = Array.from(mapP.values());
+      } catch(err) {}
+    }
+
+    let mpesaTotal = 0;
+    let emolaTotal = 0;
+    payments.forEach(p => {
+      const val = Number(p.valor) || 0;
+      if (String(p.metodo || '').toLowerCase().includes('emola')) {
+        emolaTotal += val;
+      } else {
+        mpesaTotal += val;
+      }
+    });
+
+    return res.json({
+      success: true,
+      today: {
+        valor_mt: todayTotalMt,
+        megas: todayTotalMb,
+        total_vendas: todaySales.length
+      },
+      month: {
+        valor_mt: monthTotalMt,
+        megas: monthTotalMb,
+        total_vendas: monthSales.length
+      },
+      recebidos: {
+        mpesa_mt: mpesaTotal,
+        emola_mt: emolaTotal,
+        total_mt: mpesaTotal + emolaTotal,
+        total_sms: payments.length
+      },
+      recentSales: completed.slice(-50).reverse(),
+      allSales: all.slice(-100).reverse(),
+      recentPayments: payments.slice(-50).reverse()
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── GESTÃO DE GRUPOS WHATSAPP ──
+app.get('/api/groups', async (req, res) => {
+  try {
+    let groups = [];
+    if (baileysEngine && typeof baileysEngine.getGroups === 'function') {
+      groups = await baileysEngine.getGroups();
+    }
+
+    let botCfg = {};
+    try {
+      if (fs.existsSync(path.resolve(__dirname, 'bot_config.js'))) {
+        botCfg = require(path.resolve(__dirname, 'bot_config.js'));
+      }
+    } catch(e) {}
+
+    const groupTables = botCfg.TABELAS_GRUPO || {};
+    const baseList = [
+      { jid: '120363409903708446@g.us', nome: 'Ka-Net Notificações', autorizado: true, tipo: 'Canal de Notificações' },
+      { jid: '120363408450329444@g.us', nome: 'Ka-Net Alertas & Erros', autorizado: true, tipo: 'Canal de Erros' },
+      { jid: '120363424819563179@g.us', nome: 'Ka-Net VIP Clientes', autorizado: true, tipo: 'Grupo de Clientes' }
+    ];
+
+    // Se o Baileys buscou grupos ao vivo, mesclar
+    if (groups && groups.length > 0) {
+      groups.forEach(g => {
+        const found = baseList.find(b => b.jid === g.jid);
+        if (!found) {
+          baseList.push({
+            jid: g.jid,
+            nome: g.name || 'Grupo WhatsApp',
+            autorizado: true,
+            tipo: 'Grupo Autorizado',
+            membros: g.participants_count || '?'
+          });
+        } else {
+          found.membros = g.participants_count || '?';
+        }
+      });
+    }
+
+    const finalGroups = baseList.map(g => ({
+      ...g,
+      tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
+    }));
+
+    return res.json({ success: true, count: finalGroups.length, groups: finalGroups });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── TABELAS DE PREÇOS DO SISTEMA ──
+app.get('/api/price-tables', (req, res) => {
+  try {
+    let botCfg = {};
+    try {
+      if (fs.existsSync(path.resolve(__dirname, 'bot_config.js'))) {
+        delete require.cache[require.resolve(path.resolve(__dirname, 'bot_config.js'))];
+        botCfg = require(path.resolve(__dirname, 'bot_config.js'));
+      }
+    } catch(e) {}
+
+    return res.json({
+      success: true,
+      tabelas: botCfg.TABELAS || {
+        '24hrs': {
+          '10': { nome: '350MB 24h', quantidade_mb: 350, valor: 10 },
+          '14': { nome: '550MB 24h', quantidade_mb: 550, valor: 14 },
+          '17': { nome: '696MB 24h', quantidade_mb: 696, valor: 17 },
+          '22': { nome: '1GB 24h', quantidade_mb: 1024, valor: 22 },
+          '44': { nome: '2GB 24h', quantidade_mb: 2048, valor: 44 }
+        },
+        'semanal': {
+          '47': { nome: '1.7GB 7d', quantidade_mb: 1740, valor: 47 },
+          '80': { nome: '2.9GB 7d', quantidade_mb: 2970, valor: 80 },
+          '140': { nome: '5.3GB 7d', quantidade_mb: 5427, valor: 140 }
+        },
+        'mensal': {
+          '95': { nome: '2.8GB 30d', quantidade_mb: 2867, valor: 95 },
+          '170': { nome: '5GB 30d', quantidade_mb: 5120, valor: 170 },
+          '250': { nome: '8GB 30d', quantidade_mb: 8192, valor: 250 }
+        }
+      },
+      planos_especiais: botCfg.PLANOS_ESPECIAIS || {},
+      tabelas_grupo: botCfg.TABELAS_GRUPO || {}
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
 
 // ----------------------------------------------------
 // 6. PAYMOZ / M-PESA WEBHOOK
