@@ -39,6 +39,7 @@ if (!fs.existsSync(AUTH_DIR)) {
 const BOT_CONFIG_PATH = path.join(__dirname, 'bot_config.js');
 const LOCAL_CONFIG_PATH = path.join(__dirname, 'local_config.json');
 const TRANSACOES_DB_PATH = path.join(__dirname, 'transacoes_db.json');
+const SMS_PAYMENTS_DB_PATH = path.join(__dirname, 'sms_payments_db.json');
 
 let DYN_CFG = {};
 let LOCAL_CFG = {};
@@ -47,6 +48,8 @@ const clientesLeads = new Set();
 const historicoVendas = [];
 const transacoesProcessadas = new Set();
 const transacoesProcessadasMap = new Map(); // txn_id -> { sender, jid, status: 'locked'|'completed', valor, timestamp }
+const smsPaymentsMap = new Map(); // txn_id -> { txn_id, valor, remetente, metodo, raw_sms, timestamp, usado: boolean }
+const aguardandoOperadora = new Map(); // txn_id -> { txn_id, valor, metodo, metodoNome, jid, senderNumber, nomeCliente, numDestino, pacote, timestamp, timer }
 
 function carregarTransacoes() {
     try {
@@ -75,6 +78,32 @@ function salvarTransacoes() {
     }
 }
 
+function carregarSmsPayments() {
+    try {
+        if (fs.existsSync(SMS_PAYMENTS_DB_PATH)) {
+            const data = JSON.parse(fs.readFileSync(SMS_PAYMENTS_DB_PATH, 'utf8'));
+            for (const [id, val] of Object.entries(data)) {
+                smsPaymentsMap.set(id, val);
+            }
+            console.log(`📥 [SMS DB] ${smsPaymentsMap.size} confirmações da operadora carregadas.`);
+        }
+    } catch (e) {
+        console.error('❌ Erro ao carregar sms_payments_db.json:', e.message);
+    }
+}
+
+function salvarSmsPayments() {
+    try {
+        const obj = {};
+        for (const [id, val] of smsPaymentsMap.entries()) {
+            obj[id] = val;
+        }
+        fs.writeFileSync(SMS_PAYMENTS_DB_PATH, JSON.stringify(obj, null, 2), 'utf8');
+    } catch (e) {
+        console.error('❌ Erro ao salvar sms_payments_db.json:', e.message);
+    }
+}
+
 function carregarConfigs() {
     try {
         if (fs.existsSync(LOCAL_CONFIG_PATH)) {
@@ -97,6 +126,7 @@ function carregarConfigs() {
     if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
     
     carregarTransacoes();
+    carregarSmsPayments();
 }
 
 carregarConfigs();
@@ -970,6 +1000,21 @@ async function startWhatsApp(orderCallback, db = null) {
                     };
 
                     // ── 1. AGUARDANDO NÚMERO DE DESTINO APÓS COMPROVATIVO ──
+                    // Caso o cliente esteja aguardando validação da operadora e tenha enviado o número agora:
+                    const itemAguardandoOp = [...aguardandoOperadora.values()].find(it => it.senderNumber === senderNumber && !it.numDestino);
+                    if (itemAguardandoOp) {
+                        const numDestino = extrairNumeroDestino(text);
+                        if (numDestino) {
+                            itemAguardandoOp.numDestino = numDestino;
+                            await reply(
+                                `📲 *NÚMERO DE DESTINO REGISTADO:* *${numDestino}*\n\n` +
+                                `⏳ O seu comprovativo (\`${itemAguardandoOp.txn_id}\`) continua no status *Aguardando Confirmação da Operadora*.\n` +
+                                `Assim que a rede ${itemAguardandoOp.metodoNome} confirmar o valor (*${itemAguardandoOp.valor} MT*), o pacote será enviado imediatamente para este número!`
+                            );
+                            continue;
+                        }
+                    }
+
                     const pendingKey = `${jid}:${senderNumber}`;
                     const hasPending = pendingPayments.has(pendingKey) || pendingPayments.has(jid);
                     if (hasPending) {
@@ -1501,107 +1546,213 @@ async function startWhatsApp(orderCallback, db = null) {
 
                         const { supportNum } = getSuporteDetails();
                         const numDestinoInline = extrairNumeroDestinoAbaixoDoComprovativo(text);
-                        if (numDestinoInline) {
-                            const orderId = 'WA-' + txn_id + '-' + Date.now();
-                            await reply(
-                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                `  🎉 *COMPROVATIVO CONFIRMADO!* ⚡\n` +
-                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                `📦 *Pacote:* *${pacote.nome}*\n` +
-                                `📲 *Destino:* *${numDestinoInline}*\n` +
-                                `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                `🔖 *Ref:* \`${txn_id}\`\n\n` +
-                                `🚀 *Ativação automática em andamento!*\n` +
-                                `_Você receberá uma confirmação assim que for enviado._\n\n` +
-                                `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
-                            );
+                        // ── VALIDAÇÃO REAL CONTRA CONFIRMAÇÃO DA OPERADORA (M-PESA / E-MOLA) ──
+                        const smsOperadora = smsPaymentsMap.get(txn_id);
+                        const jaConfirmadoPelaOperadora = smsOperadora && !smsOperadora.usado;
 
-                            historicoVendas.push({
-                                orderId,
-                                numero: numDestinoInline,
-                                mb: pacote.mb,
-                                valor: parseFloat(valor),
-                                timestamp: Date.now()
-                            });
-                            if (txn_id) {
-                                transacoesProcessadas.add(txn_id);
-                                transacoesProcessadasMap.set(txn_id, {
-                                    sender: senderNumber,
-                                    jid,
-                                    numeroDestino: numDestinoInline,
-                                    valor: parseFloat(valor),
-                                    status: 'completed',
-                                    timestamp: Date.now()
-                                });
-                                salvarTransacoes();
-                            }
+                        if (jaConfirmadoPelaOperadora) {
+                            // ✅ A OPERADORA JÁ CONFIRMOU O VALOR!
+                            console.log(`✅ [VALIDAÇÃO IMEDIATA] Ref ${txn_id} já confirmada pela operadora! Ativando...`);
+                            smsOperadora.usado = true;
+                            smsOperadora.usadoPor = senderNumber;
+                            smsOperadora.usadoEm = Date.now();
+                            salvarSmsPayments();
 
-                            // Notificar Grupo de Notificações
-                            const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
-                            const tabelaOrigem = pacote.origem === 'grupo_especifico' ? 'Tabela Exclusiva deste Grupo' : 'Tabela Padrão Geral';
-                            enviarNotificacaoGrupo(
-                                `🔔 *NOVO PEDIDO REGISTADO* ⚡\n` +
-                                `━━━━━━━━━━━━━━━━━━\n` +
-                                `📋 *Ref:* \`${orderId}\`\n` +
-                                `📲 *Destino:* *${numDestinoInline}*\n` +
-                                `📦 *Pacote:* *${pacote.nome}*\n` +
-                                `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
-                                `🏢 *Origem:* *${origemMsg}*\n` +
-                                `🏷️ *Tabela:* *${tabelaOrigem}*\n` +
-                                `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
-                                `━━━━━━━━━━━━━━━━━━\n` +
-                                `⏳ *Status:* Enviado para ativação USSD`
-                            );
+                            if (numDestinoInline) {
+                                const orderId = 'WA-' + txn_id + '-' + Date.now();
+                                await reply(
+                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                    `  🎉 *COMPROVATIVO VALIDADO COM SUCESSO!* ⚡\n` +
+                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `A sua transação foi confirmada pela operadora (*${metodoNome}*)!\n\n` +
+                                    `📦 *Pacote:* *${pacote.nome}*\n` +
+                                    `📲 *Destino:* *${numDestinoInline}*\n` +
+                                    `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                    `🔖 *Ref:* \`${txn_id}\`\n\n` +
+                                    `🚀 *Ativação automática em andamento!*\n` +
+                                    `_Você receberá uma confirmação assim que for concluído._\n\n` +
+                                    `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                                );
 
-                            if (orderDispatchCallback) {
-                                orderDispatchCallback({
+                                historicoVendas.push({
                                     orderId,
                                     numero: numDestinoInline,
-                                    quantidade: pacote.mb,
-                                    modo: pacote.tipo,
-                                    jid,
-                                    sender: senderNumber,
-                                    txn_id,
-                                    valor
+                                    mb: pacote.mb,
+                                    valor: parseFloat(valor),
+                                    timestamp: Date.now()
                                 });
+                                if (txn_id) {
+                                    transacoesProcessadas.add(txn_id);
+                                    transacoesProcessadasMap.set(txn_id, {
+                                        sender: senderNumber,
+                                        jid,
+                                        numeroDestino: numDestinoInline,
+                                        valor: parseFloat(valor),
+                                        status: 'completed',
+                                        timestamp: Date.now()
+                                    });
+                                    salvarTransacoes();
+                                }
+
+                                const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                                const tabelaOrigem = pacote.origem === 'grupo_especifico' ? 'Tabela Exclusiva deste Grupo' : 'Tabela Padrão Geral';
+                                enviarNotificacaoGrupo(
+                                    `🔔 *NOVO PEDIDO VALIDADO PELA OPERADORA* ⚡\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `📋 *Ref:* \`${orderId}\`\n` +
+                                    `📲 *Destino:* *${numDestinoInline}*\n` +
+                                    `📦 *Pacote:* *${pacote.nome}*\n` +
+                                    `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                    `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                    `🏢 *Origem:* *${origemMsg}*\n` +
+                                    `🏷️ *Tabela:* *${tabelaOrigem}*\n` +
+                                    `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `⏳ *Status:* Enviado para ativação USSD`
+                                );
+
+                                if (orderDispatchCallback) {
+                                    orderDispatchCallback({
+                                        orderId,
+                                        numero: numDestinoInline,
+                                        quantidade: pacote.mb,
+                                        modo: pacote.tipo,
+                                        jid,
+                                        sender: senderNumber,
+                                        txn_id,
+                                        valor
+                                    });
+                                }
+                                continue;
+                            } else {
+                                if (txn_id) {
+                                    transacoesProcessadas.add(txn_id);
+                                    transacoesProcessadasMap.set(txn_id, {
+                                        sender: senderNumber,
+                                        jid,
+                                        valor: parseFloat(valor),
+                                        status: 'locked',
+                                        timestamp: Date.now()
+                                    });
+                                    salvarTransacoes();
+                                }
+
+                                const pendingKey = `${jid}:${senderNumber}`;
+                                pendingPayments.set(pendingKey, {
+                                    txn_id,
+                                    valor,
+                                    metodo,
+                                    aguardando_numero: true
+                                });
+
+                                await reply(
+                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                    `  ✅ *COMPROVATIVO VALIDADO PELA OPERADORA!* 💳\n` +
+                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `🔖 *Transação:* \`${txn_id}\`\n` +
+                                    `💰 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                    `📦 *Pacote:* *${pacote.nome}* (${pacote.mb} MB)\n\n` +
+                                    `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?*\n` +
+                                    `Por favor, responda agora com o seu *número Vodacom*:\n` +
+                                    `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
+                                );
+                                continue;
                             }
+                        } else {
+                            // ⏳ A CONFIRMAÇÃO DA OPERADORA AINDA NÃO CHEGOU AO SISTEMA!
+                            // Colocar em status "Aguardando Comprovativo da Operadora" por até 2 minutos
+                            if (aguardandoOperadora.has(txn_id)) {
+                                await reply(
+                                    `⏳ *COMPROVATIVO JÁ EM VERIFICAÇÃO* ⏳\n━━━━━━━━━━━━━━━━━━\n` +
+                                    `A transação \`${txn_id}\` já está no status *Aguardando Comprovativo da Operadora*.\n\n` +
+                                    `Assim que a rede ${metodoNome} confirmar o recebimento do valor (*${valor} MT*), o seu pedido será processado automaticamente!`
+                                );
+                                continue;
+                            }
+
+                            console.log(`⏳ [AGUARDANDO OPERADORA] Ref ${txn_id} (${valor} MT) - Cliente: ${senderNumber}. Iniciando timer de 2 minutos.`);
+
+                            const itemAguardando = {
+                                txn_id,
+                                valor: parseFloat(valor),
+                                metodo,
+                                metodoNome,
+                                jid,
+                                senderNumber,
+                                nomeCliente,
+                                numDestino: numDestinoInline || null,
+                                pacote,
+                                timestamp: Date.now(),
+                                timer: null
+                            };
+
+                            itemAguardando.timer = setTimeout(async () => {
+                                try {
+                                    if (aguardandoOperadora.has(txn_id)) {
+                                        aguardandoOperadora.delete(txn_id);
+                                        const { supportNum } = getSuporteDetails();
+                                        await sock.sendMessage(jid, {
+                                            text: `⚠️ *COMPROVATIVO AINDA NÃO RECEBIDO PELA OPERADORA* ⚠️\n` +
+                                                  `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                                  `Olá, *${nomeCliente}*.\n` +
+                                                  `O seu comprovativo da transação \`${txn_id}\` (*${valor} MT*) ainda *não foi confirmado* pela operadora (${metodoNome}) após 2 minutos de espera.\n\n` +
+                                                  `📌 *O que aconteceu?*\n` +
+                                                  `• O SMS da operadora pode estar com atraso na rede; ou\n` +
+                                                  `• A transferência pode não ter sido concluída.\n\n` +
+                                                  `💡 *O que fazer:*\n` +
+                                                  `1. Se o dinheiro já foi debitado da sua conta, envie mensagem ao nosso suporte com o extrato/captura de tela.\n` +
+                                                  `2. Se a rede estava lenta, tente reenviar o comprovativo dentro de alguns minutos.\n\n` +
+                                                  `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                                        });
+
+                                        const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                                        enviarNotificacaoGrupo(
+                                            `⏰ *COMPROVATIVO NÃO RECEBIDO DA OPERADORA (2 MIN)*\n` +
+                                            `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                            `🔖 *Ref:* \`${txn_id}\`\n` +
+                                            `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                            `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                            `🏢 *Origem:* *${origemMsg}*\n` +
+                                            `⏳ *Status:* Tempo limite de 2 min atingido sem confirmação por SMS da operadora.`
+                                        );
+                                    }
+                                } catch (err) {
+                                    console.error('❌ Erro no timer de 2 minutos do comprovativo:', err);
+                                }
+                            }, 120_000);
+
+                            aguardandoOperadora.set(txn_id, itemAguardando);
+
+                            // Responder imediatamente ao cliente
+                            await reply(
+                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                `  ⏳ *STATUS: AGUARDANDO OPERADORA* 📡\n` +
+                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                `Identificamos o seu comprovativo:\n` +
+                                `🔖 *Ref:* \`${txn_id}\`\n` +
+                                `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                `📦 *Pacote:* *${pacote.nome}*\n` +
+                                (numDestinoInline ? `📲 *Destino:* *${numDestinoInline}*\n\n` : `\n`) +
+                                `📡 *Aguardando confirmação oficial da operadora (${metodoNome})...*\n` +
+                                `O sistema está a verificar o recebimento do valor na nossa conta. Isso costuma levar entre *30 segundos a 2 minutos*.\n\n` +
+                                `⚡ *Assim que a confirmação chegar, o seu pacote será ativado imediatamente!*`
+                            );
+
+                            // Notificar o grupo de notificações
+                            const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                            enviarNotificacaoGrupo(
+                                `⏳ *COMPROVATIVO EM VERIFICAÇÃO (${metodoNome.toUpperCase()})*\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `📋 *Ref:* \`${txn_id}\`\n` +
+                                `💳 *Valor:* *${valor} MT*\n` +
+                                `📦 *Pacote:* *${pacote.nome}*\n` +
+                                `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                (numDestinoInline ? `📲 *Destino:* *${numDestinoInline}*\n` : '') +
+                                `🏢 *Origem:* *${origemMsg}*\n` +
+                                `⏳ *Status:* Aguardando SMS da operadora (limite 2 min)...`
+                            );
                             continue;
                         }
-
-                        // Caso não venha o número de destino na mesma mensagem, bloqueia imediatamente para este cliente e aguarda o número
-                        if (txn_id) {
-                            transacoesProcessadas.add(txn_id);
-                            transacoesProcessadasMap.set(txn_id, {
-                                sender: senderNumber,
-                                jid,
-                                valor: parseFloat(valor),
-                                status: 'locked',
-                                timestamp: Date.now()
-                            });
-                            salvarTransacoes();
-                        }
-
-                        const pendingKey = `${jid}:${senderNumber}`;
-                        pendingPayments.set(pendingKey, {
-                            txn_id,
-                            valor,
-                            metodo,
-                            aguardando_numero: true
-                        });
-
-                        await reply(
-                            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                            `  ✅ *COMPROVATIVO VERIFICADO!* 💳\n` +
-                            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                            `🔖 *Transação:* \`${txn_id}\`\n` +
-                            `💰 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                            `📦 *Pacote:* *${pacote.nome}* (${pacote.mb} MB)\n\n` +
-                            `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?*\n` +
-                            `Por favor, responda agora com o seu *número Vodacom*:\n` +
-                            `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
-                        );
-                        continue;
                     }
 
                     // ── 11. SISTEMA DE FIDELIDADE E INDICAÇÃO ───────────────
@@ -1752,6 +1903,152 @@ function getJidForOrder(orderId) {
     return null;
 }
 
+/**
+ * Processa a ativação quando a operadora confirma o pagamento (M-Pesa / e-Mola)
+ */
+async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
+    try {
+        const smsRec = smsPaymentsMap.get(item.txn_id);
+        if (smsRec) {
+            smsRec.usado = true;
+            smsRec.usadoPor = item.senderNumber;
+            smsRec.usadoEm = Date.now();
+            salvarSmsPayments();
+        }
+
+        const { supportNum } = getSuporteDetails();
+        const metodoNome = (metodo || item.metodo) === 'emola' ? 'e-Mola' : 'M-Pesa';
+
+        if (item.numDestino) {
+            const orderId = 'WA-' + item.txn_id + '-' + Date.now();
+
+            if (sock) {
+                await sock.sendMessage(item.jid, {
+                    text: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                          `  🎉 *COMPROVATIVO VALIDADO COM SUCESSO!* ⚡\n` +
+                          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                          `A sua transação foi confirmada oficialmente pela rede *${metodoNome}*!\n\n` +
+                          `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                          `📲 *Destino:* *${item.numDestino}*\n` +
+                          `💳 *Valor Pago:* *${valorPago} MT*\n` +
+                          `🔖 *Ref:* \`${item.txn_id}\`\n\n` +
+                          `🚀 *Ativação automática em andamento!*\n` +
+                          `_Você receberá uma confirmação assim que for concluído._\n\n` +
+                          `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                });
+            }
+
+            historicoVendas.push({
+                orderId,
+                numero: item.numDestino,
+                mb: item.pacote.mb,
+                valor: valorPago,
+                timestamp: Date.now()
+            });
+
+            transacoesProcessadas.add(item.txn_id);
+            transacoesProcessadasMap.set(item.txn_id, {
+                sender: item.senderNumber,
+                jid: item.jid,
+                numeroDestino: item.numDestino,
+                valor: valorPago,
+                status: 'completed',
+                timestamp: Date.now()
+            });
+            salvarTransacoes();
+
+            const origemMsg = item.jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+            const tabelaOrigem = item.pacote.origem === 'grupo_especifico' ? 'Tabela Exclusiva deste Grupo' : 'Tabela Padrão Geral';
+            enviarNotificacaoGrupo(
+                `🔔 *NOVO PEDIDO VALIDADO PELA OPERADORA* ⚡\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                `📋 *Ref:* \`${orderId}\`\n` +
+                `📲 *Destino:* *${item.numDestino}*\n` +
+                `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                `👤 *Cliente:* *${item.nomeCliente}* (${item.senderNumber})\n` +
+                `🏢 *Origem:* *${origemMsg}*\n` +
+                `🏷️ *Tabela:* *${tabelaOrigem}*\n` +
+                `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                `⏳ *Status:* Validado via SMS da Operadora. Enviado para ativação USSD!`
+            );
+
+            if (orderDispatchCallback) {
+                orderDispatchCallback({
+                    orderId,
+                    numero: item.numDestino,
+                    quantidade: item.pacote.mb,
+                    modo: item.pacote.tipo,
+                    jid: item.jid,
+                    sender: item.senderNumber,
+                    txn_id: item.txn_id,
+                    valor: valorPago
+                });
+            }
+        } else {
+            const pendingKey = `${item.jid}:${item.senderNumber}`;
+            pendingPayments.set(pendingKey, {
+                txn_id: item.txn_id,
+                valor: valorPago,
+                metodo: item.metodo,
+                aguardando_numero: true
+            });
+
+            if (sock) {
+                await sock.sendMessage(item.jid, {
+                    text: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                          `  ✅ *COMPROVATIVO VALIDADO PELA OPERADORA!* 💳\n` +
+                          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                          `A operadora (${metodoNome}) confirmou a sua transação (\`${item.txn_id}\`) de *${valorPago} MT*!\n\n` +
+                          `📦 *Pacote:* *${item.pacote.nome}* (${item.pacote.mb} MB)\n\n` +
+                          `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?*\n` +
+                          `Por favor, responda com o seu *número Vodacom* que deve receber os megas:\n` +
+                          `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
+                });
+            }
+        }
+    } catch (e) {
+        console.error('❌ Erro ao processar pedido confirmado pós-operadora:', e);
+    }
+}
+
+/**
+ * Chamado quando um SMS real de dinheiro recebido chega via /api/sms/payment
+ */
+function registrarSmsPayment({ txn_id, valor, remetente, metodo, raw_sms }) {
+    if (!txn_id) return;
+    const vNum = parseFloat(valor);
+    console.log(`💰 [SMS OPERADORA REGISTADO] Ref: ${txn_id} | Valor: ${vNum} MT | Remetente: ${remetente} (${metodo})`);
+
+    const existing = smsPaymentsMap.get(txn_id);
+    if (!existing) {
+        smsPaymentsMap.set(txn_id, {
+            txn_id,
+            valor: vNum,
+            remetente: remetente || '',
+            metodo: metodo || 'mpesa',
+            raw_sms: raw_sms || '',
+            timestamp: Date.now(),
+            usado: false
+        });
+        salvarSmsPayments();
+    }
+
+    // Se houver algum cliente aguardando no status "Aguardando Comprovativo da Operadora":
+    if (aguardandoOperadora.has(txn_id)) {
+        const item = aguardandoOperadora.get(txn_id);
+        aguardandoOperadora.delete(txn_id);
+        if (item.timer) {
+            clearTimeout(item.timer);
+            item.timer = null;
+        }
+
+        console.log(`🎉 [OPERADORA VALIDOU] Cliente ${item.senderNumber} estava aguardando ref ${txn_id}. Processando imediatamente!`);
+        processarPedidoAguardandoConfirmado(item, vNum, metodo || item.metodo);
+    }
+}
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -1763,6 +2060,9 @@ module.exports = {
     getGroups,
     setModoManutencao,
     toggleGrupoFechado,
-    getJidForOrder
+    getJidForOrder,
+    registrarSmsPayment,
+    smsPaymentsMap,
+    aguardandoOperadora
 };
 
