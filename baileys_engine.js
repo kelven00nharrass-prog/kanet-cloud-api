@@ -44,6 +44,7 @@ let LOCAL_CFG = {};
 const banidosSet = new Set();
 const clientesLeads = new Set();
 const historicoVendas = [];
+const transacoesProcessadas = new Set();
 
 function carregarConfigs() {
     try {
@@ -138,6 +139,42 @@ function getSaudacaoHora() {
     if (h >= 5 && h < 12) return 'Bom dia';
     if (h >= 12 && h < 18) return 'Boa tarde';
     return 'Boa noite';
+}
+
+function getGrupoNotificacoes() {
+    return LOCAL_CFG.grupo_notificacoes || DYN_CFG.GRUPO_NOTIFICACOES || '120363409903708446@g.us';
+}
+
+function getGrupoErros() {
+    return LOCAL_CFG.grupo_erros || DYN_CFG.GRUPO_ERROS || '120363408450329444@g.us';
+}
+
+async function enviarNotificacaoGrupo(texto) {
+    try {
+        const jid = getGrupoNotificacoes();
+        if (sock && connectionStatus === 'connected' && jid) {
+            await sock.sendMessage(jid, { text: texto });
+            console.log(`🔔 [GRUPO NOTIFICAÇÕES] Mensagem enviada para ${jid}`);
+            return true;
+        }
+    } catch (e) {
+        console.warn(`⚠️ [GRUPO NOTIFICAÇÕES ERRO]: ${e.message}`);
+    }
+    return false;
+}
+
+async function enviarErroGrupo(texto) {
+    try {
+        const jid = getGrupoErros();
+        if (sock && connectionStatus === 'connected' && jid) {
+            await sock.sendMessage(jid, { text: texto });
+            console.log(`🚨 [GRUPO ERROS] Mensagem enviada para ${jid}`);
+            return true;
+        }
+    } catch (e) {
+        console.warn(`⚠️ [GRUPO ERROS ERRO]: ${e.message}`);
+    }
+    return false;
 }
 
 // ══════════════════════════════════════════════════
@@ -516,15 +553,8 @@ function isComprovativo(texto) {
     return temIndicador && temValor;
 }
 
-function getNumerosSistema() {
-    const list = new Set([
-        '856268811', // M-Pesa principal
-        '864882152', // e-Mola principal
-        '856116039', // Master / Suporte
-        '850401416', // Master
-        '841636072', // Master
-        '876692062'  // Sistema
-    ]);
+function getNumerosDeposito() {
+    const list = new Set();
     try {
         const pay = getPaymentDetails();
         if (pay.mpesa_num) {
@@ -535,18 +565,16 @@ function getNumerosSistema() {
             const c = String(pay.emola_num).replace(/\D/g, '').slice(-9);
             if (c.length === 9) list.add(c);
         }
-        getMasterNumbers().forEach(n => {
-            const c = String(n).replace(/\D/g, '').slice(-9);
-            if (c.length === 9) list.add(c);
-        });
     } catch (e) {}
+    list.add('856268811');
+    list.add('864882152');
     return list;
 }
 
-function isNumeroSistema(num) {
+function isNumeroDeposito(num) {
     if (!num) return false;
     const clean = String(num).replace(/\D/g, '').slice(-9);
-    return getNumerosSistema().has(clean);
+    return getNumerosDeposito().has(clean);
 }
 
 function extrairNumeroDestino(texto) {
@@ -557,7 +585,7 @@ function extrairNumeroDestino(texto) {
     // Se o texto for exatamente um número de telefone com ou sem 258
     if (/^(?:258)?(8[4-5]\d{7})$/.test(digitsOnly)) {
         const num = digitsOnly.slice(-9);
-        if (!isNumeroSistema(num)) return num;
+        if (!isNumeroDeposito(num)) return num;
         return null;
     }
 
@@ -567,7 +595,7 @@ function extrairNumeroDestino(texto) {
     let candidates = [];
     while ((match = regex.exec(clean)) !== null) {
         const rawNum = match[1].replace(/\s+/g, '');
-        if (/^8[4-5]\d{7}$/.test(rawNum) && !isNumeroSistema(rawNum)) {
+        if (/^8[4-5]\d{7}$/.test(rawNum) && !isNumeroDeposito(rawNum)) {
             candidates.push(rawNum);
         }
     }
@@ -588,7 +616,7 @@ function extrairNumeroDestinoAbaixoDoComprovativo(texto) {
             continue;
         }
         const num = extrairNumeroDestino(l);
-        if (num && !isNumeroSistema(num)) {
+        if (num && !isNumeroDeposito(num)) {
             return num;
         }
     }
@@ -655,13 +683,62 @@ function processarAddTabelaCompleta(corpo) {
     return `⚠️ Não foi possível identificar pacotes na tabela colada.\nUse o formato:\n*1GB 24h - 23 MT*`;
 }
 
+let firestoreDbInstance = null;
+
+async function backupAuthToFirestore(db) {
+    if (!db || !fs.existsSync(AUTH_DIR)) return;
+    try {
+        const files = fs.readdirSync(AUTH_DIR);
+        for (const file of files) {
+            const filePath = path.join(AUTH_DIR, file);
+            if (fs.statSync(filePath).isFile()) {
+                const content = fs.readFileSync(filePath, 'utf8');
+                await db.collection('whatsapp_cloud_auth').doc(encodeURIComponent(file)).set({
+                    content,
+                    updatedAt: Date.now()
+                }, { merge: true });
+            }
+        }
+        console.log(`💾 [BAILEYS NUVEM] ${files.length} ficheiros de sessão guardados no Firestore com sucesso!`);
+    } catch (e) {
+        console.warn('⚠️ [BAILEYS NUVEM] Falha no backup para Firestore:', e.message);
+    }
+}
+
+async function restoreAuthFromFirestore(db) {
+    if (!db) return;
+    try {
+        const snap = await db.collection('whatsapp_cloud_auth').get();
+        if (snap.empty) {
+            console.log('ℹ️ [BAILEYS NUVEM] Nenhuma sessão prévia no Firestore.');
+            return;
+        }
+        if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
+        for (const doc of snap.docs) {
+            const fileName = decodeURIComponent(doc.id);
+            const content = doc.data().content;
+            if (content) {
+                fs.writeFileSync(path.join(AUTH_DIR, fileName), content, 'utf8');
+            }
+        }
+        console.log(`📥 [BAILEYS NUVEM] ${snap.size} ficheiros de sessão restaurados do Firestore! Sessão recuperada sem QR.`);
+    } catch (e) {
+        console.warn('⚠️ [BAILEYS NUVEM] Falha ao restaurar sessão do Firestore:', e.message);
+    }
+}
+
 // ══════════════════════════════════════════════════
 // MOTOR PRINCIPAL BAILEYS
 // ══════════════════════════════════════════════════
-async function startWhatsApp(orderCallback) {
+async function startWhatsApp(orderCallback, db = null) {
+    if (db) firestoreDbInstance = db;
     orderDispatchCallback = orderCallback;
 
     try {
+        if (firestoreDbInstance) {
+            await restoreAuthFromFirestore(firestoreDbInstance);
+        }
+
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
         const { version } = await fetchLatestBaileysVersion();
 
@@ -675,7 +752,12 @@ async function startWhatsApp(orderCallback) {
             browser: ['Ka-Net Cloud', 'Chrome', '2.0.0']
         });
 
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', async () => {
+            await saveCreds();
+            if (firestoreDbInstance) {
+                await backupAuthToFirestore(firestoreDbInstance);
+            }
+        });
 
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
@@ -779,6 +861,21 @@ async function startWhatsApp(orderCallback) {
                                     valor: parseFloat(pay.valor),
                                     timestamp: Date.now()
                                 });
+                                if (pay.txn_id) transacoesProcessadas.add(pay.txn_id);
+
+                                // Notificar Grupo de Notificações
+                                enviarNotificacaoGrupo(
+                                    `🔔 *NOVO PEDIDO REGISTADO* ⚡\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `📋 *Ref:* \`${orderId}\`\n` +
+                                    `📲 *Destino:* *${numDestino}*\n` +
+                                    `📦 *Pacote:* *${pacote ? pacote.nome : pay.valor + ' MT'}*\n` +
+                                    `💳 *Valor:* *${pay.valor} MT* (${pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa'})\n` +
+                                    `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                    `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `⏳ *Status:* Enviado para o Celular USSD`
+                                );
 
                                 if (orderDispatchCallback) {
                                     orderDispatchCallback({
@@ -794,8 +891,8 @@ async function startWhatsApp(orderCallback) {
                                 }
                                 continue;
                             } else {
-                                if (isNumeroSistema(text)) {
-                                    await reply(`⚠️ O número digitado (*${text.trim()}*) é o número de depósito do sistema.\n\nPor favor, envie o seu *próprio número Vodacom* (ex: *84XXXXXXX* ou *85XXXXXXX*) para onde deseja receber a recarga.`);
+                                if (isNumeroDeposito(text)) {
+                                    await reply(`⚠️ O número digitado (*${text.trim()}*) é a conta de depósito do sistema.\n\nPor favor, envie o seu *próprio número Vodacom* (ex: *84XXXXXXX* ou *85XXXXXXX*) para onde deseja receber a recarga.`);
                                     continue;
                                 }
                                 // Se for em grupo e o texto não parecer minimamente um número (ex: conversa normal), ignora
@@ -1016,6 +1113,8 @@ async function startWhatsApp(orderCallback) {
                             `📱 *WhatsApp:* Conectado (${connectedUser})\n` +
                             `🛑 *Manutenção:* ${modoManutencao ? 'ATIVA' : 'DESATIVADA'}\n` +
                             `👑 *Admins Master:* ${getMasterNumbers().join(', ')}\n` +
+                            `🔔 *Grupo Notificações:* \`${getGrupoNotificacoes()}\`\n` +
+                            `🚨 *Grupo Erros:* \`${getGrupoErros()}\`\n` +
                             `👥 *Leads Ativos:* ${clientesLeads.size}\n` +
                             `🕐 *Horário do Servidor:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}`
                         );
@@ -1024,7 +1123,56 @@ async function startWhatsApp(orderCallback) {
 
                     if (cleanText === '/limpar' && senderIsMaster) {
                         pendingPayments.clear();
-                        await reply('🧹 *Fila de pagamentos pendentes limpa com sucesso!*');
+                        transacoesProcessadas.clear();
+                        await reply('🧹 *Fila de pagamentos pendentes e registos anti-duplicação limpos com sucesso!*');
+                        continue;
+                    }
+
+                    // ── GERENCIAMENTO DOS GRUPOS DE NOTIFICAÇÃO E ERROS (ADMIN) ──
+                    if (cleanText === '.idgrupo' || cleanText === '!idgrupo') {
+                        if (jid.endsWith('@g.us')) {
+                            await reply(`📋 *ID DO GRUPO ATUAL:*\n\`${jid}\``);
+                        } else {
+                            await reply(`ℹ️ Este comando deve ser executado dentro de um grupo.`);
+                        }
+                        continue;
+                    }
+
+                    if (cleanText === '.setnotificacoes' && senderIsMaster) {
+                        if (!jid.endsWith('@g.us')) {
+                            await reply(`⚠️ Este comando deve ser usado dentro do grupo de notificações.`);
+                            continue;
+                        }
+                        LOCAL_CFG.grupo_notificacoes = jid;
+                        DYN_CFG.GRUPO_NOTIFICACOES = jid;
+                        salvarLocalConfig();
+                        salvarBotConfig();
+                        await reply(`✅ *Grupo de Notificações definido com sucesso!*\n\n📋 *ID:* \`${jid}\`\n🔔 Todas as notificações de vendas e recargas ativadas serão enviadas para cá.`);
+                        continue;
+                    }
+
+                    if (cleanText === '.seterros' && senderIsMaster) {
+                        if (!jid.endsWith('@g.us')) {
+                            await reply(`⚠️ Este comando deve ser usado dentro do grupo de erros.`);
+                            continue;
+                        }
+                        LOCAL_CFG.grupo_erros = jid;
+                        DYN_CFG.GRUPO_ERROS = jid;
+                        salvarLocalConfig();
+                        salvarBotConfig();
+                        await reply(`🚨 *Grupo de Erros definido com sucesso!*\n\n📋 *ID:* \`${jid}\`\n⚠️ Todos os alertas de falhas e problemas serão enviados para cá.`);
+                        continue;
+                    }
+
+                    if (cleanText === '.grupos' && senderIsMaster) {
+                        await reply(
+                            `📋 *GRUPOS CONFIGURADOS NO SISTEMA*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                            `🔔 *Notificações:* \`${getGrupoNotificacoes() || 'Não configurado'}\`\n` +
+                            `🚨 *Erros:* \`${getGrupoErros() || 'Não configurado'}\`\n\n` +
+                            `💡 *Como alterar:*\n` +
+                            `• Entre no grupo e envie *.setnotificacoes*\n` +
+                            `• Entre no grupo e envie *.seterros*`
+                        );
                         continue;
                     }
 
@@ -1059,6 +1207,16 @@ async function startWhatsApp(orderCallback) {
                         const txn_id = extrairTxId(text);
                         const metodo = /e-mola|emola|TX[A-Z0-9]/i.test(text) ? 'emola' : 'mpesa';
                         const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
+
+                        // ── REGRA 1: ANTI-DUPLICAÇÃO / TRANSAÇÃO ÚNICA ──
+                        if (txn_id && transacoesProcessadas.has(txn_id)) {
+                            await reply(
+                                `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
+                                `❌ Esta transação (\`${txn_id}\`) já foi processada anteriormente no sistema.\n\n` +
+                                `⏳ Cada comprovativo só é válido para uma única ativação de pacote.`
+                            );
+                            continue;
+                        }
 
                         console.log(`💳 [COMPROVATIVO DETECTADO] ${metodoNome} | Ref: ${txn_id} | Valor: ${valor} MT | Remetente: ${senderNumber}`);
 
@@ -1105,6 +1263,21 @@ async function startWhatsApp(orderCallback) {
                                 valor: parseFloat(valor),
                                 timestamp: Date.now()
                             });
+                            if (txn_id) transacoesProcessadas.add(txn_id);
+
+                            // Notificar Grupo de Notificações
+                            enviarNotificacaoGrupo(
+                                `🔔 *NOVO PEDIDO REGISTADO* ⚡\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `📋 *Ref:* \`${orderId}\`\n` +
+                                `📲 *Destino:* *${numDestinoInline}*\n` +
+                                `📦 *Pacote:* *${pacote.nome}*\n` +
+                                `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `⏳ *Status:* Enviado para ativação USSD`
+                            );
 
                             if (orderDispatchCallback) {
                                 orderDispatchCallback({
@@ -1234,4 +1407,12 @@ async function sendTextMessage(jid, text) {
     return false;
 }
 
-module.exports = { startWhatsApp, getStatus, sendTextMessage };
+module.exports = { 
+    startWhatsApp, 
+    getStatus, 
+    sendTextMessage, 
+    enviarNotificacaoGrupo, 
+    enviarErroGrupo, 
+    getGrupoNotificacoes, 
+    getGrupoErros 
+};
