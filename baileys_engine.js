@@ -92,6 +92,7 @@ function carregarConfigs() {
     if (!DYN_CFG.TABELAS) DYN_CFG.TABELAS = { '24hrs': {}, 'semanal': {}, 'mensal': {}, 'ilimitado': {}, 'saldo': {} };
     if (!DYN_CFG.PLANOS_ESPECIAIS) DYN_CFG.PLANOS_ESPECIAIS = {};
     if (!DYN_CFG.GRUPOS_FECHADOS) DYN_CFG.GRUPOS_FECHADOS = [];
+    if (!DYN_CFG.TABELAS_GRUPO) DYN_CFG.TABELAS_GRUPO = {};
     // Restaurar modo manutenção persistido
     if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
     
@@ -471,7 +472,7 @@ function buscarPacotePorValor(valor, jid = null) {
     if (jid && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
         const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
         const grpTabs = grpCfg.TABELAS || grpCfg;
-        for (const cat of ['24hrs', 'semanal', 'mensal', 'ilimitado', 'especial']) {
+        for (const cat of ['24hrs', 'semanal', 'mensal', 'ilimitado', 'especial', 'estudantes', 'saldo']) {
             if (grpTabs[cat] && grpTabs[cat][vStr]) {
                 const p = grpTabs[cat][vStr];
                 return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: cat, preco: vNum, origem: 'grupo_especifico' };
@@ -660,7 +661,7 @@ function extrairNumeroDestinoAbaixoDoComprovativo(texto) {
     return null;
 }
 
-function processarAddTabelaCompleta(corpo) {
+function processarAddTabelaCompleta(corpo, targetJid = null) {
     function _parseToMB(sizeStr) {
         sizeStr = sizeStr.trim().replace(/,/g, '.');
         const gMatch = sizeStr.match(/([\d.]+)\s*GB/i);
@@ -710,6 +711,24 @@ function processarAddTabelaCompleta(corpo) {
     if (contador > 0) {
         const resumo = [];
         const catNomes = { '24hrs': '📦 24hrs', 'semanal': '📅 Semanal', 'mensal': '📆 Mensal', 'ilimitado': '🌐 Ilimitado', 'saldo': '💳 Saldo' };
+        
+        // Se foi especificado um grupo, salvar como tabela exclusiva do grupo
+        if (targetJid && String(targetJid).endsWith('@g.us')) {
+            if (!DYN_CFG.TABELAS_GRUPO) DYN_CFG.TABELAS_GRUPO = {};
+            if (!DYN_CFG.TABELAS_GRUPO[targetJid]) DYN_CFG.TABELAS_GRUPO[targetJid] = { TABELAS: {} };
+            if (!DYN_CFG.TABELAS_GRUPO[targetJid].TABELAS) DYN_CFG.TABELAS_GRUPO[targetJid].TABELAS = {};
+
+            for (const cat of Object.keys(newTabelas)) {
+                if (Object.keys(newTabelas[cat]).length > 0) {
+                    DYN_CFG.TABELAS_GRUPO[targetJid].TABELAS[cat] = newTabelas[cat];
+                    resumo.push(`${catNomes[cat] || cat}: *${Object.keys(newTabelas[cat]).length} pacotes*`);
+                }
+            }
+            salvarBotConfig();
+            return `✅ *TABELA EXCLUSIVA DESTE GRUPO ATUALIZADA!* 👥\n\n${resumo.join('\n')}\n\n_Total: ${contador} pacotes salvos exclusivamente para este grupo._\n_Clientes aqui verão e comprarão por estes preços!_`;
+        }
+
+        // Caso contrário, salvar na Tabela Geral do Sistema
         for (const cat of Object.keys(newTabelas)) {
             if (Object.keys(newTabelas[cat]).length > 0) {
                 // FULL REPLACE — remove all stale old entries for this category
@@ -718,7 +737,7 @@ function processarAddTabelaCompleta(corpo) {
             }
         }
         salvarBotConfig();
-        return `✅ *TABELA ATUALIZADA COM SUCESSO!*\n\n${resumo.join('\n')}\n\n_Total: ${contador} pacotes substituídos._`;
+        return `✅ *TABELA GERAL ATUALIZADA COM SUCESSO!*\n\n${resumo.join('\n')}\n\n_Total: ${contador} pacotes substituídos no sistema geral._`;
     }
 
     return `⚠️ Não foi possível identificar pacotes na tabela colada.\nUse o formato:\n*1GB 24h - 23 MT*`;
@@ -930,7 +949,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                     salvarTransacoes();
                                 }
 
-                                // Notificar Grupo de Notificações
+                                const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                                const tabelaOrigem = pacote && pacote.origem === 'grupo_especifico' ? 'Tabela Exclusiva deste Grupo' : 'Tabela Padrão Geral';
                                 enviarNotificacaoGrupo(
                                     `🔔 *NOVO PEDIDO REGISTADO* ⚡\n` +
                                     `━━━━━━━━━━━━━━━━━━\n` +
@@ -939,6 +959,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                     `📦 *Pacote:* *${pacote ? pacote.nome : pay.valor + ' MT'}*\n` +
                                     `💳 *Valor:* *${pay.valor} MT* (${pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa'})\n` +
                                     `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                    `🏢 *Origem:* *${origemMsg}*\n` +
+                                    `🏷️ *Tabela:* *${tabelaOrigem}*\n` +
                                     `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
                                     `━━━━━━━━━━━━━━━━━━\n` +
                                     `⏳ *Status:* Enviado para o Celular USSD`
@@ -972,17 +994,37 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
-                    // ── 2. COMANDO .addtabela (ADMIN MASTER) ────────────────
-                    if (cleanText.startsWith('.addtabela') || cleanText.startsWith('!addtabela')) {
+                    // ── 2. COMANDO .addtabela e .addtabelagrupo (ADMIN MASTER) ──
+                    const ehCmdAddTabela = cleanText.startsWith('.addtabela') || cleanText.startsWith('!addtabela') ||
+                                           cleanText.startsWith('.addtabelagrupo') || cleanText.startsWith('!addtabelagrupo');
+                    if (ehCmdAddTabela) {
                         if (!senderIsMaster) {
                             await reply('🚫 *ACESSO NEGADO*\n━━━━━━━━━━━━━━━━━━━\n⚠️ Comando restrito ao Administrador Master.');
                             continue;
                         }
 
-                        const body = text.replace(/^[.!]addtabela\s*/i, '').trim();
+                        const isExplicitGrupo = cleanText.startsWith('.addtabelagrupo') || cleanText.startsWith('!addtabelagrupo');
+                        let body = text.replace(/^[.!](addtabelagrupo|addtabela)\s*/i, '').trim();
+
+                        // Determinar se o destino é um grupo específico ou geral
+                        let targetGrupoJid = null;
+                        if (isExplicitGrupo && jid.endsWith('@g.us')) {
+                            targetGrupoJid = jid;
+                        } else if (jid.endsWith('@g.us')) {
+                            if (/^geral\b/i.test(body)) {
+                                targetGrupoJid = null;
+                                body = body.replace(/^geral\s*/i, '').trim();
+                            } else if (/^grupo\b/i.test(body)) {
+                                targetGrupoJid = jid;
+                                body = body.replace(/^grupo\s*/i, '').trim();
+                            } else {
+                                // Se enviado dentro do grupo sem dizer "geral", define para este grupo
+                                targetGrupoJid = jid;
+                            }
+                        }
 
                         if (/DI[AÁ]R|SEMAN|MENS|ILIMIT|SALDO|GB|MB/i.test(body) && body.length > 30) {
-                            const res = processarAddTabelaCompleta(body);
+                            const res = processarAddTabelaCompleta(body, targetGrupoJid);
                             await reply(res);
                             continue;
                         }
@@ -1000,26 +1042,60 @@ async function startWhatsApp(orderCallback, db = null) {
                                 continue;
                             }
 
-                            if (!DYN_CFG.TABELAS[cat]) DYN_CFG.TABELAS[cat] = {};
-                            DYN_CFG.TABELAS[cat][preco] = {
-                                quantidade: mb,
-                                nome,
-                                quantidade_mb: mb,
-                                periodo: cat,
-                                tipo: cat
-                            };
-                            salvarBotConfig();
-                            await reply(`✅ *Pacote Adicionado!*\n\n📂 Categoria: *${cat}*\n💰 Preço: *${preco} MT*\n📦 Megas: *${mb} MB*\n🏷️ Nome: *${nome}*`);
-                            continue;
+                            if (targetGrupoJid) {
+                                if (!DYN_CFG.TABELAS_GRUPO) DYN_CFG.TABELAS_GRUPO = {};
+                                if (!DYN_CFG.TABELAS_GRUPO[targetGrupoJid]) DYN_CFG.TABELAS_GRUPO[targetGrupoJid] = { TABELAS: {} };
+                                if (!DYN_CFG.TABELAS_GRUPO[targetGrupoJid].TABELAS) DYN_CFG.TABELAS_GRUPO[targetGrupoJid].TABELAS = {};
+                                if (!DYN_CFG.TABELAS_GRUPO[targetGrupoJid].TABELAS[cat]) DYN_CFG.TABELAS_GRUPO[targetGrupoJid].TABELAS[cat] = {};
+
+                                DYN_CFG.TABELAS_GRUPO[targetGrupoJid].TABELAS[cat][preco] = {
+                                    quantidade: mb,
+                                    nome,
+                                    quantidade_mb: mb,
+                                    periodo: cat,
+                                    tipo: cat
+                                };
+                                salvarBotConfig();
+                                await reply(`✅ *Pacote Adicionado EXCLUSIVAMENTE a este Grupo!* 👥\n\n📂 Categoria: *${cat}*\n💰 Preço: *${preco} MT*\n📦 Megas: *${mb} MB*\n🏷️ Nome: *${nome}*`);
+                                continue;
+                            } else {
+                                if (!DYN_CFG.TABELAS[cat]) DYN_CFG.TABELAS[cat] = {};
+                                DYN_CFG.TABELAS[cat][preco] = {
+                                    quantidade: mb,
+                                    nome,
+                                    quantidade_mb: mb,
+                                    periodo: cat,
+                                    tipo: cat
+                                };
+                                salvarBotConfig();
+                                await reply(`✅ *Pacote Adicionado na Tabela Geral!* 🌐\n\n📂 Categoria: *${cat}*\n💰 Preço: *${preco} MT*\n📦 Megas: *${mb} MB*\n🏷️ Nome: *${nome}*`);
+                                continue;
+                            }
                         }
 
                         await reply(
                             `💡 *USO DO COMANDO .addtabela*\n━━━━━━━━━━━━━━━━━━━\n\n` +
-                            `*Modo 1 — Pacote Individual:*\n\`.addtabela [categoria] [preço] [megas] [nome]\`\n` +
-                            `_Exemplo:_ \`.addtabela 24hrs 15 600 600MB 24h\`\n\n` +
-                            `*Modo 2 — Tabela Completa:*\nCole a tabela inteira formatada após \`.addtabela\`\n\n` +
-                            `*Categorias:* \`24hrs\`, \`semanal\`, \`mensal\`, \`ilimitado\`, \`estudantes\``
+                            `*Tabela Completa (Cole a tabela inteira após o comando):*\n` +
+                            `• No grupo: \`.addtabela [tabela]\` ➔ Define tabela deste grupo\n` +
+                            `• Geral: \`.addtabela geral [tabela]\` ➔ Define tabela geral do sistema\n\n` +
+                            `*Pacote Individual:*\n\`.addtabela [categoria] [preço] [megas] [nome]\`\n` +
+                            `_Exemplo:_ \`.addtabela 24hrs 25 1024 1GB 24h\`\n\n` +
+                            `*Restaurar Tabela Padrão no Grupo:*\n\`.resetartabela\` (neste grupo)`
                         );
+                        continue;
+                    }
+
+                    // ── COMANDO .resetartabela / .tabelapadrao (ADMIN MASTER) ──
+                    if (['.resetartabela', '!resetartabela', '.tabelapadrao', '!tabelapadrao'].includes(cleanText)) {
+                        if (!senderIsMaster) { await reply('🚫 Apenas Admin.'); continue; }
+                        if (!jid.endsWith('@g.us')) { await reply('⚠️ Este comando deve ser usado dentro de um grupo WhatsApp.'); continue; }
+                        if (DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
+                            delete DYN_CFG.TABELAS_GRUPO[jid];
+                            salvarBotConfig();
+                            await reply('🔄 *TABELA DO GRUPO RESETADA!*\n\nEste grupo voltou a usar a *Tabela Geral Padrão* do sistema.');
+                        } else {
+                            await reply('ℹ️ Este grupo já está a usar a Tabela Padrão do sistema.');
+                        }
                         continue;
                     }
 
@@ -1336,6 +1412,20 @@ async function startWhatsApp(orderCallback, db = null) {
                                 `Porém, não encontramos um pacote correspondente a este valor na tabela.\n` +
                                 `Digite *Menu* para verificar os preços disponíveis.`
                             );
+                            
+                            // Avisar o Grupo de Notificações para o admin não perder o dinheiro!
+                            const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                            enviarNotificacaoGrupo(
+                                `⚠️ *PAGAMENTO SEM PACOTE CORRESPONDENTE* ⚠️\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `🔖 *Ref:* \`${txn_id || 'N/D'}\`\n` +
+                                `💳 *Valor Pago:* *${valor} MT* (${metodoNome})\n` +
+                                `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                `🏢 *Origem:* *${origemMsg}*\n` +
+                                `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `❗ *Atenção:* O cliente pagou ${valor} MT mas este valor não consta na tabela deste grupo/sistema. Verificar e atender manualmente!`
+                            );
                             continue;
                         }
 
@@ -1377,6 +1467,8 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
 
                             // Notificar Grupo de Notificações
+                            const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                            const tabelaOrigem = pacote.origem === 'grupo_especifico' ? 'Tabela Exclusiva deste Grupo' : 'Tabela Padrão Geral';
                             enviarNotificacaoGrupo(
                                 `🔔 *NOVO PEDIDO REGISTADO* ⚡\n` +
                                 `━━━━━━━━━━━━━━━━━━\n` +
@@ -1385,6 +1477,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                 `📦 *Pacote:* *${pacote.nome}*\n` +
                                 `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
                                 `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                `🏢 *Origem:* *${origemMsg}*\n` +
+                                `🏷️ *Tabela:* *${tabelaOrigem}*\n` +
                                 `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
                                 `━━━━━━━━━━━━━━━━━━\n` +
                                 `⏳ *Status:* Enviado para ativação USSD`
