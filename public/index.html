@@ -3,177 +3,382 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ka-Net Cloud Panel</title>
+<title>Ka-Net Cloud Panel - Gestão & Operações</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-:root{--bg:#060913;--card:rgba(16,23,41,0.7);--border:rgba(255,255,255,0.07);--cyan:#00f0ff;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--purple:#a855f7;--text:#f3f4f6;--muted:#9ca3af}
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Outfit',sans-serif}
-body{background:var(--bg);color:var(--text);min-height:100vh}
-body::before{content:'';position:fixed;width:500px;height:500px;border-radius:50%;background:var(--cyan);filter:blur(180px);opacity:.06;top:-100px;left:-100px;pointer-events:none;z-index:0}
-body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%;background:var(--purple);filter:blur(180px);opacity:.06;bottom:-100px;right:-100px;pointer-events:none;z-index:0}
-.header{background:rgba(10,14,26,.9);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px)}
-.logo{display:flex;align-items:center;gap:12px;font-size:1.2rem;font-weight:700;color:var(--cyan)}
-.logo i{font-size:1.4rem}
-.wa-status{display:flex;align-items:center;gap:8px;font-size:.85rem;padding:6px 14px;border-radius:20px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);transition:all .3s}
-.wa-status.offline{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red)}
-.wa-status.loading{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:var(--yellow)}
-.dot{width:8px;height:8px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.container{max-width:1400px;margin:0 auto;padding:24px;position:relative;z-index:1}
-.section-title{font-size:.7rem;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
-.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
-.grid-devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px;margin-bottom:28px}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;transition:border-color .3s}
-.card:hover{border-color:rgba(0,240,255,.2)}
-.stat-card{display:flex;flex-direction:column;gap:6px}
-.stat-label{font-size:.75rem;color:var(--muted);font-weight:500}
-.stat-val{font-size:1.8rem;font-weight:800;color:var(--text)}
-.stat-val.cyan{color:var(--cyan)}
-.stat-val.green{color:var(--green)}
-.stat-val.red{color:var(--red)}
-.stat-val.yellow{color:var(--yellow)}
-.stat-sub{font-size:.75rem;color:var(--muted)}
-.device-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.device-name{font-size:.95rem;font-weight:700}
-.badge{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:20px}
-.badge.online{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
-.badge.offline{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.badge.apto{background:rgba(0,240,255,.1);color:var(--cyan);border:1px solid rgba(0,240,255,.25)}
-.badge.inapto{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
-.device-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.device-stat{background:rgba(0,0,0,.2);border-radius:10px;padding:10px}
-.device-stat-label{font-size:.68rem;color:var(--muted);margin-bottom:2px}
-.device-stat-val{font-size:.95rem;font-weight:700}
-.progress-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:4px}
-.progress-fill{height:100%;border-radius:3px;transition:width .5s}
-.progress-fill.green{background:var(--green)}
-.progress-fill.yellow{background:var(--yellow)}
-.progress-fill.red{background:var(--red)}
-.pending-order{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:10px;margin-top:10px;font-size:.8rem}
-.pending-label{color:var(--purple);font-weight:700;font-size:.7rem;margin-bottom:4px}
-.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;border:none;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s}
-.btn-primary{background:rgba(0,240,255,.15);color:var(--cyan);border:1px solid rgba(0,240,255,.3)}
-.btn-primary:hover{background:rgba(0,240,255,.25)}
-.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.btn-danger:hover{background:rgba(239,68,68,.25)}
-.btn-success{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
-.btn-success:hover{background:rgba(16,185,129,.25)}
-.btn-warn{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
-.btn-warn:hover{background:rgba(245,158,11,.25)}
-.btn-sm{padding:6px 12px;font-size:.76rem}
-.actions-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
-.order-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:rgba(0,0,0,.2);margin-bottom:8px;font-size:.82rem}
-.order-ref{font-family:monospace;color:var(--cyan);font-size:.75rem}
-.order-status{padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:600}
-.status-pending{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
-.status-assigned{background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
-.status-completed{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
-.status-failed{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.qr-area{text-align:center;padding:30px}
-.qr-area img{max-width:220px;border-radius:12px;border:3px solid var(--cyan)}
-.qr-area p{color:var(--muted);margin-top:12px;font-size:.85rem}
-.refresh-info{font-size:.72rem;color:var(--muted);margin-left:auto}
-.log-box{background:rgba(0,0,0,.4);border-radius:10px;padding:14px;font-family:monospace;font-size:.75rem;max-height:200px;overflow-y:auto;color:#64748b}
-.log-box span.ok{color:var(--green)}
-.log-box span.err{color:var(--red)}
-.log-box span.info{color:var(--cyan)}
-#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
-.toast-msg{padding:12px 18px;border-radius:10px;font-size:.83rem;font-weight:600;animation:slideIn .3s ease;border:1px solid}
-.toast-msg.ok{background:rgba(16,185,129,.15);color:var(--green);border-color:rgba(16,185,129,.3)}
-.toast-msg.err{background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3)}
-@keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
-.send-form{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end}
-.form-group{display:flex;flex-direction:column;gap:6px}
-.form-label{font-size:.72rem;color:var(--muted);font-weight:600}
-.form-input,.form-select{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:inherit;font-size:.85rem;outline:none;transition:border-color .2s}
-.form-input:focus,.form-select:focus{border-color:rgba(0,240,255,.4)}
-.form-select option{background:#0a0e1a}
-.no-devices{text-align:center;padding:40px;color:var(--muted);font-size:.9rem}
-@media(max-width:900px){.grid-4{grid-template-columns:repeat(2,1fr)}.send-form{grid-template-columns:1fr 1fr}.grid-2{grid-template-columns:1fr}}
-@media(max-width:600px){.grid-4{grid-template-columns:1fr}.actions-row{flex-direction:column}.send-form{grid-template-columns:1fr}}
+:root {
+  --bg: #060913;
+  --card: rgba(16, 23, 41, 0.75);
+  --border: rgba(255, 255, 255, 0.08);
+  --cyan: #00f0ff;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --purple: #a855f7;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --header-bg: rgba(10, 14, 26, 0.92);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+body { background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+body::before { content: ''; position: fixed; width: 600px; height: 600px; border-radius: 50%; background: var(--cyan); filter: blur(200px); opacity: .05; top: -150px; left: -150px; pointer-events: none; z-index: 0; }
+body::after { content: ''; position: fixed; width: 600px; height: 600px; border-radius: 50%; background: var(--purple); filter: blur(200px); opacity: .05; bottom: -150px; right: -150px; pointer-events: none; z-index: 0; }
+
+/* HEADER & TABS */
+.header { background: var(--header-bg); border-bottom: 1px solid var(--border); padding: 12px 24px; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.logo { display: flex; align-items: center; gap: 10px; font-size: 1.25rem; font-weight: 800; color: var(--cyan); letter-spacing: -0.02em; }
+.logo i { font-size: 1.4rem; }
+
+.nav-tabs { display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.35); padding: 4px; border-radius: 12px; border: 1px solid var(--border); }
+.nav-tab { background: transparent; border: none; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 8px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+.nav-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.nav-tab.active { color: #000; background: var(--cyan); font-weight: 700; box-shadow: 0 0 16px rgba(0, 240, 255, 0.4); }
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+.wa-status { display: flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 600; padding: 6px 14px; border-radius: 20px; background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.3); color: var(--green); transition: all .3s; }
+.wa-status.offline { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); color: var(--red); }
+.wa-status.loading { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.3); color: var(--yellow); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.refresh-info { font-size: .72rem; color: var(--muted); }
+
+/* MAIN CONTAINER */
+.container { max-width: 1440px; margin: 0 auto; padding: 24px; position: relative; z-index: 1; }
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* TYPOGRAPHY & CARDS */
+.section-title { font-size: .72rem; font-weight: 700; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.grid-devices { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; transition: border-color .3s; }
+.card:hover { border-color: rgba(0,240,255,.25); }
+
+.stat-card { display: flex; flex-direction: column; gap: 6px; }
+.stat-label { font-size: .75rem; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.stat-val { font-size: 1.9rem; font-weight: 800; color: var(--text); }
+.stat-val.cyan { color: var(--cyan); }
+.stat-val.green { color: var(--green); }
+.stat-val.red { color: var(--red); }
+.stat-val.yellow { color: var(--yellow); }
+.stat-val.purple { color: var(--purple); }
+.stat-sub { font-size: .74rem; color: var(--muted); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 10px; border: none; font-family: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .2s; }
+.btn-primary { background: rgba(0,240,255,.15); color: var(--cyan); border: 1px solid rgba(0,240,255,.3); }
+.btn-primary:hover { background: rgba(0,240,255,.25); }
+.btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.btn-danger:hover { background: rgba(239,68,68,.25); }
+.btn-success { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+.btn-success:hover { background: rgba(16,185,129,.25); }
+.btn-warn { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.btn-warn:hover { background: rgba(245,158,11,.25); }
+.btn-purple { background: rgba(168,85,247,.15); color: var(--purple); border: 1px solid rgba(168,85,247,.3); }
+.btn-purple:hover { background: rgba(168,85,247,.25); }
+.btn-sm { padding: 5px 11px; font-size: .75rem; border-radius: 8px; }
+.actions-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+
+/* DEVICES GRID */
+.device-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.device-name { font-size: 1rem; font-weight: 700; }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.badge.online { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+.badge.offline { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.badge.apto { background: rgba(0,240,255,.1); color: var(--cyan); border: 1px solid rgba(0,240,255,.25); }
+.badge.inapto { background: rgba(245,158,11,.1); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.device-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.device-stat { background: rgba(0,0,0,.25); border-radius: 10px; padding: 10px; border: 1px solid rgba(255,255,255,0.03); }
+.device-stat-label { font-size: .68rem; color: var(--muted); margin-bottom: 2px; }
+.device-stat-val { font-size: .95rem; font-weight: 700; }
+.progress-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 4px; }
+.progress-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+.progress-fill.green { background: var(--green); }
+.progress-fill.yellow { background: var(--yellow); }
+.progress-fill.red { background: var(--red); }
+.pending-order { background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.3); border-radius: 10px; padding: 10px; margin-top: 10px; font-size: .8rem; }
+.pending-label { color: var(--purple); font-weight: 700; font-size: .7rem; margin-bottom: 4px; }
+
+/* QUEUE & ORDERS */
+.order-item { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: rgba(0,0,0,.25); margin-bottom: 10px; font-size: .82rem; border: 1px solid var(--border); }
+.order-ref { font-family: monospace; color: var(--cyan); font-weight: 700; font-size: .78rem; }
+.order-status { padding: 3px 10px; border-radius: 20px; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+.status-pending { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.status-assigned { background: rgba(168,85,247,.15); color: var(--purple); border: 1px solid rgba(168,85,247,.3); }
+.status-completed { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+.status-failed { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.status-cancelled { background: rgba(100,116,139,.2); color: #94a3b8; border: 1px solid rgba(100,116,139,.3); }
+
+/* FORMS */
+.send-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: .72rem; color: var(--muted); font-weight: 600; }
+.form-input, .form-select { background: rgba(0,0,0,.35); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; color: var(--text); font-family: inherit; font-size: .85rem; outline: none; transition: border-color .2s; }
+.form-input:focus, .form-select:focus { border-color: rgba(0,240,255,.5); }
+.form-select option { background: #0a0e1a; }
+
+/* DATA TABLES (REPORTS) */
+.table-container { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,0.25); }
+.custom-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem; }
+.custom-table th { background: rgba(0,0,0,0.4); color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.custom-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); }
+.custom-table tr:last-child td { border-bottom: none; }
+.custom-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* QR AREA */
+.qr-area { text-align: center; padding: 30px; }
+.qr-area img { max-width: 220px; border-radius: 12px; border: 3px solid var(--cyan); }
+.qr-area p { color: var(--muted); margin-top: 12px; font-size: .85rem; }
+
+/* TOAST */
+#toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast-msg { padding: 12px 18px; border-radius: 10px; font-size: .83rem; font-weight: 600; animation: slideIn .3s ease; border: 1px solid; }
+.toast-msg.ok { background: rgba(16,185,129,.2); color: var(--green); border-color: rgba(16,185,129,.4); }
+.toast-msg.err { background: rgba(239,68,68,.2); color: var(--red); border-color: rgba(239,68,68,.4); }
+@keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* GROUP & PRICE CARDS */
+.group-card { background: rgba(0,0,0,.25); border-radius: 14px; border: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.group-name { font-size: 0.95rem; font-weight: 700; color: var(--cyan); display: flex; align-items: center; gap: 8px; }
+.group-jid { font-family: monospace; font-size: 0.72rem; color: var(--muted); word-break: break-all; }
+.group-meta { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
+
+.price-table-card { background: rgba(0,0,0,.25); border-radius: 14px; border: 1px solid var(--border); padding: 18px; }
+.price-table-title { font-size: 1rem; font-weight: 700; color: var(--cyan); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.price-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.02); margin-bottom: 6px; font-size: 0.84rem; }
+.price-item:hover { background: rgba(255,255,255,0.05); }
+.price-item-val { font-weight: 700; color: var(--green); }
+
+@media(max-width: 960px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .send-form { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width: 640px) {
+  .grid-4 { grid-template-columns: 1fr; }
+  .send-form { grid-template-columns: 1fr; }
+  .header { flex-direction: column; align-items: stretch; }
+  .nav-tabs { width: 100%; justify-content: space-around; }
+}
 </style>
 </head>
 <body>
+
+<!-- HEADER -->
 <div class="header">
   <div class="logo"><i class="fa-solid fa-tower-broadcast"></i> Ka-Net Cloud Panel</div>
-  <div style="display:flex;align-items:center;gap:12px">
+  
+  <!-- NAVIGATION TABS -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('operacoes')" id="tabBtn-operacoes"><i class="fa-solid fa-bolt"></i> Operações</button>
+    <button class="nav-tab" onclick="switchTab('relatorios')" id="tabBtn-relatorios"><i class="fa-solid fa-chart-line"></i> Relatórios & Finanças</button>
+    <button class="nav-tab" onclick="switchTab('grupos')" id="tabBtn-grupos"><i class="fa-solid fa-users"></i> Grupos & Tabelas</button>
+  </div>
+
+  <div class="header-right">
     <div class="wa-status loading" id="waStatus"><div class="dot"></div><span id="waStatusText">A verificar...</span></div>
     <span class="refresh-info" id="lastRefresh">A actualizar...</span>
   </div>
 </div>
 
 <div class="container">
-  <!-- METRICS ROW -->
-  <div class="section-title"><i class="fa-solid fa-chart-simple"></i> Métricas em Tempo Real</div>
-  <div class="grid-4" id="metricsRow">
-    <div class="card stat-card"><div class="stat-label">Celulares Online</div><div class="stat-val cyan" id="mDevices">--</div><div class="stat-sub">de todos registados</div></div>
-    <div class="card stat-card"><div class="stat-label">Pedidos Pendentes</div><div class="stat-val yellow" id="mPending">--</div><div class="stat-sub">na fila da nuvem</div></div>
-    <div class="card stat-card"><div class="stat-label">Transferências Hoje</div><div class="stat-val green" id="mToday">--</div><div class="stat-sub">concluídas com sucesso</div></div>
-    <div class="card stat-card"><div class="stat-label">Envios Diários Restantes</div><div class="stat-val cyan" id="mAvail">--</div><div class="stat-sub">Portas Diárias (8023 & 8024)</div></div>
-  </div>
 
-  <!-- ACTION BUTTONS -->
-  <div class="section-title"><i class="fa-solid fa-bolt"></i> Ações Rápidas</div>
-  <div class="actions-row">
-    <button class="btn btn-primary" onclick="reloadDevices()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
-    <button class="btn btn-warn" onclick="showQr()"><i class="fa-brands fa-whatsapp"></i> Ver QR Code WhatsApp</button>
-    <button class="btn btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Limpar Fila</button>
-    <button class="btn btn-success" onclick="document.getElementById('sendPanel').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-paper-plane"></i> Envio Manual</button>
-    <button class="btn btn-primary" onclick="restartBot()"><i class="fa-solid fa-power-off"></i> Reiniciar Bot</button>
-  </div>
-
-  <!-- DEVICES -->
-  <div class="section-title"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Gateway</div>
-  <div class="grid-devices" id="devicesGrid"><div class="no-devices"><i class="fa-solid fa-spinner fa-spin"></i> A carregar dispositivos...</div></div>
-
-  <!-- QUEUE -->
-  <div class="grid-2">
-    <div>
-      <div class="section-title"><i class="fa-solid fa-list-check"></i> Fila de Pedidos</div>
-      <div class="card" id="queuePanel" style="max-height:340px;overflow-y:auto">
-        <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></div>
-      </div>
+  <!-- ========================================== -->
+  <!-- TAB 1: OPERAÇÕES EM TEMPO REAL -->
+  <!-- ========================================== -->
+  <div id="tab-operacoes" class="tab-content active">
+    
+    <!-- METRICS ROW -->
+    <div class="section-title"><i class="fa-solid fa-chart-simple"></i> Métricas do Sistema</div>
+    <div class="grid-4">
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Online</div><div class="stat-val cyan" id="mDevices">--</div><div class="stat-sub">de todos registados</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-clock-rotate-left"></i> Pedidos Pendentes</div><div class="stat-val yellow" id="mPending">--</div><div class="stat-sub">na fila da nuvem</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-circle-check"></i> Transferências Hoje</div><div class="stat-val green" id="mToday">--</div><div class="stat-sub">concluídas com sucesso</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-box-archive"></i> Envios Diários Restantes</div><div class="stat-val cyan" id="mAvail">--</div><div class="stat-sub">Portas Diárias (8023 & 8024)</div></div>
     </div>
-    <div id="sendPanel">
-      <div class="section-title"><i class="fa-solid fa-paper-plane"></i> Envio Manual de Dados</div>
-      <div class="card">
-        <div class="send-form">
-          <div class="form-group">
-            <label class="form-label">Número de Destino</label>
-            <input class="form-input" type="tel" id="sendNumero" placeholder="84XXXXXXX">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Quantidade (MB)</label>
-            <input class="form-input" type="number" id="sendQtd" placeholder="500" value="500">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Tipo de Pacote</label>
-            <select class="form-select" id="sendModo">
-              <option value="diario">📦 Diário (24hrs)</option>
-              <option value="semanal">📅 Semanal</option>
-              <option value="mensal">📆 Mensal</option>
-              <option value="ilimitado">♾️ Ilimitado</option>
-              <option value="saldo">💰 Saldo / Crédito</option>
-            </select>
-          </div>
-          <button class="btn btn-success" onclick="enviarManual()" style="height:42px"><i class="fa-solid fa-paper-plane"></i> Enviar</button>
+
+    <!-- ACTION BUTTONS -->
+    <div class="section-title"><i class="fa-solid fa-bolt"></i> Ações Rápidas</div>
+    <div class="actions-row">
+      <button class="btn btn-primary" onclick="reloadAll()"><i class="fa-solid fa-rotate"></i> Atualizar Tudo</button>
+      <button class="btn btn-warn" onclick="showQr()"><i class="fa-brands fa-whatsapp"></i> Ver QR Code WhatsApp</button>
+      <button class="btn btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Limpar Fila Total</button>
+      <button class="btn btn-primary" onclick="clearCompletedQueue()"><i class="fa-solid fa-broom"></i> Limpar Concluídos</button>
+      <button class="btn btn-success" onclick="document.getElementById('sendPanel').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-paper-plane"></i> Envio Manual</button>
+      <button class="btn btn-purple" onclick="restartBot()"><i class="fa-solid fa-power-off"></i> Reiniciar Bot</button>
+    </div>
+
+    <!-- DEVICES -->
+    <div class="section-title"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Gateway USSD</div>
+    <div class="grid-devices" id="devicesGrid"><div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar celulares...</div></div>
+
+    <!-- QUEUE & MANUAL SEND -->
+    <div class="grid-2">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-list-check"></i> Fila de Pedidos em Tempo Real</div>
+          <button class="btn btn-sm btn-primary" onclick="loadQueue()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
         </div>
-        <div id="sendResult" style="margin-top:12px"></div>
+        <div class="card" id="queuePanel" style="max-height:480px;overflow-y:auto">
+          <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></div>
+        </div>
+      </div>
+      
+      <div id="sendPanel">
+        <div class="section-title"><i class="fa-solid fa-paper-plane"></i> Envio Manual de Pacotes</div>
+        <div class="card">
+          <div class="send-form">
+            <div class="form-group">
+              <label class="form-label">Número de Destino</label>
+              <input class="form-input" type="tel" id="sendNumero" placeholder="84XXXXXXX ou 85XXXXXXX">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Quantidade (MB)</label>
+              <input class="form-input" type="number" id="sendQtd" placeholder="350" value="350">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo de Pacote</label>
+              <select class="form-select" id="sendModo">
+                <option value="diario">📦 Diário (24hrs) - Portas 8023 / 8024</option>
+                <option value="semanal">📅 Semanal (7 dias) - Porta 8077</option>
+                <option value="mensal">📆 Mensal (30 dias) - Porta 8077</option>
+                <option value="ilimitado">♾️ Ilimitado - Porta 8077</option>
+                <option value="saldo">💰 Saldo / Crédito - Porta 8777</option>
+              </select>
+            </div>
+            <button class="btn btn-success" onclick="enviarManual()" style="height:42px"><i class="fa-solid fa-paper-plane"></i> Enviar</button>
+          </div>
+          <div id="sendResult" style="margin-top:14px"></div>
+        </div>
       </div>
     </div>
+
+    <!-- QR CODE PANEL -->
+    <div id="qrPanel" style="display:none;margin-top:20px;margin-bottom:28px">
+      <div class="section-title"><i class="fa-brands fa-whatsapp"></i> Conexão WhatsApp Web</div>
+      <div class="card qr-area" id="qrContent">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--cyan)"></i>
+        <p>A carregar QR Code...</p>
+      </div>
+    </div>
+
   </div>
 
-  <!-- QR PANEL (hidden) -->
-  <div id="qrPanel" style="display:none;margin-bottom:28px">
-    <div class="section-title"><i class="fa-brands fa-whatsapp"></i> QR Code WhatsApp</div>
-    <div class="card qr-area" id="qrContent">
-      <i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--muted)"></i>
-      <p>A carregar QR Code...</p>
+
+  <!-- ========================================== -->
+  <!-- TAB 2: RELATÓRIOS & FINANÇAS -->
+  <!-- ========================================== -->
+  <div id="tab-relatorios" class="tab-content">
+    
+    <div class="section-title"><i class="fa-solid fa-wallet"></i> Desempenho Financeiro & Vendas</div>
+    
+    <!-- FINANCIAL METRICS -->
+    <div class="grid-4">
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-calendar-day"></i> Vendas Hoje</div>
+        <div class="stat-val green" id="repTodayVal">0 MT</div>
+        <div class="stat-sub"><span id="repTodayMb">0 MB</span> entregues • <span id="repTodayCount">0</span> vendas</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-calendar-days"></i> Vendas do Mês</div>
+        <div class="stat-val cyan" id="repMonthVal">0 MT</div>
+        <div class="stat-sub"><span id="repMonthMb">0 MB</span> entregues • <span id="repMonthCount">0</span> vendas</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-money-bill-transfer"></i> Recebido M-Pesa (SMS)</div>
+        <div class="stat-val red" id="repMpesaVal">0 MT</div>
+        <div class="stat-sub">Pagamentos confirmados</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-money-bill-wave"></i> Recebido e-Mola (SMS)</div>
+        <div class="stat-val yellow" id="repEmolaVal">0 MT</div>
+        <div class="stat-sub">Pagamentos confirmados</div>
+      </div>
     </div>
+
+    <!-- SALES HISTORY & SMS TRANSACTIONS -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Vendas & Entregas Recentes</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-primary" onclick="loadReports()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+        <button class="btn btn-sm btn-success" onclick="exportSalesCSV()"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+      </div>
+    </div>
+
+    <div class="table-container" style="margin-bottom:28px">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Ref / ID</th>
+            <th>Data & Hora</th>
+            <th>Destinatário</th>
+            <th>Volume</th>
+            <th>Valor MT</th>
+            <th>Tipo / Modo</th>
+            <th>Porta Gateway</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="salesTableBody">
+          <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px"><i class="fa-solid fa-spinner fa-spin"></i> A carregar vendas...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SMS PAYMENTS LOG -->
+    <div class="section-title"><i class="fa-solid fa-receipt"></i> Comprovativos de Pagamento SMS Recebidos</div>
+    <div class="table-container">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Código TxID</th>
+            <th>Método</th>
+            <th>Remetente</th>
+            <th>Valor Recebido</th>
+            <th>Data Processamento</th>
+          </tr>
+        </thead>
+        <tbody id="smsTableBody">
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px"><i class="fa-solid fa-spinner fa-spin"></i> A carregar pagamentos SMS...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
   </div>
+
+
+  <!-- ========================================== -->
+  <!-- TAB 3: GRUPOS & TABELAS DE PREÇOS -->
+  <!-- ========================================== -->
+  <div id="tab-grupos" class="tab-content">
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-users"></i> Grupos WhatsApp Conectados & Autorizados</div>
+      <button class="btn btn-sm btn-primary" onclick="loadGroups()"><i class="fa-solid fa-rotate"></i> Atualizar Grupos</button>
+    </div>
+
+    <div class="grid-devices" id="groupsGrid" style="margin-bottom:32px">
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar grupos...</div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-tags"></i> Tabelas de Preços e Pacotes Configurados</div>
+      <button class="btn btn-sm btn-primary" onclick="loadPriceTables()"><i class="fa-solid fa-rotate"></i> Atualizar Tabelas</button>
+    </div>
+
+    <div class="grid-3" id="priceTablesGrid">
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar tabelas...</div>
+    </div>
+
+  </div>
+
 </div>
 
 <div id="toast"></div>
@@ -183,6 +388,21 @@ const API = 'https://kanet-cloud-api.onrender.com';
 const TOKEN = 'KaNetKelven2026Secure';
 const headers = { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' };
 let allOrders = [];
+let allSalesData = [];
+
+// TAB SWITCHING
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  
+  const target = document.getElementById('tab-' + tabId);
+  const btn = document.getElementById('tabBtn-' + tabId);
+  if (target) target.classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  if (tabId === 'relatorios') loadReports();
+  if (tabId === 'grupos') { loadGroups(); loadPriceTables(); }
+}
 
 function toast(msg, type='ok') {
   const el = document.createElement('div');
@@ -197,6 +417,9 @@ async function fetchAPI(path, opts={}) {
   return r.json();
 }
 
+// -------------------------------------------------------------------
+// 1. WHATSAPP STATUS & DEVICES
+// -------------------------------------------------------------------
 async function loadWAStatus() {
   try {
     const d = await fetchAPI('/api/whatsapp/status');
@@ -226,7 +449,7 @@ async function loadDevices() {
     const grid = document.getElementById('devicesGrid');
     
     if (devices.length === 0) {
-      grid.innerHTML = '<div class="no-devices"><i class="fa-solid fa-mobile-screen-button" style="font-size:2rem;margin-bottom:10px;display:block;color:var(--muted)"></i>Nenhum celular registado ainda.<br>Abra o Ka-Net Gateway nos celulares.</div>';
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-mobile-screen-button" style="font-size:2rem;margin-bottom:10px;display:block"></i>Nenhum celular registado ainda.<br>Abra o Ka-Net Gateway nos celulares.</div>';
       return devices;
     }
     
@@ -257,42 +480,42 @@ async function loadDevices() {
           Último: ${dev.last_result.success ? '✅' : '❌'} ${dev.last_result.numero || ''} ${dev.last_result.quantidade || ''}MB
         </div>` : '';
       
-      // Blocos personalizados: Portas especiais (8077/8777) NÃO têm limite diário de 20 transferências!
+      // Personalização: Portas especiais (8077/8777) NÃO têm limite diário de 20 transferências
       const statBlocoSaldo = isSpecial ? `
-            <div class="device-stat">
-              <div class="device-stat-label">💰 Saldo Operacional</div>
-              <div class="device-stat-val" style="color:var(--green)">${dev.saldo_credito || (dev.saldo_mt !== undefined ? dev.saldo_mt + ' MT' : 'Ativo')}</div>
-              <div style="font-size:.68rem;color:var(--muted)">Crédito Principal</div>
-            </div>` : `
-            <div class="device-stat">
-              <div class="device-stat-label">📡 SIM 1 Saldo</div>
-              <div class="device-stat-val" style="color:var(--${saldoColor})">${saldo >= 1024 ? (saldo/1024).toFixed(1)+'GB' : saldo+'MB'}</div>
-              ${saldo2 > 0 ? `<div style="font-size:.68rem;color:var(--muted)">SIM 2: ${saldo2 >= 1024 ? (saldo2/1024).toFixed(1)+'GB' : saldo2+'MB'}</div>` : ''}
-            </div>`;
+        <div class="device-stat">
+          <div class="device-stat-label">💰 Saldo Operacional</div>
+          <div class="device-stat-val" style="color:var(--green)">${dev.saldo_credito || (dev.saldo_mt !== undefined ? dev.saldo_mt + ' MT' : 'Ativo')}</div>
+          <div style="font-size:.68rem;color:var(--muted)">Crédito Principal</div>
+        </div>` : `
+        <div class="device-stat">
+          <div class="device-stat-label">📡 SIM 1 Saldo</div>
+          <div class="device-stat-val" style="color:var(--${saldoColor})">${saldo >= 1024 ? (saldo/1024).toFixed(1)+'GB' : saldo+'MB'}</div>
+          ${saldo2 > 0 ? `<div style="font-size:.68rem;color:var(--muted)">SIM 2: ${saldo2 >= 1024 ? (saldo2/1024).toFixed(1)+'GB' : saldo2+'MB'}</div>` : ''}
+        </div>`;
 
       const statBlocoEnvios = isSpecial ? `
-            <div class="device-stat">
-              <div class="device-stat-label">📤 Ofertas Ativadas</div>
-              <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">hoje</span></div>
-              <div style="font-size:.68rem;color:var(--cyan)">Sem limite de 20 envios</div>
-            </div>` : `
-            <div class="device-stat">
-              <div class="device-stat-label">📤 Envios Hoje</div>
-              <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">/ 20</span></div>
-              <div class="progress-bar"><div class="progress-fill ${pctColor}" style="width:${pct}%"></div></div>
-            </div>`;
+        <div class="device-stat">
+          <div class="device-stat-label">📤 Ofertas Ativadas</div>
+          <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">hoje</span></div>
+          <div style="font-size:.68rem;color:var(--cyan)">Sem limite de 20 envios</div>
+        </div>` : `
+        <div class="device-stat">
+          <div class="device-stat-label">📤 Envios Hoje</div>
+          <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">/ 20</span></div>
+          <div class="progress-bar"><div class="progress-fill ${pctColor}" style="width:${pct}%"></div></div>
+        </div>`;
 
       const statBlocoDisponiveis = isSpecial ? `
-            <div class="device-stat">
-              <div class="device-stat-label">⚡ Modo Ofertas</div>
-              <div class="device-stat-val" style="color:var(--cyan);font-size:.85rem">ILIMITADO</div>
-              <div style="font-size:.68rem;color:var(--muted)">Ativação via Saldo</div>
-            </div>` : `
-            <div class="device-stat">
-              <div class="device-stat-label">✅ Disponíveis</div>
-              <div class="device-stat-val" style="color:var(--${avail > 5 ? 'green' : avail > 0 ? 'yellow' : 'red'})">${avail}</div>
-              <div style="font-size:.68rem;color:var(--muted)">SIM1: ${dev.sim1_envios||0} | SIM2: ${dev.sim2_envios||0}</div>
-            </div>`;
+        <div class="device-stat">
+          <div class="device-stat-label">⚡ Modo Ofertas</div>
+          <div class="device-stat-val" style="color:var(--cyan);font-size:.85rem">ILIMITADO</div>
+          <div style="font-size:.68rem;color:var(--muted)">Ativação via Saldo</div>
+        </div>` : `
+        <div class="device-stat">
+          <div class="device-stat-label">✅ Disponíveis</div>
+          <div class="device-stat-val" style="color:var(--${avail > 5 ? 'green' : avail > 0 ? 'yellow' : 'red'})">${avail}</div>
+          <div style="font-size:.68rem;color:var(--muted)">SIM1: ${dev.sim1_envios||0} | SIM2: ${dev.sim2_envios||0}</div>
+        </div>`;
 
       return `
         <div class="card">
@@ -326,11 +549,14 @@ async function loadDevices() {
     }).join('');
     return devices;
   } catch(e) {
-    document.getElementById('devicesGrid').innerHTML = '<div class="no-devices"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao carregar: ' + e.message + '</div>';
+    document.getElementById('devicesGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:20px"><i class="fa-solid fa-triangle-exclamation"></i> Erro: ' + e.message + '</div>';
     return [];
   }
 }
 
+// -------------------------------------------------------------------
+// 2. QUEUE WITH RETRY, CHANGE PORT, CANCEL
+// -------------------------------------------------------------------
 async function loadQueue() {
   try {
     const d = await fetchAPI('/api/orders');
@@ -359,19 +585,19 @@ async function loadQueue() {
 
       const actions = `
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:.72rem" onclick="retryOrder('${oid}')" title="Repetir e colocar na fila"><i class="fa-solid fa-rotate-right"></i> Repetir</button>
-          <button class="btn btn-warn btn-sm" style="padding:3px 8px;font-size:.72rem" onclick="changeOrderPort('${oid}')" title="Mudar porta"><i class="fa-solid fa-arrow-right-arrow-left"></i> Mudar Porta</button>
-          ${st !== 'cancelled' ? `<button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:.72rem" onclick="cancelOrder('${oid}')" title="Cancelar pedido"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
+          <button class="btn btn-primary btn-sm" onclick="retryOrder('${oid}')" title="Repetir e colocar na fila"><i class="fa-solid fa-rotate-right"></i> Repetir</button>
+          <button class="btn btn-warn btn-sm" onclick="changeOrderPort('${oid}')" title="Mudar porta"><i class="fa-solid fa-arrow-right-arrow-left"></i> Mudar Porta</button>
+          ${st !== 'cancelled' ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder('${oid}')" title="Cancelar pedido"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
         </div>`;
 
       return `
-        <div class="order-item" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div class="order-item">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
               <span class="order-ref">${oid.slice(-14)}</span>
               <span style="font-size:.7rem;color:var(--muted);margin-left:6px">${hora}</span>
             </div>
-            <span class="order-status status-${st}">${st.toUpperCase()}</span>
+            <span class="order-status status-${st}">${st}</span>
           </div>
           <div style="margin-top:2px;font-size:.84rem">
             <b>📲 ${o.numero || '?'}</b> • <b>${vol}</b> • <span style="color:var(--cyan)">${o.modo || 'diario'}</span> ${porta}
@@ -390,59 +616,55 @@ async function loadQueue() {
 
 async function retryOrder(orderId, targetPort = null) {
   try {
-    toast(`A re-enfileirar pedido ${orderId.slice(-8)}...`, 'ok');
-    const d = await fetchAPI(`/api/orders/${orderId}/retry`, {
+    toast('A re-enfileirar pedido ' + orderId.slice(-8) + '...', 'ok');
+    const d = await fetchAPI('/api/orders/' + orderId + '/retry', {
       method: 'POST',
       body: JSON.stringify({ targetPort })
     });
     if (d.success) {
       toast('✅ Pedido recolocado na fila com sucesso!', 'ok');
       await loadQueue();
-      await reloadDevices();
+      await loadDevices();
     } else {
       toast('❌ ' + (d.mensagem || 'Erro ao repetir pedido'), 'err');
     }
-  } catch(e) {
-    toast('❌ ' + e.message, 'err');
-  }
+  } catch(e) { toast('❌ ' + e.message, 'err'); }
 }
 
 async function cancelOrder(orderId) {
-  if (!confirm(`Deseja realmente CANCELAR o pedido ${orderId.slice(-8)}?`)) return;
+  if (!confirm('Deseja realmente CANCELAR o pedido ' + orderId.slice(-8) + '?')) return;
   try {
-    const d = await fetchAPI(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+    const d = await fetchAPI('/api/orders/' + orderId + '/cancel', { method: 'POST' });
     if (d.success) {
       toast('Pedido cancelado com sucesso.', 'ok');
       await loadQueue();
     }
-  } catch(e) {
-    toast('Erro ao cancelar: ' + e.message, 'err');
-  }
+  } catch(e) { toast('Erro ao cancelar: ' + e.message, 'err'); }
 }
 
 async function changeOrderPort(orderId) {
-  const p = prompt("Digite a porta para onde deseja enviar este pedido:\n(Exemplos: 8023, 8024, 8077, 8777)");
+  const p = prompt('Digite a porta para onde deseja enviar este pedido:\n(Exemplos: 8023, 8024, 8077, 8777)');
   if (!p) return;
   const portNum = parseInt(p.trim());
-  if (isNaN(portNum)) { alert("Porta inválida!"); return; }
+  if (isNaN(portNum)) { alert('Porta inválida!'); return; }
   await retryOrder(orderId, portNum);
 }
 
-async function reloadDevices() {
-  document.getElementById('lastRefresh').textContent = 'A actualizar...';
-  const devices = await loadDevices();
-  await loadQueue();
-  await loadWAStatus();
-  
-  const online = devices.filter(d => d.online).length;
-  const dailyDevices = devices.filter(d => d.porta === 8023 || d.porta === 8024);
-  const avail = dailyDevices.reduce((a, d) => a + (d.transfers_available || 0), 0);
-  const today = devices.reduce((a, d) => a + (d.total_envios || 0), 0);
-  
-  document.getElementById('mDevices').textContent = online + '/' + devices.length;
-  document.getElementById('mAvail').textContent = avail;
-  document.getElementById('mToday').textContent = today;
-  document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+async function clearQueue() {
+  if (!confirm('Confirma limpar TODA a fila de pedidos da nuvem?')) return;
+  try {
+    await fetchAPI('/api/orders/clear', { method: 'POST' });
+    toast('Fila limpa com sucesso!', 'ok');
+    await loadQueue();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+async function clearCompletedQueue() {
+  try {
+    await fetchAPI('/api/orders/clear', { method: 'POST' });
+    toast('Pedidos limpos com sucesso!', 'ok');
+    await loadQueue();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
 
 async function pingDevice(porta) {
@@ -455,15 +677,6 @@ async function pingDevice(porta) {
 async function forceDispatch(porta) {
   toast('A forçar despacho na Porta ' + porta + '...', 'ok');
   await pingDevice(porta);
-}
-
-async function clearQueue() {
-  if (!confirm('Confirma limpar toda a fila de pedidos?')) return;
-  try {
-    await fetchAPI('/api/orders/clear', { method: 'POST' });
-    toast('Fila limpa com sucesso!', 'ok');
-    await loadQueue();
-  } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
 
 async function enviarManual() {
@@ -484,7 +697,7 @@ async function enviarManual() {
     if (d.success || d.status === 'sucesso') {
       res.innerHTML = '<span style="color:var(--green)">✅ Pedido enviado! Ref: <b>' + (d.orderId || '?') + '</b></span>';
       toast('Pedido enviado com sucesso!', 'ok');
-      setTimeout(loadQueue, 3000);
+      setTimeout(loadQueue, 2000);
     } else {
       res.innerHTML = '<span style="color:var(--red)">❌ Erro: ' + (d.mensagem || 'Falha') + '</span>';
     }
@@ -495,7 +708,7 @@ async function enviarManual() {
 
 async function restartBot() {
   try {
-    toast('A reiniciar o bot...', 'ok');
+    toast('A reiniciar o bot na nuvem...', 'ok');
     await fetchAPI('/api/admin/restart-bot', { method: 'POST' });
     setTimeout(loadWAStatus, 5000);
   } catch(e) { toast('Comando enviado!', 'ok'); }
@@ -539,9 +752,239 @@ async function showQr() {
   }
 }
 
-// Init
-reloadDevices();
-setInterval(reloadDevices, 10000);
+// -------------------------------------------------------------------
+// 3. RELATÓRIOS & FINANÇAS
+// -------------------------------------------------------------------
+async function loadReports() {
+  try {
+    const d = await fetchAPI('/api/reports');
+    if (!d.success) return;
+
+    // Métricas principais
+    document.getElementById('repTodayVal').textContent = (d.today.valor_mt || 0) + ' MT';
+    const tMb = d.today.megas || 0;
+    document.getElementById('repTodayMb').textContent = tMb >= 1024 ? (tMb/1024).toFixed(1) + ' GB' : tMb + ' MB';
+    document.getElementById('repTodayCount').textContent = d.today.total_vendas || 0;
+
+    document.getElementById('repMonthVal').textContent = (d.month.valor_mt || 0) + ' MT';
+    const mMb = d.month.megas || 0;
+    document.getElementById('repMonthMb').textContent = mMb >= 1024 ? (mMb/1024).toFixed(1) + ' GB' : mMb + ' MB';
+    document.getElementById('repMonthCount').textContent = d.month.total_vendas || 0;
+
+    document.getElementById('repMpesaVal').textContent = (d.recebidos.mpesa_mt || 0) + ' MT';
+    document.getElementById('repEmolaVal').textContent = (d.recebidos.emola_mt || 0) + ' MT';
+
+    // Tabela de vendas
+    allSalesData = d.allSales || d.recentSales || [];
+    const tb = document.getElementById('salesTableBody');
+    if (allSalesData.length === 0) {
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Nenhuma venda registada ainda</td></tr>';
+    } else {
+      tb.innerHTML = allSalesData.map(s => {
+        const ref = (s.orderId || s.id || '?').slice(-12);
+        const dt = s.createdAt || s.completedAt || s.timestamp ? new Date(s.createdAt || s.completedAt || s.timestamp).toLocaleString('pt-PT') : '-';
+        const num = s.numero || s.destinatario || '-';
+        const qty = s.quantidade || 0;
+        const vol = qty >= 1024 ? (qty/1024).toFixed(1) + ' GB' : qty + ' MB';
+        const val = (s.valor_pago || s.valor || 0) + ' MT';
+        const modo = s.modo || 'diario';
+        const porta = s.assignedToPort || s.porta || (s.carrier ? s.carrier : '-');
+        const st = s.status || (s.success ? 'completed' : 'pending');
+        return `
+          <tr>
+            <td><span class="order-ref">${ref}</span></td>
+            <td style="font-size:.76rem;color:var(--muted)">${dt}</td>
+            <td><b>${num}</b></td>
+            <td style="color:var(--cyan);font-weight:600">${vol}</td>
+            <td style="color:var(--green);font-weight:700">${val}</td>
+            <td><span style="text-transform:capitalize">${modo}</span></td>
+            <td>Porta ${porta}</td>
+            <td><span class="order-status status-${st}">${st}</span></td>
+          </tr>`;
+      }).join('');
+    }
+
+    // Tabela de SMS Payments
+    const payments = d.recentPayments || [];
+    const smsTb = document.getElementById('smsTableBody');
+    if (payments.length === 0) {
+      smsTb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Nenhum SMS de pagamento recebido ainda</td></tr>';
+    } else {
+      smsTb.innerHTML = payments.map(p => {
+        const tid = p.txn_id || p.id || '-';
+        const met = String(p.metodo || 'M-Pesa').toUpperCase();
+        const metColor = met.includes('EMOLA') ? 'yellow' : 'red';
+        const rem = p.remetente || '-';
+        const val = (p.valor || 0) + ' MT';
+        const proc = p.processedAt ? new Date(p.processedAt).toLocaleString('pt-PT') : '-';
+        return `
+          <tr>
+            <td><span class="order-ref">${tid}</span></td>
+            <td><span style="font-weight:700;color:var(--${metColor})">${met}</span></td>
+            <td>${rem}</td>
+            <td style="font-weight:700;color:var(--green)">${val}</td>
+            <td style="font-size:.76rem;color:var(--muted)">${proc}</td>
+          </tr>`;
+      }).join('');
+    }
+
+  } catch(e) {
+    console.error('Erro ao carregar relatórios:', e);
+  }
+}
+
+function exportSalesCSV() {
+  if (allSalesData.length === 0) { toast('Nenhuma venda para exportar', 'err'); return; }
+  const headers = ['Ref', 'Data', 'Destinatario', 'Volume_MB', 'Valor_MT', 'Modo', 'Porta', 'Status'];
+  const rows = allSalesData.map(s => [
+    s.orderId || s.id || '',
+    s.createdAt || s.completedAt || '',
+    s.numero || s.destinatario || '',
+    s.quantidade || 0,
+    s.valor_pago || s.valor || 0,
+    s.modo || 'diario',
+    s.assignedToPort || s.porta || '',
+    s.status || ''
+  ]);
+  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', 'kanet_vendas_' + new Date().toISOString().slice(0,10) + '.csv');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+// -------------------------------------------------------------------
+// 4. GRUPOS WHATSAPP & TABELAS DE PREÇOS
+// -------------------------------------------------------------------
+async function loadGroups() {
+  try {
+    const d = await fetchAPI('/api/groups');
+    const grid = document.getElementById('groupsGrid');
+    const groups = d.groups || [];
+    if (groups.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted)">Nenhum grupo registado</div>';
+      return;
+    }
+    grid.innerHTML = groups.map(g => {
+      const membros = g.membros || '?';
+      return `
+        <div class="group-card">
+          <div class="group-name"><i class="fa-brands fa-whatsapp"></i> ${g.nome || 'Grupo WhatsApp'}</div>
+          <div class="group-jid">${g.jid}</div>
+          <div class="group-meta">
+            <span style="color:var(--cyan);font-weight:600">${g.tipo || 'Grupo Autorizado'}</span>
+            <span class="badge online">🟢 Autorizado</span>
+          </div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:4px">
+            👥 Membros: <b>${membros}</b> • Tabela: <span style="color:var(--green);font-weight:600">${g.tabela_ativa || 'Padrão'}</span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('groupsGrid').innerHTML = '<div style="grid-column:1/-1;color:var(--red);padding:20px">Erro ao carregar grupos: ' + e.message + '</div>';
+  }
+}
+
+async function loadPriceTables() {
+  try {
+    const d = await fetchAPI('/api/price-tables');
+    const grid = document.getElementById('priceTablesGrid');
+    const tabs = d.tabelas || {};
+
+    let html = '';
+
+    // 24 Horas
+    if (tabs['24hrs']) {
+      const items = Object.entries(tabs['24hrs']).map(([valor, p]) => `
+        <div class="price-item">
+          <span>📦 <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-clock"></i> Pacotes 24 Horas (Diários)</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Ativados via USSD nas Portas 8023 e 8024</div>
+          ${items}
+        </div>`;
+    }
+
+    // Semanais
+    if (tabs['semanal']) {
+      const items = Object.entries(tabs['semanal']).map(([valor, p]) => `
+        <div class="price-item">
+          <span>📅 <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-calendar-week"></i> Pacotes Semanais (7 Dias)</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Ativados via Porta Especial 8077</div>
+          ${items}
+        </div>`;
+    }
+
+    // Mensais
+    if (tabs['mensal']) {
+      const items = Object.entries(tabs['mensal']).map(([valor, p]) => `
+        <div class="price-item">
+          <span>📆 <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-calendar"></i> Pacotes Mensais (30 Dias)</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Ativados via Porta Especial 8077</div>
+          ${items}
+        </div>`;
+    }
+
+    // Planos Especiais & VIP
+    if (d.planos_especiais && Object.keys(d.planos_especiais).length > 0) {
+      const items = Object.entries(d.planos_especiais).map(([valor, p]) => `
+        <div class="price-item">
+          <span>⭐ <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-star"></i> Planos Especiais & Revenda</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Configurados para Grupos VIP</div>
+          ${items}
+        </div>`;
+    }
+
+    grid.innerHTML = html || '<div style="grid-column:1/-1;padding:20px;color:var(--muted)">Nenhuma tabela configurada</div>';
+  } catch(e) {
+    document.getElementById('priceTablesGrid').innerHTML = '<div style="grid-column:1/-1;color:var(--red);padding:20px">Erro ao carregar tabelas: ' + e.message + '</div>';
+  }
+}
+
+// -------------------------------------------------------------------
+// 5. AUTO-REFRESH & INIT
+// -------------------------------------------------------------------
+async function reloadAll() {
+  document.getElementById('lastRefresh').textContent = 'A actualizar...';
+  const devices = await loadDevices();
+  await loadQueue();
+  await loadWAStatus();
+  
+  const online = devices.filter(d => d.online).length;
+  const dailyDevices = devices.filter(d => d.porta === 8023 || d.porta === 8024);
+  const avail = dailyDevices.reduce((a, d) => a + (d.transfers_available || 0), 0);
+  const today = devices.reduce((a, d) => a + (d.total_envios || 0), 0);
+  
+  document.getElementById('mDevices').textContent = online + '/' + devices.length;
+  document.getElementById('mAvail').textContent = avail;
+  document.getElementById('mToday').textContent = today;
+  document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+}
+
+// Iniciar e manter atualizado a cada 8 segundos
+reloadAll();
+setInterval(reloadAll, 8000);
 </script>
 </body>
 </html>
