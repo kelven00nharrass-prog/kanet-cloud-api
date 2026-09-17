@@ -432,12 +432,32 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     }
 
     // ── NOTIFICAÇÕES PARA OS GRUPOS DO SISTEMA (Anti-duplicação) ──
-    const jaNotificadoGrupo = order && order.groupNotified;
     if (order) {
-      order.status = success ? 'completed' : 'failed';
-      order.completedAt = new Date().toISOString();
-      if (!success) {
-        order.lastError = (req.body.last_result && req.body.last_result.error) || 'Falha USSD / Timeout';
+      if (success) {
+        order.status = 'completed';
+        order.completedAt = new Date().toISOString();
+        order.lastError = null;
+        console.log(`🎉 [PEDIDO SUCESSO] Pedido ${resId} concluído com sucesso pelo Celular Porta ${port}!`);
+      } else {
+        const errorMsg = (req.body.last_result && req.body.last_result.error) || 'Falha USSD / Timeout';
+        order.lastError = errorMsg;
+        order.retryCount = (order.retryCount || 0) + 1;
+        order.failedPorts = order.failedPorts || [];
+        if (!order.failedPorts.includes(port)) order.failedPorts.push(port);
+
+        // Se falhou menos de 5 vezes, MANTÉM COMO 'pending' para que outra porta disponível
+        // ou o mesmo celular após trocar de cartão/abrir Slim SIM pegue o pedido automaticamente!
+        if (order.retryCount < 5) {
+          order.status = 'pending';
+          order.assignedToPort = null;
+          order.processingAt = null;
+          order.targetPort = null; // Permite que qualquer porta compatível pegue
+          console.log(`🔄 [FAILOVER NUVEM] Pedido ${resId} falhou na Porta ${port} (${errorMsg}). Mantido na fila como PENDENTE para outra porta ou pós-Slim SIM (Tentativa #${order.retryCount})`);
+        } else {
+          order.status = 'failed';
+          order.completedAt = new Date().toISOString();
+          console.warn(`🛑 [PEDIDO ESGOTADO] Pedido ${resId} atingiu o limite de 5 tentativas. Marcado como falhado.`);
+        }
       }
       saveOrdersToCache();
     }
