@@ -551,7 +551,12 @@ function extrairValorMT(texto) {
 
 function extrairTxId(texto) {
     if (!texto) return null;
-    const commonWords = ['CONFIRMADO', 'RECEBESTE', 'TRANSFERISTE', 'RECEBEU', 'SALDO', 'VODACOM', 'MOVITEL', 'EMOLA', 'MPESA', 'PAGAMENTO', 'OPERADORA', 'CONTA', 'VALOR'];
+    const commonWords = [
+        'CONFIRMADO', 'RECEBESTE', 'TRANSFERISTE', 'RECEBEU', 'SALDO', 'VODACOM', 'MOVITEL',
+        'EMOLA', 'MPESA', 'PAGAMENTO', 'OPERADORA', 'CONTA', 'VALOR', 'AUTOMATICAMENTE',
+        'EXEMPLO', 'COMPROVATIVO', 'DESTINATARIO', 'TRANSFERENCIA', 'INSTANTANEA',
+        'ACTIVACAO', 'ATIVACAO', 'NOTIFICACAO', 'MENSAGEM', 'VERIFICADO', 'TRANSAÇÃO', 'TRANSACAO'
+    ];
     const regex = /\b([A-Z0-9]{6,25}(?:\.[A-Z0-9]{2,15})*)\b/gi;
     let match;
     let results = [];
@@ -560,16 +565,14 @@ function extrairTxId(texto) {
         const ref = match[1].toUpperCase();
         if (commonWords.includes(ref)) continue;
         if (/^(258)?(8[2-7]\d{7})$/.test(ref)) continue; // telefone, ignora
+        if (/^8[2-7]X+$/i.test(ref)) continue; // exemplo de máscara como 84XXXXXXX
         
         const temLetra = /[A-Z]/.test(ref);
         const temNumero = /[0-9]/.test(ref);
         
+        // Códigos reais de M-Pesa/e-Mola DEVEM conter letras E números misturados (ex: DIG0LLRIZ76, PP24...)
         if (temLetra && temNumero) {
             results.push({ val: ref, score: 100 });
-        } else if (ref.length >= 8 && temLetra) {
-            results.push({ val: ref, score: 50 });
-        } else if (ref.length >= 6 && temNumero) {
-            results.push({ val: ref, score: 40 });
         }
     }
     
