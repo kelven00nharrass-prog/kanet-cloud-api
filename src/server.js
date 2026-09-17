@@ -524,6 +524,52 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   return res.json({ success: true });
 });
 
+// ── ENDPOINTS DE FILA PARA O PAINEL CLOUD ──
+app.get('/api/orders', (req, res) => {
+  const orders = Array.from(inMemoryOrders.entries()).map(([id, o]) => ({ ...o, id }));
+  // Retornar os 50 mais recentes ordenados por data
+  const sorted = orders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 50);
+  return res.json({ success: true, count: sorted.length, orders: sorted });
+});
+
+app.post('/api/orders/clear', (req, res) => {
+  // Limpar apenas pedidos já concluídos/falhados, manter os pendentes
+  let cleared = 0;
+  for (const [id, order] of inMemoryOrders.entries()) {
+    if (order.status === 'completed' || order.status === 'failed' || order.status === 'cancelled') {
+      inMemoryOrders.delete(id);
+      cleared++;
+    }
+  }
+  console.log(`🧹 [PAINEL] Fila limpa: ${cleared} pedidos concluídos removidos.`);
+  return res.json({ success: true, cleared, remaining: inMemoryOrders.size });
+});
+
+app.delete('/api/orders/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const existed = inMemoryOrders.has(orderId);
+  if (existed) inMemoryOrders.delete(orderId);
+  return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido não encontrado.' });
+});
+
+// ── BOT STATUS PARA O PAINEL ──
+app.get('/api/bot-status', (req, res) => {
+  try {
+    const engine = baileysEngine;
+    if (engine && typeof engine.getConnectionStatus === 'function') {
+      const status = engine.getConnectionStatus();
+      return res.json({ success: true, ...status });
+    }
+    // Tentar obter estado do módulo global
+    const connected = global._waConnected || false;
+    const phone = global._waPhone || null;
+    const qr_pending = global._qrPending || false;
+    return res.json({ success: true, connected, phone, qr_pending });
+  } catch(e) {
+    return res.json({ success: false, connected: false, qr_pending: false, error: e.message });
+  }
+});
+
 // ----------------------------------------------------
 // 6. PAYMOZ / M-PESA WEBHOOK
 // ----------------------------------------------------
