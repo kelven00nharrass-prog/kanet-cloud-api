@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
@@ -311,22 +311,46 @@ async function loadQueue() {
     const panel = document.getElementById('queuePanel');
     
     if (allOrders.length === 0) {
-      panel.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:.85rem"><i class="fa-solid fa-inbox"></i><br>Fila vazia</div>';
+      panel.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:.85rem"><i class="fa-solid fa-inbox" style="font-size:1.6rem;margin-bottom:8px;display:block"></i>Fila vazia no momento</div>';
+      document.getElementById('mPending').textContent = '0';
       return;
     }
     
-    const recent = allOrders.slice(-20).reverse();
-    panel.innerHTML = recent.map(o => {
+    panel.innerHTML = allOrders.map(o => {
+      const oid = o.orderId || o.id || '?';
       const st = o.status || 'pending';
       const qty = o.quantidade || 0;
       const vol = qty < 1024 ? qty+'MB' : (qty/1024).toFixed(1)+'GB';
-      return `<div class="order-item">
-        <div>
-          <div class="order-ref">${(o.orderId||o.id||'?').slice(-14)}</div>
-          <div style="margin-top:2px"><b>${o.numero||'?'}</b> • ${vol} • ${o.modo||'diario'}</div>
-        </div>
-        <span class="order-status status-${st}">${st}</span>
-      </div>`;
+      const hora = o.createdAt ? new Date(o.createdAt).toLocaleTimeString('pt-PT') : '';
+      const porta = o.assignedToPort || o.targetPort ? `(Porta ${o.assignedToPort || o.targetPort})` : '';
+      
+      const errorMsg = o.lastError ? `
+        <div style="color:var(--red);font-size:.73rem;margin-top:4px;font-weight:500">
+          <i class="fa-solid fa-circle-exclamation"></i> ${o.lastError}
+        </div>` : '';
+
+      const actions = `
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:.72rem" onclick="retryOrder('${oid}')" title="Repetir e colocar na fila"><i class="fa-solid fa-rotate-right"></i> Repetir</button>
+          <button class="btn btn-warn btn-sm" style="padding:3px 8px;font-size:.72rem" onclick="changeOrderPort('${oid}')" title="Mudar porta"><i class="fa-solid fa-arrow-right-arrow-left"></i> Mudar Porta</button>
+          ${st !== 'cancelled' ? `<button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:.72rem" onclick="cancelOrder('${oid}')" title="Cancelar pedido"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
+        </div>`;
+
+      return `
+        <div class="order-item" style="flex-direction:column;align-items:stretch;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span class="order-ref">${oid.slice(-14)}</span>
+              <span style="font-size:.7rem;color:var(--muted);margin-left:6px">${hora}</span>
+            </div>
+            <span class="order-status status-${st}">${st.toUpperCase()}</span>
+          </div>
+          <div style="margin-top:2px;font-size:.84rem">
+            <b>📲 ${o.numero || '?'}</b> • <b>${vol}</b> • <span style="color:var(--cyan)">${o.modo || 'diario'}</span> ${porta}
+          </div>
+          ${errorMsg}
+          ${actions}
+        </div>`;
     }).join('');
     
     const pending = allOrders.filter(o => o.status === 'pending').length;
@@ -334,6 +358,46 @@ async function loadQueue() {
   } catch(e) {
     document.getElementById('queuePanel').innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;font-size:.85rem">Erro: ' + e.message + '</div>';
   }
+}
+
+async function retryOrder(orderId, targetPort = null) {
+  try {
+    toast(`A re-enfileirar pedido ${orderId.slice(-8)}...`, 'ok');
+    const d = await fetchAPI(`/api/orders/${orderId}/retry`, {
+      method: 'POST',
+      body: JSON.stringify({ targetPort })
+    });
+    if (d.success) {
+      toast('✅ Pedido recolocado na fila com sucesso!', 'ok');
+      await loadQueue();
+      await reloadDevices();
+    } else {
+      toast('❌ ' + (d.mensagem || 'Erro ao repetir pedido'), 'err');
+    }
+  } catch(e) {
+    toast('❌ ' + e.message, 'err');
+  }
+}
+
+async function cancelOrder(orderId) {
+  if (!confirm(`Deseja realmente CANCELAR o pedido ${orderId.slice(-8)}?`)) return;
+  try {
+    const d = await fetchAPI(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+    if (d.success) {
+      toast('Pedido cancelado com sucesso.', 'ok');
+      await loadQueue();
+    }
+  } catch(e) {
+    toast('Erro ao cancelar: ' + e.message, 'err');
+  }
+}
+
+async function changeOrderPort(orderId) {
+  const p = prompt("Digite a porta para onde deseja enviar este pedido:\n(Exemplos: 8023, 8024, 8077, 8777)");
+  if (!p) return;
+  const portNum = parseInt(p.trim());
+  if (isNaN(portNum)) { alert("Porta inválida!"); return; }
+  await retryOrder(orderId, portNum);
 }
 
 async function reloadDevices() {
