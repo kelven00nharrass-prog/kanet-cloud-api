@@ -110,6 +110,7 @@ async function handleTransfer(req, res) {
     };
 
     inMemoryOrders.set(orderId, orderDoc);
+    saveOrdersToCache();
 
     if (db) {
       try {
@@ -423,6 +424,10 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     if (order) {
       order.status = success ? 'completed' : 'failed';
       order.completedAt = new Date().toISOString();
+      if (!success) {
+        order.lastError = (req.body.last_result && req.body.last_result.error) || 'Falha USSD / Timeout';
+      }
+      saveOrdersToCache();
     }
 
     if (baileysEngine && !jaNotificadoGrupo) {
@@ -524,24 +529,102 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   return res.json({ success: true });
 });
 
+// ── PERSISTÊNCIA DE PEDIDOS EM CACHE LOCAL ──
+const ORDERS_CACHE_FILE = path.resolve(__dirname, 'orders_cache.json');
+
+function saveOrdersToCache() {
+  try {
+    const list = Array.from(inMemoryOrders.entries()).slice(-100);
+    fs.writeFileSync(ORDERS_CACHE_FILE, JSON.stringify(list), 'utf8');
+  } catch(e) {}
+}
+
+function loadOrdersFromCache() {
+  try {
+    if (fs.existsSync(ORDERS_CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
+      if (Array.isArray(data)) {
+        data.forEach(([k, v]) => inMemoryOrders.set(k, v));
+        console.log(`📦 [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histórico.`);
+      }
+    }
+  } catch(e) {}
+}
+
+loadOrdersFromCache();
+
 // ── ENDPOINTS DE FILA PARA O PAINEL CLOUD ──
 app.get('/api/orders', (req, res) => {
   const orders = Array.from(inMemoryOrders.entries()).map(([id, o]) => ({ ...o, id }));
-  // Retornar os 50 mais recentes ordenados por data
   const sorted = orders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 50);
   return res.json({ success: true, count: sorted.length, orders: sorted });
 });
 
+// Repetir / Tentar de Novo um pedido que falhou ou travou
+app.post('/api/orders/:orderId/retry', (req, res) => {
+  const { orderId } = req.params;
+  const targetPort = req.body && req.body.targetPort ? Number(req.body.targetPort) : null;
+  const order = inMemoryOrders.get(orderId);
+
+  if (!order) {
+    return res.status(404).json({ success: false, mensagem: 'Pedido não encontrado na fila.' });
+  }
+
+  // Desocupar qualquer celular que estivesse com este pedido preso
+  for (const dev of Object.values(inMemoryDevices)) {
+    if (dev.pending_order && (dev.pending_order.id === orderId || dev.pending_order.orderId === orderId)) {
+      dev.pending_order = null;
+    }
+  }
+
+  order.status = 'pending';
+  order.retryCount = (order.retryCount || 0) + 1;
+  order.assignedToPort = null;
+  order.processingAt = null;
+  order.completedAt = null;
+  order.lastError = null;
+  if (targetPort) {
+    order.targetPort = targetPort;
+  }
+  order.updatedAt = new Date().toISOString();
+
+  saveOrdersToCache();
+  console.log(`🔄 [PAINEL] Pedido ${orderId} re-enfileirado para reprocessamento imediato! (Tentativa #${order.retryCount})`);
+  return res.json({ success: true, mensagem: `Pedido ${orderId} recolocado na fila com status PENDENTE!`, order });
+});
+
+// Cancelar pedido
+app.post(['/api/orders/:orderId/cancel', '/api/orders/:orderId/cancelar'], (req, res) => {
+  const { orderId } = req.params;
+  const order = inMemoryOrders.get(orderId);
+
+  if (order) {
+    order.status = 'cancelled';
+    order.updatedAt = new Date().toISOString();
+  }
+
+  // Desocupar qualquer celular
+  for (const dev of Object.values(inMemoryDevices)) {
+    if (dev.pending_order && (dev.pending_order.id === orderId || dev.pending_order.orderId === orderId)) {
+      dev.pending_order = null;
+    }
+  }
+
+  saveOrdersToCache();
+  console.log(`❌ [PAINEL] Pedido ${orderId} cancelado pelo operador.`);
+  return res.json({ success: true, mensagem: `Pedido ${orderId} cancelado.` });
+});
+
 app.post('/api/orders/clear', (req, res) => {
-  // Limpar apenas pedidos já concluídos/falhados, manter os pendentes
   let cleared = 0;
   for (const [id, order] of inMemoryOrders.entries()) {
-    if (order.status === 'completed' || order.status === 'failed' || order.status === 'cancelled') {
+    if (order.status === 'completed' || order.status === 'cancelled') {
       inMemoryOrders.delete(id);
       cleared++;
     }
   }
-  console.log(`🧹 [PAINEL] Fila limpa: ${cleared} pedidos concluídos removidos.`);
+  saveOrdersToCache();
+  console.log(`🧹 [PAINEL] Fila limpa: ${cleared} pedidos finalizados removidos.`);
   return res.json({ success: true, cleared, remaining: inMemoryOrders.size });
 });
 
@@ -549,6 +632,7 @@ app.delete('/api/orders/:orderId', (req, res) => {
   const { orderId } = req.params;
   const existed = inMemoryOrders.has(orderId);
   if (existed) inMemoryOrders.delete(orderId);
+  saveOrdersToCache();
   return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido não encontrado.' });
 });
 
