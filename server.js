@@ -635,6 +635,10 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           order.assignedToPort = null;
           order.processingAt = null;
           order.targetPort = null; // Permite que qualquer porta compatível pegue
+          // ✅ CRÍTICO: Resetar flags de notificação para que a próxima tentativa bem-sucedida
+          // possa notificar correctamente o cliente e o grupo (evita silêncio após retry).
+          order.notified = false;
+          order.groupNotified = false;
           console.log(`🔄 [FAILOVER NUVEM] Pedido ${resId} falhou na Porta ${port} (${errorMsg}). Mantido na fila como PENDENTE para outra porta ou pós-Slim SIM (Tentativa #${order.retryCount})`);
         } else {
           order.status = 'failed';
