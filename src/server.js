@@ -839,6 +839,40 @@ app.get('/api/groups', async (req, res) => {
 });
 
 
+// ── MANUTENÇÃO GLOBAL (fecha vendas em grupos + privado) ──
+app.post('/api/maintenance', (req, res) => {
+  try {
+    const { ativo } = req.body;
+    if (typeof ativo !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'Campo "ativo" (boolean) é obrigatório.' });
+    }
+    let estado = ativo;
+    if (baileysEngine && typeof baileysEngine.setModoManutencao === 'function') {
+      estado = baileysEngine.setModoManutencao(ativo);
+    }
+    return res.json({ success: true, modoManutencao: estado, mensagem: estado ? '🛑 Sistema em manutenção — vendas bloqueadas.' : '🟢 Sistema online — vendas liberadas.' });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── FECHAR / ABRIR GRUPO ESPECÍFICO ──
+app.post('/api/groups/:jid/fechar', (req, res) => {
+  try {
+    const jid = decodeURIComponent(req.params.jid);
+    if (!jid || !jid.endsWith('@g.us')) {
+      return res.status(400).json({ success: false, error: 'JID de grupo inválido.' });
+    }
+    let fechado = false;
+    if (baileysEngine && typeof baileysEngine.toggleGrupoFechado === 'function') {
+      fechado = baileysEngine.toggleGrupoFechado(jid);
+    }
+    return res.json({ success: true, jid, fechado, mensagem: fechado ? '🔒 Grupo fechado — bot não responde neste grupo.' : '🔓 Grupo aberto — bot volta a responder normalmente.' });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ── TABELAS DE PREÇOS DO SISTEMA ──
 app.get('/api/price-tables', (req, res) => {
   try {
