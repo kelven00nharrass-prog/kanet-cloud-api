@@ -91,6 +91,9 @@ function carregarConfigs() {
 
     if (!DYN_CFG.TABELAS) DYN_CFG.TABELAS = { '24hrs': {}, 'semanal': {}, 'mensal': {}, 'ilimitado': {}, 'saldo': {} };
     if (!DYN_CFG.PLANOS_ESPECIAIS) DYN_CFG.PLANOS_ESPECIAIS = {};
+    if (!DYN_CFG.GRUPOS_FECHADOS) DYN_CFG.GRUPOS_FECHADOS = [];
+    // Restaurar modo manutenção persistido
+    if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
     
     carregarTransacoes();
 }
@@ -856,11 +859,20 @@ async function startWhatsApp(orderCallback, db = null) {
                     // Se estiver banido, ignorar
                     if (banidosSet.has(senderNumber) && !senderIsMaster) continue;
 
+                    // Se o grupo estiver fechado (vendas desativadas neste grupo), ignorar silenciosamente
+                    const isGrupo = jid.endsWith('@g.us');
+                    const gruposFechados = DYN_CFG.GRUPOS_FECHADOS || [];
+                    if (isGrupo && gruposFechados.includes(jid) && !senderIsMaster) {
+                        // Grupo fechado — bot não responde para não-admins
+                        continue;
+                    }
+
                     // Se estiver em manutenção e não for Master, avisar
                     if (modoManutencao && !senderIsMaster) {
                         await sock.sendMessage(jid, { text: '🛑 *SISTEMA EM MANUTENÇÃO*\n\nEstamos atualizando os nossos servidores para melhor atendê-lo. Por favor, tente novamente mais tarde!' });
                         continue;
                     }
+
 
                     console.log(`📩 [MSG] ${senderNumber} ${senderIsMaster ? '👑' : ''}: ${text.substring(0, 60)}`);
 
@@ -1150,6 +1162,8 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (cleanText === '.manutencao') {
                         if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
                         modoManutencao = true;
+                        DYN_CFG.MODO_MANUTENCAO = true;
+                        salvarBotConfig();
                         await reply('🛑 *Modo de Manutenção ATIVADO.* Clientes normais receberão aviso de manutenção.');
                         continue;
                     }
@@ -1157,9 +1171,12 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (cleanText === '.online') {
                         if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
                         modoManutencao = false;
+                        DYN_CFG.MODO_MANUTENCAO = false;
+                        salvarBotConfig();
                         await reply('🟢 *Modo de Manutenção DESATIVADO.* Sistema online para todos os clientes.');
                         continue;
                     }
+
 
                     if (['/status', '!status', '.status', 'status'].includes(cleanText) && senderIsMaster) {
                         await reply(
@@ -1502,7 +1519,9 @@ function getStatus() {
         status: connectionStatus,
         user: connectedUser,
         hasQr: !!currentQrBase64,
-        qrImage: currentQrBase64
+        qrImage: currentQrBase64,
+        modoManutencao,
+        gruposFechados: DYN_CFG.GRUPOS_FECHADOS || []
     };
 }
 
@@ -1531,6 +1550,34 @@ async function getGroups() {
     return [];
 }
 
+/**
+ * Ativa ou desativa o modo de manutenção global.
+ * Bloqueia compras em grupos E em privado para todos os não-admins.
+ */
+function setModoManutencao(ativo) {
+    modoManutencao = !!ativo;
+    DYN_CFG.MODO_MANUTENCAO = modoManutencao;
+    salvarBotConfig();
+    return modoManutencao;
+}
+
+/**
+ * Ativa ou desativa vendas para um grupo específico.
+ * Quando fechado, o bot ignora mensagens de não-admins nesse grupo.
+ * @returns {boolean} true = grupo agora fechado, false = grupo agora aberto
+ */
+function toggleGrupoFechado(jid) {
+    if (!DYN_CFG.GRUPOS_FECHADOS) DYN_CFG.GRUPOS_FECHADOS = [];
+    const idx = DYN_CFG.GRUPOS_FECHADOS.indexOf(jid);
+    if (idx === -1) {
+        DYN_CFG.GRUPOS_FECHADOS.push(jid);
+    } else {
+        DYN_CFG.GRUPOS_FECHADOS.splice(idx, 1);
+    }
+    salvarBotConfig();
+    return DYN_CFG.GRUPOS_FECHADOS.includes(jid);
+}
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -1539,5 +1586,8 @@ module.exports = {
     enviarErroGrupo, 
     getGrupoNotificacoes, 
     getGrupoErros,
-    getGroups
+    getGroups,
+    setModoManutencao,
+    toggleGrupoFechado
 };
+
