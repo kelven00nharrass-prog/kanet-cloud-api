@@ -845,8 +845,15 @@ async function startWhatsApp(orderCallback, db = null) {
             logger: pino({ level: 'silent' }),
             printQRInTerminal: true,
             auth: state,
-            browser: ['Ka-Net Cloud', 'Chrome', '2.0.0']
+            browser: ['Ubuntu', 'Chrome', '20.0.04'],
+            keepAliveIntervalMs: 30000,      // ping a cada 30s para manter a sessão viva
+            syncFullHistory: false,          // não tentar sincronizar histórico todo (evita timeouts)
+            markOnlineOnConnect: false,      // não marcar como online (menos detecção)
+            generateHighQualityLinkPreview: false,
+            getMessage: async () => ({ conversation: '' })
         });
+
+        let reconnectAttempts = 0;
 
         sock.ev.on('creds.update', async () => {
             await saveCreds();
@@ -860,6 +867,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
             if (qr) {
                 connectionStatus = 'qr_ready';
+                reconnectAttempts = 0;
                 try {
                     currentQrBase64 = await QRCode.toDataURL(qr);
                     console.log('📱 [BAILEYS] Novo QR Code gerado em /qr');
@@ -873,11 +881,19 @@ async function startWhatsApp(orderCallback, db = null) {
                 currentQrBase64 = null;
                 console.log(`🔌 [BAILEYS] Conexão fechada (${statusCode}). Reconectar: ${shouldReconnect}`);
                 if (shouldReconnect) {
-                    setTimeout(() => startWhatsApp(orderDispatchCallback), 5000);
+                    // Backoff exponencial: 5s, 10s, 20s, 40s, máx 60s
+                    reconnectAttempts++;
+                    const delay = Math.min(5000 * Math.pow(2, reconnectAttempts - 1), 60000);
+                    console.log(`⏳ [BAILEYS] Aguardando ${delay / 1000}s antes de reconectar (tentativa #${reconnectAttempts})...`);
+                    setTimeout(() => startWhatsApp(orderDispatchCallback), delay);
+                } else {
+                    console.warn('🚪 [BAILEYS] Sessão encerrada (loggedOut). Precisa escanear novo QR Code.');
+                    reconnectAttempts = 0;
                 }
             } else if (connection === 'open') {
                 connectionStatus = 'connected';
                 currentQrBase64 = null;
+                reconnectAttempts = 0; // reset após conexão bem-sucedida
                 connectedUser = sock.user?.id || 'KaNet Cloud Bot';
                 console.log(`✅ [BAILEYS] WhatsApp Conectado com SUCESSO! Logado como: ${connectedUser}`);
             }
