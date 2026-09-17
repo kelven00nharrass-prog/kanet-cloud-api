@@ -832,7 +832,8 @@ app.get('/api/groups', async (req, res) => {
       }));
     }
 
-    return res.json({ success: true, count: finalGroups.length, ao_vivo: liveGroups.length > 0, groups: finalGroups });
+    const gruposFechados = botCfg.GRUPOS_FECHADOS || [];
+    return res.json({ success: true, count: finalGroups.length, ao_vivo: liveGroups.length > 0, groups: finalGroups, gruposFechados });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
