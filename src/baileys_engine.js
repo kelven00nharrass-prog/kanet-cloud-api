@@ -134,10 +134,16 @@ function isMaster(numero) {
     const clean = String(numero).replace(/\D/g, '');
     const clean9 = (clean.startsWith('258') && clean.length >= 11) ? clean.substring(3) : clean;
 
-    // Números do Criador / Kelven (Sempre Master em todas as situações)
+    // Números do Criador / Kelven e LIDs conhecidos em grupos (Sempre Master em todas as situações)
     if (clean.includes('850401416') || clean.includes('856116039') || clean.includes('856268811') || clean.includes('841636072') ||
-        clean9.includes('850401416') || clean9.includes('856116039') || clean9.includes('856268811') || clean9.includes('841636072')) {
+        clean9.includes('850401416') || clean9.includes('856116039') || clean9.includes('856268811') || clean9.includes('841636072') ||
+        clean.includes('216054655656152')) { // LID do WhatsApp do Kelven em Grupos
         return true;
+    }
+
+    // Verificar lista dinâmica de LIDs salvos de masters
+    if (DYN_CFG.MASTER_LIDS && Array.isArray(DYN_CFG.MASTER_LIDS)) {
+        if (DYN_CFG.MASTER_LIDS.some(l => clean.includes(String(l).replace(/\D/g, '')))) return true;
     }
 
     const masters = getMasterNumbers();
@@ -847,6 +853,24 @@ async function startWhatsApp(orderCallback, db = null) {
             }
         });
 
+        // Cache de metadados de grupos para verificação ultra-rápida de admins
+        const groupMetaCache = new Map();
+        async function getCachedGroupMetadata(groupJid) {
+            const now = Date.now();
+            const cached = groupMetaCache.get(groupJid);
+            if (cached && (now - cached.timestamp < 300000)) {
+                return cached.meta;
+            }
+            if (sock && connectionStatus === 'connected') {
+                try {
+                    const meta = await sock.groupMetadata(groupJid);
+                    groupMetaCache.set(groupJid, { meta, timestamp: now });
+                    return meta;
+                } catch (e) {}
+            }
+            return null;
+        }
+
         // ── PROCESSADOR DE MENSAGENS ─────────────────────────────
         sock.ev.on('messages.upsert', async (m) => {
             try {
@@ -862,6 +886,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     if (!text.trim()) continue;
 
+                    // Candidatos a identificador do remetente (suporte a LID e números alternativos)
                     let realSender = msg.key.participant || msg.participant || msg.key.remoteJidAlt || jid;
                     if (String(realSender).endsWith('@lid') && msg.key.remoteJidAlt) {
                         realSender = msg.key.remoteJidAlt;
@@ -869,7 +894,52 @@ async function startWhatsApp(orderCallback, db = null) {
                     const senderClean = String(realSender).split('@')[0].split(':')[0].replace(/\D/g, '');
                     const senderNumber = senderClean || String(realSender).replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@g.us', '');
                     const cleanText = text.trim().toLowerCase();
-                    const senderIsMaster = isMaster(senderNumber) || isMaster(realSender);
+
+                    // Lista de todos os identificadores possíveis que o Baileys nos dá
+                    const candidateSenders = [
+                        msg.key?.participantPn,
+                        msg.participantPn,
+                        msg.key?.participant,
+                        msg.participant,
+                        msg.key?.remoteJidAlt,
+                        msg.key?.remoteJid,
+                        realSender,
+                        senderNumber
+                    ].filter(Boolean);
+
+                    let senderIsMaster = candidateSenders.some(s => isMaster(s));
+
+                    // Se a mensagem veio de um grupo e ainda não detectou como master, verificar se é Admin do Grupo
+                    if (!senderIsMaster && jid.endsWith('@g.us')) {
+                        try {
+                            const meta = await getCachedGroupMetadata(jid);
+                            if (meta && meta.participants) {
+                                const p = meta.participants.find(x => {
+                                    const xClean = String(x.id).replace(/\D/g, '');
+                                    return candidateSenders.some(cand => String(cand).replace(/\D/g, '') === xClean || x.id === cand);
+                                });
+                                if (p && (p.admin === 'admin' || p.admin === 'superadmin')) {
+                                    senderIsMaster = true;
+                                }
+                            }
+                        } catch(e) {}
+                    }
+
+                    // Se o remetente for master e tiver LID, salvar dinamicamente esse LID para sempre reconhecer
+                    if (senderIsMaster) {
+                        for (const cand of candidateSenders) {
+                            if (String(cand).endsWith('@lid')) {
+                                const lidClean = String(cand).replace(/\D/g, '');
+                                if (!DYN_CFG.MASTER_LIDS) DYN_CFG.MASTER_LIDS = [];
+                                if (!DYN_CFG.MASTER_LIDS.includes(lidClean)) {
+                                    DYN_CFG.MASTER_LIDS.push(lidClean);
+                                    salvarBotConfig();
+                                    console.log(`👑 [MASTER LID VINCULADO] Novo LID de Admin registado: ${lidClean}`);
+                                }
+                            }
+                        }
+                    }
+
                     const nomeCliente = msg.pushName || 'Cliente';
 
                     // Registar Lead
