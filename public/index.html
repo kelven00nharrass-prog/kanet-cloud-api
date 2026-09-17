@@ -199,22 +199,23 @@ async function fetchAPI(path, opts={}) {
 
 async function loadWAStatus() {
   try {
-    const d = await fetchAPI('/api/bot-status');
+    const d = await fetchAPI('/api/whatsapp/status');
     const el = document.getElementById('waStatus');
     const tx = document.getElementById('waStatusText');
-    if (d.connected) {
+    if (d.status === 'connected') {
       el.className = 'wa-status';
-      tx.textContent = '📱 WhatsApp Conectado: ' + (d.phone || d.number || 'Ativo');
-    } else if (d.qr_pending) {
+      const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
+      tx.textContent = '📱 WhatsApp Conectado: +' + phone;
+    } else if (d.hasQr || d.status === 'qr_ready') {
       el.className = 'wa-status loading';
-      tx.textContent = '⏳ Aguardando QR Code';
+      tx.textContent = '⏳ QR Code Pronto (Clique em Ver QR)';
     } else {
       el.className = 'wa-status offline';
       tx.textContent = '❌ WhatsApp Desconectado';
     }
   } catch(e) {
     document.getElementById('waStatus').className = 'wa-status offline';
-    document.getElementById('waStatusText').textContent = '❌ Offline';
+    document.getElementById('waStatusText').textContent = '❌ Desconectado';
   }
 }
 
@@ -505,18 +506,35 @@ async function showQr() {
   const content = document.getElementById('qrContent');
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   if (panel.style.display === 'block') {
-    content.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--muted)"></i><p>A carregar QR Code...</p>';
+    panel.scrollIntoView({ behavior: 'smooth' });
+    content.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--cyan)"></i><p style="margin-top:12px;color:var(--muted)">A carregar QR Code em tempo real...</p>';
     try {
-      const d = await fetchAPI('/qr');
-      if (d.qr_image) {
-        content.innerHTML = '<img src="' + d.qr_image + '" alt="QR Code"><p>Escaneie com o WhatsApp no celular do Bot</p>';
-      } else if (d.connected) {
-        content.innerHTML = '<i class="fa-solid fa-circle-check" style="font-size:3rem;color:var(--green)"></i><p style="color:var(--green)">✅ WhatsApp já está conectado!</p>';
+      const d = await fetchAPI('/api/whatsapp/status');
+      if (d.status === 'connected') {
+        const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
+        content.innerHTML = `
+          <i class="fa-solid fa-circle-check" style="font-size:3.5rem;color:var(--green)"></i>
+          <p style="color:var(--green);font-size:1.1rem;font-weight:700;margin-top:12px">✅ WhatsApp Conectado com Sucesso!</p>
+          <p style="color:var(--muted);font-size:.85rem;margin-top:4px">Número: +${phone}</p>`;
+      } else if (d.qrImage || (d.hasQr && d.qrImage)) {
+        content.innerHTML = `
+          <div style="display:inline-block;padding:12px;background:#ffffff;border-radius:14px;box-shadow:0 0 35px rgba(0,240,255,0.25)">
+            <img src="${d.qrImage}" style="width:230px;height:230px;display:block" alt="QR Code WhatsApp">
+          </div>
+          <p style="margin-top:14px;font-weight:700;color:var(--text);font-size:.95rem">Escaneie com o WhatsApp no Celular do Bot</p>
+          <p style="color:var(--muted);font-size:.78rem;margin-top:4px">WhatsApp &gt; Aparelhos Conectados &gt; Conectar um Aparelho</p>
+          <div style="margin-top:12px">
+            <button class="btn btn-primary btn-sm" onclick="showQr()"><i class="fa-solid fa-rotate"></i> Atualizar Código</button>
+          </div>`;
       } else {
-        content.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;color:var(--yellow)"></i><p>QR Code não disponível no momento</p>';
+        content.innerHTML = `
+          <i class="fa-solid fa-clock" style="font-size:2.5rem;color:var(--yellow)"></i>
+          <p style="margin-top:10px;font-weight:600">A gerar sessão do WhatsApp na nuvem...</p>
+          <p style="color:var(--muted);font-size:.8rem;margin-top:4px">Aguarde alguns segundos e clique no botão abaixo.</p>
+          <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="showQr()"><i class="fa-solid fa-rotate"></i> Tentar Novamente</button>`;
       }
     } catch(e) {
-      content.innerHTML = '<p style="color:var(--red)">Erro: ' + e.message + '</p>';
+      content.innerHTML = '<p style="color:var(--red)">Erro ao carregar: ' + e.message + '</p>';
     }
   }
 }
