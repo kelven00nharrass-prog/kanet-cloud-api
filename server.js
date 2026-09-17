@@ -223,8 +223,122 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         }
       }
     }
-  } else if (dev.limite_atingido || dev.sem_saldo) {
-    console.log(`⏸️ [PAUSA OPERACIONAL] Celular Porta ${port} sem saldo ou atingiu o limite. Pedidos retidos na fila até troca no Slim SIM Card.`);
+  } else if (dev.limite_atingido || dev.sem_saldo || (dev.transfers_available !== undefined && dev.transfers_available <= 0)) {
+    // ── LÓGICA DE FALLBACK: redirecionar pedidos desta porta para outra porta disponível ──
+    const now2 = Date.now();
+    const lastBlockLog = dev._lastBlockLogTime || 0;
+    if (now2 - lastBlockLog > 30000) { // logar máx 1x a cada 30s por porta
+      dev._lastBlockLogTime = now2;
+      console.log(`⏸️ [PAUSA OPERACIONAL] Celular Porta ${port} sem saldo ou atingiu o limite. A verificar portas alternativas...`);
+    }
+
+    for (const [orderId, order] of inMemoryOrders.entries()) {
+      if (order.status === 'pending') {
+        const designatedPort = order.targetPort || getPortForModo(order.modo);
+        if (designatedPort !== port) continue; // não é desta porta, ignorar
+
+        // Procurar outra porta disponível que suporte o mesmo modo
+        const modoOrder = (order.modo || 'diario').toLowerCase().trim();
+        let fallbackDev = null;
+        let fallbackPort = null;
+
+        for (const [candidatePortStr, candidateDev] of Object.entries(inMemoryDevices)) {
+          const candidatePort = Number(candidatePortStr);
+          if (candidatePort === port) continue; // não usar a porta esgotada
+          if (!isDeviceApto(candidateDev)) continue; // deve estar apto
+
+          // Verificar se a porta candidata é compatível com o modo do pedido
+          const candidateDesignated = getPortForModo(modoOrder);
+          // Aceitar apenas se o candidato for a porta correta para esse modo
+          // Exceção: se a porta original for 8077 e não houver outra 8077, mas houver 8023 disponível e ambos forem vodacom
+          // → Para pacotes diários (8023) → fallback: outra porta vodacom disponível  
+          // → Para semanais/mensais (8077) → fallback: outra porta vodacom disponível
+          // → Para saldo (8777) → sem fallback (porta específica)
+          if (candidateDesignated === candidatePort) {
+            // porta perfeita para o modo
+            fallbackDev = candidateDev;
+            fallbackPort = candidatePort;
+            break;
+          }
+
+          // Se modo não for saldo (8777), aceitar qualquer porta Vodacom disponível como fallback
+          if (modoOrder !== 'saldo' && modoOrder !== 'credito' && candidatePort !== 8777) {
+            if (!fallbackDev) {
+              fallbackDev = candidateDev;
+              fallbackPort = candidatePort;
+            }
+          }
+        }
+
+        if (fallbackDev && fallbackPort) {
+          // Redirecionar pedido para a porta de fallback
+          const rawQty = order.quantidade || 0;
+          const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(1)} GB`;
+          const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
+
+          order.status = 'assigned';
+          order.targetPort = fallbackPort;
+          order.assignedToPort = fallbackPort;
+          order.originalPort = port;
+          order.redirected = true;
+          order.processingAt = new Date().toISOString();
+
+          fallbackDev.pending_order = {
+            id: order.orderId || order.id,
+            orderId: order.orderId || order.id,
+            numero: order.numero,
+            quantidade: order.quantidade,
+            modo: order.modo || 'diario',
+            input_val: order.input_val || '',
+            jid: order.jid || null,
+            timestamp: Date.now()
+          };
+
+          console.log(`🔀 [REDIRECIONAMENTO] Pedido ${orderId} redirecionado: Porta ${port} (cheia/sem saldo) → Porta ${fallbackPort} (apta)`);
+
+          // Notificar o grupo de notificações sobre o redirecionamento
+          if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+            baileysEngine.enviarNotificacaoGrupo(
+              `🔀 *REDIRECIONAMENTO AUTOMÁTICO DE PEDIDO*\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📋 *Ref:* \`${orderId}\`\n` +
+              `📲 *Destino:* *${order.numero}*\n` +
+              `📦 *Volume:* *${volStr}*\n` +
+              `⚠️ *Porta Original:* Celular ${port} (Sem saldo / Limite atingido)\n` +
+              `✅ *Redirecionado Para:* Celular ${fallbackPort} (Disponível)\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `♻️ O pedido será processado automaticamente pelo celular alternativo.`
+            );
+          }
+          break; // só redirecionar 1 por vez
+        } else {
+          // Nenhuma porta disponível para este modo — avisar grupo (1x por pedido)
+          if (!order._noFallbackNotified) {
+            order._noFallbackNotified = true;
+            const rawQty = order.quantidade || 0;
+            const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(1)} GB`;
+            const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
+            if (baileysEngine && typeof baileysEngine.enviarErroGrupo === 'function') {
+              baileysEngine.enviarErroGrupo(
+                `🚨 *PEDIDO EM ESPERA — SEM CELULAR DISPONÍVEL* 🚨\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                `📋 *Ref:* \`${orderId}\`\n` +
+                `📲 *Destino:* *${order.numero}*\n` +
+                `📦 *Volume:* *${volStr}*\n` +
+                `🔌 *Porta Necessária:* Celular ${port}\n` +
+                `🕒 *Hora:* ${horaAgora}\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                `⚠️ Todos os celulares disponíveis para este tipo de pacote estão sem saldo ou atingiram o limite.\n` +
+                `💡 *Solução:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cartões.`
+              );
+            }
+            console.log(`⚠️ [SEM FALLBACK] Pedido ${orderId} (${volStr}) em espera — nenhum celular disponível para Porta ${port}.`);
+          }
+          break;
+        }
+      }
+    }
   }
 
   const now = Date.now();
