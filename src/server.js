@@ -221,13 +221,21 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   // - SÓ atribui pedidos se o celular estiver 100% APTO (com saldo e sem ter atingido limite diário)
   if (isDeviceApto(dev)) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
-      if (order.status === 'pending') {
-        const isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
+        let isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
+        if (!isCompatible && port === 8077 && (order.modo === 'diario' || !order.modo)) {
+          // Se nenhuma porta diária (8023, 8024) estiver apta/online, a porta 8077 assume para não deixar o cliente à espera!
+          const anyDailyApto = isDeviceApto(inMemoryDevices[8023]) || isDeviceApto(inMemoryDevices[8024]);
+          if (!anyDailyApto) {
+            isCompatible = true;
+            console.log(`🔀 [FAILOVER AUTO] Portas diárias (8023/8024) indisponíveis. Porta 8077 assumindo pedido diário ${orderId}!`);
+          }
+        }
         if (isCompatible) {
           order.status = 'assigned';
           order.targetPort = port;
           order.assignedToPort = port;
           order.processingAt = new Date().toISOString();
+          saveOrdersToCache();
 
           dev.pending_order = {
             id: order.id || order.orderId,
@@ -401,33 +409,39 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const volStr = rawQty < 1024 ? `${rawQty} MB` : `${rawQty / 1024} GB`;
     const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
 
-    if (order && order.jid && !order.notified && baileysEngine) {
-      order.notified = true;
+    // Resolver JID do cliente com máxima resiliência (do pedido em cache, do body ou do histórico Baileys)
+    let clientJid = (order && order.jid) || req.body.last_result.jid || null;
+    if (!clientJid && resId && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
+      clientJid = baileysEngine.getJidForOrder(resId);
+    }
+
+    if (clientJid && (!order || !order.notified) && baileysEngine) {
+      if (order) order.notified = true;
       if (success) {
-        baileysEngine.sendTextMessage(order.jid,
+        baileysEngine.sendTextMessage(clientJid,
           `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
           `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-          `📲 *Destino:* *${order.numero}*\n` +
+          `📲 *Destino:* *${targetNum}*\n` +
           `📦 *Volume:* *${volStr}*\n` +
           `🔖 *Ref:* \`${resId}\`\n\n` +
           `⚡ *A sua recarga já está pronta para uso!*\n` +
           `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
           `📞 *Suporte / Dúvidas:* Envie *Suporte*`
         );
-        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${order.jid} notificado de SUCESSO no pedido ${resId}`);
+        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${resId}`);
       } else {
-        baileysEngine.sendTextMessage(order.jid,
+        baileysEngine.sendTextMessage(clientJid,
           `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
           `  ⚠️ *AVISO DE ENVIO DE DADOS* ⚠️\n` +
           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-          `📲 *Destino:* *${order.numero}*\n` +
+          `📲 *Destino:* *${targetNum}*\n` +
           `📦 *Volume:* *${volStr}*\n\n` +
           `Detectamos uma instabilidade temporária na rede da operadora ao processar a recarga.\n` +
           `⚡ O sistema tentará reenviar automaticamente em instantes!\n\n` +
           `📞 Caso precise de assistência imediata, envie *Suporte*!`
         );
-        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${order.jid} notificado de FALHA no pedido ${resId}`);
+        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de FALHA no pedido ${resId}`);
       }
     }
 
@@ -462,6 +476,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       saveOrdersToCache();
     }
 
+    const jaNotificadoGrupo = !!(order && order.groupNotified);
     if (baileysEngine && !jaNotificadoGrupo) {
       if (order) order.groupNotified = true;
       if (success) {
@@ -1121,6 +1136,7 @@ try {
       createdAt: new Date().toISOString()
     };
     inMemoryOrders.set(order.orderId, orderDoc);
+    saveOrdersToCache();
 
     // Roteamento Estrito de Portas:
     // - 8023: Diários (24hrs)
