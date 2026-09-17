@@ -251,7 +251,6 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           break;
         }
       }
-    }
   } else if (dev.limite_atingido || dev.sem_saldo || (dev.transfers_available !== undefined && dev.transfers_available <= 0)) {
     // ── LÓGICA DE FALLBACK: redirecionar pedidos desta porta para outra porta disponível ──
     const now2 = Date.now();
@@ -1405,6 +1404,11 @@ app.post('/api/sms/payment', (req, res) => {
       metodo: metodo || 'mpesa',
       processedAt: new Date().toISOString()
     });
+
+    // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Comprovativo da Operadora"
+    if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
+      baileysEngine.registrarSmsPayment({ txn_id, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
+    }
 
     // Determinar quantos MB enviar
     const mbAEnviar = getMbFromValor(valor);
