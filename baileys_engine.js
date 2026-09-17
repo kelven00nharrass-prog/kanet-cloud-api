@@ -1742,6 +1742,16 @@ function toggleGrupoFechado(jid) {
     return DYN_CFG.GRUPOS_FECHADOS.includes(jid);
 }
 
+function getJidForOrder(orderId) {
+    if (!orderId) return null;
+    for (const [txnId, reg] of transacoesProcessadasMap.entries()) {
+        if (orderId.includes(txnId)) return reg.jid;
+    }
+    const v = historicoVendas.find(x => x.orderId === orderId);
+    if (v && v.jid) return v.jid;
+    return null;
+}
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -1752,6 +1762,7 @@ module.exports = {
     getGrupoErros,
     getGroups,
     setModoManutencao,
-    toggleGrupoFechado
+    toggleGrupoFechado,
+    getJidForOrder
 };
 
