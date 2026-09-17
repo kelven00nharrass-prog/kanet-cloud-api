@@ -63,6 +63,7 @@ const inMemoryOrders = new Map();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -181,8 +182,14 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   const port = Number(req.params.port);
   let dev = inMemoryDevices[port];
   if (!dev) {
+    // Auto-registar qualquer novo celular que reporte pela primeira vez
+    const carrierName = port === 8023 ? 'Vodacom (Huawei)' :
+                        port === 8077 ? 'Vodacom (Redmi)' :
+                        port === 8777 ? 'Vodacom (Saldo)' :
+                        `Vodacom (Celular ${port})`;
     dev = {
       porta: port,
+      carrier: carrierName,
       saldo_mb: 0,
       sem_saldo: false,
       livre: true,
@@ -191,6 +198,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
       lastSeen: new Date().toISOString()
     };
     inMemoryDevices[port] = dev;
+    console.log(`📱 [NOVO DISPOSITIVO] Celular Porta ${port} registado automaticamente! (${carrierName})`);
   }
 
   // ── AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA (ROTEAMENTO ESTRITO & APTIDÃO) ──
