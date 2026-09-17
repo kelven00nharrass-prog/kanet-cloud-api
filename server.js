@@ -260,8 +260,15 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       }
     }
 
-    // ── NOTIFICAÇÕES PARA OS GRUPOS DO SISTEMA ──
-    if (baileysEngine) {
+    // ── NOTIFICAÇÕES PARA OS GRUPOS DO SISTEMA (Anti-duplicação) ──
+    const jaNotificadoGrupo = order && order.groupNotified;
+    if (order) {
+      order.status = success ? 'completed' : 'failed';
+      order.completedAt = new Date().toISOString();
+    }
+
+    if (baileysEngine && !jaNotificadoGrupo) {
+      if (order) order.groupNotified = true;
       if (success) {
         if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
           baileysEngine.enviarNotificacaoGrupo(
@@ -570,6 +577,9 @@ try {
     // Despacha para qualquer celular online disponível (fallback para 8023)
     const targetPort = findAvailablePort() || 8023;
     if (inMemoryDevices[targetPort]) {
+      orderDoc.status = 'assigned';
+      orderDoc.targetPort = targetPort;
+      orderDoc.assignedToPort = targetPort;
       inMemoryDevices[targetPort].pending_order = {
         id: order.orderId,
         orderId: order.orderId,
@@ -579,8 +589,9 @@ try {
         jid: order.jid,
         timestamp: Date.now()
       };
-      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue ao canal do Celular ${targetPort}`);
+      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue com exclusividade ao Celular ${targetPort}`);
     } else {
+      orderDoc.status = 'pending';
       console.warn(`⚠️ [WHATSAPP NUVEM] Nenhum celular conectado para a ordem ${order.orderId}. Ordem mantida na fila.`);
     }
   }, db);
