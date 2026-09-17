@@ -150,19 +150,47 @@ app.get('/api/devices', async (req, res) => {
 
 app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   const port = Number(req.params.port);
-  const dev = inMemoryDevices[port];
+  let dev = inMemoryDevices[port];
   if (!dev) {
-    return res.json({
-      status: 'offline',
-      online: false,
+    dev = {
       porta: port,
       saldo_mb: 0,
-      sem_saldo: true,
-      livre: false,
+      sem_saldo: false,
+      livre: true,
       is_busy: false,
-      mensagem: `Nenhum celular conectado na porta ${port}`
-    });
+      pending_order: null,
+      lastSeen: new Date().toISOString()
+    };
+    inMemoryDevices[port] = dev;
   }
+
+  // ── AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA ──
+  // Se o celular está livre (sem pending_order), atribuir o próximo pedido pendente da fila
+  if (!dev.pending_order) {
+    for (const [orderId, order] of inMemoryOrders.entries()) {
+      if (order.status === 'pending') {
+        if (!order.targetPort || order.targetPort === port) {
+          order.status = 'processing';
+          order.assignedToPort = port;
+          order.processingAt = new Date().toISOString();
+
+          dev.pending_order = {
+            id: order.id || order.orderId,
+            orderId: order.id || order.orderId,
+            numero: order.numero,
+            quantidade: order.quantidade,
+            modo: order.modo || 'diario',
+            input_val: order.input_val || '',
+            jid: order.jid || null,
+            timestamp: Date.now()
+          };
+          console.log(`📦 [FILA NUVEM] Atribuindo pedido ${orderId} (${order.quantidade}MB -> ${order.numero}) ao Celular Porta ${port}`);
+          break;
+        }
+      }
+    }
+  }
+
   const now = Date.now();
   const lastSeen = new Date(dev.lastSeen || 0).getTime();
   const isOnline = (now - lastSeen) < 180000; // 3 min window
@@ -175,25 +203,42 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
 app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, res) => {
   const port = Number(req.params.port);
+  const currentDev = inMemoryDevices[port] || {};
+
+  // Preservar pending_order existente se o heartbeat não enviou pending_order explicitamente
+  let pendingOrder = currentDev.pending_order;
+  if ('pending_order' in req.body) {
+    pendingOrder = req.body.pending_order;
+  }
+
   inMemoryDevices[port] = {
-    porta: port,
+    ...currentDev,
     ...req.body,
+    porta: port,
+    pending_order: pendingOrder,
     lastSeen: new Date().toISOString()
   };
 
   // Notificar cliente no WhatsApp assim que o celular finalizar o envio USSD
+  // Notificar cliente no WhatsApp e grupos assim que o celular finalizar o envio USSD
   if (req.body.last_result && req.body.last_result.id) {
     const resId = req.body.last_result.id;
     const order = inMemoryOrders.get(resId);
+    const success = !!req.body.last_result.success;
+    const targetNum = (order && order.numero) || req.body.last_result.numero || 'N/A';
+    const rawQty = (order && order.quantidade) || req.body.last_result.quantidade || 1024;
+    const volStr = rawQty < 1024 ? `${rawQty} MB` : `${rawQty / 1024} GB`;
+    const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
+
     if (order && order.jid && !order.notified && baileysEngine) {
       order.notified = true;
-      if (req.body.last_result.success) {
+      if (success) {
         baileysEngine.sendTextMessage(order.jid,
           `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
           `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
           `📲 *Destino:* *${order.numero}*\n` +
-          `📦 *Volume:* *${order.quantidade < 1024 ? order.quantidade + ' MB' : (order.quantidade / 1024) + ' GB'}*\n` +
+          `📦 *Volume:* *${volStr}*\n` +
           `🔖 *Ref:* \`${resId}\`\n\n` +
           `⚡ *A sua recarga já está pronta para uso!*\n` +
           `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
@@ -206,12 +251,48 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           `  ⚠️ *AVISO DE ENVIO DE DADOS* ⚠️\n` +
           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
           `📲 *Destino:* *${order.numero}*\n` +
-          `📦 *Volume:* *${order.quantidade} MB*\n\n` +
+          `📦 *Volume:* *${volStr}*\n\n` +
           `Detectamos uma instabilidade temporária na rede da operadora ao processar a recarga.\n` +
           `⚡ O sistema tentará reenviar automaticamente em instantes!\n\n` +
           `📞 Caso precise de assistência imediata, envie *Suporte*!`
         );
         console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${order.jid} notificado de FALHA no pedido ${resId}`);
+      }
+    }
+
+    // ── NOTIFICAÇÕES PARA OS GRUPOS DO SISTEMA ──
+    if (baileysEngine) {
+      if (success) {
+        if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+          baileysEngine.enviarNotificacaoGrupo(
+            `✅ *PACOTE ATIVADO COM SUCESSO!* 🎉\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `📋 *Ref:* \`${resId}\`\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
+            `📦 *Volume:* *${volStr}*\n` +
+            `🔌 *Porta:* Celular ${port}\n` +
+            `🕒 *Hora:* ${horaAgora}\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `✨ *Status:* Concluído e confirmado pela operadora`
+          );
+        }
+      } else {
+        if (typeof baileysEngine.enviarErroGrupo === 'function') {
+          const errMsg = (req.body.last_result && (req.body.last_result.error || req.body.last_result.message)) || 'Falha no disparo USSD';
+          baileysEngine.enviarErroGrupo(
+            `🚨 *ERRO DETECTADO [NORMAL]* 🚨\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `📋 *Referência:* \`${resId}\`\n` +
+            `📞 *Número:* *${targetNum}*\n` +
+            `📊 *Tipo:* ${(order && order.modo) || 'diario'}\n` +
+            `🔌 *Porta:* Celular ${port}\n` +
+            `📦 *Volume:* ${volStr}\n` +
+            `🕒 *Data/Hora:* ${horaAgora}\n` +
+            `❌ *Erro:* ${errMsg}\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `⚠️ *Status:* Aguardando verificação / intervenção manual`
+          );
+        }
       }
     }
   }
@@ -502,7 +583,7 @@ try {
     } else {
       console.warn(`⚠️ [WHATSAPP NUVEM] Nenhum celular conectado para a ordem ${order.orderId}. Ordem mantida na fila.`);
     }
-  });
+  }, db);
 } catch(e) {
   console.warn('⚠️ [BAILEYS] Inicializando em modo standard:', e.message);
 }
@@ -775,6 +856,23 @@ app.post('/api/sms/payment', (req, res) => {
     if (targetPort && inMemoryDevices[targetPort]) {
       inMemoryDevices[targetPort].pending_order = order;
       console.log(`💳 [SMS PAYMENT] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT → ${mbAEnviar} MB para ${remetente} via Celular ${targetPort}`);
+
+      if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+        const volStr = mbAEnviar < 1024 ? `${mbAEnviar} MB` : `${mbAEnviar / 1024} GB`;
+        baileysEngine.enviarNotificacaoGrupo(
+          `💰 *PAGAMENTO SMS CONFIRMADO* ⚡\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `📋 *Txn:* \`${txn_id}\`\n` +
+          `📲 *Remetente:* *${remetente}*\n` +
+          `💳 *Valor:* *${valor} MT* (${metodo || 'M-Pesa'})\n` +
+          `📦 *Pacote:* *${volStr}*\n` +
+          `🔌 *Porta:* Celular ${targetPort}\n` +
+          `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `🚀 *Status:* Disparo USSD iniciado automaticamente`
+        );
+      }
+
       return res.json({
         success: true,
         orderId,
@@ -791,6 +889,20 @@ app.post('/api/sms/payment', (req, res) => {
         updatedAt: new Date().toISOString()
       });
       console.warn(`⚠️ [SMS PAYMENT] Nenhum celular disponível. Pedido ${orderId} em fila de espera.`);
+
+      if (baileysEngine && typeof baileysEngine.enviarErroGrupo === 'function') {
+        baileysEngine.enviarErroGrupo(
+          `⚠️ *NENHUM CELULAR DISPONÍVEL* ⚠️\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `📋 *Txn:* \`${txn_id}\`\n` +
+          `📲 *Remetente:* *${remetente}*\n` +
+          `💳 *Valor:* *${valor} MT*\n` +
+          `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `⚠️ *Status:* Pedido colocado em fila de espera`
+        );
+      }
+
       return res.json({
         success: true,
         orderId,
