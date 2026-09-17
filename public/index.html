@@ -512,13 +512,13 @@ async function loadDevices() {
       const saldo = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
       const saldo2 = dev.sim2_saldo_mb !== undefined ? dev.sim2_saldo_mb : 0;
       const saldoColor = saldo > 500 ? 'green' : saldo > 100 ? 'yellow' : 'red';
-      const isDiario = dev.porta === 8023 || dev.porta === 8024;
+      const isDiario = dev.porta !== 8077 && dev.porta !== 8777;
       const isSpecial = dev.porta === 8077 || dev.porta === 8777;
       const avail = dev.transfers_available !== undefined ? dev.transfers_available : '?';
       const total = dev.total_envios || 0;
       const pct = Math.min(100, (total / 20) * 100);
       const pctColor = pct < 50 ? 'green' : pct < 80 ? 'yellow' : 'red';
-      const tipoPorta = isDiario ? '📦 Diários (24hrs)' : dev.porta === 8077 ? '📅 Semanais / Mensais / VIP' : '💰 Saldo & Crédito';
+      const tipoPorta = dev.porta === 8077 ? '📅 Semanais / Mensais / VIP' : dev.porta === 8777 ? '💰 Saldo & Crédito' : '📦 Diários (24hrs)';
       
       const pendingHtml = dev.pending_order ? `
         <div class="pending-order">
@@ -568,11 +568,13 @@ async function loadDevices() {
           <div style="font-size:.68rem;color:var(--muted)">SIM1: ${dev.sim1_envios||0} | SIM2: ${dev.sim2_envios||0}</div>
         </div>`;
 
+      const modelName = dev.device_model || (dev.porta === 8023 ? 'Xiaomi Redmi' : dev.porta === 8077 ? 'Huawei Honor' : ('Celular Gateway'));
+
       return `
         <div class="card">
           <div class="device-header">
             <div>
-              <div class="device-name">📱 Porta ${dev.porta}</div>
+              <div class="device-name">📱 ${modelName} <span style="font-size:.8rem;color:var(--cyan)">(Porta ${dev.porta})</span></div>
               <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${dev.carrier || 'Vodacom'} • ${tipoPorta}</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
@@ -1052,11 +1054,11 @@ async function reloadAll() {
   await loadWAStatus();
   
   const online = devices.filter(d => d.online).length;
-  const dailyDevices = devices.filter(d => d.porta === 8023 || d.porta === 8024);
+  const dailyDevices = devices.filter(d => d.porta !== 8077 && d.porta !== 8777 && d.online);
   const avail = dailyDevices.reduce((a, d) => a + (d.transfers_available || 0), 0);
   const today = devices.reduce((a, d) => a + (d.total_envios || 0), 0);
   
-  document.getElementById('mDevices').textContent = online + '/' + devices.length;
+  document.getElementById('mDevices').textContent = online + ' / ' + devices.length;
   document.getElementById('mAvail').textContent = avail;
   document.getElementById('mToday').textContent = today;
   document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');

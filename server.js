@@ -47,13 +47,10 @@ try {
 
 // In-Memory Device & Order Store (Fallback & Instant Sync)
 
-// In-Memory Device & Order Store
+// In-Memory Device & Order Store (Dinâmico - sem dispositivos fantasmas)
 let pendingBotCommand = null;
 let inMemoryMetrics = null;
-const inMemoryDevices = {
-  8023: { porta: 8023, carrier: 'Vodacom (Huawei)', saldo_mb: 10240, bateria: 100, online: true, livre: true, is_busy: false, lastSeen: new Date().toISOString() },
-  8077: { porta: 8077, carrier: 'Vodacom (Redmi)', saldo_mb: 10240, bateria: 100, online: true, livre: true, is_busy: false, lastSeen: new Date().toISOString() }
-};
+const inMemoryDevices = {};
 
 const inMemoryOrders = new Map();
 
@@ -74,12 +71,15 @@ app.use((req, res, next) => {
 // 3. HEALTH & ROOT ENDPOINTS
 // ----------------------------------------------------
 app.get(['/health', '/', '/status'], (req, res) => {
+  const now = Date.now();
+  const onlineCount = Object.values(inMemoryDevices).filter(d => (now - new Date(d.lastSeen || 0).getTime()) < 35000).length;
   res.json({
     status: 'online',
     service: 'Ka-Net Cloud API (Render + Firebase)',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
-    devices_online: Object.keys(inMemoryDevices).length
+    devices_online: onlineCount,
+    devices_total: Object.keys(inMemoryDevices).length
   });
 });
 
@@ -146,8 +146,9 @@ app.get('/api/devices', async (req, res) => {
   const now = Date.now();
   const devices = Object.values(inMemoryDevices).map(dev => {
     const lastSeen = new Date(dev.lastSeen || 0).getTime();
-    const online = (now - lastSeen) < 180000; // 3 min window
-    return { ...dev, online };
+    const online = (now - lastSeen) < 35000; // 35 segundos (heartbeat a cada 3s)
+    const apto = isDeviceApto(dev);
+    return { ...dev, online, is_apto: apto };
   });
   return res.json({ success: true, count: devices.length, devices });
 });
@@ -160,15 +161,33 @@ function isPortCompatibleWithModo(port, modo) {
   if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) {
     return port === 8077;
   }
-  // Pacotes Diários: compatível com Porta 8023 E Porta 8024 (ou qualquer outro celular diário)
-  return port === 8023 || port === 8024 || (port !== 8077 && port !== 8777);
+  // Pacotes Diários: compatível com qualquer celular diário (8023, 8024, 8025, etc.)
+  return port !== 8077 && port !== 8777;
+}
+
+function getPortForModo(modo) {
+  const m = String(modo || '').toLowerCase().trim();
+  if (m === 'saldo' || m === 'credito') return 8777;
+  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) return 8077;
+
+  // Para diários: selecionar dinamicamente a melhor porta diária online e apta
+  const dailyDevs = Object.values(inMemoryDevices).filter(d => {
+    const port = Number(d.porta);
+    return port !== 8077 && port !== 8777 && isDeviceApto(d);
+  });
+  if (dailyDevs.length > 0) {
+    // Escolher a porta com maior saldo ou mais transferências disponíveis
+    dailyDevs.sort((a, b) => (b.transfers_available || 0) - (a.transfers_available || 0));
+    return Number(dailyDevs[0].porta);
+  }
+  return 8023; // fallback padrão
 }
 
 function isDeviceApto(dev) {
   if (!dev) return false;
   const now = Date.now();
   const lastSeen = new Date(dev.lastSeen || 0).getTime();
-  const isOnline = (now - lastSeen) < 180000;
+  const isOnline = (now - lastSeen) < 35000;
   if (!isOnline) return false;
   if (dev.pending_order) return false;
   if (dev.livre === false) return false;
@@ -176,19 +195,18 @@ function isDeviceApto(dev) {
   const port = Number(dev.porta);
 
   // ── PORTAS ESPECIAIS (8077 - Semanais/Mensais/Ilimitados e 8777 - Saldo/Crédito) ──
-  // Não utilizam o limite de 10 transferências de dados por chip nem dependem de pacotes diários
   if (port === 8077 || port === 8777) {
     if (dev.sem_saldo === true) return false;
     if (dev.saldo_mt !== undefined && dev.saldo_mt <= 0) return false;
     return true;
   }
 
-  // ── PORTAS DIÁRIAS (8023, 8024) ──
+  // ── PORTAS DIÁRIAS (todas as demais portas) ──
   if (dev.sem_saldo === true) return false;
   if (dev.limite_atingido === true) return false;
   if (dev.transfers_available !== undefined && dev.transfers_available <= 0) return false;
-  const s1 = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : 10240;
-  const s2 = dev.sim2_saldo_mb !== undefined ? dev.sim2_saldo_mb : 10240;
+  const s1 = dev.sim1_saldo_mb !== undefined && dev.sim1_saldo_mb !== null ? dev.sim1_saldo_mb : 10240;
+  const s2 = dev.sim2_saldo_mb !== undefined && dev.sim2_saldo_mb !== null ? dev.sim2_saldo_mb : 10240;
   if (s1 < 50 && s2 < 50) return false;
   return true;
 }
