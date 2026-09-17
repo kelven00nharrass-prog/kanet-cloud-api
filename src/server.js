@@ -779,53 +779,65 @@ app.get('/api/reports', async (req, res) => {
 // ── GESTÃO DE GRUPOS WHATSAPP ──
 app.get('/api/groups', async (req, res) => {
   try {
-    let groups = [];
-    if (baileysEngine && typeof baileysEngine.getGroups === 'function') {
-      groups = await baileysEngine.getGroups();
-    }
-
+    // 1. Carregar config do bot para metadados
     let botCfg = {};
     try {
-      if (fs.existsSync(path.resolve(__dirname, 'bot_config.js'))) {
-        botCfg = require(path.resolve(__dirname, 'bot_config.js'));
+      const cfgPath = path.resolve(__dirname, 'bot_config.js');
+      if (fs.existsSync(cfgPath)) {
+        delete require.cache[require.resolve(cfgPath)];
+        botCfg = require(cfgPath);
       }
     } catch(e) {}
 
     const groupTables = botCfg.TABELAS_GRUPO || {};
-    const baseList = [
-      { jid: '120363409903708446@g.us', nome: 'Ka-Net Notificações', autorizado: true, tipo: 'Canal de Notificações' },
-      { jid: '120363408450329444@g.us', nome: 'Ka-Net Alertas & Erros', autorizado: true, tipo: 'Canal de Erros' },
-      { jid: '120363424819563179@g.us', nome: 'Ka-Net VIP Clientes', autorizado: true, tipo: 'Grupo de Clientes' }
-    ];
+    const jidNotif  = (botCfg.GRUPO_NOTIFICACOES || '120363409903708446@g.us').trim();
+    const jidErros  = (botCfg.GRUPO_ERROS        || '120363408450329444@g.us').trim();
 
-    // Se o Baileys buscou grupos ao vivo, mesclar
-    if (groups && groups.length > 0) {
-      groups.forEach(g => {
-        const found = baseList.find(b => b.jid === g.jid);
-        if (!found) {
-          baseList.push({
-            jid: g.jid,
-            nome: g.name || 'Grupo WhatsApp',
-            autorizado: true,
-            tipo: 'Grupo Autorizado',
-            membros: g.participants_count || '?'
-          });
-        } else {
-          found.membros = g.participants_count || '?';
-        }
-      });
+    // 2. Tentar buscar grupos ao vivo via Baileys
+    let liveGroups = [];
+    if (baileysEngine && typeof baileysEngine.getGroups === 'function') {
+      liveGroups = await baileysEngine.getGroups();
     }
 
-    const finalGroups = baseList.map(g => ({
-      ...g,
-      tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
-    }));
+    let finalGroups = [];
 
-    return res.json({ success: true, count: finalGroups.length, groups: finalGroups });
+    if (liveGroups && liveGroups.length > 0) {
+      // Usar lista ao vivo como fonte principal
+      finalGroups = liveGroups.map(g => {
+        let tipo = 'Grupo de Clientes';
+        if (g.jid === jidNotif)  tipo = 'Canal de Notificações';
+        if (g.jid === jidErros)  tipo = 'Canal de Erros';
+
+        return {
+          jid: g.jid,
+          nome: g.name || 'Grupo WhatsApp',
+          autorizado: true,
+          tipo,
+          membros: g.participants_count || '?',
+          tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
+        };
+      });
+    } else {
+      // Fallback: grupos conhecidos hardcoded quando WhatsApp está offline
+      const fallback = [
+        { jid: jidNotif, nome: 'Ka-Net Notificações', tipo: 'Canal de Notificações' },
+        { jid: jidErros,  nome: 'Ka-Net Alertas & Erros', tipo: 'Canal de Erros' },
+        { jid: '120363424819563179@g.us', nome: 'Ka-Net VIP Clientes', tipo: 'Grupo de Clientes' }
+      ];
+      finalGroups = fallback.map(g => ({
+        ...g,
+        autorizado: true,
+        membros: '?',
+        tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
+      }));
+    }
+
+    return res.json({ success: true, count: finalGroups.length, ao_vivo: liveGroups.length > 0, groups: finalGroups });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
 });
+
 
 // ── TABELAS DE PREÇOS DO SISTEMA ──
 app.get('/api/price-tables', (req, res) => {
