@@ -1665,11 +1665,87 @@ app.post('/api/sms/payment', (req, res) => {
   }
 });
 
-// Listar pagamentos já processados (debug)
+// ────────────────────────────────────────────────────────────────
+// Pesquisa de referências SMS (M-Pesa / e-Mola)
+// GET /api/sms/payments          → lista últimos 50 (aceita ?q= para filtrar)
+// GET /api/sms/payments/:txn_id  → procura por ID exacto (em memória + Firestore)
+// ────────────────────────────────────────────────────────────────
 app.get('/api/sms/payments', (req, res) => {
-  const list = [...inMemoryPayments.values()];
-  return res.json({ success: true, count: list.length, payments: list.slice(-50) });
+  try {
+    const query = (req.query.q || '').toLowerCase().trim();
+    // Combinar inMemoryPayments (endpoint) + smsPaymentsMap (baileys_engine)
+    const allPayments = new Map();
+    for (const [k, v] of inMemoryPayments.entries()) allPayments.set(k, v);
+    if (baileysEngine && baileysEngine.smsPaymentsMap) {
+      for (const [k, v] of baileysEngine.smsPaymentsMap.entries()) {
+        if (!allPayments.has(k)) allPayments.set(k, v);
+      }
+    }
+    let list = [...allPayments.values()];
+    if (query) {
+      list = list.filter(p =>
+        (p.txn_id || '').toLowerCase().includes(query) ||
+        (p.remetente || '').toLowerCase().includes(query) ||
+        String(p.valor || '').includes(query) ||
+        (p.metodo || '').toLowerCase().includes(query)
+      );
+    }
+    // Ordenar mais recente primeiro
+    list.sort((a, b) => (b.processedAt || b.timestamp || 0) > (a.processedAt || a.timestamp || 0) ? 1 : -1);
+    return res.json({ success: true, count: list.length, payments: list.slice(0, 100) });
+  } catch (err) {
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
 });
+
+// Pesquisar referência específica por txn_id
+app.get('/api/sms/payments/:txn_id', async (req, res) => {
+  try {
+    const txnId = req.params.txn_id;
+    let payment = null;
+
+    // 1. Procurar em memória
+    if (inMemoryPayments.has(txnId)) payment = inMemoryPayments.get(txnId);
+    if (!payment && baileysEngine && baileysEngine.smsPaymentsMap && baileysEngine.smsPaymentsMap.has(txnId)) {
+      payment = baileysEngine.smsPaymentsMap.get(txnId);
+    }
+
+    // 2. Procurar no Firestore (se disponível)
+    if (!payment && db) {
+      try {
+        const snap = await db.collection('sms_payments').doc(txnId).get();
+        if (snap.exists) payment = snap.data();
+      } catch (_) {}
+    }
+
+    // 3. Pesquisa parcial (contém) nos pagamentos em memória
+    let similarResults = [];
+    if (!payment) {
+      const all = new Map();
+      for (const [k, v] of inMemoryPayments.entries()) all.set(k, v);
+      if (baileysEngine && baileysEngine.smsPaymentsMap) {
+        for (const [k, v] of baileysEngine.smsPaymentsMap.entries()) all.set(k, v);
+      }
+      similarResults = [...all.values()].filter(p =>
+        (p.txn_id || '').toLowerCase().includes(txnId.toLowerCase())
+      ).slice(0, 10);
+    }
+
+    if (payment) {
+      return res.json({ success: true, encontrado: true, payment });
+    } else if (similarResults.length > 0) {
+      return res.json({ success: true, encontrado: false, similares: similarResults,
+        mensagem: `Referência exacta não encontrada. ${similarResults.length} resultado(s) similar(es).` });
+    } else {
+      return res.status(404).json({ success: false, encontrado: false,
+        mensagem: `Referência ${txnId} não encontrada em memória ou base de dados.` });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
+});
+
+
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log('==================================================================');
