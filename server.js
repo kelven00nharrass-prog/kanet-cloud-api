@@ -148,6 +148,18 @@ app.get('/api/devices', async (req, res) => {
   return res.json({ success: true, count: devices.length, devices });
 });
 
+function getPortForModo(modo) {
+  const m = String(modo || '').toLowerCase().trim();
+  if (m === 'saldo' || m === 'credito') {
+    return 8777;
+  }
+  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) {
+    return 8077;
+  }
+  // Porta 8023 exclusiva para pacotes diários
+  return 8023;
+}
+
 app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   const port = Number(req.params.port);
   let dev = inMemoryDevices[port];
@@ -164,13 +176,17 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
     inMemoryDevices[port] = dev;
   }
 
-  // ── AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA ──
-  // Se o celular está livre (sem pending_order), atribuir o próximo pedido pendente da fila
+  // ── AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA (ROTEAMENTO ESTRITO) ──
+  // - Porta 8023: Exclusiva para pacotes diários (24hrs)
+  // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados
+  // - Porta 8777: Exclusiva para recargas de saldo/crédito
   if (!dev.pending_order) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
       if (order.status === 'pending') {
-        if (!order.targetPort || order.targetPort === port) {
-          order.status = 'processing';
+        const designatedPort = order.targetPort || getPortForModo(order.modo);
+        if (designatedPort === port) {
+          order.status = 'assigned';
+          order.targetPort = port;
           order.assignedToPort = port;
           order.processingAt = new Date().toISOString();
 
@@ -184,7 +200,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             jid: order.jid || null,
             timestamp: Date.now()
           };
-          console.log(`📦 [FILA NUVEM] Atribuindo pedido ${orderId} (${order.quantidade}MB -> ${order.numero}) ao Celular Porta ${port}`);
+          console.log(`📦 [FILA NUVEM] Atribuindo pedido ${orderId} (${order.quantidade}MB [${order.modo || 'diario'}] -> ${order.numero}) exclusivamente ao Celular Porta ${port}`);
           break;
         }
       }
@@ -574,13 +590,21 @@ try {
     };
     inMemoryOrders.set(order.orderId, orderDoc);
 
-    // Despacha para qualquer celular online disponível (fallback para 8023)
-    const targetPort = findAvailablePort() || 8023;
-    if (inMemoryDevices[targetPort]) {
+    // Roteamento Estrito de Portas:
+    // - 8023: Diários (24hrs)
+    // - 8077: Semanais, Mensais e Ilimitados
+    // - 8777: Saldo
+    const targetPort = getPortForModo(order.modo);
+    orderDoc.targetPort = targetPort;
+
+    const dev = inMemoryDevices[targetPort];
+    const now = Date.now();
+    const isOnline = dev && (now - new Date(dev.lastSeen || 0).getTime()) < 180000;
+
+    if (isOnline && !dev.pending_order) {
       orderDoc.status = 'assigned';
-      orderDoc.targetPort = targetPort;
       orderDoc.assignedToPort = targetPort;
-      inMemoryDevices[targetPort].pending_order = {
+      dev.pending_order = {
         id: order.orderId,
         orderId: order.orderId,
         numero: order.numero,
@@ -589,10 +613,10 @@ try {
         jid: order.jid,
         timestamp: Date.now()
       };
-      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue com exclusividade ao Celular ${targetPort}`);
+      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue com exclusividade ao Celular ${targetPort} (Modo: ${order.modo || 'diario'})`);
     } else {
       orderDoc.status = 'pending';
-      console.warn(`⚠️ [WHATSAPP NUVEM] Nenhum celular conectado para a ordem ${order.orderId}. Ordem mantida na fila.`);
+      console.log(`⏳ [WHATSAPP NUVEM] Celular Porta ${targetPort} (Modo: ${order.modo || 'diario'}) ocupado ou offline. Ordem mantida na fila exclusiva da porta ${targetPort}.`);
     }
   }, db);
 } catch(e) {
