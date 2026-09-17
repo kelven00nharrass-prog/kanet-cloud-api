@@ -150,16 +150,16 @@ app.get('/api/devices', async (req, res) => {
   return res.json({ success: true, count: devices.length, devices });
 });
 
-function getPortForModo(modo) {
+function isPortCompatibleWithModo(port, modo) {
   const m = String(modo || '').toLowerCase().trim();
   if (m === 'saldo' || m === 'credito') {
-    return 8777;
+    return port === 8777;
   }
   if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) {
-    return 8077;
+    return port === 8077;
   }
-  // Porta 8023 exclusiva para pacotes diários
-  return 8023;
+  // Pacotes Diários: compatível com Porta 8023 E Porta 8024 (ou qualquer outro celular diário)
+  return port === 8023 || port === 8024 || (port !== 8077 && port !== 8777);
 }
 
 function isDeviceApto(dev) {
@@ -222,8 +222,8 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   if (isDeviceApto(dev)) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
       if (order.status === 'pending') {
-        const designatedPort = order.targetPort || getPortForModo(order.modo);
-        if (designatedPort === port) {
+        const isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
+        if (isCompatible) {
           order.status = 'assigned';
           order.targetPort = port;
           order.assignedToPort = port;
