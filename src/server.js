@@ -1327,16 +1327,36 @@ function resolveDeviceConfig(portOrSerial) {
 
 // 1. Listar celulares disponíveis para controle remoto
 app.get('/api/remote/devices', (req, res) => {
-  exec('adb devices -l', (err, stdout, stderr) => {
-    const lines = stdout ? stdout.split('\n').filter(l => l.includes('device product:')) : [];
-    const connectedSerials = new Set();
-    lines.forEach(l => {
-      const parts = l.trim().split(/\s+/);
-      if (parts[0]) connectedSerials.add(parts[0]);
-    });
+  try {
+    exec('adb devices -l', { timeout: 3000 }, (err, stdout, stderr) => {
+      const lines = (!err && stdout) ? stdout.split('\n').filter(l => l.includes('device product:')) : [];
+      const connectedSerials = new Set();
+      lines.forEach(l => {
+        const parts = l.trim().split(/\s+/);
+        if (parts[0]) connectedSerials.add(parts[0]);
+      });
 
+      const devices = Object.entries(ADB_DEVICE_MAP).map(([port, dev]) => {
+        const isAdbOnline = connectedSerials.has(dev.serial);
+        const inMem = inMemoryDevices[port] || {};
+        return {
+          port: Number(port),
+          name: dev.name,
+          serial: dev.serial,
+          width: dev.width,
+          height: dev.height,
+          adbOnline: isAdbOnline,
+          cloudOnline: !!inMem.online,
+          isApto: inMem.is_apto !== false,
+          saldo_mb: inMem.saldo_mb || 0,
+          activeSim: inMem.active_sim || dev.defaultSim || 1
+        };
+      });
+
+      return res.json({ success: true, devices });
+    });
+  } catch (err) {
     const devices = Object.entries(ADB_DEVICE_MAP).map(([port, dev]) => {
-      const isAdbOnline = connectedSerials.has(dev.serial);
       const inMem = inMemoryDevices[port] || {};
       return {
         port: Number(port),
@@ -1344,16 +1364,15 @@ app.get('/api/remote/devices', (req, res) => {
         serial: dev.serial,
         width: dev.width,
         height: dev.height,
-        adbOnline: isAdbOnline,
+        adbOnline: false,
         cloudOnline: !!inMem.online,
         isApto: inMem.is_apto !== false,
         saldo_mb: inMem.saldo_mb || 0,
         activeSim: inMem.active_sim || dev.defaultSim || 1
       };
     });
-
     return res.json({ success: true, devices });
-  });
+  }
 });
 
 // 2. Captura de tela sob demanda (JPEG/PNG)
@@ -1361,15 +1380,19 @@ app.get('/api/remote/:port/screen', (req, res) => {
   const { port } = req.params;
   const dev = resolveDeviceConfig(port);
 
-  const adbCmd = `adb -s ${dev.serial} exec-out screencap -p`;
-  exec(adbCmd, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-    if (err || !stdout || stdout.length === 0) {
-      return res.status(500).json({ success: false, mensagem: `Falha ao capturar ecrã do celular (${dev.serial}): ${err ? err.message : 'Buffer vazio'}` });
-    }
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-    return res.send(stdout);
-  });
+  try {
+    const adbCmd = `adb -s ${dev.serial} exec-out screencap -p`;
+    exec(adbCmd, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024, timeout: 5000 }, (err, stdout, stderr) => {
+      if (err || !stdout || stdout.length === 0) {
+        return res.status(503).json({ success: false, mensagem: `ADB indisponível ou celular (${dev.serial}) offline.` });
+      }
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      return res.send(stdout);
+    });
+  } catch(err) {
+    return res.status(503).json({ success: false, mensagem: `Erro ao capturar tela: ${err.message}` });
+  }
 });
 
 // 3. Toque na tela (Tap)
@@ -1389,10 +1412,14 @@ app.post('/api/remote/:port/touch', (req, res) => {
     realY = Math.round((y / height) * dev.height);
   }
 
-  exec(`adb -s ${dev.serial} shell input tap ${realX} ${realY}`, (err) => {
-    if (err) return res.status(500).json({ success: false, mensagem: err.message });
-    return res.json({ success: true, tap: { x: realX, y: realY } });
-  });
+  try {
+    exec(`adb -s ${dev.serial} shell input tap ${realX} ${realY}`, { timeout: 4000 }, (err) => {
+      if (err) return res.status(500).json({ success: false, mensagem: err.message });
+      return res.json({ success: true, tap: { x: realX, y: realY } });
+    });
+  } catch(err) {
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
 });
 
 // 4. Arrastar / Rolar tela (Swipe)
@@ -1414,10 +1441,14 @@ app.post('/api/remote/:port/swipe', (req, res) => {
     rY2 = Math.round((y2 / height) * dev.height);
   }
 
-  exec(`adb -s ${dev.serial} shell input swipe ${rX1} ${rY1} ${rX2} ${rY2} ${dur}`, (err) => {
-    if (err) return res.status(500).json({ success: false, mensagem: err.message });
-    return res.json({ success: true, swipe: { x1: rX1, y1: rY1, x2: rX2, y2: rY2, duration: dur } });
-  });
+  try {
+    exec(`adb -s ${dev.serial} shell input swipe ${rX1} ${rY1} ${rX2} ${rY2} ${dur}`, { timeout: 5000 }, (err) => {
+      if (err) return res.status(500).json({ success: false, mensagem: err.message });
+      return res.json({ success: true, swipe: { x1: rX1, y1: rY1, x2: rX2, y2: rY2, duration: dur } });
+    });
+  } catch(err) {
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
 });
 
 // 5. Teclas de Navegação e Sistema (Keyevent)
@@ -1451,10 +1482,14 @@ app.post('/api/remote/:port/key', (req, res) => {
     cmd = `adb -s ${dev.serial} shell ${action}`;
   }
 
-  exec(cmd, (err) => {
-    if (err) return res.status(500).json({ success: false, mensagem: err.message });
-    return res.json({ success: true, key });
-  });
+  try {
+    exec(cmd, { timeout: 4000 }, (err) => {
+      if (err) return res.status(500).json({ success: false, mensagem: err.message });
+      return res.json({ success: true, key });
+    });
+  } catch(err) {
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
 });
 
 // 6. Digitar Texto Remotamente
@@ -1466,10 +1501,14 @@ app.post('/api/remote/:port/type', (req, res) => {
   if (!text) return res.status(400).json({ success: false, mensagem: 'Texto não fornecido.' });
 
   const safeText = String(text).replace(/\s/g, '%s').replace(/["`$\\]/g, '\\$&');
-  exec(`adb -s ${dev.serial} shell input text "${safeText}"`, (err) => {
-    if (err) return res.status(500).json({ success: false, mensagem: err.message });
-    return res.json({ success: true, text });
-  });
+  try {
+    exec(`adb -s ${dev.serial} shell input text "${safeText}"`, { timeout: 4000 }, (err) => {
+      if (err) return res.status(500).json({ success: false, mensagem: err.message });
+      return res.json({ success: true, text });
+    });
+  } catch(err) {
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
 });
 
 // 7. Discar USSD Livre
@@ -1481,10 +1520,14 @@ app.post('/api/remote/:port/ussd', (req, res) => {
   if (!code) return res.status(400).json({ success: false, mensagem: 'Código USSD não fornecido.' });
 
   const encoded = encodeURIComponent(String(code).trim());
-  exec(`adb -s ${dev.serial} shell am start -a android.intent.action.CALL -d "tel:${encoded}"`, (err) => {
-    if (err) return res.status(500).json({ success: false, mensagem: err.message });
-    return res.json({ success: true, code });
-  });
+  try {
+    exec(`adb -s ${dev.serial} shell am start -a android.intent.action.CALL -d "tel:${encoded}"`, { timeout: 5000 }, (err) => {
+      if (err) return res.status(500).json({ success: false, mensagem: err.message });
+      return res.json({ success: true, code });
+    });
+  } catch(err) {
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
 });
 
 // 8. Iniciar Janela Nativa Scrcpy no Desktop (60 FPS com 1 clique)
