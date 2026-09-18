@@ -180,7 +180,14 @@ function getPortForModo(modo) {
     dailyDevs.sort((a, b) => (b.transfers_available || 0) - (a.transfers_available || 0));
     return Number(dailyDevs[0].porta);
   }
-  return 8023; // fallback padrão
+  // Se nenhuma porta diária estiver apta no momento, verificar qualquer porta diária registrada online
+  const anyDailyDev = Object.values(inMemoryDevices).find(d => {
+    const port = Number(d.porta);
+    return port !== 8077 && port !== 8777;
+  });
+  if (anyDailyDev) return Number(anyDailyDev.porta);
+
+  return 8025; // fallback padrão (Huawei)
 }
 
 function isDeviceApto(dev) {
@@ -1409,15 +1416,15 @@ try {
     saveOrdersToCache();
 
     // Roteamento Estrito de Portas:
-    // - 8023: Diários (24hrs)
+    // - Portas Diárias (8025, 8023, 8024): Diários (24hrs)
     // - 8077: Semanais, Mensais e Ilimitados
     // - 8777: Saldo
     const targetPort = getPortForModo(order.modo);
-    orderDoc.targetPort = targetPort;
-
+    const isDiario = (order.modo || 'diario').toLowerCase().trim() === 'diario' || (order.modo || 'diario').toLowerCase().trim() === '24hrs';
+    // Se for diário, NÃO travar targetPort em uma porta fixa se ela estiver offline, para que qualquer porta diária que acordar pegue
     const dev = inMemoryDevices[targetPort];
-
     if (isDeviceApto(dev)) {
+      orderDoc.targetPort = targetPort;
       orderDoc.status = 'assigned';
       orderDoc.assignedToPort = targetPort;
       dev.pending_order = {
@@ -1429,10 +1436,11 @@ try {
         jid: order.jid,
         timestamp: Date.now()
       };
-      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue com exclusividade ao Celular Apto ${targetPort} (Modo: ${order.modo || 'diario'})`);
+      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue ao Celular Apto ${targetPort} (Modo: ${order.modo || 'diario'})`);
     } else {
+      orderDoc.targetPort = isDiario ? null : targetPort;
       orderDoc.status = 'pending';
-      console.log(`⏳ [WHATSAPP NUVEM] Celular Porta ${targetPort} (Modo: ${order.modo || 'diario'}) ocupado, sem saldo ou no limite. Ordem mantida na fila exclusiva da porta ${targetPort}.`);
+      console.log(`⏳ [WHATSAPP NUVEM] Celulares para modo ${order.modo || 'diario'} ocupados ou offline. Ordem mantida como PENDENTE na fila geral para atendimento assim que uma porta ficar online.`);
     }
   }, db);
 } catch(e) {
