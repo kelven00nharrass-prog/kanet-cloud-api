@@ -1763,53 +1763,66 @@ app.get('/api/sms/payments/:txn_id', async (req, res) => {
   }
 });
 
-// ── ADMIN: Corrigir duplicatas em TABELAS_GRUPO ──
-app.post('/api/admin/fix-duplicates', async (req, res) => {
+// ── ADMIN: Corrigir duplicatas em TABELAS_GRUPO (fire-and-forget) ──
+let _fixDupStatus = { running: false, done: false, removidos: 0, log: [], error: null, ts: null };
+
+app.post('/api/admin/fix-duplicates', (req, res) => {
   const token = req.headers['x-master-token'] || req.query.token;
   if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
   if (!db) return res.status(500).json({ error: 'Firestore não disponível' });
+  if (_fixDupStatus.running) return res.json({ ok: true, msg: 'Ja a correr, usa GET para ver estado' });
 
-  try {
-    const docRef = db.collection('bot_settings').doc('pricing_tables');
-    const doc = await docRef.get();
-    const d = doc.data();
-    if (!d || !d.TABELAS_GRUPO) return res.json({ ok: true, removidos: 0, msg: 'Sem TABELAS_GRUPO' });
+  _fixDupStatus = { running: true, done: false, removidos: 0, log: [], error: null, ts: new Date().toISOString() };
+  res.json({ ok: true, msg: 'A correr em background. Usa GET /api/admin/fix-duplicates?token=... para ver resultado.' });
 
-    const newGrupo = JSON.parse(JSON.stringify(d.TABELAS_GRUPO));
-    const log = [];
-    let total = 0;
+  (async () => {
+    try {
+      const docRef = db.collection('bot_settings').doc('pricing_tables');
+      const doc = await docRef.get();
+      const d = doc.data();
+      if (!d || !d.TABELAS_GRUPO) { _fixDupStatus = { running: false, done: true, removidos: 0, log: [], error: null, ts: new Date().toISOString() }; return; }
 
-    for (const [gid, grpCfg] of Object.entries(newGrupo)) {
-      const tabelas = grpCfg.TABELAS || {};
-      for (const tipo of ['24hrs', 'semanal', 'mensal', 'ilimitado']) {
-        const tabela = tabelas[tipo] || {};
-        const byVolume = {};
-        for (const [preco, pkg] of Object.entries(tabela)) {
-          const mb = pkg.quantidade_mb;
-          if (!byVolume[mb]) byVolume[mb] = [];
-          byVolume[mb].push({ preco: Number(preco), pkg });
-        }
-        for (const [mb, entries] of Object.entries(byVolume)) {
-          if (entries.length > 1) {
-            entries.sort((a, b) => a.preco - b.preco);
-            const remove = entries.slice(1);
-            log.push(`[${gid.slice(-8)}] ${tipo} ${mb}MB: manter ${entries[0].preco}MT, remover ${remove.map(r=>r.preco+'MT').join(',')}`);
-            for (const r of remove) { delete tabelas[tipo][r.preco]; total++; }
+      const newGrupo = JSON.parse(JSON.stringify(d.TABELAS_GRUPO));
+      let total = 0;
+      const log = [];
+
+      for (const [gid, grpCfg] of Object.entries(newGrupo)) {
+        const tabelas = grpCfg.TABELAS || {};
+        for (const tipo of ['24hrs', 'semanal', 'mensal', 'ilimitado']) {
+          const tabela = tabelas[tipo] || {};
+          const byVolume = {};
+          for (const [preco, pkg] of Object.entries(tabela)) {
+            const mb = pkg.quantidade_mb;
+            if (!byVolume[mb]) byVolume[mb] = [];
+            byVolume[mb].push({ preco: Number(preco), pkg });
+          }
+          for (const [mb, entries] of Object.entries(byVolume)) {
+            if (entries.length > 1) {
+              entries.sort((a, b) => a.preco - b.preco);
+              log.push(`[${gid.slice(-8)}] ${tipo} ${mb}MB manter ${entries[0].preco}MT`);
+              for (const r of entries.slice(1)) { delete tabelas[tipo][r.preco]; total++; }
+            }
           }
         }
       }
-    }
 
-    if (total > 0) {
-      await docRef.update({ TABELAS_GRUPO: newGrupo });
-      console.log(`✅ [FIX-DUP] ${total} duplicados removidos do Firestore`);
+      if (total > 0) {
+        console.log(`🔧 [FIX-DUP] Removendo ${total} duplicados...`);
+        await docRef.update({ TABELAS_GRUPO: newGrupo });
+        console.log(`✅ [FIX-DUP] ${total} duplicados removidos!`);
+      }
+      _fixDupStatus = { running: false, done: true, removidos: total, log, error: null, ts: new Date().toISOString() };
+    } catch (err) {
+      console.error('❌ [FIX-DUP]', err.message);
+      _fixDupStatus = { running: false, done: true, removidos: 0, log: [], error: err.message, ts: new Date().toISOString() };
     }
+  })();
+});
 
-    res.json({ ok: true, removidos: total, log });
-  } catch (err) {
-    console.error('❌ [FIX-DUP]', err.message);
-    res.status(500).json({ ok: false, error: err.message });
-  }
+app.get('/api/admin/fix-duplicates', (req, res) => {
+  const token = req.headers['x-master-token'] || req.query.token;
+  if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
+  res.json(_fixDupStatus);
 });
 
 
