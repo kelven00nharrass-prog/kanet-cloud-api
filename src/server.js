@@ -1555,6 +1555,24 @@ app.post('/api/remote/:port/launch-scrcpy', (req, res) => {
   }
 });
 
+// ── TABELAS DE PREÇOS PARA O PAINEL ──
+app.get(['/api/price-tables', '/api/prices', '/api/groups/prices'], (req, res) => {
+  let cfg = {};
+  if (baileysEngine && baileysEngine.DYN_CFG) {
+    cfg = baileysEngine.DYN_CFG;
+  } else {
+    try {
+      cfg = require('./bot_config.js');
+    } catch (_) {}
+  }
+  return res.json({
+    success: true,
+    tabelas: cfg.TABELAS || {},
+    planos_especiais: cfg.TABELAS && cfg.TABELAS.ilimitado ? cfg.TABELAS.ilimitado : (cfg.PLANOS_ESPECIAIS || {}),
+    tabelas_grupo: cfg.TABELAS_GRUPO || {}
+  });
+});
+
 // ── BOT STATUS PARA O PAINEL ──
 app.get('/api/bot-status', (req, res) => {
   try {
