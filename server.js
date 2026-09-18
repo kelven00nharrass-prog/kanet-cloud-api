@@ -214,12 +214,13 @@ function isDeviceApto(dev) {
   }
 
   // ── PORTAS DIÁRIAS (todas as demais portas) ──
-  if (dev.sem_saldo === true) return false;
   if (dev.limite_atingido === true) return false;
   if (dev.transfers_available !== undefined && dev.transfers_available <= 0) return false;
   const s1 = dev.sim1_saldo_mb !== undefined && dev.sim1_saldo_mb !== null ? dev.sim1_saldo_mb : 10240;
   const s2 = dev.sim2_saldo_mb !== undefined && dev.sim2_saldo_mb !== null ? dev.sim2_saldo_mb : 10240;
+  // Só considera sem saldo se AMBOS os cartões estiverem zerados (<100MB) ou marcados sem saldo
   if (s1 < 100 && s2 < 100) return false;
+  if (dev.sem_saldo === true && s1 < 100 && s2 < 100) return false;
   return true;
 }
 
@@ -830,8 +831,18 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
 
   // Buscar próximo pedido pendente para esta porta ou genérico
   let task = null;
+  const isPortDaily = isDailyPort(port);
+
   for (const [orderId, order] of inMemoryOrders.entries()) {
     if (order.status === 'pending') {
+      const modo = (order.modo || 'diario').toLowerCase().trim();
+      const isOrderDaily = modo === 'diario' || modo === '24hrs' || modo === '24h';
+
+      // 🛑 REGRA ESTRITA: Porta 8077 NUNCA pode pegar pedidos diários!
+      if (port === 8077 && isOrderDaily) continue;
+      // 🛑 REGRA ESTRITA: Portas diárias NUNCA podem pegar pedidos semanais, mensais ou saldo!
+      if (isPortDaily && !isOrderDaily) continue;
+
       if (!order.targetPort || order.targetPort === port) {
         order.status = 'processing';
         order.assignedToPort = port;
@@ -857,16 +868,39 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
 
   const order = inMemoryOrders.get(orderId);
   if (order) {
-    order.status = success ? 'completed' : 'failed';
-    order.resultMessage = mensagem || '';
-    order.completedAt = new Date().toISOString();
+    if (success) {
+      order.status = 'completed';
+      order.resultMessage = mensagem || '';
+      order.completedAt = new Date().toISOString();
+      order.lastError = null;
+    } else {
+      order.retryCount = (order.retryCount || 0) + 1;
+      order.failedPorts = order.failedPorts || [];
+      if (!order.failedPorts.includes(Number(port))) order.failedPorts.push(Number(port));
+
+      if (order.retryCount < 5) {
+        order.status = 'pending';
+        order.assignedToPort = null;
+        order.processingAt = null;
+        order.targetPort = null;
+        order.lastError = mensagem || 'Falha USSD / Timeout';
+        console.log(`🔄 [APP RESULT RETRY] Pedido ${orderId} falhou no Celular ${port} (${order.lastError}). Devolvido à fila como PENDENTE para outro cartão/porta (Tentativa #${order.retryCount})`);
+      } else {
+        order.status = 'failed';
+        order.resultMessage = mensagem || '';
+        order.completedAt = new Date().toISOString();
+        console.warn(`🛑 [APP RESULT ESGOTADO] Pedido ${orderId} atingiu 5 tentativas e falhou definitivamente.`);
+      }
+    }
+    saveOrdersToCache();
   }
 
   if (db) {
     db.collection('orders').doc(orderId).set({
-      status: success ? 'completed' : 'failed',
+      status: order ? order.status : (success ? 'completed' : 'failed'),
       resultMessage: mensagem || '',
-      completedAt: new Date().toISOString()
+      completedAt: (order && order.completedAt) || (success ? new Date().toISOString() : null),
+      retryCount: (order && order.retryCount) || 0
     }, { merge: true }).catch(() => {});
   }
 
