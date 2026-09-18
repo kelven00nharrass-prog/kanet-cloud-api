@@ -287,6 +287,65 @@ app.post('/api/devices/:port/force-dispatch', (req, res) => {
   return res.json({ success: true, mensagem: `Pedido ${targetOrderId} (${targetOrder.quantidade}MB) despachado para a Porta ${port}!`, order: targetOrder });
 });
 
+// ── FORÇAR DESPACHO OVERRIDE (ignora modo/compatibilidade) ──
+// Usar quando portas normais estão sem saldo mas há outra porta disponível
+app.post('/api/devices/:port/force-dispatch-override', (req, res) => {
+  const port = Number(req.params.port);
+  const dev = inMemoryDevices[port];
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+
+  if (dev.pending_order) {
+    return res.status(400).json({ success: false, mensagem: `Porta ${port} já tem um pedido em processamento (${dev.pending_order.numero}).` });
+  }
+
+  // Buscar pedido específico (por ID) ou primeiro pendente qualquer
+  const targetOrderId = req.body && req.body.orderId;
+  let foundOrder = null;
+  let foundId = null;
+
+  if (targetOrderId) {
+    foundOrder = inMemoryOrders.get(targetOrderId);
+    foundId = targetOrderId;
+  } else {
+    for (const [orderId, order] of inMemoryOrders.entries()) {
+      if (order.status === 'pending') {
+        foundOrder = order;
+        foundId = orderId;
+        break;
+      }
+    }
+  }
+
+  if (!foundOrder || !foundId) {
+    return res.json({ success: false, mensagem: `Nenhum pedido pendente encontrado para despacho.` });
+  }
+
+  foundOrder.status = 'assigned';
+  foundOrder.assignedToPort = port;
+  foundOrder.targetPort = port;
+  foundOrder.processingAt = new Date().toISOString();
+  foundOrder._overrideDispatch = true;
+
+  dev.sem_saldo = false;
+  dev.limite_atingido = false;
+  dev.livre = true;
+  dev.is_apto = true;
+  dev.pending_order = {
+    id: foundId,
+    orderId: foundId,
+    numero: foundOrder.numero,
+    quantidade: foundOrder.quantidade,
+    modo: foundOrder.modo || 'diario',
+    input_val: foundOrder.input_val || '',
+    jid: foundOrder.jid || null,
+    timestamp: Date.now()
+  };
+
+  saveOrdersToCache();
+  console.log(`⚡ [OVERRIDE PAINEL] Pedido ${foundId} (${foundOrder.quantidade}MB -> ${foundOrder.numero}) despachado OVERRIDE para Porta ${port}!`);
+  return res.json({ success: true, mensagem: `Pedido ${foundId} (${foundOrder.quantidade}MB → ${foundOrder.numero}) despachado para a Porta ${port} com override!`, order: foundOrder });
+});
+
 // ── LIBERTAR TODOS OS CELULARES (operador) ──
 app.post('/api/devices/reset-all', (req, res) => {
   let count = 0;

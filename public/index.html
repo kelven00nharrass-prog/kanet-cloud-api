@@ -1094,6 +1094,7 @@ async function loadDevices() {
               <button class="btn btn-success btn-sm" onclick="resetDevice(${dev.porta})" title="Desbloquear e limpar travas"><i class="fa-solid fa-unlock"></i> Libertar</button>
               <button class="btn btn-primary btn-sm" onclick="openSaldoModal(${dev.porta}, ${saldo1}, ${saldo2}, ${dev.saldo_mt || 0})" title="Definir saldo"><i class="fa-solid fa-coins"></i> Saldo</button>
               <button class="btn btn-warn btn-sm" onclick="forceDispatch(${dev.porta})" title="Forçar despacho de pedido pendente"><i class="fa-solid fa-bolt"></i> Forçar</button>
+              <button class="btn btn-danger btn-sm" onclick="forceDispatchOverride(${dev.porta})" title="Despachar qualquer pedido (ignora tipo de pacote)"><i class="fa-solid fa-triangle-exclamation"></i> Override</button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
               <button class="btn ${activeSim === 1 ? 'btn-primary' : 'btn-purple'} btn-sm" onclick="setDeviceSim(${dev.porta}, 1)" title="Ativar SIM 1">
@@ -1226,6 +1227,31 @@ async function saveSaldoModal() {
       await loadDevices();
     } else {
       toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: FORÇAR DESPACHO OVERRIDE (Ignora compatibilidade de modo) ──
+async function forceDispatchOverride(port, orderId = null) {
+  try {
+    const confirm_msg = orderId
+      ? `Despachar pedido ${orderId} para porta ${port}?`
+      : `Despachar próximo pedido pendente (qualquer tipo) para porta ${port}?`;
+    if (!confirm(confirm_msg)) return;
+
+    toast(`⚡ A despachar override para Porta ${port}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/force-dispatch-override`, {
+      method: 'POST',
+      body: JSON.stringify(orderId ? { orderId } : {})
+    });
+    if (d.success) {
+      toast(`✅ ${d.mensagem}`, 'ok');
+      await loadDevices();
+      await loadQueue();
+    } else {
+      toast(`❌ ${d.mensagem || 'Falha no override'}`, 'err');
     }
   } catch(e) {
     toast(`❌ Erro: ${e.message}`, 'err');
