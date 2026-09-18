@@ -139,9 +139,9 @@ function salvarBotConfig() {
     } catch (e) {
         console.error('❌ Erro ao salvar bot_config.js:', e.message);
     }
-    // ✅ Persistência definitiva no Firestore (sobrevive a reinícios e deploys no Render)
+    // ✅ Persistência definitiva no Firestore (sem merge: true para refletir deleções e substituições completas)
     if (firestoreDbInstance) {
-        firestoreDbInstance.collection('bot_settings').doc('pricing_tables').set(DYN_CFG, { merge: true })
+        firestoreDbInstance.collection('bot_settings').doc('pricing_tables').set(DYN_CFG)
             .then(() => console.log('☁️ [FIRESTORE] Tabelas salvas na nuvem com sucesso!'))
             .catch(e => console.warn('⚠️ [FIRESTORE] Erro ao salvar tabelas no Firestore:', e.message));
     }
@@ -164,6 +164,18 @@ function salvarLocalConfig() {
 function limparDuplicatasTabelas() {
     let alterado = false;
     let totalRemovidos = 0;
+
+    // Limpar chaves que não sejam grupos válidos (@g.us) de TABELAS_GRUPO
+    if (DYN_CFG.TABELAS_GRUPO) {
+        for (const k of Object.keys(DYN_CFG.TABELAS_GRUPO)) {
+            if (!k.endsWith('@g.us')) {
+                console.log(`🧹 [TABELAS_GRUPO] Removendo chave não-grupo inválida: ${k}`);
+                delete DYN_CFG.TABELAS_GRUPO[k];
+                alterado = true;
+            }
+        }
+    }
+
     const alvos = [];
     if (DYN_CFG.TABELAS) alvos.push(DYN_CFG.TABELAS);
     if (DYN_CFG.TABELAS_GRUPO) {
@@ -321,7 +333,7 @@ function gerarMenuOriginal(jid = null) {
     let _tabelas = DYN_CFG.TABELAS || {};
     let _especiais = DYN_CFG.PLANOS_ESPECIAIS || {};
 
-    if (jid && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
+    if (jid && String(jid).endsWith('@g.us') && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
         const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
         if (grpCfg.TABELAS) _tabelas = grpCfg.TABELAS;
         else _tabelas = grpCfg;
@@ -581,7 +593,7 @@ function buscarPacotePorValor(valor, jid = null) {
     const vNum = parseInt(vStr);
 
     // 1. PRIORIDADE MÁXIMA: Tabela específica do Grupo (se a mensagem veio de um grupo configurado)
-    if (jid && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
+    if (jid && String(jid).endsWith('@g.us') && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
         const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
         const grpTabs = grpCfg.TABELAS || grpCfg;
         for (const cat of ['24hrs', 'semanal', 'mensal', 'ilimitado', 'especial', 'estudantes', 'saldo']) {
@@ -621,6 +633,7 @@ function buscarPacotePorValor(valor, jid = null) {
     // 3. Fallback: procurar em qualquer grupo se não foi achado na tabela geral
     if (DYN_CFG.TABELAS_GRUPO) {
         for (const [gJid, grpObj] of Object.entries(DYN_CFG.TABELAS_GRUPO)) {
+            if (!String(gJid).endsWith('@g.us')) continue;
             const grpTabs = grpObj.TABELAS || grpObj;
             for (const cat of ['24hrs', 'semanal', 'mensal', 'ilimitado', 'especial']) {
                 if (grpTabs[cat] && grpTabs[cat][vStr]) {
@@ -1378,7 +1391,28 @@ async function startWhatsApp(orderCallback, db = null) {
                     // ── COMANDO .resetartabela / .tabelapadrao (ADMIN MASTER) ──
                     if (['.resetartabela', '!resetartabela', '.tabelapadrao', '!tabelapadrao'].includes(cleanText)) {
                         if (!senderIsMaster) { await reply('🚫 Apenas Admin.'); continue; }
-                        if (!jid.endsWith('@g.us')) { await reply('⚠️ Este comando deve ser usado dentro de um grupo WhatsApp.'); continue; }
+                        if (!jid.endsWith('@g.us')) {
+                            let resetou = false;
+                            if (DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
+                                delete DYN_CFG.TABELAS_GRUPO[jid];
+                                resetou = true;
+                            }
+                            if (DYN_CFG.TABELAS_GRUPO) {
+                                for (const k of Object.keys(DYN_CFG.TABELAS_GRUPO)) {
+                                    if (!k.endsWith('@g.us')) {
+                                        delete DYN_CFG.TABELAS_GRUPO[k];
+                                        resetou = true;
+                                    }
+                                }
+                            }
+                            if (resetou) {
+                                salvarBotConfig();
+                                await reply('🔄 *CONFIGURAÇÕES DO PRIVADO RESETADAS!*\n\nOverrides removidos. O chat privado está a usar 100% a *Tabela Geral Padrão*.');
+                            } else {
+                                await reply('ℹ️ No chat privado, o bot já utiliza diretamente a *Tabela Geral* do sistema.\nPara alterar a tabela geral, envie:\n`.addtabela [tabela]`');
+                            }
+                            continue;
+                        }
                         if (DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
                             delete DYN_CFG.TABELAS_GRUPO[jid];
                             salvarBotConfig();
