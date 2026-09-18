@@ -992,10 +992,23 @@ async function restoreConfigsFromFirestore(db) {
         if (doc.exists) {
             const data = doc.data();
             if (data && data.TABELAS) {
-                DYN_CFG = { ...DYN_CFG, ...data };
+                // ── Deep merge: preservar TABELAS_GRUPO do bot_config.js como base,
+                // e fundir com os dados do Firestore por grupo (Firestore prevalece por grupo,
+                // mas grupos só existentes localmente não são apagados).
+                const localTabelasGrupo = DYN_CFG.TABELAS_GRUPO || {};
+                const remoteTabelasGrupo = data.TABELAS_GRUPO || {};
+                const mergedTabelasGrupo = { ...localTabelasGrupo };
+                for (const [jid, grpData] of Object.entries(remoteTabelasGrupo)) {
+                    // Dados do Firestore têm prioridade (são os mais recentes editados em runtime)
+                    mergedTabelasGrupo[jid] = grpData;
+                }
+
+                // Aplicar o resto normalmente, mas TABELAS_GRUPO usa o merge profundo
+                DYN_CFG = { ...DYN_CFG, ...data, TABELAS_GRUPO: mergedTabelasGrupo };
                 if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
+                if (!DYN_CFG.TABELAS_GRUPO) DYN_CFG.TABELAS_GRUPO = {};
                 const mudou = limparDuplicatasTabelas();
-                console.log('📥 [FIRESTORE CONFIG] Tabelas de preços restauradas com sucesso do Firestore!');
+                console.log(`📥 [FIRESTORE CONFIG] Tabelas restauradas! Grupos configurados: ${Object.keys(DYN_CFG.TABELAS_GRUPO).length}`);
                 if (mudou) {
                     salvarBotConfig();
                 } else {
