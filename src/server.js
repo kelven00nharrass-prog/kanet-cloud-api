@@ -460,8 +460,19 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             break;
           }
 
-          // Se modo não for saldo (8777), aceitar qualquer porta Vodacom disponível como fallback
+          // ── FALLBACK ESTRITO: manter compatibilidade de modo ──
+          // Diários (8024/8025/8023) → só fallback para outras portas diárias (NUNCA 8077 nem 8777)
+          // Semanais/Mensais/Ilimitados (8077) → só fallback para portas não-diárias e não-8777
+          // Saldo (8777) → sem fallback
+          const isOrderDaily = modoOrder === 'diario' || modoOrder === '24hrs' || modoOrder === '24h';
+          const candidateIsDaily = candidatePort !== 8077 && candidatePort !== 8777;
           if (modoOrder !== 'saldo' && modoOrder !== 'credito' && candidatePort !== 8777) {
+            // Pedido diário → candidato deve ser porta diária (não 8077)
+            if (isOrderDaily && !candidateIsDaily) continue; // ← BLOQUEAR 8077 para pedidos diários
+            // Pedido semanal/mensal → candidato deve ser porta não-diária (8077 ou similar)
+            if (!isOrderDaily && candidateIsDaily && candidatePort !== port) {
+              // aceitar só se não houver opção 8077 apta (já verificado acima)
+            }
             if (!fallbackDev) {
               fallbackDev = candidateDev;
               fallbackPort = candidatePort;
@@ -560,13 +571,52 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     pendingOrder = req.body.pending_order;
   }
 
+  // ── FIX SALDO NULL: Nunca sobrescrever saldo conhecido com null/undefined ──
+  // O app Android envia null quando o saldo ainda não foi consultado via USSD.
+  // Preservar o último saldo real para não confundir o roteador de pedidos.
+  const bodyClean = { ...req.body };
+  const saldoFields = ['sim1_saldo_mb', 'sim2_saldo_mb', 'saldo_mb'];
+  for (const field of saldoFields) {
+    if (field in bodyClean && (bodyClean[field] === null || bodyClean[field] === undefined || bodyClean[field] < 0)) {
+      // Manter o valor anterior se existir; caso contrário remover para não poluir
+      if (currentDev[field] !== null && currentDev[field] !== undefined && currentDev[field] >= 0) {
+        bodyClean[field] = currentDev[field]; // preservar saldo real anterior
+      } else {
+        delete bodyClean[field]; // nunca havia saldo, não definir
+      }
+    }
+  }
+
   inMemoryDevices[port] = {
     ...currentDev,
-    ...req.body,
+    ...bodyClean,
     porta: port,
     pending_order: pendingOrder,
     lastSeen: new Date().toISOString()
   };
+
+  // ── FIX PEDIDOS FANTASMA: TTL de 10 min para pedidos presos em 'assigned'/'processing' ──
+  // Se o celular pegou o pedido mas nunca reportou resultado (crash, offline, etc.),
+  // o pedido fica travado. Após 10 min sem resultado, volta automaticamente para 'pending'.
+  const PROCESSING_TTL_MS = 10 * 60 * 1000; // 10 minutos
+  for (const [orderId, order] of inMemoryOrders.entries()) {
+    if ((order.status === 'assigned' || order.status === 'processing') &&
+        order.assignedToPort === port && order.processingAt) {
+      const processingAge = Date.now() - new Date(order.processingAt).getTime();
+      if (processingAge > PROCESSING_TTL_MS) {
+        order.status = 'pending';
+        order.assignedToPort = null;
+        order.processingAt = null;
+        order.targetPort = null;
+        order.lastError = `Timeout: celular porta ${port} não reportou resultado em ${Math.round(processingAge/60000)}min`;
+        order.retryCount = (order.retryCount || 0) + 1;
+        order.notified = false;
+        order.groupNotified = false;
+        saveOrdersToCache();
+        console.warn(`⏰ [TIMEOUT PEDIDO] Pedido ${orderId} estava em ${order.status} na Porta ${port} há ${Math.round(processingAge/60000)}min sem resultado. Devolvido à fila.`);
+      }
+    }
+  }
 
   // Notificar cliente no WhatsApp assim que o celular finalizar o envio USSD
   // Notificar cliente no WhatsApp e grupos assim que o celular finalizar o envio USSD
@@ -934,9 +984,76 @@ loadOrdersFromCache();
 
 // ── ENDPOINTS DE FILA PARA O PAINEL CLOUD ──
 app.get('/api/orders', (req, res) => {
-  const orders = Array.from(inMemoryOrders.entries()).map(([id, o]) => ({ ...o, id }));
-  const sorted = orders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 50);
-  return res.json({ success: true, count: sorted.length, orders: sorted });
+  const showAll = req.query.all === 'true';
+  const now = Date.now();
+
+  const allOrders = Array.from(inMemoryOrders.entries()).map(([id, o]) => {
+    const createdMs = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+    const processingMs = o.processingAt ? new Date(o.processingAt).getTime() : 0;
+    const ageSeconds = createdMs ? Math.round((now - createdMs) / 1000) : null;
+    const processingSeconds = processingMs ? Math.round((now - processingMs) / 1000) : null;
+    const mbVal = Number(o.quantidade) || 0;
+    const volStr = mbVal < 1024 ? `${mbVal}MB` : `${(mbVal/1024).toFixed(1)}GB`;
+
+    // Detectar pedidos potencialmente fantasmas (assigned há mais de 5 min sem resultado)
+    const isPhantom = (o.status === 'assigned' || o.status === 'processing') &&
+                      processingSeconds !== null && processingSeconds > 300;
+
+    return {
+      id,
+      ref: id,
+      numero: o.numero || '?',
+      volume: volStr,
+      quantidade: mbVal,
+      modo: o.modo || 'diario',
+      status: o.status,
+      porta: o.assignedToPort || o.targetPort || null,
+      tentativas: o.retryCount || 0,
+      erro: o.lastError || null,
+      criado_ha: ageSeconds !== null ? `${Math.floor(ageSeconds/60)}m${ageSeconds%60}s` : null,
+      processando_ha: processingSeconds !== null ? `${Math.floor(processingSeconds/60)}m${processingSeconds%60}s` : null,
+      fantasma: isPhantom,
+      createdAt: o.createdAt || null,
+      completedAt: o.completedAt || null,
+      isSplit: o.isSplit || false,
+      splitPart: o.splitPart || null
+    };
+  });
+
+  // Separar por grupo de status
+  const active    = allOrders.filter(o => o.status === 'assigned' || o.status === 'processing');
+  const pending   = allOrders.filter(o => o.status === 'pending');
+  const waiting   = allOrders.filter(o => o.status === 'waiting_part1');
+  const completed = allOrders.filter(o => o.status === 'completed').sort((a,b) => new Date(b.completedAt||0) - new Date(a.completedAt||0)).slice(0, 20);
+  const failed    = allOrders.filter(o => o.status === 'failed').sort((a,b) => new Date(b.completedAt||0) - new Date(a.completedAt||0)).slice(0, 10);
+  const expired   = allOrders.filter(o => o.status === 'expired' || o.status === 'cancelled');
+  const phantoms  = active.filter(o => o.fantasma);
+
+  const summary = {
+    total: allOrders.length,
+    activos: active.length,
+    pendentes: pending.length,
+    aguardando: waiting.length,
+    concluidos: completed.length,
+    falhados: failed.length,
+    expirados: expired.length,
+    fantasmas: phantoms.length
+  };
+
+  if (showAll) {
+    return res.json({ success: true, summary, active, pending, waiting, completed, failed, expired });
+  }
+
+  // Por defeito: mostrar apenas os que precisam de atenção
+  return res.json({
+    success: true,
+    summary,
+    active,      // Em processamento agora
+    pending,     // À espera de celular
+    waiting,     // À espera da parte 1 (split)
+    failed: failed.slice(0, 5),   // Últimos 5 falhados
+    phantoms     // Pedidos potencialmente travados (>5min sem resultado)
+  });
 });
 
 // Repetir / Tentar de Novo um pedido que falhou ou travou
