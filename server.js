@@ -1141,7 +1141,26 @@ app.post('/api/admin/restart-bot', (req, res) => {
   }
 });
 
-// ── GESTÃO DE GRUPOS WHATSAPP ──
+// ── ENDPOINT DE TESTE: Envia mensagem de teste para JID/número ──
+app.post('/api/whatsapp/test-send', async (req, res) => {
+  try {
+    const token = req.headers['x-master-token'] || req.query.token || req.body?.token;
+    if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
+    
+    const { jid, numero, mensagem } = req.body || {};
+    const targetJid = jid || (numero ? `${String(numero).replace(/\D/g, '')}@s.whatsapp.net` : null);
+    
+    if (!targetJid) return res.status(400).json({ error: 'Forneça jid ou numero' });
+    if (!baileysEngine || !baileysEngine.sendTextMessage) return res.status(503).json({ error: 'Bot não disponível' });
+    
+    await baileysEngine.sendTextMessage(targetJid, mensagem || '🤖 *Teste KA-NET* — Bot online e a responder correctamente!');
+    return res.json({ success: true, jid: targetJid, mensagem: mensagem || 'Teste enviado' });
+  } catch(e) {
+    return res.status(500).json({ success: false, erro: e.message });
+  }
+});
+
+
 app.get('/api/groups', async (req, res) => {
   try {
     // 1. Carregar config do bot para metadados
