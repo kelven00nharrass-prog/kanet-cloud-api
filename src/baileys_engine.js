@@ -127,6 +127,7 @@ function carregarConfigs() {
     
     carregarTransacoes();
     carregarSmsPayments();
+    limparDuplicatasTabelas();
 }
 
 carregarConfigs();
@@ -158,6 +159,48 @@ function salvarLocalConfig() {
             .then(() => console.log('☁️ [FIRESTORE] Config local salva na nuvem com sucesso!'))
             .catch(e => console.warn('⚠️ [FIRESTORE] Erro ao salvar local_config no Firestore:', e.message));
     }
+}
+
+function limparDuplicatasTabelas() {
+    let alterado = false;
+    let totalRemovidos = 0;
+    const alvos = [];
+    if (DYN_CFG.TABELAS) alvos.push(DYN_CFG.TABELAS);
+    if (DYN_CFG.TABELAS_GRUPO) {
+        for (const grp of Object.values(DYN_CFG.TABELAS_GRUPO)) {
+            if (grp && grp.TABELAS) alvos.push(grp.TABELAS);
+            else if (grp) alvos.push(grp);
+        }
+    }
+
+    for (const tabelas of alvos) {
+        for (const tipo of ['24hrs', 'semanal', 'mensal', 'ilimitado']) {
+            const tab = tabelas[tipo];
+            if (!tab || typeof tab !== 'object') continue;
+            const byVolume = {};
+            for (const [precoStr, pkg] of Object.entries(tab)) {
+                const mb = pkg.quantidade_mb || pkg.quantidade || 0;
+                if (!mb) continue;
+                if (!byVolume[mb]) byVolume[mb] = [];
+                byVolume[mb].push({ preco: Number(precoStr), precoStr });
+            }
+            for (const [mb, entries] of Object.entries(byVolume)) {
+                if (entries.length > 1) {
+                    entries.sort((a, b) => a.preco - b.preco);
+                    // Manter o menor preço (mais vantajoso para o cliente) e remover duplicatas
+                    for (let i = 1; i < entries.length; i++) {
+                        delete tab[entries[i].precoStr];
+                        alterado = true;
+                        totalRemovidos++;
+                    }
+                }
+            }
+        }
+    }
+    if (totalRemovidos > 0) {
+        console.log(`🧹 [DEDUP TABELAS] ${totalRemovidos} entradas duplicadas removidas com sucesso.`);
+    }
+    return alterado;
 }
 
 function getMasterNumbers() {
@@ -295,11 +338,18 @@ function gerarMenuOriginal(jid = null) {
     if (_tabelas['24hrs'] && Object.keys(_tabelas['24hrs']).length > 0) {
         out += `⚡ *PACOTES DIÁRIOS (24H)*\n`;
         out += `╭─────────────────────────────╮\n`;
-        const sorted = Object.keys(_tabelas['24hrs']).map(Number).sort((a, b) => a - b);
-        for (const preco of sorted) {
-            const pkg = _tabelas['24hrs'][preco];
+        const bestByVol = new Map();
+        for (const [pStr, pkg] of Object.entries(_tabelas['24hrs'])) {
+            const preco = Number(pStr);
             const mb = pkg.quantidade_mb || pkg.quantidade || 0;
-            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${preco} MT*\n`;
+            if (!mb) continue;
+            if (!bestByVol.has(mb) || preco < bestByVol.get(mb).preco) {
+                bestByVol.set(mb, { preco, pkg });
+            }
+        }
+        const sorted = Array.from(bestByVol.entries()).sort((a, b) => a[0] - b[0]);
+        for (const [mb, item] of sorted) {
+            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${item.preco} MT*\n`;
         }
         out += `╰─────────────────────────────╯\n\n`;
     }
@@ -308,11 +358,18 @@ function gerarMenuOriginal(jid = null) {
     if (_tabelas['semanal'] && Object.keys(_tabelas['semanal']).length > 0) {
         out += `📅 *PACOTES SEMANAIS (7 DIAS)*\n`;
         out += `╭─────────────────────────────╮\n`;
-        const sorted = Object.keys(_tabelas['semanal']).map(Number).sort((a, b) => a - b);
-        for (const preco of sorted) {
-            const pkg = _tabelas['semanal'][preco];
+        const bestByVol = new Map();
+        for (const [pStr, pkg] of Object.entries(_tabelas['semanal'])) {
+            const preco = Number(pStr);
             const mb = pkg.quantidade_mb || pkg.quantidade || 0;
-            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${preco} MT*\n`;
+            if (!mb) continue;
+            if (!bestByVol.has(mb) || preco < bestByVol.get(mb).preco) {
+                bestByVol.set(mb, { preco, pkg });
+            }
+        }
+        const sorted = Array.from(bestByVol.entries()).sort((a, b) => a[0] - b[0]);
+        for (const [mb, item] of sorted) {
+            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${item.preco} MT*\n`;
         }
         out += `╰─────────────────────────────╯\n\n`;
     }
@@ -321,11 +378,18 @@ function gerarMenuOriginal(jid = null) {
     if (_tabelas['mensal'] && Object.keys(_tabelas['mensal']).length > 0) {
         out += `🗓️ *PACOTES MENSAIS (30 DIAS)*\n`;
         out += `╭─────────────────────────────╮\n`;
-        const sorted = Object.keys(_tabelas['mensal']).map(Number).sort((a, b) => a - b);
-        for (const preco of sorted) {
-            const pkg = _tabelas['mensal'][preco];
+        const bestByVol = new Map();
+        for (const [pStr, pkg] of Object.entries(_tabelas['mensal'])) {
+            const preco = Number(pStr);
             const mb = pkg.quantidade_mb || pkg.quantidade || 0;
-            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${preco} MT*\n`;
+            if (!mb) continue;
+            if (!bestByVol.has(mb) || preco < bestByVol.get(mb).preco) {
+                bestByVol.set(mb, { preco, pkg });
+            }
+        }
+        const sorted = Array.from(bestByVol.entries()).sort((a, b) => a[0] - b[0]);
+        for (const [mb, item] of sorted) {
+            out += `│ 🔹 *${_fmtSize(mb).padEnd(6)}* ➔ *${item.preco} MT*\n`;
         }
         out += `╰─────────────────────────────╯\n\n`;
     }
@@ -844,11 +908,16 @@ async function restoreConfigsFromFirestore(db) {
             if (data && data.TABELAS) {
                 DYN_CFG = { ...DYN_CFG, ...data };
                 if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
+                const mudou = limparDuplicatasTabelas();
                 console.log('📥 [FIRESTORE CONFIG] Tabelas de preços restauradas com sucesso do Firestore!');
-                try {
-                    const content = '// GERADO PELO SISTEMA KA-NET CLOUD (CACHE FIRESTORE)\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
-                    fs.writeFileSync(BOT_CONFIG_PATH, content, 'utf8');
-                } catch (_) {}
+                if (mudou) {
+                    salvarBotConfig();
+                } else {
+                    try {
+                        const content = '// GERADO PELO SISTEMA KA-NET CLOUD (CACHE FIRESTORE)\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
+                        fs.writeFileSync(BOT_CONFIG_PATH, content, 'utf8');
+                    } catch (_) {}
+                }
             }
         } else {
             console.log('📤 [FIRESTORE CONFIG] Fazendo upload inicial das tabelas padrão para o Firestore...');
@@ -2128,6 +2197,8 @@ module.exports = {
     getJidForOrder,
     registrarSmsPayment,
     smsPaymentsMap,
-    aguardandoOperadora
+    aguardandoOperadora,
+    limparDuplicatasTabelas,
+    salvarBotConfig
 };
 
