@@ -1,4 +1,4 @@
-// GERADO PELO PAINEL LOCAL KANET
+// GERADO PELO SISTEMA KA-NET CLOUD
 module.exports = {
     "BOT_EXPIRACAO_DIAS": 10000000,
     "SMS_GATEWAY_SEND_URL": "http://192.168.43.1:8080/send",
@@ -86,392 +86,347 @@ module.exports = {
     },
     "TABELAS": {
         "24hrs": {
-            "10": {
+            "9": {
                 "quantidade": 350,
-                "nome": "350MB 24h",
+                "nome": "350 MB 24h",
                 "quantidade_mb": 350,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
             "14": {
                 "quantidade": 550,
-                "nome": "550MB 24h",
+                "nome": "550 MB 24h",
                 "quantidade_mb": 550,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
             "17": {
                 "quantidade": 696,
-                "nome": "696MB 24h",
+                "nome": "696 MB 24h",
                 "quantidade_mb": 696,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
             "19": {
                 "quantidade": 800,
-                "nome": "800MB 24h",
+                "nome": "800 MB 24h",
                 "quantidade_mb": 800,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "23": {
+            "25": {
                 "quantidade": 1024,
-                "nome": "1GB 24h",
+                "nome": "1.0 GB 24h",
                 "quantidade_mb": 1024,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "28": {
-                "quantidade": 1229,
-                "nome": "1.2GB 24h",
-                "quantidade_mb": 1229,
+            "27": {
+                "quantidade": 1228,
+                "nome": "1.2 GB 24h",
+                "quantidade_mb": 1228,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "30": {
-                "quantidade": 1331,
-                "nome": "1.3GB 24h",
-                "quantidade_mb": 1331,
-                "periodo": "24hrs",
-                "tipo": "24hrs"
-            },
-            "37": {
+            "36": {
                 "quantidade": 1638,
-                "nome": "1.6GB 24h",
+                "nome": "1.6 GB 24h",
                 "quantidade_mb": 1638,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "46": {
+            "50": {
                 "quantidade": 2048,
-                "nome": "2GB 24h",
+                "nome": "2.0 GB 24h",
                 "quantidade_mb": 2048,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "69": {
+            "75": {
                 "quantidade": 3072,
-                "nome": "3GB 24h",
+                "nome": "3.0 GB 24h",
                 "quantidade_mb": 3072,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "92": {
+            "100": {
                 "quantidade": 4096,
-                "nome": "4GB 24h",
+                "nome": "4.0 GB 24h",
                 "quantidade_mb": 4096,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "115": {
+            "125": {
                 "quantidade": 5120,
-                "nome": "5GB 24h",
+                "nome": "5.0 GB 24h",
                 "quantidade_mb": 5120,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "138": {
+            "150": {
                 "quantidade": 6144,
-                "nome": "6GB 24h",
+                "nome": "6.0 GB 24h",
                 "quantidade_mb": 6144,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "161": {
+            "175": {
                 "quantidade": 7168,
-                "nome": "7GB 24h",
+                "nome": "7.0 GB 24h",
                 "quantidade_mb": 7168,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "184": {
+            "200": {
                 "quantidade": 8192,
-                "nome": "8GB 24h",
+                "nome": "8.0 GB 24h",
                 "quantidade_mb": 8192,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "207": {
+            "225": {
                 "quantidade": 9216,
-                "nome": "9GB 24h",
+                "nome": "9.0 GB 24h",
                 "quantidade_mb": 9216,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             },
-            "230": {
+            "250": {
                 "quantidade": 10240,
-                "nome": "10GB 24h",
+                "nome": "10.0 GB 24h",
                 "quantidade_mb": 10240,
                 "periodo": "24hrs",
-                "tipo": "24hrs"
+                "tipo": "diario"
             }
         },
         "semanal": {
             "47": {
-                "quantidade": 1741,
-                "nome": "1.7GB 7 Dias",
-                "quantidade_mb": 1741,
+                "quantidade": 1740,
+                "nome": "1.7 GB 7 Dias",
+                "quantidade_mb": 1740,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 3,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             },
             "80": {
-                "quantidade": 2970,
-                "nome": "2.9GB 7 Dias",
-                "quantidade_mb": 2970,
+                "quantidade": 2969,
+                "nome": "2.9 GB 7 Dias",
+                "quantidade_mb": 2969,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 4,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             },
             "90": {
-                "quantidade": 3482,
-                "nome": "3.4GB 7 Dias",
-                "quantidade_mb": 3482,
+                "quantidade": 3481,
+                "nome": "3.4 GB 7 Dias",
+                "quantidade_mb": 3481,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 5,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             },
             "140": {
                 "quantidade": 5427,
-                "nome": "5.3GB 7 Dias",
+                "nome": "5.3 GB 7 Dias",
                 "quantidade_mb": 5427,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 6,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             },
             "190": {
-                "quantidade": 7373,
-                "nome": "7.2GB 7 Dias",
-                "quantidade_mb": 7373,
+                "quantidade": 7372,
+                "nome": "7.2 GB 7 Dias",
+                "quantidade_mb": 7372,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 7,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             },
             "290": {
-                "quantidade": 10957,
-                "nome": "10.7GB 7 Dias",
-                "quantidade_mb": 10957,
+                "quantidade": 10956,
+                "nome": "10.7 GB 7 Dias",
+                "quantidade_mb": 10956,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 8,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             },
             "380": {
                 "quantidade": 14438,
-                "nome": "14.1GB 7 Dias",
+                "nome": "14.1 GB 7 Dias",
                 "quantidade_mb": 14438,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 9,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             },
             "470": {
                 "quantidade": 18022,
-                "nome": "17.6GB 7 Dias",
+                "nome": "17.6 GB 7 Dias",
                 "quantidade_mb": 18022,
                 "periodo": "semanal",
-                "tipo": "semanal",
-                "input_val": 10,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "semanal"
             }
         },
         "mensal": {
             "95": {
                 "quantidade": 2867,
-                "nome": "2.8GB Mensal",
+                "nome": "2.8 GB Mensal",
                 "quantidade_mb": 2867,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 1,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "170": {
                 "quantidade": 5120,
-                "nome": "5GB Mensal",
+                "nome": "5.0 GB Mensal",
                 "quantidade_mb": 5120,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 2,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "250": {
                 "quantidade": 8192,
-                "nome": "8GB Mensal",
+                "nome": "8.0 GB Mensal",
                 "quantidade_mb": 8192,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 3,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "285": {
                 "quantidade": 10240,
-                "nome": "10GB Mensal",
+                "nome": "10.0 GB Mensal",
                 "quantidade_mb": 10240,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 4,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "390": {
                 "quantidade": 13312,
-                "nome": "13GB Mensal",
+                "nome": "13.0 GB Mensal",
                 "quantidade_mb": 13312,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 5,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "550": {
                 "quantidade": 15360,
-                "nome": "15GB Mensal",
+                "nome": "15.0 GB Mensal",
                 "quantidade_mb": 15360,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 6,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "585": {
                 "quantidade": 20480,
-                "nome": "20GB Mensal",
+                "nome": "20.0 GB Mensal",
                 "quantidade_mb": 20480,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 7,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "800": {
                 "quantidade": 25600,
-                "nome": "25GB Mensal",
+                "nome": "25.0 GB Mensal",
                 "quantidade_mb": 25600,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 8,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "890": {
                 "quantidade": 30720,
-                "nome": "30GB Mensal",
+                "nome": "30.0 GB Mensal",
                 "quantidade_mb": 30720,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 9,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
-            "1455": {
+            "1450": {
                 "quantidade": 52224,
-                "nome": "51GB Mensal",
+                "nome": "51.0 GB Mensal",
                 "quantidade_mb": 52224,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 10,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             },
             "2890": {
                 "quantidade": 104448,
-                "nome": "102GB Mensal",
+                "nome": "102.0 GB Mensal",
                 "quantidade_mb": 104448,
                 "periodo": "mensal",
-                "tipo": "mensal",
-                "input_val": 11,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "mensal"
             }
         },
         "ilimitado": {
+            "76": {
+                "quantidade": 3772,
+                "nome": "3GB+700 (Renov)",
+                "quantidade_mb": 3772,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "120": {
+                "quantidade": 5820,
+                "nome": "5GB+700 (Renov)",
+                "quantidade_mb": 5820,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "130": {
+                "quantidade": 5120,
+                "nome": "5GB (Faseado)",
+                "quantidade_mb": 5120,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "195": {
+                "quantidade": 8892,
+                "nome": "8GB+700 (Renov)",
+                "quantidade_mb": 8892,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "240": {
+                "quantidade": 10940,
+                "nome": "10GB+700 (Renov)",
+                "quantidade_mb": 10940,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "255": {
+                "quantidade": 10240,
+                "nome": "10GB (Faseado)",
+                "quantidade_mb": 10240,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "381": {
+                "quantidade": 15360,
+                "nome": "15GB (Faseado)",
+                "quantidade_mb": 15360,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
             "450": {
                 "quantidade": 11264,
-                "nome": "💎 11GB + Ilimitado (Voda)",
+                "nome": "Vodacom 11GB + Minutos",
                 "quantidade_mb": 11264,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado",
-                "input_val": 1,
-                "ativacao_mb": 11264,
-                "extras": 0,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "ilimitado"
             },
             "469": {
                 "quantidade": 9216,
-                "nome": "💎 9GB + Ilimitado (Movi)",
+                "nome": "Movitel 9GB + Minutos",
                 "quantidade_mb": 9216,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado",
-                "input_val": 1,
-                "ativacao_mb": 9216,
-                "extras": 0,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "ilimitado"
+            },
+            "510": {
+                "quantidade": 20480,
+                "nome": "20GB (Faseado)",
+                "quantidade_mb": 20480,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
             },
             "570": {
                 "quantidade": 15360,
-                "nome": "💎 15GB + Ilimitado (Voda)",
+                "nome": "Vodacom 15GB + Minutos",
                 "quantidade_mb": 15360,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado",
-                "input_val": 1,
-                "ativacao_mb": 15360,
-                "extras": 0,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "ilimitado"
             },
             "850": {
                 "quantidade": 25600,
-                "nome": "💎 25GB + Ilimitado (Voda)",
+                "nome": "Vodacom 25GB + Minutos",
                 "quantidade_mb": 25600,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado",
-                "input_val": 1,
-                "ativacao_mb": 25600,
-                "extras": 0,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "ilimitado"
             },
             "950": {
                 "quantidade": 23552,
-                "nome": "💎 23GB + Ilimitado (Movi)",
+                "nome": "Movitel 23GB + Minutos",
                 "quantidade_mb": 23552,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado",
-                "input_val": 1,
-                "ativacao_mb": 23552,
-                "extras": 0,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
-            },
-            "1450": {
-                "quantidade": 38912,
-                "nome": "💎 38GB + Ilimitado (Movi)",
-                "quantidade_mb": 38912,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado",
-                "input_val": 1,
-                "ativacao_mb": 38912,
-                "extras": 0,
-                "porta_obrigatoria": 8077,
-                "permite_retry": false
+                "tipo": "ilimitado"
             }
         }
     },
