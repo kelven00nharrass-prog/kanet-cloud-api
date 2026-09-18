@@ -490,7 +490,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
                 numero: order.numero,
                 quantidade: parte2,
                 modo: order.modo || 'diario',
-                input_val: order.input_val || '',
+                input_val: '', // ⚠️ Limpar input_val para que a Parte 2 use estritamente a quantidade restante (parte2)
                 jid: order.jid || null,
                 remetente: order.remetente || 'Bot',
                 targetPort: null,
@@ -514,7 +514,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
                 numero: order.numero,
                 quantidade: parte1,
                 modo: order.modo || 'diario',
-                input_val: order.input_val || '',
+                input_val: '', // ⚠️ Limpar input_val para que a Parte 1 envie estritamente a quantidade da parte1
                 jid: order.jid || null,
                 timestamp: Date.now()
               };
@@ -879,7 +879,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           numero: order.numero,
           quantidade: restanteMb,
           modo: order.modo || 'diario',
-          input_val: order.input_val || '',
+          input_val: '', // ⚠️ Limpar input_val para que envie estritamente a diferença restante (restanteMb)
           jid: order.jid || null,
           remetente: order.remetente || 'Bot',
           targetPort: null,
