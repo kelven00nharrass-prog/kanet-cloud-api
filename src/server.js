@@ -158,6 +158,29 @@ app.get('/api/devices', async (req, res) => {
   return res.json({ success: true, count: devices.length, devices });
 });
 
+// ── RESET / LIBERTAR PORTA (operador) ──
+app.post('/api/devices/:port/reset', (req, res) => {
+  const port = Number(req.params.port);
+  const dev = inMemoryDevices[port];
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+
+  // Resetar flags de bloqueio
+  dev.sem_saldo = false;
+  dev.limite_atingido = false;
+  dev.livre = true;
+  dev.is_apto = true;
+  dev.pending_order = null;
+  dev._lastBlockLogTime = 0;
+
+  // Se o body tiver saldos explícitos, actualizar
+  if (req.body && req.body.sim1_saldo_mb !== undefined) dev.sim1_saldo_mb = Number(req.body.sim1_saldo_mb);
+  if (req.body && req.body.sim2_saldo_mb !== undefined) dev.sim2_saldo_mb = Number(req.body.sim2_saldo_mb);
+  if (req.body && req.body.saldo_mb !== undefined) dev.saldo_mb = Number(req.body.saldo_mb);
+
+  console.log(`🔓 [RESET OPERADOR] Porta ${port} libertada manualmente pelo operador.`);
+  return res.json({ success: true, mensagem: `Porta ${port} libertada! Pronta para receber pedidos.`, device: dev });
+});
+
 function isPortCompatibleWithModo(port, modo) {
   const m = String(modo || '').toLowerCase().trim();
   if (m === 'saldo' || m === 'credito') {
