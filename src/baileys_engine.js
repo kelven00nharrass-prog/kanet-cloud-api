@@ -1110,6 +1110,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         realSender = msg.key.remoteJidAlt;
                     }
                     const senderClean = String(realSender).split('@')[0].split(':')[0].replace(/\D/g, '');
+                    const senderNumber = senderClean; // Alias utilizado em toda a lógica abaixo
                     // Remove menções (@258... ou @nome) e cria comando limpo sem prefixos (. ! / #)
                     const textSemMencoes = text.replace(/@\d+/g, '').replace(/@[\w.-]+/g, '').trim();
                     const cleanText = (textSemMencoes || text).trim().toLowerCase();
