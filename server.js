@@ -1763,6 +1763,54 @@ app.get('/api/sms/payments/:txn_id', async (req, res) => {
   }
 });
 
+// ── ADMIN: Corrigir duplicatas em TABELAS_GRUPO ──
+app.post('/api/admin/fix-duplicates', async (req, res) => {
+  const token = req.headers['x-master-token'] || req.query.token;
+  if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
+  if (!db) return res.status(500).json({ error: 'Firestore não disponível' });
+
+  try {
+    const docRef = db.collection('bot_settings').doc('pricing_tables');
+    const doc = await docRef.get();
+    const d = doc.data();
+    if (!d || !d.TABELAS_GRUPO) return res.json({ ok: true, removidos: 0, msg: 'Sem TABELAS_GRUPO' });
+
+    const newGrupo = JSON.parse(JSON.stringify(d.TABELAS_GRUPO));
+    const log = [];
+    let total = 0;
+
+    for (const [gid, grpCfg] of Object.entries(newGrupo)) {
+      const tabelas = grpCfg.TABELAS || {};
+      for (const tipo of ['24hrs', 'semanal', 'mensal', 'ilimitado']) {
+        const tabela = tabelas[tipo] || {};
+        const byVolume = {};
+        for (const [preco, pkg] of Object.entries(tabela)) {
+          const mb = pkg.quantidade_mb;
+          if (!byVolume[mb]) byVolume[mb] = [];
+          byVolume[mb].push({ preco: Number(preco), pkg });
+        }
+        for (const [mb, entries] of Object.entries(byVolume)) {
+          if (entries.length > 1) {
+            entries.sort((a, b) => a.preco - b.preco);
+            const remove = entries.slice(1);
+            log.push(`[${gid.slice(-8)}] ${tipo} ${mb}MB: manter ${entries[0].preco}MT, remover ${remove.map(r=>r.preco+'MT').join(',')}`);
+            for (const r of remove) { delete tabelas[tipo][r.preco]; total++; }
+          }
+        }
+      }
+    }
+
+    if (total > 0) {
+      await docRef.update({ TABELAS_GRUPO: newGrupo });
+      console.log(`✅ [FIX-DUP] ${total} duplicados removidos do Firestore`);
+    }
+
+    res.json({ ok: true, removidos: total, log });
+  } catch (err) {
+    console.error('❌ [FIX-DUP]', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 
 app.listen(PORT, '0.0.0.0', () => {
