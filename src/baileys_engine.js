@@ -1110,8 +1110,10 @@ async function startWhatsApp(orderCallback, db = null) {
                         realSender = msg.key.remoteJidAlt;
                     }
                     const senderClean = String(realSender).split('@')[0].split(':')[0].replace(/\D/g, '');
-                    const senderNumber = senderClean || String(realSender).replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@g.us', '');
-                    const cleanText = text.trim().toLowerCase();
+                    // Remove menções (@258... ou @nome) e cria comando limpo sem prefixos (. ! / #)
+                    const textSemMencoes = text.replace(/@\d+/g, '').replace(/@[\w.-]+/g, '').trim();
+                    const cleanText = (textSemMencoes || text).trim().toLowerCase();
+                    const cleanCmd = cleanText.replace(/^[.!/#]/, '').trim();
 
                     // Lista de todos os identificadores possíveis que o Baileys nos dá
                     const candidateSenders = [
@@ -1986,19 +1988,28 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
 
                     // ── 13. MENU / TABELA ORIGINAL ──────────────────────────
-                    if (['1', '1️⃣', 'menu', 'tabela', 'pacotes', 'planos', 'precos', 'preço', 'preco'].includes(cleanText)) {
+                    const ehPedidoMenu = [
+                        '1', '1️⃣', 'menu', 'tabela', 'tabelas', 'pacote', 'pacotes', 'plano', 'planos',
+                        'preco', 'precos', 'preço', 'preços', 'valores', 'megas', 'gigas', 'comprar'
+                    ].includes(cleanCmd) || cleanCmd === 'menu' || cleanCmd.startsWith('menu ') || cleanCmd.startsWith('tabela ') || cleanCmd.startsWith('preço') || cleanCmd.startsWith('preco');
+
+                    if (ehPedidoMenu) {
                         await reply(gerarMenuOriginal(jid));
                         continue;
                     }
 
                     // ── 14. PAGAMENTO ORIGINAL ──────────────────────────────
-                    if (['2', '2️⃣', 'pagamento', '!pagamento', '.pagamento', 'conta', 'contas', 'mpesa', 'emola', 'pagar'].includes(cleanText)) {
+                    const ehPedidoPagamento = [
+                        '2', '2️⃣', 'pagamento', 'pagar', 'conta', 'contas', 'mpesa', 'emola', 'dados de pagamento'
+                    ].includes(cleanCmd) || cleanCmd.startsWith('pagamento');
+
+                    if (ehPedidoPagamento) {
                         await reply(gerarMensagemPagamento(nomeCliente));
                         continue;
                     }
 
                     // ── 15. SUPORTE & AJUDA (OU QUANDO NÃO RECEBEU O PACOTE) ──
-                    const ehPedidoSuporte = ['5', '5️⃣', 'suporte', '!suporte', '.suporte', 'ajuda', '!ajuda', '.ajuda', 'socorro', 'contato', 'contacto', 'admin'].includes(cleanText);
+                    const ehPedidoSuporte = ['5', '5️⃣', 'suporte', 'ajuda', 'socorro', 'contato', 'contacto', 'admin'].includes(cleanCmd);
                     const ehReclamacaoPacote = [
                         'nao recebi', 'não recebi', 'nao chegou', 'não chegou', 'ainda nao', 'ainda não',
                         'cade meu', 'cadê meu', 'onde esta meu', 'onde está o meu', 'nao ativou', 'não ativou',
@@ -2012,7 +2023,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (APENAS PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
                     const isGroupMsg = jid.endsWith('@g.us');
-                    const ehSaudacaoExplicita = ['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'iniciar', 'start', 'começar', 'bot'].some(w => cleanText === w || cleanText.startsWith(w + ' '));
+                    const ehSaudacaoExplicita = ['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'iniciar', 'start', 'começar', 'bot', 'ka-net', 'kanet'].some(w => cleanCmd === w || cleanCmd.startsWith(w + ' '));
 
                     if (ehSaudacaoExplicita) {
                         await reply(gerarMensagemBoasVindas(nomeCliente));
