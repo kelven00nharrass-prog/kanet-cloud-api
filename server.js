@@ -169,6 +169,7 @@ app.post('/api/devices/:port/reset', (req, res) => {
   dev.limite_atingido = false;
   dev.livre = true;
   dev.is_apto = true;
+  dev.paused = false;
   dev.pending_order = null;
   dev._lastBlockLogTime = 0;
 
@@ -176,9 +177,131 @@ app.post('/api/devices/:port/reset', (req, res) => {
   if (req.body && req.body.sim1_saldo_mb !== undefined) dev.sim1_saldo_mb = Number(req.body.sim1_saldo_mb);
   if (req.body && req.body.sim2_saldo_mb !== undefined) dev.sim2_saldo_mb = Number(req.body.sim2_saldo_mb);
   if (req.body && req.body.saldo_mb !== undefined) dev.saldo_mb = Number(req.body.saldo_mb);
+  if (req.body && req.body.saldo_mt !== undefined) dev.saldo_mt = Number(req.body.saldo_mt);
 
-  console.log(`🔓 [RESET OPERADOR] Porta ${port} libertada manualmente pelo operador.`);
-  return res.json({ success: true, mensagem: `Porta ${port} libertada! Pronta para receber pedidos.`, device: dev });
+  console.log(`🔓 [MANUSEIO PAINEL] Porta ${port} libertada manualmente pelo operador.`);
+  return res.json({ success: true, mensagem: `Porta ${port} libertada e desbloqueada com sucesso!`, device: dev });
+});
+
+// ── AJUSTAR SALDO MANUALMENTE (operador) ──
+app.post('/api/devices/:port/set-saldo', (req, res) => {
+  const port = Number(req.params.port);
+  const dev = inMemoryDevices[port];
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+
+  const { sim1_saldo_mb, sim2_saldo_mb, saldo_mb, saldo_mt } = req.body || {};
+  if (sim1_saldo_mb !== undefined) dev.sim1_saldo_mb = Number(sim1_saldo_mb);
+  if (sim2_saldo_mb !== undefined) dev.sim2_saldo_mb = Number(sim2_saldo_mb);
+  if (saldo_mb !== undefined) dev.saldo_mb = Number(saldo_mb);
+  if (saldo_mt !== undefined) dev.saldo_mt = Number(saldo_mt);
+
+  // Se o saldo configurado for >= 100MB, desmarcar sem_saldo
+  const maxMb = Math.max(dev.sim1_saldo_mb || 0, dev.sim2_saldo_mb || 0, dev.saldo_mb || 0);
+  if (maxMb >= 100 || (dev.saldo_mt !== undefined && dev.saldo_mt > 0)) {
+    dev.sem_saldo = false;
+  }
+
+  console.log(`💰 [MANUSEIO PAINEL] Saldo da Porta ${port} ajustado para: SIM1=${dev.sim1_saldo_mb}MB | SIM2=${dev.sim2_saldo_mb}MB | Saldo=${dev.saldo_mb}MB / ${dev.saldo_mt}MT`);
+  return res.json({ success: true, mensagem: `Saldo da Porta ${port} atualizado com sucesso!`, device: dev });
+});
+
+// ── ALTERNAR SIM ATIVO (operador) ──
+app.post('/api/devices/:port/set-sim', (req, res) => {
+  const port = Number(req.params.port);
+  const dev = inMemoryDevices[port];
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+
+  const slot = Number(req.body && req.body.slot);
+  if (slot !== 1 && slot !== 2) {
+    return res.status(400).json({ success: false, mensagem: 'Slot de SIM deve ser 1 ou 2.' });
+  }
+
+  dev.active_sim_slot = slot;
+  dev.carrier = dev.carrier ? dev.carrier.replace(/SIM\s*\d/, `SIM ${slot}`) : `Vodacom (SIM ${slot})`;
+  console.log(`📶 [MANUSEIO PAINEL] Porta ${port} alternada para SIM ${slot}`);
+  return res.json({ success: true, mensagem: `Porta ${port} configurada para usar SIM ${slot}!`, device: dev });
+});
+
+// ── PAUSAR / RETOMAR CELULAR (operador) ──
+app.post('/api/devices/:port/toggle-pause', (req, res) => {
+  const port = Number(req.params.port);
+  const dev = inMemoryDevices[port];
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+
+  dev.paused = !dev.paused;
+  console.log(`⏸️ [MANUSEIO PAINEL] Porta ${port} ${dev.paused ? 'PAUSADA' : 'RETOMADA'} pelo operador.`);
+  return res.json({
+    success: true,
+    paused: dev.paused,
+    mensagem: dev.paused ? `Porta ${port} pausada. Não receberá pedidos até ser retomada.` : `Porta ${port} retomada e pronta para pedidos!`,
+    device: dev
+  });
+});
+
+// ── FORÇAR DESPACHO DE PEDIDO PARA ESTA PORTA (operador) ──
+app.post('/api/devices/:port/force-dispatch', (req, res) => {
+  const port = Number(req.params.port);
+  const dev = inMemoryDevices[port];
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+
+  if (dev.pending_order) {
+    return res.status(400).json({ success: false, mensagem: `Porta ${port} já tem um pedido em processamento (${dev.pending_order.numero}).` });
+  }
+
+  // Buscar primeiro pedido pendente compatível
+  let targetOrder = null;
+  let targetOrderId = null;
+  for (const [orderId, order] of inMemoryOrders.entries()) {
+    if (order.status === 'pending') {
+      const isCompat = isPortCompatibleWithModo(port, order.modo);
+      if (isCompat) {
+        targetOrder = order;
+        targetOrderId = orderId;
+        break;
+      }
+    }
+  }
+
+  if (!targetOrder) {
+    return res.json({ success: false, mensagem: `Nenhum pedido pendente compatível na fila para a Porta ${port}.` });
+  }
+
+  targetOrder.status = 'assigned';
+  targetOrder.assignedToPort = port;
+  targetOrder.targetPort = port;
+  targetOrder.processingAt = new Date().toISOString();
+
+  dev.pending_order = {
+    id: targetOrderId,
+    orderId: targetOrderId,
+    numero: targetOrder.numero,
+    quantidade: targetOrder.quantidade,
+    modo: targetOrder.modo || 'diario',
+    input_val: targetOrder.input_val || '',
+    jid: targetOrder.jid || null,
+    timestamp: Date.now()
+  };
+
+  saveOrdersToCache();
+  console.log(`⚡ [MANUSEIO PAINEL] Pedido ${targetOrderId} (${targetOrder.quantidade}MB -> ${targetOrder.numero}) despachado FORÇADO para Porta ${port}!`);
+  return res.json({ success: true, mensagem: `Pedido ${targetOrderId} (${targetOrder.quantidade}MB) despachado para a Porta ${port}!`, order: targetOrder });
+});
+
+// ── LIBERTAR TODOS OS CELULARES (operador) ──
+app.post('/api/devices/reset-all', (req, res) => {
+  let count = 0;
+  for (const [portStr, dev] of Object.entries(inMemoryDevices)) {
+    dev.sem_saldo = false;
+    dev.limite_atingido = false;
+    dev.livre = true;
+    dev.is_apto = true;
+    dev.paused = false;
+    dev.pending_order = null;
+    dev._lastBlockLogTime = 0;
+    count++;
+  }
+  console.log(`🔓 [MANUSEIO PAINEL] Todos os ${count} celulares foram libertados e desbloqueados.`);
+  return res.json({ success: true, mensagem: `Todos os ${count} celulares foram libertados e estão prontos!`, count });
 });
 
 function isPortCompatibleWithModo(port, modo) {
@@ -220,6 +343,7 @@ function getPortForModo(modo) {
 
 function isDeviceApto(dev) {
   if (!dev) return false;
+  if (dev.paused === true) return false; // Pausado manualmente pelo operador
   const now = Date.now();
   const lastSeen = new Date(dev.lastSeen || 0).getTime();
   const isOnline = (now - lastSeen) < 35000;

@@ -227,7 +227,13 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
     </div>
 
     <!-- DEVICES -->
-    <div class="section-title"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Gateway USSD</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Gateway USSD & Manuseio</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-primary" onclick="loadDevices()"><i class="fa-solid fa-rotate"></i> Atualizar Celulares</button>
+        <button class="btn btn-sm btn-success" onclick="resetAllDevices()"><i class="fa-solid fa-unlock"></i> Libertar Todos</button>
+      </div>
+    </div>
     <div class="grid-devices" id="devicesGrid"><div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar celulares...</div></div>
 
     <!-- QUEUE & MANUAL SEND -->
@@ -509,29 +515,31 @@ async function loadDevices() {
       const apto = dev.is_apto;
       const bat = dev.bateria || 0;
       const batColor = bat > 50 ? 'green' : bat > 20 ? 'yellow' : 'red';
-      const saldo = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
+      const saldo1 = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
       const saldo2 = dev.sim2_saldo_mb !== undefined ? dev.sim2_saldo_mb : 0;
-      const saldoColor = saldo > 500 ? 'green' : saldo > 100 ? 'yellow' : 'red';
-      const isDiario = dev.porta !== 8077 && dev.porta !== 8777;
+      const saldoColor1 = saldo1 > 500 ? 'green' : saldo1 >= 100 ? 'yellow' : 'red';
+      const saldoColor2 = saldo2 > 500 ? 'green' : saldo2 >= 100 ? 'yellow' : 'red';
       const isSpecial = dev.porta === 8077 || dev.porta === 8777;
       const avail = dev.transfers_available !== undefined ? dev.transfers_available : '?';
       const total = dev.total_envios || 0;
       const pct = Math.min(100, (total / 20) * 100);
       const pctColor = pct < 50 ? 'green' : pct < 80 ? 'yellow' : 'red';
       const tipoPorta = dev.porta === 8077 ? '📅 Semanais / Mensais / VIP' : dev.porta === 8777 ? '💰 Saldo & Crédito' : '📦 Diários (24hrs)';
+      const activeSim = dev.active_sim_slot || 1;
+      const isPaused = !!dev.paused;
       
       const pendingHtml = dev.pending_order ? `
         <div class="pending-order">
           <div class="pending-label"><i class="fa-solid fa-spinner fa-spin"></i> EM PROCESSAMENTO</div>
-          <div>📲 ${dev.pending_order.numero} • ${dev.pending_order.quantidade}MB • ${dev.pending_order.modo || 'diario'}</div>
+          <div>📲 <b>${dev.pending_order.numero}</b> • <b>${dev.pending_order.quantidade}MB</b> • <span style="color:var(--cyan)">${dev.pending_order.modo || 'diario'}</span></div>
         </div>` : '';
       
       const lastResult = dev.last_result ? `
         <div style="font-size:.72rem;color:var(--muted);margin-top:8px">
-          Último: ${dev.last_result.success ? '✅' : '❌'} ${dev.last_result.numero || ''} ${dev.last_result.quantidade || ''}MB
+          Último envio: ${dev.last_result.success ? '✅' : '❌'} ${dev.last_result.numero || ''} ${dev.last_result.quantidade ? dev.last_result.quantidade+'MB' : ''}
         </div>` : '';
       
-      // Personalização: Portas especiais (8077/8777) NÃO têm limite diário de 20 transferências
+      // Bloco de Saldo
       const statBlocoSaldo = isSpecial ? `
         <div class="device-stat">
           <div class="device-stat-label">💰 Saldo Operacional</div>
@@ -539,16 +547,20 @@ async function loadDevices() {
           <div style="font-size:.68rem;color:var(--muted)">Crédito Principal</div>
         </div>` : `
         <div class="device-stat">
-          <div class="device-stat-label">📡 SIM 1 Saldo</div>
-          <div class="device-stat-val" style="color:var(--${saldoColor})">${saldo >= 1024 ? (saldo/1024).toFixed(1)+'GB' : saldo+'MB'}</div>
-          ${saldo2 > 0 ? `<div style="font-size:.68rem;color:var(--muted)">SIM 2: ${saldo2 >= 1024 ? (saldo2/1024).toFixed(1)+'GB' : saldo2+'MB'}</div>` : ''}
+          <div class="device-stat-label">📡 SIM 1 & SIM 2</div>
+          <div class="device-stat-val" style="font-size:.85rem">
+            <span style="color:var(--${saldoColor1})">S1: ${saldo1 >= 1024 ? (saldo1/1024).toFixed(1)+'GB' : saldo1+'MB'}</span> | 
+            <span style="color:var(--${saldoColor2})">S2: ${saldo2 >= 1024 ? (saldo2/1024).toFixed(1)+'GB' : saldo2+'MB'}</span>
+          </div>
+          <div style="font-size:.68rem;color:var(--cyan)">Slot Ativo: <b>SIM ${activeSim}</b></div>
         </div>`;
 
+      // Bloco de Envios Diários
       const statBlocoEnvios = isSpecial ? `
         <div class="device-stat">
           <div class="device-stat-label">📤 Ofertas Ativadas</div>
           <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">hoje</span></div>
-          <div style="font-size:.68rem;color:var(--cyan)">Sem limite de 20 envios</div>
+          <div style="font-size:.68rem;color:var(--cyan)">Sem limite diário</div>
         </div>` : `
         <div class="device-stat">
           <div class="device-stat-label">📤 Envios Hoje</div>
@@ -556,6 +568,7 @@ async function loadDevices() {
           <div class="progress-bar"><div class="progress-fill ${pctColor}" style="width:${pct}%"></div></div>
         </div>`;
 
+      // Bloco de Disponíveis
       const statBlocoDisponiveis = isSpecial ? `
         <div class="device-stat">
           <div class="device-stat-label">⚡ Modo Ofertas</div>
@@ -565,21 +578,21 @@ async function loadDevices() {
         <div class="device-stat">
           <div class="device-stat-label">✅ Disponíveis</div>
           <div class="device-stat-val" style="color:var(--${avail > 5 ? 'green' : avail > 0 ? 'yellow' : 'red'})">${avail}</div>
-          <div style="font-size:.68rem;color:var(--muted)">SIM1: ${dev.sim1_envios||0} | SIM2: ${dev.sim2_envios||0}</div>
+          <div style="font-size:.68rem;color:var(--muted)">S1: ${dev.sim1_envios||0}/10 | S2: ${dev.sim2_envios||0}/10</div>
         </div>`;
 
       const modelName = dev.device_model || (dev.porta === 8023 ? 'Xiaomi Redmi' : dev.porta === 8077 ? 'Huawei Honor' : ('Celular Gateway'));
 
       return `
-        <div class="card">
+        <div class="card" style="${isPaused ? 'border-color:rgba(245,158,11,.4);opacity:0.85;' : ''}">
           <div class="device-header">
             <div>
               <div class="device-name">📱 ${modelName} <span style="font-size:.8rem;color:var(--cyan)">(Porta ${dev.porta})</span></div>
               <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${dev.carrier || 'Vodacom'} • ${tipoPorta}</div>
             </div>
-            <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
               <span class="badge ${online ? 'online' : 'offline'}">${online ? '● Online' : '● Offline'}</span>
-              <span class="badge ${apto ? 'apto' : 'inapto'}">${apto ? '✓ Apto' : '⚠ Inapto'}</span>
+              <span class="badge ${isPaused ? 'inapto' : (apto ? 'apto' : 'inapto')}">${isPaused ? '⏸ Pausado' : (apto ? '✓ Apto' : (dev.sem_saldo ? '⚠ Sem Saldo' : (dev.limite_atingido ? '⛔ Limite' : '⚠ Inapto')))}</span>
             </div>
           </div>
           <div class="device-grid">
@@ -594,9 +607,28 @@ async function loadDevices() {
           </div>
           ${pendingHtml}
           ${lastResult}
-          <div style="display:flex;gap:8px;margin-top:12px">
-            <button class="btn btn-primary btn-sm" onclick="pingDevice(${dev.porta})"><i class="fa-solid fa-heartbeat"></i> Ping</button>
-            <button class="btn btn-warn btn-sm" onclick="forceDispatch(${dev.porta})"><i class="fa-solid fa-bolt"></i> Forçar</button>
+          
+          <!-- PAINEL DE MANUSEIO E CONTROLO DIRETO -->
+          <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:10px;margin-top:12px;border:1px solid rgba(255,255,255,0.05)">
+            <div style="font-size:0.68rem;font-weight:700;color:var(--cyan);text-transform:uppercase;margin-bottom:6px;letter-spacing:0.05em">
+              <i class="fa-solid fa-gamepad"></i> Manuseio do Celular
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px">
+              <button class="btn btn-success btn-sm" onclick="resetDevice(${dev.porta})" title="Desbloquear e limpar travas"><i class="fa-solid fa-unlock"></i> Libertar</button>
+              <button class="btn btn-primary btn-sm" onclick="openSaldoModal(${dev.porta}, ${saldo1}, ${saldo2}, ${dev.saldo_mt || 0})" title="Definir saldo"><i class="fa-solid fa-coins"></i> Saldo</button>
+              <button class="btn btn-warn btn-sm" onclick="forceDispatch(${dev.porta})" title="Forçar despacho de pedido pendente"><i class="fa-solid fa-bolt"></i> Forçar</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+              <button class="btn ${activeSim === 1 ? 'btn-primary' : 'btn-purple'} btn-sm" onclick="setDeviceSim(${dev.porta}, 1)" title="Ativar SIM 1">
+                <i class="fa-solid fa-sim-card"></i> SIM 1 ${activeSim === 1 ? '✓' : ''}
+              </button>
+              <button class="btn ${activeSim === 2 ? 'btn-primary' : 'btn-purple'} btn-sm" onclick="setDeviceSim(${dev.porta}, 2)" title="Ativar SIM 2">
+                <i class="fa-solid fa-sim-card"></i> SIM 2 ${activeSim === 2 ? '✓' : ''}
+              </button>
+              <button class="btn ${isPaused ? 'btn-success' : 'btn-danger'} btn-sm" onclick="togglePauseDevice(${dev.porta})" title="${isPaused ? 'Retomar celular' : 'Pausar celular'}">
+                <i class="fa-solid ${isPaused ? 'fa-play' : 'fa-pause'}"></i> ${isPaused ? 'Retomar' : 'Pausar'}
+              </button>
+            </div>
           </div>
         </div>`;
     }).join('');
@@ -604,6 +636,119 @@ async function loadDevices() {
   } catch(e) {
     document.getElementById('devicesGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:20px"><i class="fa-solid fa-triangle-exclamation"></i> Erro: ' + e.message + '</div>';
     return [];
+  }
+}
+
+// ── MANUSEIO: LIBERTAR PORTA ──
+async function resetDevice(port) {
+  try {
+    toast(`A libertar porta ${port}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/reset`, { method: 'POST', body: JSON.stringify({}) });
+    if (d.success) {
+      toast(`✅ Porta ${port} desbloqueada e pronta!`, 'ok');
+      await loadDevices();
+      await loadQueue();
+    } else {
+      toast(`❌ Erro ao libertar: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: LIBERTAR TODOS OS CELULARES ──
+async function resetAllDevices() {
+  if (!confirm('Deseja libertar e desbloquear todos os celulares registados?')) return;
+  try {
+    toast('A libertar todos os celulares...', 'ok');
+    const d = await fetchAPI('/api/devices/reset-all', { method: 'POST', body: JSON.stringify({}) });
+    if (d.success) {
+      toast(`✅ Todos os celulares foram libertados com sucesso!`, 'ok');
+      await loadDevices();
+      await loadQueue();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: ALTERNAR SIM ATIVO ──
+async function setDeviceSim(port, slot) {
+  try {
+    toast(`A alterar porta ${port} para SIM ${slot}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/set-sim`, { method: 'POST', body: JSON.stringify({ slot }) });
+    if (d.success) {
+      toast(`✅ Porta ${port} agora está a usar SIM ${slot}!`, 'ok');
+      await loadDevices();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: PAUSAR / RETOMAR CELULAR ──
+async function togglePauseDevice(port) {
+  try {
+    const d = await fetchAPI(`/api/devices/${port}/toggle-pause`, { method: 'POST', body: JSON.stringify({}) });
+    if (d.success) {
+      toast(`✅ ${d.mensagem}`, 'ok');
+      await loadDevices();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: MODAL DE AJUSTE DE SALDO ──
+let currentSaldoModalPort = null;
+
+function openSaldoModal(port, sim1, sim2, saldoMt) {
+  currentSaldoModalPort = port;
+  document.getElementById('modalPortTitle').textContent = `Celular Porta ${port}`;
+  document.getElementById('modalSim1Saldo').value = sim1 || 0;
+  document.getElementById('modalSim2Saldo').value = sim2 || 0;
+  document.getElementById('modalSaldoMt').value = saldoMt || 0;
+  document.getElementById('saldoModal').style.display = 'flex';
+}
+
+function closeSaldoModal() {
+  document.getElementById('saldoModal').style.display = 'none';
+  currentSaldoModalPort = null;
+}
+
+async function saveSaldoModal() {
+  if (!currentSaldoModalPort) return;
+  const port = currentSaldoModalPort;
+  const s1 = Number(document.getElementById('modalSim1Saldo').value) || 0;
+  const s2 = Number(document.getElementById('modalSim2Saldo').value) || 0;
+  const smt = Number(document.getElementById('modalSaldoMt').value) || 0;
+
+  try {
+    toast(`A guardar saldo da Porta ${port}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/set-saldo`, {
+      method: 'POST',
+      body: JSON.stringify({
+        sim1_saldo_mb: s1,
+        sim2_saldo_mb: s2,
+        saldo_mb: Math.max(s1, s2),
+        saldo_mt: smt
+      })
+    });
+    if (d.success) {
+      toast(`✅ Saldo da Porta ${port} atualizado com sucesso!`, 'ok');
+      closeSaldoModal();
+      await loadDevices();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
   }
 }
 
@@ -1072,5 +1217,38 @@ async function reloadAll() {
 reloadAll();
 setInterval(reloadAll, 8000);
 </script>
+
+<!-- MODAL DE AJUSTE DE SALDO DO CELULAR -->
+<div id="saldoModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--header-bg);border:1px solid var(--cyan);border-radius:18px;max-width:440px;width:100%;padding:24px;box-shadow:0 0 30px rgba(0,240,255,0.25);animation:fadeIn .2s ease">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+      <div style="font-size:1.1rem;font-weight:800;color:var(--cyan);display:flex;align-items:center;gap:8px">
+        <i class="fa-solid fa-coins"></i> Ajustar Saldo - <span id="modalPortTitle">Porta</span>
+      </div>
+      <button onclick="closeSaldoModal()" style="background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+      <div class="form-group">
+        <label class="form-label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)</label>
+        <input class="form-input" type="number" id="modalSim1Saldo" placeholder="Ex: 2048 (para 2GB) ou 500">
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 2 (em Megabytes / MB)</label>
+        <input class="form-input" type="number" id="modalSim2Saldo" placeholder="Ex: 1500 ou 0">
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="fa-solid fa-money-bill"></i> Saldo Principal (em Meticais / MT)</label>
+        <input class="form-input" type="number" id="modalSaldoMt" placeholder="Ex: 100 MT">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="closeSaldoModal()" style="background:rgba(255,255,255,0.08);color:var(--text)">Cancelar</button>
+      <button class="btn btn-success" onclick="saveSaldoModal()"><i class="fa-solid fa-check"></i> Guardar Saldo</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
