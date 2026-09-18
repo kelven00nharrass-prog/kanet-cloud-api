@@ -172,6 +172,11 @@ app.post('/api/devices/:port/reset', (req, res) => {
   dev.paused = false;
   dev.pending_order = null;
   dev._lastBlockLogTime = 0;
+  dev.manual_saldo_override = Date.now();
+
+  // Enviar comando ao celular via próximo polling (/health)
+  dev.pending_commands = dev.pending_commands || {};
+  dev.pending_commands.reset_counters = true;
 
   // Se o body tiver saldos explícitos, actualizar
   if (req.body && req.body.sim1_saldo_mb !== undefined) dev.sim1_saldo_mb = Number(req.body.sim1_saldo_mb);
@@ -195,10 +200,19 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
   if (saldo_mb !== undefined) dev.saldo_mb = Number(saldo_mb);
   if (saldo_mt !== undefined) dev.saldo_mt = Number(saldo_mt);
 
+  dev.manual_saldo_override = Date.now();
+
+  // Enviar novo saldo ao aplicativo no celular
+  dev.pending_commands = dev.pending_commands || {};
+  if (sim1_saldo_mb !== undefined) dev.pending_commands.set_sim1_saldo_mb = Number(sim1_saldo_mb);
+  if (sim2_saldo_mb !== undefined) dev.pending_commands.set_sim2_saldo_mb = Number(sim2_saldo_mb);
+
   // Se o saldo configurado for >= 100MB, desmarcar sem_saldo
   const maxMb = Math.max(dev.sim1_saldo_mb || 0, dev.sim2_saldo_mb || 0, dev.saldo_mb || 0);
   if (maxMb >= 100 || (dev.saldo_mt !== undefined && dev.saldo_mt > 0)) {
     dev.sem_saldo = false;
+    dev.is_apto = true;
+    dev.livre = true;
   }
 
   console.log(`💰 [MANUSEIO PAINEL] Saldo da Porta ${port} ajustado para: SIM1=${dev.sim1_saldo_mb}MB | SIM2=${dev.sim2_saldo_mb}MB | Saldo=${dev.saldo_mb}MB / ${dev.saldo_mt}MT`);
@@ -218,6 +232,9 @@ app.post('/api/devices/:port/set-sim', (req, res) => {
 
   dev.active_sim_slot = slot;
   dev.carrier = dev.carrier ? dev.carrier.replace(/SIM\s*\d/, `SIM ${slot}`) : `Vodacom (SIM ${slot})`;
+  dev.pending_commands = dev.pending_commands || {};
+  dev.pending_commands.set_sim_slot = slot;
+
   console.log(`📶 [MANUSEIO PAINEL] Porta ${port} alternada para SIM ${slot}`);
   return res.json({ success: true, mensagem: `Porta ${port} configurada para usar SIM ${slot}!`, device: dev });
 });
@@ -760,9 +777,14 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   const now = Date.now();
   const lastSeen = new Date(dev.lastSeen || 0).getTime();
   const isOnline = (now - lastSeen) < 180000; // 3 min window
+
+  const pendingCmds = dev.pending_commands || {};
+  dev.pending_commands = null; // consumido
+
   return res.json({
     status: isOnline ? 'ok' : 'offline',
     online: isOnline,
+    ...pendingCmds,
     ...dev
   });
 });
@@ -790,6 +812,19 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       } else {
         delete bodyClean[field]; // nunca havia saldo, não definir
       }
+    }
+  }
+
+  // Se o operador definiu o saldo manualmente pelo painel nos últimos 5 minutos,
+  // não deixar o celular sobrescrever com saldo menor/sem_saldo antes que o novo saldo seja aplicado
+  const isManualOverride = currentDev.manual_saldo_override && (Date.now() - currentDev.manual_saldo_override < 300000);
+  if (isManualOverride) {
+    if (bodyClean.sim1_saldo_mb !== undefined && bodyClean.sim1_saldo_mb < 100 && (currentDev.sim1_saldo_mb || 0) >= 100) {
+      bodyClean.sim1_saldo_mb = currentDev.sim1_saldo_mb;
+      bodyClean.saldo_mb = currentDev.saldo_mb;
+      bodyClean.sem_saldo = false;
+      bodyClean.is_apto = true;
+      bodyClean.livre = true;
     }
   }
 
