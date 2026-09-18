@@ -305,12 +305,12 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
       <div class="card stat-card">
         <div class="stat-label"><i class="fa-solid fa-money-bill-transfer"></i> Recebido M-Pesa (SMS)</div>
         <div class="stat-val red" id="repMpesaVal">0 MT</div>
-        <div class="stat-sub">Pagamentos confirmados</div>
+        <div class="stat-sub"><span id="repMpesaCount">0</span> SMS confirmados</div>
       </div>
       <div class="card stat-card">
         <div class="stat-label"><i class="fa-solid fa-money-bill-wave"></i> Recebido e-Mola (SMS)</div>
         <div class="stat-val yellow" id="repEmolaVal">0 MT</div>
-        <div class="stat-sub">Pagamentos confirmados</div>
+        <div class="stat-sub"><span id="repEmolaCount">0</span> SMS confirmados</div>
       </div>
     </div>
 
@@ -825,7 +825,11 @@ async function loadReports() {
     document.getElementById('repMonthCount').textContent = d.month.total_vendas || 0;
 
     document.getElementById('repMpesaVal').textContent = (d.recebidos.mpesa_mt || 0) + ' MT';
+    const mCountEl = document.getElementById('repMpesaCount');
+    if (mCountEl) mCountEl.textContent = d.recebidos.mpesa_count || 0;
     document.getElementById('repEmolaVal').textContent = (d.recebidos.emola_mt || 0) + ' MT';
+    const eCountEl = document.getElementById('repEmolaCount');
+    if (eCountEl) eCountEl.textContent = d.recebidos.emola_count || 0;
 
     // Tabela de vendas
     allSalesData = d.allSales || d.recentSales || [];
@@ -841,7 +845,7 @@ async function loadReports() {
         const vol = qty >= 1024 ? (qty/1024).toFixed(1) + ' GB' : qty + ' MB';
         const val = (s.valor_pago || s.valor || 0) + ' MT';
         const modo = s.modo || 'diario';
-        const porta = s.assignedToPort || s.porta || (s.carrier ? s.carrier : '-');
+        const porta = s.assignedToPort || s.targetPort || s.porta || 'Auto';
         const st = s.status || (s.success ? 'completed' : 'pending');
         return `
           <tr>

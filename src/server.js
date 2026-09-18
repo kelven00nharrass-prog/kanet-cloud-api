@@ -96,11 +96,16 @@ async function handleTransfer(req, res) {
 
     const orderId = request_id || `ORD-${Date.now()}-${uuidv4().substring(0, 8)}`;
     const timestamp = new Date().toISOString();
+    const qtyMb = Number(quantidade) || Number(req.body.input_val) || 0;
+    const valPago = Number(req.body.valor) || Number(req.body.valor_pago) || getValorFromMb(qtyMb, modo);
 
     const orderDoc = {
       orderId,
+      id: orderId,
       numero: String(numero).replace(/\D/g, ''),
-      quantidade: Number(quantidade) || Number(req.body.input_val) || 0,
+      quantidade: qtyMb,
+      valor: valPago,
+      valor_pago: valPago,
       modo,
       targetPort: porta ? Number(porta) : null,
       remetente,
@@ -725,6 +730,22 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         }
       }
       saveOrdersToCache();
+
+      if (db) {
+        const orderIdToSave = order.orderId || order.id || resId;
+        const valToSave = Number(order.valor || order.valor_pago) || getValorFromMb(order.quantidade, order.modo);
+        db.collection('orders').doc(orderIdToSave).set({
+          ...order,
+          status: order.status,
+          completedAt: order.completedAt || null,
+          assignedToPort: port,
+          valor: valToSave,
+          valor_pago: valToSave,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(e => {
+          console.warn('⚠️ [FIREBASE] Erro ao sincronizar status do pedido no Firestore:', e.message);
+        });
+      }
     }
 
     const jaNotificadoGrupo = !!(order && order.groupNotified);
@@ -983,7 +1004,7 @@ app.get('/api/reports', async (req, res) => {
     let all = Array.from(inMemoryOrders.values());
     if (db) {
       try {
-        const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(150).get();
+        const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(200).get();
         const fbOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const map = new Map();
         all.forEach(o => map.set(o.orderId || o.id, o));
@@ -997,47 +1018,83 @@ app.get('/api/reports', async (req, res) => {
       }
     }
 
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    const monthStr = now.toISOString().slice(0, 7);
+    // Garantir que todas as ordens tenham valor em MT calculado
+    all.forEach(o => {
+      const v = Number(o.valor || o.valor_pago);
+      if (!v || isNaN(v) || v <= 0) {
+        const calcVal = getValorFromMb(o.quantidade, o.modo);
+        o.valor = calcVal;
+        o.valor_pago = calcVal;
+      } else {
+        o.valor = v;
+        o.valor_pago = v;
+      }
+    });
+
+    // Fuso horário oficial de Moçambique (CAT / Africa/Maputo)
+    function toMaputoDate(dateVal) {
+      if (!dateVal) return '';
+      try {
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' });
+      } catch(e) {
+        return '';
+      }
+    }
+
+    const todayStr = toMaputoDate(new Date());
+    const monthStr = todayStr.slice(0, 7);
 
     // Vendas concluídas
     const completed = all.filter(o => o.status === 'completed' || o.success === true);
 
     // Vendas de hoje
-    const todaySales = completed.filter(o => (o.createdAt || o.completedAt || '').startsWith(todayStr));
+    const todaySales = completed.filter(o => toMaputoDate(o.completedAt || o.createdAt) === todayStr);
     const todayTotalMt = todaySales.reduce((acc, o) => acc + (Number(o.valor_pago || o.valor) || 0), 0);
     const todayTotalMb = todaySales.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
 
     // Vendas do mês
-    const monthSales = completed.filter(o => (o.createdAt || o.completedAt || '').startsWith(monthStr));
+    const monthSales = completed.filter(o => toMaputoDate(o.completedAt || o.createdAt).startsWith(monthStr));
     const monthTotalMt = monthSales.reduce((acc, o) => acc + (Number(o.valor_pago || o.valor) || 0), 0);
     const monthTotalMb = monthSales.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
 
     // Valores recebidos via SMS (M-Pesa vs e-Mola)
-    let payments = Array.from(inMemoryPayments.values());
+    const mapP = new Map();
+    inMemoryPayments.forEach(p => mapP.set(p.txn_id || p.id, p));
+
+    if (baileysEngine && baileysEngine.smsPaymentsMap) {
+      for (const [k, v] of baileysEngine.smsPaymentsMap.entries()) {
+        if (!mapP.has(k)) mapP.set(k, v);
+      }
+    }
+
     if (db) {
       try {
-        const snapP = await db.collection('sms_payments').orderBy('processedAt', 'desc').limit(150).get();
+        const snapP = await db.collection('sms_payments').orderBy('processedAt', 'desc').limit(200).get();
         const fbP = snapP.docs.map(d => ({ id: d.id, ...d.data() }));
-        const mapP = new Map();
-        payments.forEach(p => mapP.set(p.txn_id || p.id, p));
         fbP.forEach(p => {
           const tid = p.txn_id || p.id;
           if (tid) mapP.set(tid, { ...(mapP.get(tid) || {}), ...p });
         });
-        payments = Array.from(mapP.values());
       } catch(err) {}
     }
 
+    const payments = Array.from(mapP.values());
+    payments.sort((a, b) => new Date(b.processedAt || b.timestamp || 0) - new Date(a.processedAt || a.timestamp || 0));
+
     let mpesaTotal = 0;
     let emolaTotal = 0;
+    let mpesaCount = 0;
+    let emolaCount = 0;
     payments.forEach(p => {
       const val = Number(p.valor) || 0;
       if (String(p.metodo || '').toLowerCase().includes('emola')) {
         emolaTotal += val;
+        emolaCount++;
       } else {
         mpesaTotal += val;
+        mpesaCount++;
       }
     });
 
@@ -1056,15 +1113,31 @@ app.get('/api/reports', async (req, res) => {
       recebidos: {
         mpesa_mt: mpesaTotal,
         emola_mt: emolaTotal,
+        mpesa_count: mpesaCount,
+        emola_count: emolaCount,
         total_mt: mpesaTotal + emolaTotal,
         total_sms: payments.length
       },
-      recentSales: completed.slice(-50).reverse(),
-      allSales: all.slice(-100).reverse(),
-      recentPayments: payments.slice(-50).reverse()
+      recentSales: completed.slice(0, 50),
+      allSales: all.slice(0, 100),
+      recentPayments: payments.slice(0, 50)
     });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Endpoint para reiniciar o bot a partir do painel
+app.post('/api/admin/restart-bot', (req, res) => {
+  try {
+    if (baileysEngine && typeof baileysEngine.startWhatsApp === 'function') {
+      console.log('🔄 [ADMIN] Reinicialização manual do Bot WhatsApp solicitada pelo Painel');
+      baileysEngine.startWhatsApp(null, db);
+      return res.json({ success: true, mensagem: 'Bot WhatsApp a reiniciar na nuvem...' });
+    }
+    return res.json({ success: false, mensagem: 'Módulo WhatsApp indisponível' });
+  } catch(e) {
+    return res.status(500).json({ success: false, mensagem: e.message });
   }
 });
 
@@ -1406,14 +1479,23 @@ try {
   baileysEngine.startWhatsApp((order) => {
     console.log(`📱 [WHATSAPP NUVEM] Nova ordem recebida via WhatsApp: ${order.orderId} (${order.quantidade}MB para ${order.numero})`);
     
+    const valPago = Number(order.valor) || Number(order.valor_pago) || getValorFromMb(order.quantidade, order.modo);
     const orderDoc = {
       ...order,
       id: order.orderId,
+      valor: valPago,
+      valor_pago: valPago,
       status: 'pending',
       createdAt: new Date().toISOString()
     };
     inMemoryOrders.set(order.orderId, orderDoc);
     saveOrdersToCache();
+
+    if (db) {
+      db.collection('orders').doc(order.orderId).set(orderDoc).catch(e => {
+        console.warn('⚠️ [FIREBASE] Falha ao salvar ordem WhatsApp no Firestore:', e.message);
+      });
+    }
 
     // Roteamento Estrito de Portas:
     // - Portas Diárias (8025, 8023, 8024): Diários (24hrs)
@@ -1636,6 +1718,46 @@ function getMbFromValor(valor) {
   return match ? match.mb : null;
 }
 
+function getValorFromMb(mb, modo = 'diario') {
+  if (!mb || isNaN(mb) || mb <= 0) return 0;
+  const numMb = Number(mb);
+  const m = String(modo || 'diario').toLowerCase().trim();
+
+  try {
+    const cfg = require('./bot_config.js');
+    const tabelas = cfg.TABELAS || {};
+    let tab = tabelas['24hrs'];
+    if (m === 'semanal') tab = tabelas['semanal'];
+    else if (m === 'mensal') tab = tabelas['mensal'];
+    else if (m === 'ilimitado') tab = tabelas['ilimitado'];
+
+    if (tab) {
+      for (const [valorStr, plan] of Object.entries(tab)) {
+        const pMb = plan.quantidade_mb || plan.quantidade;
+        if (pMb === numMb) return Number(valorStr);
+      }
+      let closestVal = 0;
+      let closestDiff = Infinity;
+      for (const [valorStr, plan] of Object.entries(tab)) {
+        const pMb = plan.quantidade_mb || plan.quantidade;
+        const diff = Math.abs(pMb - numMb);
+        if (diff < closestDiff) {
+          closestDiff = diff;
+          closestVal = Number(valorStr);
+        }
+      }
+      if (closestVal > 0 && closestDiff <= numMb * 0.45) return closestVal;
+    }
+  } catch (e) {}
+
+  const exact = PRICE_TABLE.find(p => p.mb === numMb);
+  if (exact) return exact.valor;
+  const match = [...PRICE_TABLE].reverse().find(p => p.mb <= numMb);
+  if (match) return match.valor;
+
+  return Math.max(10, Math.round(numMb * 0.025));
+}
+
 function findAvailablePort() {
   const now = Date.now();
   for (const [port, dev] of Object.entries(inMemoryDevices)) {
@@ -1679,13 +1801,23 @@ app.post('/api/sms/payment', (req, res) => {
     }
 
     // Guardar como processado
-    inMemoryPayments.set(cleanTxnId, {
+    const paymentDoc = {
       txn_id: cleanTxnId,
-      valor,
-      remetente,
+      valor: Number(valor),
+      remetente: String(remetente || ''),
       metodo: metodo || 'mpesa',
-      processedAt: new Date().toISOString()
-    });
+      raw_sms: raw_sms || '',
+      processedAt: new Date().toISOString(),
+      timestamp: Number(timestamp) || Date.now()
+    };
+
+    inMemoryPayments.set(cleanTxnId, paymentDoc);
+
+    if (db) {
+      db.collection('sms_payments').doc(cleanTxnId).set(paymentDoc).catch(e => {
+        console.warn('⚠️ [FIREBASE] Erro ao salvar sms_payments no Firestore:', e.message);
+      });
+    }
 
     // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Comprovativo da Operadora"
     if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
