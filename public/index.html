@@ -107,14 +107,19 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
 .pending-label { color: var(--purple); font-weight: 700; font-size: .7rem; margin-bottom: 4px; }
 
 /* QUEUE & ORDERS */
-.order-item { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: rgba(0,0,0,.25); margin-bottom: 10px; font-size: .82rem; border: 1px solid var(--border); }
+.order-item { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: rgba(0,0,0,.25); margin-bottom: 10px; font-size: .82rem; border: 1px solid var(--border); transition: all 0.2s; }
+.order-item:hover { border-color: rgba(0,240,255,.2); background: rgba(0,0,0,.35); }
 .order-ref { font-family: monospace; color: var(--cyan); font-weight: 700; font-size: .78rem; }
 .order-status { padding: 3px 10px; border-radius: 20px; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
 .status-pending { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
 .status-assigned { background: rgba(168,85,247,.15); color: var(--purple); border: 1px solid rgba(168,85,247,.3); }
+.status-processing { background: rgba(0,240,255,.15); color: var(--cyan); border: 1px solid rgba(0,240,255,.3); }
+.status-waiting_part1 { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
 .status-completed { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
 .status-failed { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
 .status-cancelled { background: rgba(100,116,139,.2); color: #94a3b8; border: 1px solid rgba(100,116,139,.3); }
+.status-expired { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.status-phantom { background: rgba(239,68,68,.25); color: #ff6b6b; border: 1px solid #ef4444; animation: pulse 1.5s infinite; }
 
 /* FORMS */
 .send-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
@@ -239,12 +244,25 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
     <!-- QUEUE & MANUAL SEND -->
     <div class="grid-2">
       <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-list-check"></i> Fila de Pedidos em Tempo Real</div>
-          <button class="btn btn-sm btn-primary" onclick="loadQueue()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary" onclick="loadQueue()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+            <button class="btn btn-sm btn-danger" onclick="clearFailedOrders()" title="Limpar pedidos falhados"><i class="fa-solid fa-trash"></i> Limpar Falhados</button>
+          </div>
         </div>
-        <div class="card" id="queuePanel" style="max-height:480px;overflow-y:auto">
-          <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></div>
+
+        <!-- FILTROS RÁPIDOS DA FILA -->
+        <div id="queueFilterTabs" style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px">
+          <button class="btn btn-sm btn-primary" id="qf-all" onclick="setQueueFilter('all')">📋 Todos (<span id="qc-all">0</span>)</button>
+          <button class="btn btn-sm" id="qf-pending" onclick="setQueueFilter('pending')" style="background:rgba(245,158,11,.15);color:var(--yellow)">⏳ Pendentes (<span id="qc-pending">0</span>)</button>
+          <button class="btn btn-sm" id="qf-active" onclick="setQueueFilter('active')" style="background:rgba(168,85,247,.15);color:var(--purple)">⚡ Activos (<span id="qc-active">0</span>)</button>
+          <button class="btn btn-sm" id="qf-failed" onclick="setQueueFilter('failed')" style="background:rgba(239,68,68,.15);color:var(--red)">❌ Falhados (<span id="qc-failed">0</span>)</button>
+          <button class="btn btn-sm" id="qf-completed" onclick="setQueueFilter('completed')" style="background:rgba(16,185,129,.15);color:var(--green)">✅ Concluídos (<span id="qc-completed">0</span>)</button>
+        </div>
+
+        <div class="card" id="queuePanel" style="max-height:520px;overflow-y:auto;padding:14px">
+          <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i> A carregar fila...</div>
         </div>
       </div>
       
@@ -753,62 +771,146 @@ async function saveSaldoModal() {
 }
 
 // -------------------------------------------------------------------
-// 2. QUEUE WITH RETRY, CHANGE PORT, CANCEL
+// 2. FILA DE PEDIDOS INTELIGENTE COM FILTROS & AÇÕES RÁPIDAS
 // -------------------------------------------------------------------
+let currentQueueFilter = 'all';
+let cachedOrdersData = [];
+
+function setQueueFilter(filter) {
+  currentQueueFilter = filter;
+  const tabs = ['all', 'pending', 'active', 'failed', 'completed'];
+  tabs.forEach(tab => {
+    const btn = document.getElementById('qf-' + tab);
+    if (!btn) return;
+    if (tab === filter) {
+      btn.style.outline = '2px solid var(--cyan)';
+      btn.style.boxShadow = '0 0 12px rgba(0, 240, 255, 0.4)';
+    } else {
+      btn.style.outline = 'none';
+      btn.style.boxShadow = 'none';
+    }
+  });
+  renderQueue();
+}
+
+function renderQueue() {
+  const panel = document.getElementById('queuePanel');
+  if (!panel) return;
+
+  let list = [...cachedOrdersData];
+
+  // Aplicar filtro selecionado
+  if (currentQueueFilter === 'pending') {
+    list = list.filter(o => o.status === 'pending' || o.status === 'waiting_part1');
+  } else if (currentQueueFilter === 'active') {
+    list = list.filter(o => o.status === 'assigned' || o.status === 'processing');
+  } else if (currentQueueFilter === 'failed') {
+    list = list.filter(o => o.status === 'failed' || o.status === 'expired' || o.status === 'cancelled');
+  } else if (currentQueueFilter === 'completed') {
+    list = list.filter(o => o.status === 'completed');
+  }
+
+  if (list.length === 0) {
+    const filterLabels = {
+      all: 'Nenhum pedido na fila',
+      pending: 'Nenhum pedido pendente',
+      active: 'Nenhum pedido em processamento no momento',
+      failed: 'Nenhum pedido falhado',
+      completed: 'Nenhum pedido concluído recente'
+    };
+    panel.innerHTML = `<div style="text-align:center;color:var(--muted);padding:28px;font-size:.85rem">
+      <i class="fa-solid fa-inbox" style="font-size:1.8rem;margin-bottom:8px;display:block;opacity:0.6"></i>
+      ${filterLabels[currentQueueFilter] || 'Fila vazia'}
+    </div>`;
+    return;
+  }
+
+  panel.innerHTML = list.map(o => {
+    const oid = o.orderId || o.id || o.ref || '?';
+    const shortRef = oid.length > 14 ? '...' + oid.slice(-12) : oid;
+    const st = o.status || 'pending';
+    const qty = Number(o.quantidade) || 0;
+    const vol = o.volume || (qty < 1024 ? qty + 'MB' : (qty / 1024).toFixed(1) + 'GB');
+    const hora = o.createdAt ? new Date(o.createdAt).toLocaleTimeString('pt-PT') : '';
+    const porta = o.porta || o.assignedToPort || o.targetPort ? `Porta ${o.porta || o.assignedToPort || o.targetPort}` : 'Sem porta fixa';
+    const splitInfo = o.isSplit ? `<span style="background:rgba(168,85,247,0.2);color:var(--purple);padding:2px 6px;border-radius:4px;font-size:0.68rem;font-weight:700">Split P${o.splitPart || 1}</span>` : '';
+    const isPhantom = o.fantasma;
+
+    let statusBadgeClass = `status-${st}`;
+    let statusLabel = st;
+    if (st === 'pending') statusLabel = '⏳ Pendente';
+    else if (st === 'assigned' || st === 'processing') statusLabel = isPhantom ? '⚠️ Travado (>5m)' : '⚡ Processando';
+    else if (st === 'completed') statusLabel = '✅ Concluído';
+    else if (st === 'failed') statusLabel = '❌ Falhado';
+    else if (st === 'waiting_part1') statusLabel = '⏳ Aguardando P1';
+    else if (st === 'cancelled') statusLabel = '🚫 Cancelado';
+    else if (st === 'expired') statusLabel = '⌛ Expirado';
+
+    const errorMsg = (o.erro || o.lastError) ? `
+      <div style="background:rgba(239,68,68,0.12);border-left:3px solid var(--red);padding:6px 10px;border-radius:4px;color:#fca5a5;font-size:.73rem;margin-top:6px;font-weight:500;word-break:break-word">
+        <i class="fa-solid fa-circle-exclamation" style="margin-right:4px"></i> <b>Motivo:</b> ${o.erro || o.lastError}
+      </div>` : '';
+
+    const actions = `
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="retryOrder('${oid}')" title="Repetir e despachar novamente"><i class="fa-solid fa-rotate-right"></i> Repetir</button>
+        <button class="btn btn-warn btn-sm" onclick="changeOrderPort('${oid}')" title="Trocar porta do celular"><i class="fa-solid fa-arrow-right-arrow-left"></i> Trocar Porta</button>
+        ${(st !== 'cancelled' && st !== 'completed') ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder('${oid}')" title="Cancelar pedido"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
+        <button class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--muted)" onclick="deleteOrder('${oid}')" title="Remover da lista"><i class="fa-solid fa-trash-can"></i></button>
+      </div>`;
+
+    return `
+      <div class="order-item" style="${isPhantom ? 'border:1px solid #ef4444;background:rgba(239,68,68,0.06)' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="order-ref" title="${oid}">${shortRef}</span>
+            <span style="font-size:.7rem;color:var(--muted)">${hora}</span>
+            ${splitInfo}
+          </div>
+          <span class="order-status ${statusBadgeClass}">${statusLabel}</span>
+        </div>
+        <div style="margin-top:4px;font-size:.84rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <div>
+            <b>📲 ${o.numero || '?'}</b> • <span style="color:var(--cyan);font-weight:700">${vol}</span> • <span style="color:var(--muted);text-transform:capitalize">${o.modo || 'diario'}</span>
+          </div>
+          <span style="font-size:0.75rem;background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:6px;color:var(--muted)">
+            <i class="fa-solid fa-mobile-screen" style="font-size:0.7rem;margin-right:3px"></i> ${porta}
+          </span>
+        </div>
+        ${errorMsg}
+        ${actions}
+      </div>`;
+  }).join('');
+}
+
 async function loadQueue() {
   try {
-    const d = await fetchAPI('/api/orders');
-    const orders = d.orders || d || [];
-    allOrders = Array.isArray(orders) ? orders : Object.values(orders);
-    const panel = document.getElementById('queuePanel');
-    
-    if (allOrders.length === 0) {
-      panel.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:.85rem"><i class="fa-solid fa-inbox" style="font-size:1.6rem;margin-bottom:8px;display:block"></i>Fila vazia no momento</div>';
-      document.getElementById('mPending').textContent = '0';
-      return;
-    }
-    
-    panel.innerHTML = allOrders.map(o => {
-      const oid = o.orderId || o.id || '?';
-      const st = o.status || 'pending';
-      const qty = o.quantidade || 0;
-      const vol = qty < 1024 ? qty+'MB' : (qty/1024).toFixed(1)+'GB';
-      const hora = o.createdAt ? new Date(o.createdAt).toLocaleTimeString('pt-PT') : '';
-      const porta = o.assignedToPort || o.targetPort ? `(Porta ${o.assignedToPort || o.targetPort})` : '';
-      
-      const errorMsg = o.lastError ? `
-        <div style="color:var(--red);font-size:.73rem;margin-top:4px;font-weight:500">
-          <i class="fa-solid fa-circle-exclamation"></i> ${o.lastError}
-        </div>` : '';
+    const d = await fetchAPI('/api/orders?all=true');
+    const all = d.all_orders || d.orders || (Array.isArray(d) ? d : Object.values(d)) || [];
+    cachedOrdersData = Array.isArray(all) ? all : [];
 
-      const actions = `
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="retryOrder('${oid}')" title="Repetir e colocar na fila"><i class="fa-solid fa-rotate-right"></i> Repetir</button>
-          <button class="btn btn-warn btn-sm" onclick="changeOrderPort('${oid}')" title="Mudar porta"><i class="fa-solid fa-arrow-right-arrow-left"></i> Mudar Porta</button>
-          ${st !== 'cancelled' ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder('${oid}')" title="Cancelar pedido"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
-        </div>`;
+    // Estatísticas dos botões de filtro
+    const sum = d.summary || {};
+    const totalCount = sum.total !== undefined ? sum.total : cachedOrdersData.length;
+    const pendingCount = (sum.pendentes || 0) + (sum.aguardando || 0) || cachedOrdersData.filter(o => o.status === 'pending' || o.status === 'waiting_part1').length;
+    const activeCount = sum.activos !== undefined ? sum.activos : cachedOrdersData.filter(o => o.status === 'assigned' || o.status === 'processing').length;
+    const failedCount = (sum.falhados || 0) + (sum.expirados || 0) || cachedOrdersData.filter(o => o.status === 'failed' || o.status === 'expired' || o.status === 'cancelled').length;
+    const completedCount = sum.concluidos !== undefined ? sum.concluidos : cachedOrdersData.filter(o => o.status === 'completed').length;
 
-      return `
-        <div class="order-item">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <span class="order-ref">${oid.slice(-14)}</span>
-              <span style="font-size:.7rem;color:var(--muted);margin-left:6px">${hora}</span>
-            </div>
-            <span class="order-status status-${st}">${st}</span>
-          </div>
-          <div style="margin-top:2px;font-size:.84rem">
-            <b>📲 ${o.numero || '?'}</b> • <b>${vol}</b> • <span style="color:var(--cyan)">${o.modo || 'diario'}</span> ${porta}
-          </div>
-          ${errorMsg}
-          ${actions}
-        </div>`;
-    }).join('');
-    
-    const pending = allOrders.filter(o => o.status === 'pending').length;
-    document.getElementById('mPending').textContent = pending;
+    const elAll = document.getElementById('qc-all'); if (elAll) elAll.textContent = totalCount;
+    const elPending = document.getElementById('qc-pending'); if (elPending) elPending.textContent = pendingCount;
+    const elActive = document.getElementById('qc-active'); if (elActive) elActive.textContent = activeCount;
+    const elFailed = document.getElementById('qc-failed'); if (elFailed) elFailed.textContent = failedCount;
+    const elCompleted = document.getElementById('qc-completed'); if (elCompleted) elCompleted.textContent = completedCount;
+
+    // Métricas topo
+    const mPend = document.getElementById('mPending');
+    if (mPend) mPend.textContent = pendingCount + activeCount;
+
+    renderQueue();
   } catch(e) {
-    document.getElementById('queuePanel').innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;font-size:.85rem">Erro: ' + e.message + '</div>';
+    const panel = document.getElementById('queuePanel');
+    if (panel) panel.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;font-size:.85rem">Erro ao carregar fila: ' + e.message + '</div>';
   }
 }
 
@@ -840,27 +942,55 @@ async function cancelOrder(orderId) {
   } catch(e) { toast('Erro ao cancelar: ' + e.message, 'err'); }
 }
 
+async function deleteOrder(orderId) {
+  try {
+    const d = await fetchAPI('/api/orders/' + orderId, { method: 'DELETE' });
+    if (d.success) {
+      toast('Pedido removido da lista.', 'ok');
+      await loadQueue();
+    }
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
 async function changeOrderPort(orderId) {
-  const p = prompt('Digite a porta para onde deseja enviar este pedido:\n(Exemplos: 8023, 8024, 8077, 8777)');
+  const p = prompt('Digite a porta para onde deseja transferir este pedido:\n(Exemplos: 8023, 8024, 8077, 8777)');
   if (!p) return;
   const portNum = parseInt(p.trim());
   if (isNaN(portNum)) { alert('Porta inválida!'); return; }
   await retryOrder(orderId, portNum);
 }
 
+async function clearFailedOrders() {
+  if (!confirm('Deseja limpar todos os pedidos com status FALHADO / CANCELADO?')) return;
+  try {
+    const d = await fetchAPI('/api/orders/clear', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'failed' })
+    });
+    toast(`✅ ${d.cleared || 0} pedidos falhados limpos.`, 'ok');
+    await loadQueue();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
 async function clearQueue() {
   if (!confirm('Confirma limpar TODA a fila de pedidos da nuvem?')) return;
   try {
-    await fetchAPI('/api/orders/clear', { method: 'POST' });
-    toast('Fila limpa com sucesso!', 'ok');
+    const d = await fetchAPI('/api/orders/clear', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'all' })
+    });
+    toast(`✅ Fila limpa: ${d.cleared || 0} pedidos removidos.`, 'ok');
     await loadQueue();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
 
 async function clearCompletedQueue() {
   try {
-    await fetchAPI('/api/orders/clear', { method: 'POST' });
-    toast('Pedidos limpos com sucesso!', 'ok');
+    const d = await fetchAPI('/api/orders/clear', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'finalized' })
+    });
+    toast(`✅ ${d.cleared || 0} pedidos concluídos limpos.`, 'ok');
     await loadQueue();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }

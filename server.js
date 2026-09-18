@@ -1188,17 +1188,21 @@ app.get('/api/orders', (req, res) => {
   };
 
   if (showAll) {
-    return res.json({ success: true, summary, active, pending, waiting, completed, failed, expired });
+    return res.json({ success: true, summary, orders: allOrders, active, pending, waiting, completed, failed, expired, phantoms });
   }
 
-  // Por defeito: mostrar apenas os que precisam de atenção
+  // Por defeito: mostrar ativos, pendentes, aguardando e falhados
+  const displayOrders = [...active, ...pending, ...waiting, ...failed.slice(0, 10)];
   return res.json({
     success: true,
     summary,
+    orders: displayOrders,
+    all_orders: allOrders,
     active,      // Em processamento agora
     pending,     // À espera de celular
     waiting,     // À espera da parte 1 (split)
-    failed: failed.slice(0, 5),   // Últimos 5 falhados
+    completed: completed.slice(0, 10),
+    failed: failed.slice(0, 10),   // Últimos falhados
     phantoms     // Pedidos potencialmente travados (>5min sem resultado)
   });
 });
@@ -1259,15 +1263,27 @@ app.post(['/api/orders/:orderId/cancel', '/api/orders/:orderId/cancelar'], (req,
 });
 
 app.post('/api/orders/clear', (req, res) => {
+  const type = (req.body && req.body.type) || req.query.type || 'finalized';
   let cleared = 0;
   for (const [id, order] of inMemoryOrders.entries()) {
-    if (order.status === 'completed' || order.status === 'cancelled') {
+    if (type === 'all') {
       inMemoryOrders.delete(id);
       cleared++;
+    } else if (type === 'failed') {
+      if (order.status === 'failed' || order.status === 'cancelled' || order.status === 'expired') {
+        inMemoryOrders.delete(id);
+        cleared++;
+      }
+    } else {
+      // finalized / default
+      if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'expired') {
+        inMemoryOrders.delete(id);
+        cleared++;
+      }
     }
   }
   saveOrdersToCache();
-  console.log(`🧹 [PAINEL] Fila limpa: ${cleared} pedidos finalizados removidos.`);
+  console.log(`🧹 [PAINEL] Fila limpa (${type}): ${cleared} pedidos removidos.`);
   return res.json({ success: true, cleared, remaining: inMemoryOrders.size });
 });
 
