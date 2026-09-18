@@ -94,15 +94,70 @@ async function handleTransfer(req, res) {
       return res.status(400).json({ success: false, status: 'erro', mensagem: 'Número obrigatório' });
     }
 
-    const orderId = request_id || `ORD-${Date.now()}-${uuidv4().substring(0, 8)}`;
+    const numLimpo = String(numero).replace(/\D/g, '');
+    const orderId = (request_id || req.body.ref || req.body.id || `ORD-${Date.now()}-${uuidv4().substring(0, 8)}`).trim();
     const timestamp = new Date().toISOString();
     const qtyMb = Number(quantidade) || Number(req.body.input_val) || 0;
     const valPago = Number(req.body.valor) || Number(req.body.valor_pago) || getValorFromMb(qtyMb, modo);
 
+    // ── 1. PROTEÇÃO CONTRA DUPLICAÇÃO POR REFERÊNCIA / ID ──
+    if (inMemoryOrders.has(orderId)) {
+      const existing = inMemoryOrders.get(orderId);
+      if (existing.status === 'completed' || existing.status === 'sucesso') {
+        console.warn(`🛡️ [DEDUPLICAÇÃO] Pedido com referência ${orderId} já foi CONCLUÍDO. Bloqueando duplicação.`);
+        return res.status(200).json({
+          status: 'concluido',
+          success: true,
+          duplicado: true,
+          orderId,
+          mensagem: `Este pedido com a referência ${orderId} já foi atendido e concluído anteriormente!`
+        });
+      }
+      if (existing.status === 'assigned' || existing.status === 'processing' || existing.status === 'pending') {
+        console.warn(`🛡️ [DEDUPLICAÇÃO] Pedido com referência ${orderId} já está na fila (${existing.status}). Ignorando duplicação.`);
+        return res.status(200).json({
+          status: 'processando',
+          success: true,
+          duplicado: true,
+          orderId,
+          mensagem: `Este pedido (${orderId}) já está na fila e a ser atendido!`
+        });
+      }
+    }
+
+    // ── 2. PROTEÇÃO CONTRA DUPLICAÇÃO POR NÚMERO + VOLUME RECENTE (15 min) ──
+    const nowMs = Date.now();
+    for (const [existingId, o] of inMemoryOrders.entries()) {
+      if (existingId !== orderId && o.numero === numLimpo && Number(o.quantidade) === qtyMb) {
+        const orderAgeMs = nowMs - new Date(o.createdAt || 0).getTime();
+        if ((o.status === 'completed' || o.status === 'sucesso') && orderAgeMs < 15 * 60 * 1000) {
+          const mins = Math.max(1, Math.round(orderAgeMs / 60000));
+          console.warn(`🛡️ [DEDUPLICAÇÃO] O número ${numLimpo} já recebeu ${qtyMb}MB há ${mins}m (Ref: ${existingId}). Bloqueando envio duplicado.`);
+          return res.status(200).json({
+            status: 'concluido',
+            success: true,
+            duplicado: true,
+            orderId: existingId,
+            mensagem: `O número ${numLimpo} já recebeu este pacote de ${qtyMb}MB há ${mins} minuto(s) (Ref: ${existingId}). Pedido já foi atendido!`
+          });
+        }
+        if ((o.status === 'pending' || o.status === 'assigned' || o.status === 'processing') && orderAgeMs < 15 * 60 * 1000) {
+          console.warn(`🛡️ [DEDUPLICAÇÃO] Pedido idêntico em andamento para ${numLimpo} (${qtyMb}MB). Ignorando.`);
+          return res.status(200).json({
+            status: 'processando',
+            success: true,
+            duplicado: true,
+            orderId: existingId,
+            mensagem: `Já existe um pedido idêntico para ${numLimpo} (${qtyMb}MB) a ser processado na fila!`
+          });
+        }
+      }
+    }
+
     const orderDoc = {
       orderId,
       id: orderId,
-      numero: String(numero).replace(/\D/g, ''),
+      numero: numLimpo,
       quantidade: qtyMb,
       valor: valPago,
       valor_pago: valPago,
