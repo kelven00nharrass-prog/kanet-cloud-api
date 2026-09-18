@@ -1609,13 +1609,16 @@ app.post('/api/sms/payment', (req, res) => {
       });
     }
 
+    let cleanTxnId = String(txn_id || '').trim().toUpperCase();
+    if (cleanTxnId.endsWith('.')) cleanTxnId = cleanTxnId.slice(0, -1);
+
     // Anti-fraude: verificar duplicação
-    if (inMemoryPayments.has(txn_id)) {
-      console.warn(`⚠️ [SMS PAYMENT] Transação duplicada ignorada: ${txn_id}`);
+    if (inMemoryPayments.has(cleanTxnId)) {
+      console.warn(`⚠️ [SMS PAYMENT] Transação duplicada ignorada: ${cleanTxnId}`);
       return res.json({
         success: false,
         duplicado: true,
-        mensagem: `Transação ${txn_id} já foi processada`
+        mensagem: `Transação ${cleanTxnId} já foi processada`
       });
     }
 
@@ -1626,8 +1629,8 @@ app.post('/api/sms/payment', (req, res) => {
     }
 
     // Guardar como processado
-    inMemoryPayments.set(txn_id, {
-      txn_id,
+    inMemoryPayments.set(cleanTxnId, {
+      txn_id: cleanTxnId,
       valor,
       remetente,
       metodo: metodo || 'mpesa',
@@ -1636,7 +1639,7 @@ app.post('/api/sms/payment', (req, res) => {
 
     // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Comprovativo da Operadora"
     if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
-      baileysEngine.registrarSmsPayment({ txn_id, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
+      baileysEngine.registrarSmsPayment({ txn_id: cleanTxnId, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
     }
 
     // Determinar quantos MB enviar

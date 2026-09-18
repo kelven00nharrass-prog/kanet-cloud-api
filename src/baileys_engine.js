@@ -654,19 +654,58 @@ const pendingPayments = new Map(); // chave: jid + ":" + senderNumber
 
 function extrairValorMT(texto) {
     if (!texto) return null;
-    const mTransf = texto.match(/Transferiste\s+([\d.,]+)\s*MT/i);
+    const mTransf = texto.match(/Transferiste\s+([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
     if (mTransf) return mTransf[1].replace(/\s/g, '').replace(',', '.');
-    const mReceb = texto.match(/Recebeste\s+([\d.,]+)\s*MT/i);
+    const mReceb = texto.match(/(?:Recebeste|Recebeu|Creditado|Depositado)\s+([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
     if (mReceb) return mReceb[1].replace(/\s/g, '').replace(',', '.');
-    const mRec = texto.match(/Recebeu\s+([\d.,]+)\s*MT/i);
-    if (mRec) return mRec[1].replace(/\s/g, '').replace(',', '.');
-    const mGeral = texto.match(/([\d.,]+)\s*MT\b/i);
+    const mValor = texto.match(/Valor\s*[:.]?\s*([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
+    if (mValor) return mValor[1].replace(/\s/g, '').replace(',', '.');
+    const mGeral = texto.match(/([\d.,]+)\s*(?:MT|MZN|Mts?)\b/i);
     if (mGeral) return mGeral[1].replace(/\s/g, '').replace(',', '.');
     return null;
 }
 
 function extrairTxId(texto) {
     if (!texto) return null;
+
+    // 1. Padrão explícito com label de ID/Transação/Ref (MÁXIMA PRIORIDADE - 100% certeiro)
+    // Cobre: 'ID da transacao: PP251205.2043.k61611', 'ID da transacao PP...', 'ID Trans: PP260819.0642.B03818', 'Ref: DHJ4L92EBZW', 'TxId: ...'
+    const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[cç][aã]o|ID\s*Trans(?:a[cç][aã]o)?|TxId|Ref(?:er[eê]ncia)?|Transa[cç][aã]o(?:\s*N[oº.]?)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
+    if (mExplicit && mExplicit[1]) {
+        let cand = mExplicit[1].toUpperCase().trim();
+        if (cand.endsWith('.')) cand = cand.slice(0, -1);
+        if (!/^(258)?8[2-7]\d{7}$/.test(cand) && cand.length >= 6) {
+            return cand;
+        }
+    }
+
+    // 2. Padrão específico e-Mola / Vodacom PP: PP + 6 dígitos data + 4 dígitos hora + código alfanumérico
+    // Ex: PP260818.1138.924955, PP251205.2043.k61611, PP260819.0642.B03818
+    const mPP = texto.match(/\b(PP[0-9]{6}\.[0-9]{4}\.[A-Z0-9]{4,8})\b/i);
+    if (mPP && mPP[1]) {
+        let cand = mPP[1].toUpperCase().trim();
+        if (cand.endsWith('.')) cand = cand.slice(0, -1);
+        return cand;
+    }
+
+    // 3. Padrão específico M-Pesa com 'Confirmado [CODE]' (ex: Confirmado DHJ4L92EBZW, Confirmado DHI4L8VY3SO)
+    const mConf = texto.match(/Confirmado\s+([A-Z0-9]{8,15})\b/i);
+    if (mConf && mConf[1]) {
+        const c = mConf[1].toUpperCase().trim();
+        if (!/^(258)?8[2-7]\d{7}$/.test(c)) return c;
+    }
+
+    // 4. Padrão alfanumérico padrão M-Pesa (10 a 12 caracteres com letras e números misturados)
+    const mAlphanum = texto.match(/\b([A-Z][A-Z0-9]{9,12})\b/);
+    if (mAlphanum && mAlphanum[1]) {
+        const c = mAlphanum[1].toUpperCase().trim();
+        const commonIgnored = ['CONFIRMADO', 'TRANSFERISTE', 'RECEBESTE', 'NOTIFICACAO', 'COMPROVATIVO', 'AUTOMATICA'];
+        if (!commonIgnored.includes(c) && /[0-9]/.test(c)) {
+            return c;
+        }
+    }
+
+    // 5. Fallback geral original aperfeiçoado
     const commonWords = [
         'CONFIRMADO', 'RECEBESTE', 'TRANSFERISTE', 'RECEBEU', 'SALDO', 'VODACOM', 'MOVITEL',
         'EMOLA', 'MPESA', 'PAGAMENTO', 'OPERADORA', 'CONTA', 'VALOR', 'AUTOMATICAMENTE',
@@ -678,7 +717,8 @@ function extrairTxId(texto) {
     let results = [];
     
     while ((match = regex.exec(texto)) !== null) {
-        const ref = match[1].toUpperCase();
+        let ref = match[1].toUpperCase().trim();
+        if (ref.endsWith('.')) ref = ref.slice(0, -1);
         if (commonWords.includes(ref)) continue;
         if (/^(258)?(8[2-7]\d{7})$/.test(ref)) continue; // telefone, ignora
         if (/^8[2-7]X+$/i.test(ref)) continue; // exemplo de máscara como 84XXXXXXX
@@ -686,9 +726,10 @@ function extrairTxId(texto) {
         const temLetra = /[A-Z]/.test(ref);
         const temNumero = /[0-9]/.test(ref);
         
-        // Códigos reais de M-Pesa/e-Mola DEVEM conter letras E números misturados (ex: DIG0LLRIZ76, PP24...)
         if (temLetra && temNumero) {
             results.push({ val: ref, score: 100 });
+        } else if (ref.length >= 8 && temNumero) {
+            results.push({ val: ref, score: 50 });
         }
     }
     
@@ -698,8 +739,8 @@ function extrairTxId(texto) {
 
 function isComprovativo(texto) {
     if (!texto) return false;
-    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|Transf|e-Mola|M-Pesa|TxId|Transação|Transacao)/i.test(texto);
-    const temValor = /[\d.,]+\s*MT\b/i.test(texto);
+    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|Transf|e-Mola|eMola|M-Pesa|MPesa|TxId|Transação|Transacao|ID\s*(?:da)?\s*transa|ID\s*Trans|PP2\d{5})/i.test(texto);
+    const temValor = /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(texto);
     return temIndicador && temValor;
 }
 
@@ -1604,7 +1645,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (isComprovativo(text)) {
                         const valor = extrairValorMT(text);
                         const txn_id = extrairTxId(text);
-                        const metodo = /e-mola|emola|TX[A-Z0-9]/i.test(text) ? 'emola' : 'mpesa';
+                        const metodo = /e-mola|emola|movitel|864882152|catia|TX[A-Z0-9]/i.test(text) ? 'emola' : 'mpesa';
                         const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
                         // ── REGRA 1: SEGURANÇA MÁXIMA ANTI-DUPLICAÇÃO E LOCK EXCLUSIVO ──
@@ -2152,13 +2193,14 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
  */
 function registrarSmsPayment({ txn_id, valor, remetente, metodo, raw_sms }) {
     if (!txn_id) return;
+    const cleanTxnId = String(txn_id).trim().toUpperCase();
     const vNum = parseFloat(valor);
-    console.log(`💰 [SMS OPERADORA REGISTADO] Ref: ${txn_id} | Valor: ${vNum} MT | Remetente: ${remetente} (${metodo})`);
+    console.log(`💰 [SMS OPERADORA REGISTADO] Ref: ${cleanTxnId} | Valor: ${vNum} MT | Remetente: ${remetente} (${metodo})`);
 
-    const existing = smsPaymentsMap.get(txn_id);
+    const existing = smsPaymentsMap.get(cleanTxnId);
     if (!existing) {
-        smsPaymentsMap.set(txn_id, {
-            txn_id,
+        smsPaymentsMap.set(cleanTxnId, {
+            txn_id: cleanTxnId,
             valor: vNum,
             remetente: remetente || '',
             metodo: metodo || 'mpesa',
@@ -2170,15 +2212,15 @@ function registrarSmsPayment({ txn_id, valor, remetente, metodo, raw_sms }) {
     }
 
     // Se houver algum cliente aguardando no status "Aguardando Comprovativo da Operadora":
-    if (aguardandoOperadora.has(txn_id)) {
-        const item = aguardandoOperadora.get(txn_id);
-        aguardandoOperadora.delete(txn_id);
+    if (aguardandoOperadora.has(cleanTxnId)) {
+        const item = aguardandoOperadora.get(cleanTxnId);
+        aguardandoOperadora.delete(cleanTxnId);
         if (item.timer) {
             clearTimeout(item.timer);
             item.timer = null;
         }
 
-        console.log(`🎉 [OPERADORA VALIDOU] Cliente ${item.senderNumber} estava aguardando ref ${txn_id}. Processando imediatamente!`);
+        console.log(`🎉 [OPERADORA VALIDOU] Cliente ${item.senderNumber} estava aguardando ref ${cleanTxnId}. Processando imediatamente!`);
         processarPedidoAguardandoConfirmado(item, vNum, metodo || item.metodo);
     }
 }
