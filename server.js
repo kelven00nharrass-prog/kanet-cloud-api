@@ -125,33 +125,22 @@ async function handleTransfer(req, res) {
       }
     }
 
-    // ── 2. PROTEÇÃO CONTRA DUPLICAÇÃO POR NÚMERO + VOLUME RECENTE (15 min) ──
-    const nowMs = Date.now();
-    for (const [existingId, o] of inMemoryOrders.entries()) {
-      if (existingId !== orderId && o.numero === numLimpo && Number(o.quantidade) === qtyMb) {
-        const orderAgeMs = nowMs - new Date(o.createdAt || 0).getTime();
-        if ((o.status === 'completed' || o.status === 'sucesso') && orderAgeMs < 15 * 60 * 1000) {
-          const mins = Math.max(1, Math.round(orderAgeMs / 60000));
-          console.warn(`🛡️ [DEDUPLICAÇÃO] O número ${numLimpo} já recebeu ${qtyMb}MB há ${mins}m (Ref: ${existingId}). Bloqueando envio duplicado.`);
+    // ── 2. PROTEÇÃO DE REFERÊNCIA NO CACHE PERSISTENTE (caso o servidor tenha reiniciado) ──
+    if (fs.existsSync(ORDERS_CACHE_FILE)) {
+      try {
+        const cachedList = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
+        const found = cachedList.find(([k, v]) => k === orderId);
+        if (found && (found[1].status === 'completed' || found[1].status === 'sucesso')) {
+          console.warn(`🛡️ [DEDUPLICAÇÃO CACHE] Referência ${orderId} já consta como CONCLUÍDA.`);
           return res.status(200).json({
             status: 'concluido',
             success: true,
             duplicado: true,
-            orderId: existingId,
-            mensagem: `O número ${numLimpo} já recebeu este pacote de ${qtyMb}MB há ${mins} minuto(s) (Ref: ${existingId}). Pedido já foi atendido!`
+            orderId,
+            mensagem: `Este pedido com a referência ${orderId} já foi atendido e concluído anteriormente!`
           });
         }
-        if ((o.status === 'pending' || o.status === 'assigned' || o.status === 'processing') && orderAgeMs < 15 * 60 * 1000) {
-          console.warn(`🛡️ [DEDUPLICAÇÃO] Pedido idêntico em andamento para ${numLimpo} (${qtyMb}MB). Ignorando.`);
-          return res.status(200).json({
-            status: 'processando',
-            success: true,
-            duplicado: true,
-            orderId: existingId,
-            mensagem: `Já existe um pedido idêntico para ${numLimpo} (${qtyMb}MB) a ser processado na fila!`
-          });
-        }
-      }
+      } catch(e) {}
     }
 
     const orderDoc = {
@@ -1047,31 +1036,34 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.failedPorts = order.failedPorts || [];
         if (!order.failedPorts.includes(port)) order.failedPorts.push(port);
 
-        // Se falhou menos de 5 vezes, MANTÉM COMO 'pending' para que outra porta disponível
-        // ou o mesmo celular após trocar de cartão/abrir Slim SIM pegue o pedido automaticamente!
-        if (order.retryCount < 5) {
+        // 🛡️ PROTEÇÃO ANTI-DUPLICAÇÃO FINANCEIRA:
+        // Apenas repassar para outra porta se o celular reportou que NÃO TINHA SALDO ou limite atingido.
+        // NUNCA fazer reenvio automático se o celular chegou a discar USSD e deu timeout ou falha de leitura,
+        // pois a Vodacom frequentemente conclui o envio mesmo com timeout! Reenvio só manual pelo operador.
+        const errorLower = errorMsg.toLowerCase();
+        const isSaldoError = errorLower.includes('saldo') || errorLower.includes('limite') || errorLower.includes('inapto') || errorLower.includes('insuficiente');
+
+        if (isSaldoError && order.retryCount < 3) {
           order.status = 'pending';
           order.assignedToPort = null;
           order.processingAt = null;
-          order.targetPort = null; // Permite que qualquer porta compatível pegue
-          // ✅ CRÍTICO: Resetar flags de notificação para que a próxima tentativa bem-sucedida
-          // possa notificar correctamente o cliente e o grupo (evita silêncio após retry).
+          order.targetPort = null;
           order.notified = false;
           order.groupNotified = false;
-          console.log(`🔄 [FAILOVER NUVEM] Pedido ${resId} falhou na Porta ${port} (${errorMsg}). Mantido na fila como PENDENTE para outra porta ou pós-Slim SIM (Tentativa #${order.retryCount})`);
+          console.log(`🔄 [FAILOVER SALDO] Celular ${port} sem saldo para ${resId}. Repassando para porta com saldo (Tentativa #${order.retryCount})`);
         } else {
           order.status = 'failed';
           order.completedAt = new Date().toISOString();
-          console.warn(`🛑 [PEDIDO ESGOTADO] Pedido ${resId} atingiu o limite de 5 tentativas. Marcado como falhado.`);
+          console.warn(`🛑 [PROTEÇÃO ANTI-REPETIÇÃO] Pedido ${resId} marcado como falhado (${errorMsg}) para evitar repetição acidental de saldo. Reenvio apenas se o operador solicitar no painel.`);
 
-          // Se a Parte 1 falhou definitivamente, cancelar a Parte 2
+          // Se a Parte 1 falhou, cancelar a Parte 2
           if (order.isSplit && order.splitPart === 1 && order.part2Id) {
             const part2Order = inMemoryOrders.get(order.part2Id);
             if (part2Order && part2Order.status === 'waiting_part1') {
               part2Order.status = 'cancelled';
               part2Order.completedAt = new Date().toISOString();
-              part2Order.lastError = 'Cancelado devido a falha permanente na Parte 1';
-              console.warn(`🛑 [PARTE 2 CANCELADA] Parte 2 ${part2Order.id} cancelada devido à falha permanente da Parte 1.`);
+              part2Order.lastError = 'Cancelado devido a falha na Parte 1';
+              console.warn(`🛑 [PARTE 2 CANCELADA] Parte 2 ${part2Order.id} cancelada devido à falha da Parte 1.`);
             }
           }
         }
