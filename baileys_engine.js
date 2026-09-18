@@ -1092,9 +1092,16 @@ async function startWhatsApp(orderCallback, db = null) {
         // ── PROCESSADOR DE MENSAGENS ─────────────────────────────
         sock.ev.on('messages.upsert', async (m) => {
             try {
-                if (m.type !== 'notify') return;
+                console.log(`🔍 [DEBUG MSG] type=${m.type} count=${m.messages?.length}`);
+                if (m.type !== 'notify') {
+                    console.log(`⏭️ [DEBUG MSG] Ignorado: type=${m.type} (não é notify)`);
+                    return;
+                }
                 for (const msg of m.messages) {
-                    if (msg.key.fromMe) continue;
+                    if (msg.key.fromMe) {
+                        console.log(`⏭️ [DEBUG MSG] Ignorado: fromMe=true`);
+                        continue;
+                    }
                     const jid = msg.key.remoteJid;
                     if (!jid) continue;
 
@@ -1102,7 +1109,12 @@ async function startWhatsApp(orderCallback, db = null) {
                                  msg.message?.extendedTextMessage?.text ||
                                  msg.message?.imageMessage?.caption || '';
 
-                    if (!text.trim()) continue;
+                    console.log(`📨 [DEBUG MSG] jid=${jid} | text="${text.slice(0,40)}" | fromMe=${msg.key.fromMe}`);
+
+                    if (!text.trim()) {
+                        console.log(`⏭️ [DEBUG MSG] Ignorado: texto vazio`);
+                        continue;
+                    }
 
                     // Candidatos a identificador do remetente (suporte a LID e números alternativos)
                     let realSender = msg.key.participant || msg.participant || msg.key.remoteJidAlt || jid;
@@ -1166,13 +1178,19 @@ async function startWhatsApp(orderCallback, db = null) {
                     // Registar Lead
                     clientesLeads.add(senderNumber);
 
+                    console.log(`🔎 [DEBUG] sender=${senderNumber} | isMaster=${senderIsMaster} | isGrupo=${jid.endsWith('@g.us')} | banido=${banidosSet.has(senderNumber)} | modoManut=${modoManutencao}`);
+
                     // Se estiver banido, ignorar
-                    if (banidosSet.has(senderNumber) && !senderIsMaster) continue;
+                    if (banidosSet.has(senderNumber) && !senderIsMaster) {
+                        console.log(`🚫 [DEBUG] Bloqueado: banido`);
+                        continue;
+                    }
 
                     // Se o grupo estiver fechado (vendas desativadas neste grupo), ignorar silenciosamente
                     const isGrupo = jid.endsWith('@g.us');
                     const gruposFechados = DYN_CFG.GRUPOS_FECHADOS || [];
                     if (isGrupo && gruposFechados.includes(jid) && !senderIsMaster) {
+                        console.log(`🚫 [DEBUG] Bloqueado: grupo fechado`);
                         // Grupo fechado — bot não responde para não-admins
                         continue;
                     }
