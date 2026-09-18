@@ -1161,6 +1161,19 @@ app.post('/api/whatsapp/test-send', async (req, res) => {
 });
 
 
+app.get('/api/whatsapp/recent-logs', (req, res) => {
+  try {
+    const token = req.headers['x-master-token'] || req.query.token;
+    if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
+    if (baileysEngine && typeof baileysEngine.getRecentLogs === 'function') {
+      return res.json({ success: true, logs: baileysEngine.getRecentLogs() });
+    }
+    return res.json({ success: true, logs: [] });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.get('/api/groups', async (req, res) => {
   try {
     // 1. Carregar config do bot para metadados

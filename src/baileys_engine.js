@@ -50,6 +50,13 @@ const transacoesProcessadas = new Set();
 const transacoesProcessadasMap = new Map(); // txn_id -> { sender, jid, status: 'locked'|'completed', valor, timestamp }
 const smsPaymentsMap = new Map(); // txn_id -> { txn_id, valor, remetente, metodo, raw_sms, timestamp, usado: boolean }
 const aguardandoOperadora = new Map(); // txn_id -> { txn_id, valor, metodo, metodoNome, jid, senderNumber, nomeCliente, numDestino, pacote, timestamp, timer }
+const recentLogs = [];
+function addLog(msg) {
+    const entry = `[${new Date().toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo' })}] ${msg}`;
+    console.log(entry);
+    recentLogs.unshift(entry);
+    if (recentLogs.length > 50) recentLogs.pop();
+}
 
 function carregarTransacoes() {
     try {
@@ -999,7 +1006,7 @@ async function restoreConfigsFromFirestore(db) {
 // ══════════════════════════════════════════════════
 async function startWhatsApp(orderCallback, db = null) {
     if (db) firestoreDbInstance = db;
-    orderDispatchCallback = orderCallback;
+    if (orderCallback) orderDispatchCallback = orderCallback;
 
     try {
         if (firestoreDbInstance) {
@@ -1067,7 +1074,10 @@ async function startWhatsApp(orderCallback, db = null) {
                 currentQrBase64 = null;
                 reconnectAttempts = 0; // reset após conexão bem-sucedida
                 connectedUser = sock.user?.id || 'KaNet Cloud Bot';
-                console.log(`✅ [BAILEYS] WhatsApp Conectado com SUCESSO! Logado como: ${connectedUser}`);
+                addLog(`✅ WhatsApp Conectado com SUCESSO! Logado como: ${connectedUser}`);
+                if (firestoreDbInstance) {
+                    backupAuthToFirestore(firestoreDbInstance);
+                }
             }
         });
 
@@ -1103,6 +1113,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                  msg.message?.imageMessage?.caption || '';
 
                     if (!text.trim()) continue;
+
+                    addLog(`📨 [RECEBIDA] JID: ${jid.endsWith('@g.us') ? 'GRUPO' : 'PRIVADO'} (${jid}) | Texto: "${text.slice(0, 50)}"`);
 
                     // Candidatos a identificador do remetente (suporte a LID e números alternativos)
                     let realSender = msg.key.participant || msg.participant || msg.key.remoteJidAlt || jid;
@@ -1166,13 +1178,19 @@ async function startWhatsApp(orderCallback, db = null) {
                     // Registar Lead
                     clientesLeads.add(senderNumber);
 
+                    console.log(`🔎 [DEBUG] sender=${senderNumber} | isMaster=${senderIsMaster} | isGrupo=${jid.endsWith('@g.us')} | banido=${banidosSet.has(senderNumber)} | modoManut=${modoManutencao}`);
+
                     // Se estiver banido, ignorar
-                    if (banidosSet.has(senderNumber) && !senderIsMaster) continue;
+                    if (banidosSet.has(senderNumber) && !senderIsMaster) {
+                        console.log(`🚫 [DEBUG] Bloqueado: banido`);
+                        continue;
+                    }
 
                     // Se o grupo estiver fechado (vendas desativadas neste grupo), ignorar silenciosamente
                     const isGrupo = jid.endsWith('@g.us');
                     const gruposFechados = DYN_CFG.GRUPOS_FECHADOS || [];
                     if (isGrupo && gruposFechados.includes(jid) && !senderIsMaster) {
+                        console.log(`🚫 [DEBUG] Bloqueado: grupo fechado`);
                         // Grupo fechado — bot não responde para não-admins
                         continue;
                     }
@@ -1995,6 +2013,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     ].includes(cleanCmd) || cleanCmd === 'menu' || cleanCmd.startsWith('menu ') || cleanCmd.startsWith('tabela ') || cleanCmd.startsWith('preço') || cleanCmd.startsWith('preco');
 
                     if (ehPedidoMenu) {
+                        addLog(`📋 [RESPONDENDO] Menu/Tabela enviado para ${jid}`);
                         await reply(gerarMenuOriginal(jid));
                         continue;
                     }
@@ -2005,6 +2024,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     ].includes(cleanCmd) || cleanCmd.startsWith('pagamento');
 
                     if (ehPedidoPagamento) {
+                        addLog(`💳 [RESPONDENDO] Formas de Pagamento enviadas para ${jid}`);
                         await reply(gerarMensagemPagamento(nomeCliente));
                         continue;
                     }
@@ -2033,6 +2053,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // Se for mensagem de grupo e não bateu nenhum comando/comprovativo/menu, NÃO RESPONDER NADA!
                     if (isGroupMsg) {
+                        addLog(`ℹ️ [GRUPO DESCARTADO] Sem comando reconhecido: "${cleanCmd}" em ${jid}`);
                         continue;
                     }
 
@@ -2040,6 +2061,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     await reply(gerarMensagemBoasVindas(nomeCliente));
                 }
             } catch (err) {
+                addLog(`❌ [ERRO MSG]: ${err.message}`);
                 console.error('❌ [BAILEYS MSG ERROR]:', err);
             }
         });
@@ -2287,6 +2309,7 @@ module.exports = {
     smsPaymentsMap,
     aguardandoOperadora,
     limparDuplicatasTabelas,
-    salvarBotConfig
+    salvarBotConfig,
+    getRecentLogs: () => recentLogs
 };
 
