@@ -1295,6 +1295,223 @@ app.delete('/api/orders/:orderId', (req, res) => {
   return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido não encontrado.' });
 });
 
+// ── CONTROLE REMOTO ADB & WEBADB / SCRCPY BRIDGE ──
+const ADB_DEVICE_MAP = {
+  '8024': { serial: 'DWH9X17405W12389', name: 'Huawei DIG-L21 (SIM 2)', width: 720, height: 1280, defaultSim: 2 },
+  '8077': { serial: 'WOZTG6X455DMXG99', name: 'Xiaomi M2006C3LG (Movitel)', width: 720, height: 1600, defaultSim: 1 },
+  '8023': { serial: '192.168.43.190:5555', name: 'Huawei DIG-L21 (SIM 1)', width: 720, height: 1280, defaultSim: 1 },
+  '8777': { serial: '192.168.43.192:5555', name: 'Celular 8777 (Saldo/M-Pesa)', width: 720, height: 1280, defaultSim: 1 }
+};
+
+const SCRCPY_PATHS = [
+  'C:\\Users\\Kelven\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Genymobile.scrcpy_Microsoft.Winget.Source_8wekyb3d8bbwe\\scrcpy-win64-v4.1\\scrcpy.exe',
+  'D:\\Kelven\\KaNet\\Kelven System\\scrcpy-win64-v2.4\\scrcpy.exe',
+  'scrcpy'
+];
+
+function getScrcpyExecutable() {
+  for (const p of SCRCPY_PATHS) {
+    if (fs.existsSync(p)) return p;
+  }
+  return 'scrcpy';
+}
+
+function resolveDeviceConfig(portOrSerial) {
+  const pStr = String(portOrSerial).trim();
+  if (ADB_DEVICE_MAP[pStr]) return { port: pStr, ...ADB_DEVICE_MAP[pStr] };
+  for (const [p, dev] of Object.entries(ADB_DEVICE_MAP)) {
+    if (dev.serial === pStr) return { port: p, ...dev };
+  }
+  return { port: pStr, serial: pStr, name: `Celular (${pStr})`, width: 720, height: 1280 };
+}
+
+// 1. Listar celulares disponíveis para controle remoto
+app.get('/api/remote/devices', (req, res) => {
+  exec('adb devices -l', (err, stdout, stderr) => {
+    const lines = stdout ? stdout.split('\n').filter(l => l.includes('device product:')) : [];
+    const connectedSerials = new Set();
+    lines.forEach(l => {
+      const parts = l.trim().split(/\s+/);
+      if (parts[0]) connectedSerials.add(parts[0]);
+    });
+
+    const devices = Object.entries(ADB_DEVICE_MAP).map(([port, dev]) => {
+      const isAdbOnline = connectedSerials.has(dev.serial);
+      const inMem = inMemoryDevices[port] || {};
+      return {
+        port: Number(port),
+        name: dev.name,
+        serial: dev.serial,
+        width: dev.width,
+        height: dev.height,
+        adbOnline: isAdbOnline,
+        cloudOnline: !!inMem.online,
+        isApto: inMem.is_apto !== false,
+        saldo_mb: inMem.saldo_mb || 0,
+        activeSim: inMem.active_sim || dev.defaultSim || 1
+      };
+    });
+
+    return res.json({ success: true, devices });
+  });
+});
+
+// 2. Captura de tela sob demanda (JPEG/PNG)
+app.get('/api/remote/:port/screen', (req, res) => {
+  const { port } = req.params;
+  const dev = resolveDeviceConfig(port);
+
+  const adbCmd = `adb -s ${dev.serial} exec-out screencap -p`;
+  exec(adbCmd, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    if (err || !stdout || stdout.length === 0) {
+      return res.status(500).json({ success: false, mensagem: `Falha ao capturar ecrã do celular (${dev.serial}): ${err ? err.message : 'Buffer vazio'}` });
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    return res.send(stdout);
+  });
+});
+
+// 3. Toque na tela (Tap)
+app.post('/api/remote/:port/touch', (req, res) => {
+  const { port } = req.params;
+  const dev = resolveDeviceConfig(port);
+  const { x, y, width, height } = req.body;
+
+  if (x === undefined || y === undefined) {
+    return res.status(400).json({ success: false, mensagem: 'Coordenadas (x, y) obrigatórias.' });
+  }
+
+  let realX = Math.round(x);
+  let realY = Math.round(y);
+  if (width && height && width > 0 && height > 0) {
+    realX = Math.round((x / width) * dev.width);
+    realY = Math.round((y / height) * dev.height);
+  }
+
+  exec(`adb -s ${dev.serial} shell input tap ${realX} ${realY}`, (err) => {
+    if (err) return res.status(500).json({ success: false, mensagem: err.message });
+    return res.json({ success: true, tap: { x: realX, y: realY } });
+  });
+});
+
+// 4. Arrastar / Rolar tela (Swipe)
+app.post('/api/remote/:port/swipe', (req, res) => {
+  const { port } = req.params;
+  const dev = resolveDeviceConfig(port);
+  const { x1, y1, x2, y2, duration, width, height } = req.body;
+
+  let rX1 = Math.round(x1 || 0);
+  let rY1 = Math.round(y1 || 0);
+  let rX2 = Math.round(x2 || 0);
+  let rY2 = Math.round(y2 || 0);
+  const dur = Math.max(100, Math.min(2000, Number(duration) || 300));
+
+  if (width && height && width > 0 && height > 0) {
+    rX1 = Math.round((x1 / width) * dev.width);
+    rY1 = Math.round((y1 / height) * dev.height);
+    rX2 = Math.round((x2 / width) * dev.width);
+    rY2 = Math.round((y2 / height) * dev.height);
+  }
+
+  exec(`adb -s ${dev.serial} shell input swipe ${rX1} ${rY1} ${rX2} ${rY2} ${dur}`, (err) => {
+    if (err) return res.status(500).json({ success: false, mensagem: err.message });
+    return res.json({ success: true, swipe: { x1: rX1, y1: rY1, x2: rX2, y2: rY2, duration: dur } });
+  });
+});
+
+// 5. Teclas de Navegação e Sistema (Keyevent)
+app.post('/api/remote/:port/key', (req, res) => {
+  const { port } = req.params;
+  const dev = resolveDeviceConfig(port);
+  const { key } = req.body;
+
+  const KEY_MAP = {
+    'BACK': 4,
+    'HOME': 3,
+    'APP_SWITCH': 187,
+    'RECENTS': 187,
+    'POWER': 26,
+    'WAKE': 224,
+    'WAKEUP': 224,
+    'VOLUME_UP': 24,
+    'VOLUME_DOWN': 25,
+    'ENTER': 66,
+    'DELETE': 67,
+    'DEL': 67,
+    'TAB': 61,
+    'ESCAPE': 111,
+    'MENU': 82,
+    'NOTIFICATIONS': 'cmd statusbar expand-notifications'
+  };
+
+  const action = KEY_MAP[String(key).toUpperCase()] !== undefined ? KEY_MAP[String(key).toUpperCase()] : key;
+  let cmd = `adb -s ${dev.serial} shell input keyevent ${action}`;
+  if (String(action).startsWith('cmd ')) {
+    cmd = `adb -s ${dev.serial} shell ${action}`;
+  }
+
+  exec(cmd, (err) => {
+    if (err) return res.status(500).json({ success: false, mensagem: err.message });
+    return res.json({ success: true, key });
+  });
+});
+
+// 6. Digitar Texto Remotamente
+app.post('/api/remote/:port/type', (req, res) => {
+  const { port } = req.params;
+  const dev = resolveDeviceConfig(port);
+  const { text } = req.body;
+
+  if (!text) return res.status(400).json({ success: false, mensagem: 'Texto não fornecido.' });
+
+  const safeText = String(text).replace(/\s/g, '%s').replace(/["`$\\]/g, '\\$&');
+  exec(`adb -s ${dev.serial} shell input text "${safeText}"`, (err) => {
+    if (err) return res.status(500).json({ success: false, mensagem: err.message });
+    return res.json({ success: true, text });
+  });
+});
+
+// 7. Discar USSD Livre
+app.post('/api/remote/:port/ussd', (req, res) => {
+  const { port } = req.params;
+  const dev = resolveDeviceConfig(port);
+  const { code } = req.body;
+
+  if (!code) return res.status(400).json({ success: false, mensagem: 'Código USSD não fornecido.' });
+
+  const encoded = encodeURIComponent(String(code).trim());
+  exec(`adb -s ${dev.serial} shell am start -a android.intent.action.CALL -d "tel:${encoded}"`, (err) => {
+    if (err) return res.status(500).json({ success: false, mensagem: err.message });
+    return res.json({ success: true, code });
+  });
+});
+
+// 8. Iniciar Janela Nativa Scrcpy no Desktop (60 FPS com 1 clique)
+app.post('/api/remote/:port/launch-scrcpy', (req, res) => {
+  const { port } = req.params;
+  const dev = resolveDeviceConfig(port);
+  const scrcpyBin = getScrcpyExecutable();
+
+  try {
+    const child = spawn(scrcpyBin, [
+      '-s', dev.serial,
+      '--window-title', `📱 Ka-Net - Celular Porta ${port} (${dev.name})`,
+      '--always-on-top',
+      '--stay-awake'
+    ], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    console.log(`🖥️ [SCRCPY] Janela nativa iniciada para Porta ${port} (${dev.serial})`);
+    return res.json({ success: true, mensagem: `Janela Scrcpy 60 FPS aberta no seu computador para a Porta ${port}!` });
+  } catch(e) {
+    return res.status(500).json({ success: false, mensagem: `Erro ao iniciar Scrcpy: ${e.message}` });
+  }
+});
+
 // ── BOT STATUS PARA O PAINEL ──
 app.get('/api/bot-status', (req, res) => {
   try {
