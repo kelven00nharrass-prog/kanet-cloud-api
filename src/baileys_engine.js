@@ -917,30 +917,55 @@ function processarAddTabelaCompleta(corpo, targetJid = null) {
 }
 
 let firestoreDbInstance = null;
+const fileHashCache = new Map();
+let backupDebounceTimer = null;
 
-async function backupAuthToFirestore(db) {
+function backupAuthToFirestore(db) {
     if (!db || !fs.existsSync(AUTH_DIR)) return;
-    try {
-        const files = fs.readdirSync(AUTH_DIR);
-        for (const file of files) {
-            const filePath = path.join(AUTH_DIR, file);
-            if (fs.statSync(filePath).isFile()) {
-                const content = fs.readFileSync(filePath, 'utf8');
-                await db.collection('whatsapp_cloud_auth').doc(encodeURIComponent(file)).set({
-                    content,
-                    updatedAt: Date.now()
-                }, { merge: true });
+    if (backupDebounceTimer) clearTimeout(backupDebounceTimer);
+    backupDebounceTimer = setTimeout(async () => {
+        try {
+            const files = fs.readdirSync(AUTH_DIR);
+            let batch = db.batch();
+            let count = 0;
+            for (const file of files) {
+                const filePath = path.join(AUTH_DIR, file);
+                if (fs.statSync(filePath).isFile()) {
+                    const content = fs.readFileSync(filePath, 'utf8');
+                    if (fileHashCache.get(file) !== content) {
+                        fileHashCache.set(file, content);
+                        batch.set(db.collection('whatsapp_cloud_auth').doc(encodeURIComponent(file)), {
+                            content,
+                            updatedAt: Date.now()
+                        }, { merge: true });
+                        count++;
+                        if (count % 400 === 0) {
+                            await batch.commit();
+                            batch = db.batch();
+                        }
+                    }
+                }
             }
+            if (count % 400 !== 0 && count > 0) {
+                await batch.commit();
+            }
+            if (count > 0) {
+                console.log(`💾 [BAILEYS NUVEM] ${count} ficheiros de sessão sincronizados no Firestore.`);
+            }
+        } catch (e) {
+            console.warn('⚠️ [BAILEYS NUVEM] Falha no backup para Firestore:', e.message);
         }
-        console.log(`💾 [BAILEYS NUVEM] ${files.length} ficheiros de sessão guardados no Firestore com sucesso!`);
-    } catch (e) {
-        console.warn('⚠️ [BAILEYS NUVEM] Falha no backup para Firestore:', e.message);
-    }
+    }, 5000);
 }
 
 async function restoreAuthFromFirestore(db) {
     if (!db) return;
     try {
+        const credsExist = fs.existsSync(path.join(AUTH_DIR, 'creds.json'));
+        if (credsExist) {
+            console.log('ℹ️ [BAILEYS NUVEM] creds.json local presente. Pulando restore do Firestore para evitar conflito.');
+            return;
+        }
         const snap = await db.collection('whatsapp_cloud_auth').get();
         if (snap.empty) {
             console.log('ℹ️ [BAILEYS NUVEM] Nenhuma sessão prévia no Firestore.');
@@ -1004,14 +1029,33 @@ async function restoreConfigsFromFirestore(db) {
 // ══════════════════════════════════════════════════
 // MOTOR PRINCIPAL BAILEYS
 // ══════════════════════════════════════════════════
+let reconnectAttempts = 0;
+let isConnecting = false;
+
 async function startWhatsApp(orderCallback, db = null) {
     if (db) firestoreDbInstance = db;
     if (orderCallback) orderDispatchCallback = orderCallback;
+
+    if (isConnecting) {
+        console.log('⏳ [BAILEYS] Inicialização já em andamento. Ignorando chamada concorrente.');
+        return;
+    }
+    isConnecting = true;
 
     try {
         if (firestoreDbInstance) {
             await restoreAuthFromFirestore(firestoreDbInstance);
             await restoreConfigsFromFirestore(firestoreDbInstance);
+        }
+
+        // Limpeza prévia de socket anterior se existir
+        if (sock) {
+            try {
+                sock.ev.removeAllListeners();
+                sock.ws?.close();
+                sock.end?.(undefined);
+            } catch (e) {}
+            sock = null;
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -1025,19 +1069,16 @@ async function startWhatsApp(orderCallback, db = null) {
             printQRInTerminal: true,
             auth: state,
             browser: ['Ubuntu', 'Chrome', '20.0.04'],
-            keepAliveIntervalMs: 30000,      // ping a cada 30s para manter a sessão viva
             syncFullHistory: false,          // não tentar sincronizar histórico todo (evita timeouts)
             markOnlineOnConnect: false,      // não marcar como online (menos detecção)
             generateHighQualityLinkPreview: false,
             getMessage: async () => ({ conversation: '' })
         });
 
-        let reconnectAttempts = 0;
-
         sock.ev.on('creds.update', async () => {
             await saveCreds();
             if (firestoreDbInstance) {
-                await backupAuthToFirestore(firestoreDbInstance);
+                backupAuthToFirestore(firestoreDbInstance);
             }
         });
 
@@ -1054,15 +1095,22 @@ async function startWhatsApp(orderCallback, db = null) {
             }
 
             if (connection === 'close') {
+                isConnecting = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const errMsg = lastDisconnect?.error?.message || (lastDisconnect?.error ? String(lastDisconnect.error) : 'sem msg');
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 connectionStatus = 'disconnected';
                 currentQrBase64 = null;
-                console.log(`🔌 [BAILEYS] Conexão fechada (${statusCode}). Reconectar: ${shouldReconnect}`);
+                addLog(`🔌 [DESCONEXÃO] Código: ${statusCode} | Motivo: ${errMsg} | Reconectar: ${shouldReconnect}`);
+                console.log(`🔌 [BAILEYS] Conexão fechada (${statusCode} - ${errMsg}). Reconectar: ${shouldReconnect}`);
+                
+                try {
+                    sock.ws?.close();
+                } catch (e) {}
+
                 if (shouldReconnect) {
-                    // Backoff exponencial: 5s, 10s, 20s, 40s, máx 60s
                     reconnectAttempts++;
-                    const delay = Math.min(5000 * Math.pow(2, reconnectAttempts - 1), 60000);
+                    const delay = Math.min(5000 * Math.pow(2, Math.min(reconnectAttempts - 1, 4)), 60000);
                     console.log(`⏳ [BAILEYS] Aguardando ${delay / 1000}s antes de reconectar (tentativa #${reconnectAttempts})...`);
                     setTimeout(() => startWhatsApp(orderDispatchCallback, firestoreDbInstance), delay);
                 } else {
@@ -1070,6 +1118,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     reconnectAttempts = 0;
                 }
             } else if (connection === 'open') {
+                isConnecting = false;
                 connectionStatus = 'connected';
                 currentQrBase64 = null;
                 reconnectAttempts = 0; // reset após conexão bem-sucedida
@@ -1094,7 +1143,9 @@ async function startWhatsApp(orderCallback, db = null) {
                     const meta = await sock.groupMetadata(groupJid);
                     groupMetaCache.set(groupJid, { meta, timestamp: now });
                     return meta;
-                } catch (e) {}
+                } catch (e) {
+                    addLog(`⚠️ [GROUP META ERRO] ${groupJid}: ${e.message}`);
+                }
             }
             return null;
         }
@@ -2010,7 +2061,20 @@ async function startWhatsApp(orderCallback, db = null) {
                     const ehPedidoMenu = [
                         '1', '1️⃣', 'menu', 'tabela', 'tabelas', 'pacote', 'pacotes', 'plano', 'planos',
                         'preco', 'precos', 'preço', 'preços', 'valores', 'megas', 'gigas', 'comprar'
-                    ].includes(cleanCmd) || cleanCmd === 'menu' || cleanCmd.startsWith('menu ') || cleanCmd.startsWith('tabela ') || cleanCmd.startsWith('preço') || cleanCmd.startsWith('preco');
+                    ].includes(cleanCmd) || 
+                    cleanCmd === 'menu' || cleanCmd.startsWith('menu ') || 
+                    cleanCmd.startsWith('tabela ') || cleanCmd.startsWith('preço') || cleanCmd.startsWith('preco') ||
+                    cleanText.includes('tabela') || 
+                    cleanText.includes('preco') || 
+                    cleanText.includes('preço') || 
+                    cleanText.includes('pacote') || 
+                    cleanText.includes('valores') ||
+                    cleanText.includes('como comprar') ||
+                    cleanText.includes('quero comprar') ||
+                    cleanText.includes('manda a tabela') ||
+                    cleanText.includes('manda tabela') ||
+                    cleanText.includes('quero megas') ||
+                    cleanText.includes('tem megas');
 
                     if (ehPedidoMenu) {
                         addLog(`📋 [RESPONDENDO] Menu/Tabela enviado para ${jid}`);
@@ -2021,7 +2085,14 @@ async function startWhatsApp(orderCallback, db = null) {
                     // ── 14. PAGAMENTO ORIGINAL ──────────────────────────────
                     const ehPedidoPagamento = [
                         '2', '2️⃣', 'pagamento', 'pagar', 'conta', 'contas', 'mpesa', 'emola', 'dados de pagamento'
-                    ].includes(cleanCmd) || cleanCmd.startsWith('pagamento');
+                    ].includes(cleanCmd) || 
+                    cleanCmd.startsWith('pagamento') ||
+                    cleanText.includes('pagamento') ||
+                    cleanText.includes('como pagar') ||
+                    cleanText.includes('formas de pagamento') ||
+                    cleanText.includes('dados de pagamento') ||
+                    cleanText.includes('numero de pagamento') ||
+                    cleanText.includes('número de pagamento');
 
                     if (ehPedidoPagamento) {
                         addLog(`💳 [RESPONDENDO] Formas de Pagamento enviadas para ${jid}`);
@@ -2051,8 +2122,23 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // Se for mensagem de grupo e não bateu nenhum comando/comprovativo/menu, NÃO RESPONDER NADA!
+                    // ── 17. MENSAGEM DIRECIONADA OU MENÇÃO AO BOT NO GRUPO ──
                     if (isGroupMsg) {
+                        const myJidNumber = sock?.user?.id ? sock.user.id.split(':')[0].replace(/\D/g, '') : '258876692062';
+                        const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+                        const mentionedJids = (contextInfo?.mentionedJid || []).map(j => String(j).replace(/\D/g, ''));
+                        const isBotMentioned = mentionedJids.some(m => m.includes(myJidNumber)) || 
+                                               text.includes(myJidNumber) || 
+                                               cleanText.startsWith('@bot') || 
+                                               cleanText === 'bot';
+
+                        if (isBotMentioned) {
+                            addLog(`📢 [BOT MENCIONADO EM GRUPO] Enviando menu para ${jid}`);
+                            await reply(gerarMenuOriginal(jid));
+                            continue;
+                        }
+
+                        // Se for mensagem de grupo comum e não bateu nenhum comando/comprovativo/menu, ignorar para não poluir
                         addLog(`ℹ️ [GRUPO DESCARTADO] Sem comando reconhecido: "${cleanCmd}" em ${jid}`);
                         continue;
                     }
@@ -2067,6 +2153,7 @@ async function startWhatsApp(orderCallback, db = null) {
         });
 
     } catch (e) {
+        isConnecting = false;
         console.error('❌ [BAILEYS INIT ERROR]:', e);
         setTimeout(() => startWhatsApp(orderDispatchCallback), 10000);
     }
