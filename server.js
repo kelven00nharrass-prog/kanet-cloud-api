@@ -207,11 +207,11 @@ function isDeviceApto(dev) {
   if (dev.transfers_available !== undefined && dev.transfers_available <= 0) return false;
   const s1 = dev.sim1_saldo_mb !== undefined && dev.sim1_saldo_mb !== null ? dev.sim1_saldo_mb : 10240;
   const s2 = dev.sim2_saldo_mb !== undefined && dev.sim2_saldo_mb !== null ? dev.sim2_saldo_mb : 10240;
-  if (s1 < 50 && s2 < 50) return false;
+  if (s1 < 100 && s2 < 100) return false;
   return true;
 }
 
-const MIN_TRANSFER_MB = 50;
+const MIN_TRANSFER_MB = 100;
 
 function getDeviceAvailableMb(dev) {
   if (!dev) return 0;
@@ -235,7 +235,8 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   if (!dev) {
     // Auto-registar qualquer novo celular que reporte pela primeira vez
     const carrierName = port === 8023 ? 'Vodacom (Huawei)' :
-                        port === 8077 ? 'Vodacom (Redmi)' :
+                        port === 8025 ? 'Vodacom (Huawei 8025)' :
+                        port === 8077 ? 'Movitel (Xiaomi 8077)' :
                         port === 8777 ? 'Vodacom (Saldo)' :
                         `Vodacom (Celular ${port})`;
     dev = {
@@ -253,22 +254,30 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   }
 
   // ── AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA (ROTEAMENTO ESTRITO & APTIDÃO) ──
-  // - Porta 8023: Exclusiva para pacotes diários (24hrs)
-  // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados
+  // - Portas Diárias (8025, 8023, 8024): Exclusivas para pacotes diários (24hrs)
+  // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados (NUNCA assume diários)
   // - Porta 8777: Exclusiva para recargas de saldo/crédito
-  // - SÓ atribui pedidos se o celular estiver 100% APTO (com saldo e sem ter atingido limite diário)
+  // - SÓ atribui pedidos se o celular estiver 100% APTO (com saldo >= 100MB e sem ter atingido limite diário)
   if (isDeviceApto(dev)) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
         if (order.status !== 'pending') continue;
 
-        let isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
-        if (!isCompatible && port === 8077 && (order.modo === 'diario' || !order.modo)) {
-          // Se nenhuma porta diária (8023, 8024) estiver apta/online, a porta 8077 assume para não deixar o cliente à espera!
-          const anyDailyApto = isDeviceApto(inMemoryDevices[8023]) || isDeviceApto(inMemoryDevices[8024]);
-          if (!anyDailyApto) {
-            isCompatible = true;
-            console.log(`🔀 [FAILOVER AUTO] Portas diárias (8023/8024) indisponíveis. Porta 8077 assumindo pedido diário ${orderId}!`);
+        // TTL / Validade máxima do pedido: 45 minutos (evita que pedidos velhos repitam horas depois)
+        if (order.createdAt) {
+          const ageMs = Date.now() - new Date(order.createdAt).getTime();
+          if (ageMs > 45 * 60 * 1000) { // > 45 minutos
+            order.status = 'expired';
+            order.lastError = 'Pedido expirado (mais de 45 minutos na fila)';
+            order.completedAt = new Date().toISOString();
+            console.warn(`⏰ [EXPIRAÇÃO] Pedido ${orderId} (${order.quantidade}MB -> ${order.numero}) expirou após 45m na fila.`);
+            continue;
           }
+        }
+
+        let isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
+        // GARANTIA: Porta 8077 JAMAIS assume pacotes diários
+        if (port === 8077 && (order.modo === 'diario' || order.modo === '24hrs' || !order.modo)) {
+          isCompatible = false;
         }
         if (isCompatible) {
           const orderMb = Number(order.quantidade) || 0;
@@ -624,6 +633,10 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
     // ── NOTIFICAÇÕES PARA OS GRUPOS DO SISTEMA (Anti-duplicação) ──
     if (order) {
+      const isParcial = !!req.body.last_result.parcial;
+      const qtdEntregue = Number(req.body.last_result.quantidade) || 0;
+      const qtdPedida = Number(req.body.last_result.quantidade_solicitada) || Number(order.quantidade) || 0;
+
       if (success) {
         order.status = 'completed';
         order.completedAt = new Date().toISOString();
@@ -639,6 +652,35 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             console.log(`🚀 [PARTE 2 LIBERADA] Parte 2 (${part2Order.id} - ${part2Order.quantidade}MB) liberada para envio imediato por outra porta!`);
           }
         }
+      } else if (isParcial && qtdEntregue > 0 && qtdPedida > qtdEntregue) {
+        // 💡 ENVIO PARCIAL CONCLUÍDO NO CELULAR: A primeira parte foi entregue!
+        const restanteMb = qtdPedida - qtdEntregue;
+        order.status = 'completed';
+        order.quantidade = qtdEntregue;
+        order.completedAt = new Date().toISOString();
+        order.lastError = `Parcial entregue: ${qtdEntregue}MB de ${qtdPedida}MB`;
+
+        // Criar uma nova ordem pendente para o restante dos Megas ser atendido por outra porta
+        const restanteId = `${resId}-RESTANTE`;
+        const orderRestante = {
+          id: restanteId,
+          orderId: restanteId,
+          parentOrderId: resId,
+          numero: order.numero,
+          quantidade: restanteMb,
+          modo: order.modo || 'diario',
+          input_val: order.input_val || '',
+          jid: order.jid || null,
+          remetente: order.remetente || 'Bot',
+          targetPort: null,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          notified: false,
+          groupNotified: false
+        };
+        inMemoryOrders.set(restanteId, orderRestante);
+        console.log(`🔀 [ENVIO PARCIAL REGISTADO] Pedido ${resId} entregou ${qtdEntregue}MB. Criado pedido ${restanteId} de ${restanteMb}MB na fila para conclusão!`);
       } else {
         const errorMsg = (req.body.last_result && req.body.last_result.error) || 'Falha USSD / Timeout';
         order.lastError = errorMsg;
