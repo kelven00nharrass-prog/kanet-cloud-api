@@ -1441,12 +1441,12 @@ app.delete('/api/orders/:orderId', (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 
 // In-Memory Payments store for M-Pesa & e-Mola receipts
-const inMemoryPayments = [];
+const adminReceiptsHistory = [];
 const PAYMENTS_CACHE_FILE = path.resolve(__dirname, 'payments_cache.json');
 
 function savePaymentsToCache() {
   try {
-    const keep = inMemoryPayments.slice(-200);
+    const keep = adminReceiptsHistory.slice(-200);
     fs.writeFileSync(PAYMENTS_CACHE_FILE, JSON.stringify(keep), 'utf8');
   } catch(e) {}
 }
@@ -1456,7 +1456,7 @@ function loadPaymentsFromCache() {
     if (fs.existsSync(PAYMENTS_CACHE_FILE)) {
       const data = JSON.parse(fs.readFileSync(PAYMENTS_CACHE_FILE, 'utf8'));
       if (Array.isArray(data)) {
-        inMemoryPayments.push(...data);
+        adminReceiptsHistory.push(...data);
       }
     }
   } catch(e) {}
@@ -1483,7 +1483,7 @@ app.get('/api/admin/payments', (req, res) => {
     }));
 
   // Unir e ordenar do mais recente ao mais antigo
-  const combined = [...inMemoryPayments, ...fromOrders];
+  const combined = [...adminReceiptsHistory, ...fromOrders];
   const uniqueMap = new Map();
   combined.forEach(p => {
     if (p.ref && !uniqueMap.has(p.ref)) {
@@ -1524,11 +1524,11 @@ app.post('/api/admin/payments/register', (req, res) => {
     detalhes: detalhes || ''
   };
 
-  const existingIdx = inMemoryPayments.findIndex(p => p.ref === ref);
+  const existingIdx = adminReceiptsHistory.findIndex(p => p.ref === ref);
   if (existingIdx >= 0) {
-    inMemoryPayments[existingIdx] = paymentDoc;
+    adminReceiptsHistory[existingIdx] = paymentDoc;
   } else {
-    inMemoryPayments.unshift(paymentDoc);
+    adminReceiptsHistory.unshift(paymentDoc);
   }
   savePaymentsToCache();
 
