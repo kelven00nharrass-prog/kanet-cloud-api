@@ -1436,7 +1436,175 @@ app.delete('/api/orders/:orderId', (req, res) => {
   return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido não encontrado.' });
 });
 
-// ── CONTROLE REMOTO ADB & WEBADB / SCRCPY BRIDGE ──
+// ══════════════════════════════════════════════════════════════════
+// 📊 KA-NET ADMIN MASTER API: RELATÓRIOS & EXTRATO DE RECEBIMENTOS
+// ══════════════════════════════════════════════════════════════════
+
+// In-Memory Payments store for M-Pesa & e-Mola receipts
+const inMemoryPayments = [];
+const PAYMENTS_CACHE_FILE = path.resolve(__dirname, 'payments_cache.json');
+
+function savePaymentsToCache() {
+  try {
+    const keep = inMemoryPayments.slice(-200);
+    fs.writeFileSync(PAYMENTS_CACHE_FILE, JSON.stringify(keep), 'utf8');
+  } catch(e) {}
+}
+
+function loadPaymentsFromCache() {
+  try {
+    if (fs.existsSync(PAYMENTS_CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(PAYMENTS_CACHE_FILE, 'utf8'));
+      if (Array.isArray(data)) {
+        inMemoryPayments.push(...data);
+      }
+    }
+  } catch(e) {}
+}
+loadPaymentsFromCache();
+
+// 1. Extrato de Pagamentos Recebidos (M-Pesa / e-Mola)
+app.get('/api/admin/payments', (req, res) => {
+  const limit = Number(req.query.limit) || 50;
+  // Derivar também pagamentos a partir dos pedidos concluídos/processados
+  const fromOrders = Array.from(inMemoryOrders.values())
+    .filter(o => o.valor || o.valor_pago)
+    .map(o => ({
+      id: o.orderId || o.id,
+      ref: o.orderId || o.id,
+      operadora: (o.modo === 'saldo' || (o.numero && o.numero.startsWith('86') || o.numero && o.numero.startsWith('87'))) ? 'e-Mola' : 'M-Pesa',
+      valor: Number(o.valor || o.valor_pago || 0),
+      numero: o.numero || '',
+      remetente: o.remetente || '',
+      timestamp: o.createdAt || new Date().toISOString(),
+      orderId: o.orderId || o.id,
+      status: o.status === 'completed' ? 'ativado' : (o.status === 'failed' ? 'falhou' : 'processando'),
+      detalhes: `${o.quantidade}MB [${o.modo || 'diario'}]`
+    }));
+
+  // Unir e ordenar do mais recente ao mais antigo
+  const combined = [...inMemoryPayments, ...fromOrders];
+  const uniqueMap = new Map();
+  combined.forEach(p => {
+    if (p.ref && !uniqueMap.has(p.ref)) {
+      uniqueMap.set(p.ref, p);
+    }
+  });
+
+  const sorted = Array.from(uniqueMap.values())
+    .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+    .slice(0, limit);
+
+  const totalValor = sorted.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+
+  return res.json({
+    success: true,
+    total_registos: sorted.length,
+    total_faturado_lista: totalValor,
+    payments: sorted
+  });
+});
+
+// Endpoint para registrar recebimento de SMS M-Pesa / e-Mola via Bot ou Celular
+app.post('/api/admin/payments/register', (req, res) => {
+  const { ref, operadora, valor, numero, remetente, status, detalhes } = req.body || {};
+  if (!ref || !valor) {
+    return res.status(400).json({ success: false, mensagem: 'Ref e Valor são obrigatórios.' });
+  }
+
+  const paymentDoc = {
+    id: ref,
+    ref,
+    operadora: operadora || 'M-Pesa',
+    valor: Number(valor),
+    numero: numero || '',
+    remetente: remetente || '',
+    timestamp: new Date().toISOString(),
+    status: status || 'recebido',
+    detalhes: detalhes || ''
+  };
+
+  const existingIdx = inMemoryPayments.findIndex(p => p.ref === ref);
+  if (existingIdx >= 0) {
+    inMemoryPayments[existingIdx] = paymentDoc;
+  } else {
+    inMemoryPayments.unshift(paymentDoc);
+  }
+  savePaymentsToCache();
+
+  return res.json({ success: true, payment: paymentDoc });
+});
+
+// 2. Relatórios de Vendas (Diário, Semanal, Mensal, Trimestral, Semestral, Anual)
+app.get('/api/admin/reports', (req, res) => {
+  const period = (req.query.period || 'today').toLowerCase(); // today, week, month, quarter, semester, year
+  const now = new Date();
+  
+  let startTime = new Date();
+  if (period === 'today' || period === 'diario') {
+    startTime.setHours(0, 0, 0, 0);
+  } else if (period === 'week' || period === 'semanal') {
+    startTime.setDate(now.getDate() - 7);
+  } else if (period === 'month' || period === 'mensal') {
+    startTime.setDate(now.getDate() - 30);
+  } else if (period === 'quarter' || period === 'trimestral') {
+    startTime.setDate(now.getDate() - 90);
+  } else if (period === 'semester' || period === 'semestral') {
+    startTime.setDate(now.getDate() - 180);
+  } else if (period === 'year' || period === 'anual') {
+    startTime.setDate(now.getDate() - 365);
+  } else {
+    startTime.setHours(0, 0, 0, 0);
+  }
+
+  const startMs = startTime.getTime();
+  const allOrders = Array.from(inMemoryOrders.values());
+
+  const filteredOrders = allOrders.filter(o => {
+    const t = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+    return t >= startMs;
+  });
+
+  const completed = filteredOrders.filter(o => o.status === 'completed');
+  const failed = filteredOrders.filter(o => o.status === 'failed');
+  const pending = filteredOrders.filter(o => o.status === 'pending' || o.status === 'assigned');
+
+  const totalFaturadoMT = completed.reduce((acc, o) => acc + (Number(o.valor || o.valor_pago) || 0), 0);
+  const totalVolumeMB = completed.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
+  const totalVolumeGB = (totalVolumeMB / 1024).toFixed(1);
+
+  // Agrupamento por pacote mais vendido
+  const pacotesMap = {};
+  completed.forEach(o => {
+    const key = `${o.quantidade}MB [${o.modo || 'diario'}]`;
+    pacotesMap[key] = (pacotesMap[key] || 0) + 1;
+  });
+
+  const pacotesMaisVendidos = Object.entries(pacotesMap)
+    .map(([pacote, total]) => ({ pacote, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  return res.json({
+    success: true,
+    periodo: period,
+    data_inicio: startTime.toISOString(),
+    data_fim: now.toISOString(),
+    metricas: {
+      total_faturado_mt: totalFaturadoMT,
+      total_pedidos: filteredOrders.length,
+      pedidos_concluidos: completed.length,
+      pedidos_falhados: failed.length,
+      pedidos_pendentes: pending.length,
+      taxa_sucesso_pct: filteredOrders.length > 0 ? Math.round((completed.length / filteredOrders.length) * 100) : 100,
+      total_volume_mb: totalVolumeMB,
+      total_volume_gb: totalVolumeGB
+    },
+    pacotes_mais_vendidos: pacotesMaisVendidos,
+    ultimas_vendas: completed.slice(-15).reverse()
+  });
+});
+
 const ADB_DEVICE_MAP = {
   '8024': { serial: 'DWH9X17405W12389', name: 'Huawei DIG-L21 (SIM 2)', width: 720, height: 1280, defaultSim: 2 },
   '8077': { serial: 'WOZTG6X455DMXG99', name: 'Xiaomi M2006C3LG (Movitel)', width: 720, height: 1600, defaultSim: 1 },
