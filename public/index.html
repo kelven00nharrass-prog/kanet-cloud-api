@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ka-Net Cloud Panel - Gestão & Operações</title>
+<link rel="icon" type="image/jpeg" href="/logo.jpg">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  --bg: #060913;
+  --card: rgba(16, 23, 41, 0.75);
+  --border: rgba(255, 255, 255, 0.08);
+  --cyan: #00f0ff;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --purple: #a855f7;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --header-bg: rgba(10, 14, 26, 0.92);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+body { background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+body::before { content: ''; position: fixed; width: 600px; height: 600px; border-radius: 50%; background: var(--cyan); filter: blur(200px); opacity: .05; top: -150px; left: -150px; pointer-events: none; z-index: 0; }
+body::after { content: ''; position: fixed; width: 600px; height: 600px; border-radius: 50%; background: var(--purple); filter: blur(200px); opacity: .05; bottom: -150px; right: -150px; pointer-events: none; z-index: 0; }
+
+/* HEADER & TABS */
+.header { background: var(--header-bg); border-bottom: 1px solid var(--border); padding: 12px 24px; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.logo { display: flex; align-items: center; gap: 10px; font-size: 1.25rem; font-weight: 800; color: var(--cyan); letter-spacing: -0.02em; }
+.logo i { font-size: 1.4rem; }
+
+.nav-tabs { display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.35); padding: 4px; border-radius: 12px; border: 1px solid var(--border); }
+.nav-tab { background: transparent; border: none; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 8px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+.nav-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.nav-tab.active { color: #000; background: var(--cyan); font-weight: 700; box-shadow: 0 0 16px rgba(0, 240, 255, 0.4); }
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+.wa-status { display: flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 600; padding: 6px 14px; border-radius: 20px; background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.3); color: var(--green); transition: all .3s; }
+.wa-status.offline { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); color: var(--red); }
+.wa-status.loading { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.3); color: var(--yellow); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.refresh-info { font-size: .72rem; color: var(--muted); }
+
+/* MAIN CONTAINER */
+.container { max-width: 1440px; margin: 0 auto; padding: 24px; position: relative; z-index: 1; }
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* TYPOGRAPHY & CARDS */
+.section-title { font-size: .72rem; font-weight: 700; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.grid-devices { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; transition: border-color .3s; }
+.card:hover { border-color: rgba(0,240,255,.25); }
+
+.stat-card { display: flex; flex-direction: column; gap: 6px; }
+.stat-label { font-size: .75rem; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.stat-val { font-size: 1.9rem; font-weight: 800; color: var(--text); }
+.stat-val.cyan { color: var(--cyan); }
+.stat-val.green { color: var(--green); }
+.stat-val.red { color: var(--red); }
+.stat-val.yellow { color: var(--yellow); }
+.stat-val.purple { color: var(--purple); }
+.stat-sub { font-size: .74rem; color: var(--muted); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 10px; border: none; font-family: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .2s; }
+.btn-primary { background: rgba(0,240,255,.15); color: var(--cyan); border: 1px solid rgba(0,240,255,.3); }
+.btn-primary:hover { background: rgba(0,240,255,.25); }
+.btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.btn-danger:hover { background: rgba(239,68,68,.25); }
+.btn-success { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+.btn-success:hover { background: rgba(16,185,129,.25); }
+.btn-warn { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.btn-warn:hover { background: rgba(245,158,11,.25); }
+.btn-purple { background: rgba(168,85,247,.15); color: var(--purple); border: 1px solid rgba(168,85,247,.3); }
+.btn-purple:hover { background: rgba(168,85,247,.25); }
+.btn-sm { padding: 5px 11px; font-size: .75rem; border-radius: 8px; }
+.actions-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+
+/* DEVICES GRID */
+.device-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.device-name { font-size: 1rem; font-weight: 700; }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.badge.online { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+.badge.offline { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.badge.apto { background: rgba(0,240,255,.1); color: var(--cyan); border: 1px solid rgba(0,240,255,.25); }
+.badge.inapto { background: rgba(245,158,11,.1); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.device-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.device-stat { background: rgba(0,0,0,.25); border-radius: 10px; padding: 10px; border: 1px solid rgba(255,255,255,0.03); }
+.device-stat-label { font-size: .68rem; color: var(--muted); margin-bottom: 2px; }
+.device-stat-val { font-size: .95rem; font-weight: 700; }
+.progress-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 4px; }
+.progress-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+.progress-fill.green { background: var(--green); }
+.progress-fill.yellow { background: var(--yellow); }
+.progress-fill.red { background: var(--red); }
+.pending-order { background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.3); border-radius: 10px; padding: 10px; margin-top: 10px; font-size: .8rem; }
+.pending-label { color: var(--purple); font-weight: 700; font-size: .7rem; margin-bottom: 4px; }
+
+/* QUEUE & ORDERS */
+.order-item { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: rgba(0,0,0,.25); margin-bottom: 10px; font-size: .82rem; border: 1px solid var(--border); transition: all 0.2s; }
+.order-item:hover { border-color: rgba(0,240,255,.2); background: rgba(0,0,0,.35); }
+.order-ref { font-family: monospace; color: var(--cyan); font-weight: 700; font-size: .78rem; }
+.order-status { padding: 3px 10px; border-radius: 20px; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+.status-pending { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.status-assigned { background: rgba(168,85,247,.15); color: var(--purple); border: 1px solid rgba(168,85,247,.3); }
+.status-processing { background: rgba(0,240,255,.15); color: var(--cyan); border: 1px solid rgba(0,240,255,.3); }
+.status-waiting_part1 { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.status-completed { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+.status-failed { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.status-cancelled { background: rgba(100,116,139,.2); color: #94a3b8; border: 1px solid rgba(100,116,139,.3); }
+.status-expired { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+.status-phantom { background: rgba(239,68,68,.25); color: #ff6b6b; border: 1px solid #ef4444; animation: pulse 1.5s infinite; }
+
+/* FORMS */
+.send-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: .72rem; color: var(--muted); font-weight: 600; }
+.form-input, .form-select { background: rgba(0,0,0,.35); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; color: var(--text); font-family: inherit; font-size: .85rem; outline: none; transition: border-color .2s; }
+.form-input:focus, .form-select:focus { border-color: rgba(0,240,255,.5); }
+.form-select option { background: #0a0e1a; }
+
+/* DATA TABLES (REPORTS) */
+.table-container { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,0.25); }
+.custom-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem; }
+.custom-table th { background: rgba(0,0,0,0.4); color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.custom-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); }
+.custom-table tr:last-child td { border-bottom: none; }
+.custom-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* QR AREA */
+.qr-area { text-align: center; padding: 30px; }
+.qr-area img { max-width: 220px; border-radius: 12px; border: 3px solid var(--cyan); }
+.qr-area p { color: var(--muted); margin-top: 12px; font-size: .85rem; }
+
+/* TOAST */
+#toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast-msg { padding: 12px 18px; border-radius: 10px; font-size: .83rem; font-weight: 600; animation: slideIn .3s ease; border: 1px solid; }
+.toast-msg.ok { background: rgba(16,185,129,.2); color: var(--green); border-color: rgba(16,185,129,.4); }
+.toast-msg.err { background: rgba(239,68,68,.2); color: var(--red); border-color: rgba(239,68,68,.4); }
+@keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* GROUP & PRICE CARDS */
+.group-card { background: rgba(0,0,0,.25); border-radius: 14px; border: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.group-name { font-size: 0.95rem; font-weight: 700; color: var(--cyan); display: flex; align-items: center; gap: 8px; }
+.group-jid { font-family: monospace; font-size: 0.72rem; color: var(--muted); word-break: break-all; }
+.group-meta { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
+
+.price-table-card { background: rgba(0,0,0,.25); border-radius: 14px; border: 1px solid var(--border); padding: 18px; }
+.price-table-title { font-size: 1rem; font-weight: 700; color: var(--cyan); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.price-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.02); margin-bottom: 6px; font-size: 0.84rem; }
+.price-item:hover { background: rgba(255,255,255,0.05); }
+.price-item-val { font-weight: 700; color: var(--green); }
+
+@media(max-width: 960px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .send-form { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width: 640px) {
+  .grid-4 { grid-template-columns: 1fr; }
+  .send-form { grid-template-columns: 1fr; }
+  .header { flex-direction: column; align-items: stretch; }
+  .nav-tabs { width: 100%; justify-content: space-around; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <img src="/logo.jpg" alt="Ka-Net" style="height:38px;width:38px;border-radius:10px;object-fit:cover;box-shadow:0 0 12px rgba(0,240,255,0.25);border:1px solid rgba(0,240,255,0.3)">
+    <div style="display:flex;flex-direction:column">
+      <span style="font-size:1.25rem;font-weight:800;color:var(--cyan);line-height:1;letter-spacing:-0.02em">Ka-Net</span>
+      <span style="font-size:0.64rem;font-weight:600;color:var(--muted);letter-spacing:0.04em;text-transform:uppercase;margin-top:2px">Internet rápida e segura</span>
+    </div>
+  </div>
+  
+  <!-- NAVIGATION TABS -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('operacoes')" id="tabBtn-operacoes"><i class="fa-solid fa-bolt"></i> Operações</button>
+    <button class="nav-tab" onclick="switchTab('remote')" id="tabBtn-remote"><i class="fa-solid fa-gamepad"></i> Controle Remoto</button>
+    <button class="nav-tab" onclick="switchTab('relatorios')" id="tabBtn-relatorios"><i class="fa-solid fa-chart-line"></i> Relatórios & Finanças</button>
+    <button class="nav-tab" onclick="switchTab('grupos')" id="tabBtn-grupos"><i class="fa-solid fa-users"></i> Grupos & Tabelas</button>
+    <button class="nav-tab" onclick="switchTab('crm')" id="tabBtn-crm"><i class="fa-solid fa-users-gear"></i> Clientes & Suporte Hub</button>
+  </div>
+
+  <div class="header-right">
+    <!-- BOTÃO MANUTENÇÃO GLOBAL -->
+    <button id="btnManutencao" class="btn btn-sm" onclick="toggleMaintenance()" style="font-weight:700;min-width:180px;background:#e53935;border:none;color:#fff;cursor:pointer;" title="Fecha vendas em grupos E no privado para todos os clientes">
+      <i class="fa-solid fa-triangle-exclamation"></i> <span id="manutencaoLabel">🟢 Sistema Online</span>
+    </button>
+    <div class="wa-status loading" id="waStatus"><div class="dot"></div><span id="waStatusText">A verificar...</span></div>
+    <span class="refresh-info" id="lastRefresh">A actualizar...</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ========================================== -->
+  <!-- TAB 1: OPERAÇÕES EM TEMPO REAL -->
+  <!-- ========================================== -->
+  <div id="tab-operacoes" class="tab-content active">
+    
+    <!-- METRICS ROW -->
+    <div class="section-title"><i class="fa-solid fa-chart-simple"></i> Métricas do Sistema</div>
+    <div class="grid-4">
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Online</div><div class="stat-val cyan" id="mDevices">--</div><div class="stat-sub">de todos registados</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-clock-rotate-left"></i> Pedidos Pendentes</div><div class="stat-val yellow" id="mPending">--</div><div class="stat-sub">na fila da nuvem</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-circle-check"></i> Transferências Hoje</div><div class="stat-val green" id="mToday">--</div><div class="stat-sub">concluídas com sucesso</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-box-archive"></i> Envios Diários Restantes</div><div class="stat-val cyan" id="mAvail">--</div><div class="stat-sub">Portas Diárias (8023 & 8024)</div></div>
+    </div>
+
+    <!-- ACTION BUTTONS -->
+    <div class="section-title"><i class="fa-solid fa-bolt"></i> Ações Rápidas</div>
+    <div class="actions-row">
+      <button class="btn btn-primary" onclick="reloadAll()"><i class="fa-solid fa-rotate"></i> Atualizar Tudo</button>
+      <button class="btn btn-warn" onclick="showQr()"><i class="fa-brands fa-whatsapp"></i> Ver QR Code WhatsApp</button>
+      <button class="btn btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Limpar Fila Total</button>
+      <button class="btn btn-primary" onclick="clearCompletedQueue()"><i class="fa-solid fa-broom"></i> Limpar Concluídos</button>
+      <button class="btn btn-success" onclick="document.getElementById('sendPanel').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-paper-plane"></i> Envio Manual</button>
+      <button class="btn btn-purple" onclick="restartBot()"><i class="fa-solid fa-power-off"></i> Reiniciar Bot</button>
+    </div>
+
+    <!-- DEVICES -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-mobile-screen-button"></i> Celulares Gateway USSD & Manuseio</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-primary" onclick="loadDevices()"><i class="fa-solid fa-rotate"></i> Atualizar Celulares</button>
+        <button class="btn btn-sm btn-success" onclick="resetAllDevices()"><i class="fa-solid fa-unlock"></i> Libertar Todos</button>
+      </div>
+    </div>
+    <div class="grid-devices" id="devicesGrid"><div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar celulares...</div></div>
+
+    <!-- QUEUE & MANUAL SEND -->
+    <div class="grid-2">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-list-check"></i> Fila de Pedidos em Tempo Real</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary" onclick="loadQueue()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+            <button class="btn btn-sm btn-danger" onclick="clearFailedOrders()" title="Limpar pedidos falhados"><i class="fa-solid fa-trash"></i> Limpar Falhados</button>
+          </div>
+        </div>
+
+        <!-- FILTROS RÁPIDOS DA FILA -->
+        <div id="queueFilterTabs" style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px">
+          <button class="btn btn-sm btn-primary" id="qf-all" onclick="setQueueFilter('all')">📋 Todos (<span id="qc-all">0</span>)</button>
+          <button class="btn btn-sm" id="qf-pending" onclick="setQueueFilter('pending')" style="background:rgba(245,158,11,.15);color:var(--yellow)">⏳ Pendentes (<span id="qc-pending">0</span>)</button>
+          <button class="btn btn-sm" id="qf-active" onclick="setQueueFilter('active')" style="background:rgba(168,85,247,.15);color:var(--purple)">⚡ Activos (<span id="qc-active">0</span>)</button>
+          <button class="btn btn-sm" id="qf-failed" onclick="setQueueFilter('failed')" style="background:rgba(239,68,68,.15);color:var(--red)">❌ Falhados (<span id="qc-failed">0</span>)</button>
+          <button class="btn btn-sm" id="qf-completed" onclick="setQueueFilter('completed')" style="background:rgba(16,185,129,.15);color:var(--green)">✅ Concluídos (<span id="qc-completed">0</span>)</button>
+        </div>
+
+        <div class="card" id="queuePanel" style="max-height:520px;overflow-y:auto;padding:14px">
+          <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i> A carregar fila...</div>
+        </div>
+      </div>
+      
+      <div id="sendPanel">
+        <div class="section-title"><i class="fa-solid fa-paper-plane"></i> Envio Manual de Pacotes</div>
+        <div class="card">
+          <div class="send-form" style="grid-template-columns: 1.2fr 1.2fr 1.5fr auto;">
+            <div class="form-group">
+              <label class="form-label">Número de Destino</label>
+              <input class="form-input" type="tel" id="sendNumero" placeholder="84XXXXXXX ou 85XXXXXXX">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo de Pacote</label>
+              <select class="form-select" id="sendModo" onchange="onSendModoChange()">
+                <option value="diario">📦 Diário (24hrs) - Portas 8023 / 8024</option>
+                <option value="semanal" selected>📅 Semanal (7 dias) - Porta 8077</option>
+                <option value="mensal">📆 Mensal (30 dias) - Porta 8077 (+ Split)</option>
+                <option value="ilimitado">♾️ Tudo Top - Porta 8077 (*111#)</option>
+                <option value="saldo">💰 Saldo / Crédito - Porta 8777</option>
+              </select>
+            </div>
+            <div class="form-group" id="groupSendQtd" style="display:none">
+              <label class="form-label" id="lblSendQtd">Quantidade (MB)</label>
+              <input class="form-input" type="number" id="sendQtd" placeholder="Ex: 350" value="350">
+            </div>
+            <div class="form-group" id="groupSendPackage">
+              <label class="form-label" id="lblSendPackage">Escolha o Pacote</label>
+              <select class="form-select" id="sendPackageSelect"></select>
+            </div>
+            <button class="btn btn-success" onclick="enviarManual()" style="height:42px"><i class="fa-solid fa-paper-plane"></i> Enviar</button>
+          </div>
+          <div id="sendHelpRoute" style="margin-top:10px;font-size:0.75rem;color:var(--cyan)"></div>
+          <div id="sendResult" style="margin-top:14px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR CODE PANEL -->
+    <div id="qrPanel" style="display:none;margin-top:20px;margin-bottom:28px">
+      <div class="section-title"><i class="fa-brands fa-whatsapp"></i> Conexão WhatsApp Web</div>
+      <div class="card qr-area" id="qrContent">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--cyan)"></i>
+        <p>A carregar QR Code...</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB: CONTROLE REMOTO WEBADB & SCRCPY -->
+  <!-- ========================================== -->
+  <div id="tab-remote" class="tab-content">
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="section-title" style="margin-bottom:4px"><i class="fa-solid fa-gamepad"></i> Controle Remoto WebADB & Espelhamento de Ecrã</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Veja a tela em tempo real, controle com o mouse, digite e execute comandos diretamente pelo navegador.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <!-- SELETOR DE DISPOSITIVO -->
+        <div id="remoteDeviceSelector" style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-primary" id="rdev-8024" onclick="selectRemoteDevice(8024)">📱 Huawei 8024 (SIM 2)</button>
+          <button class="btn btn-sm" id="rdev-8077" onclick="selectRemoteDevice(8077)" style="background:rgba(255,255,255,0.06);color:var(--text)">📱 Xiaomi 8077 (Movitel)</button>
+        </div>
+        <button class="btn btn-sm btn-purple" onclick="launchScrcpyDesktop()" title="Abre a janela oficial do Scrcpy no PC a 60 FPS com latência zero">
+          <i class="fa-solid fa-display"></i> Abrir Scrcpy Janela (60 FPS)
+        </button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns: minmax(320px, 380px) 1fr; gap:20px; align-items:start">
+      
+      <!-- COLUNA ESQUERDA: MOCKUP DO CELULAR E ECRÃ INTERATIVO -->
+      <div class="card" style="padding:16px;display:flex;flex-direction:column;align-items:center;background:rgba(10,14,26,0.95);border:1px solid rgba(0,240,255,0.25);box-shadow:0 0 25px rgba(0,0,0,0.5)">
+        
+        <!-- BARRA SUPERIOR DO ECRÃ -->
+        <div style="width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:0.75rem">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge online" id="remoteStatusBadge"><i class="fa-solid fa-circle" style="font-size:0.5rem"></i> ADB Activo</span>
+            <span id="remoteDeviceName" style="font-weight:700;color:var(--cyan)">Porta 8024</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="btn btn-sm" onclick="toggleScreenAutoRefresh()" id="btnAutoRefresh" style="background:rgba(0,240,255,0.15);color:var(--cyan);padding:4px 8px;font-size:0.7rem">
+              <i class="fa-solid fa-play"></i> <span id="autoRefreshText">Ao Vivo</span>
+            </button>
+            <button class="btn btn-sm" onclick="refreshScreenManual()" style="background:rgba(255,255,255,0.08);color:var(--text);padding:4px 8px;font-size:0.7rem" title="Atualizar Agora">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- MOLDURA DO CELULAR (PHONE FRAME) -->
+        <div id="phoneFrame" style="position:relative;width:100%;max-width:340px;background:#05070e;border-radius:32px;padding:12px 10px 10px 10px;box-shadow:0 0 40px rgba(0,0,0,0.9), 0 0 20px rgba(0,240,255,0.12);border:3px solid #1e293b;user-select:none">
+          
+          <!-- NOTCH / SPEAKER -->
+          <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);width:50px;height:4px;background:#334155;border-radius:4px;z-index:10"></div>
+          
+          <!-- ECRÃ TOUCH (CANVAS/IMG) -->
+          <div id="screenWrapper" style="position:relative;width:100%;border-radius:22px;overflow:hidden;background:#000;cursor:crosshair;display:flex;align-items:center;justify-content:center;aspect-ratio:9/16;border:1px solid rgba(255,255,255,0.06)">
+            <img id="remoteScreenImg" src="" alt="Ecrã do Celular" style="width:100%;height:100%;object-fit:contain;display:block">
+            <div id="screenLoadingOverlay" style="position:absolute;inset:0;background:rgba(6,9,19,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--cyan);font-size:0.85rem">
+              <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem"></i>
+              <span>A carregar ecrã do celular...</span>
+            </div>
+            <!-- RIPPLE EFFECT ON TAP -->
+            <div id="touchRipple" style="position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(0,240,255,0.7);border:2px solid #fff;transform:translate(-50%,-50%) scale(0);pointer-events:none;transition:transform 0.25s ease, opacity 0.25s ease;opacity:0;z-index:20"></div>
+          </div>
+
+          <!-- BOTÕES VIRTUAIS DE NAVEGAÇÃO NA BASE DO ECRÃ -->
+          <div style="display:flex;justify-content:space-around;align-items:center;margin-top:8px;padding:2px 0">
+            <button class="btn btn-sm" onclick="sendRemoteKey('BACK')" style="background:transparent;color:var(--muted);font-size:1.1rem;padding:6px 14px" title="Voltar (Back)"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="btn btn-sm" onclick="sendRemoteKey('HOME')" style="background:transparent;color:var(--muted);font-size:1.1rem;padding:6px 14px" title="Início (Home)"><i class="fa-regular fa-circle"></i></button>
+            <button class="btn btn-sm" onclick="sendRemoteKey('APP_SWITCH')" style="background:transparent;color:var(--muted);font-size:1.1rem;padding:6px 14px" title="Aplicações Abertas (Recents)"><i class="fa-regular fa-square"></i></button>
+          </div>
+
+        </div>
+
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:12px;text-align:center">
+          <i class="fa-solid fa-computer-mouse" style="color:var(--cyan)"></i> <b>Clique</b> para tocar • <b>Arraste</b> para rolar tela
+        </div>
+
+      </div>
+
+      <!-- COLUNA DIREITA: PAINEL DE COMANDOS, NAVEGAÇÃO & ATALHOS -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        
+        <!-- CARD 1: CONTROLES DE SISTEMA E HARDWARE -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom:12px"><i class="fa-solid fa-sliders"></i> Controles de Sistema & Ecrã</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn btn-sm btn-primary" onclick="sendRemoteKey('WAKEUP')"><i class="fa-solid fa-sun"></i> Despertar / Ligar Ecrã</button>
+            <button class="btn btn-sm btn-warn" onclick="sendRemoteKey('POWER')"><i class="fa-solid fa-power-off"></i> Botão Power / Bloquear</button>
+            <button class="btn btn-sm btn-purple" onclick="sendRemoteKey('NOTIFICATIONS')"><i class="fa-solid fa-bell"></i> Puxar Notificações</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--text)" onclick="sendRemoteKey('VOLUME_UP')"><i class="fa-solid fa-volume-high"></i> Vol +</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--text)" onclick="sendRemoteKey('VOLUME_DOWN')"><i class="fa-solid fa-volume-low"></i> Vol -</button>
+            <button class="btn btn-sm btn-danger" onclick="sendRemoteKey('BACK')" title="Fechar Diálogo USSD"><i class="fa-solid fa-xmark"></i> Fechar Caixa USSD</button>
+          </div>
+        </div>
+
+        <!-- CARD 2: AÇÕES DO GATEWAY KANET -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom:12px"><i class="fa-solid fa-bolt"></i> Ações Rápidas do Gateway Ka-Net</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn btn-sm btn-success" onclick="openGatewayAppRemote()"><i class="fa-solid fa-rocket"></i> Abrir App Ka-Net Gateway</button>
+            <button class="btn btn-sm btn-warn" onclick="restartGatewayAppRemote()"><i class="fa-solid fa-rotate-right"></i> Reiniciar App Gateway</button>
+            <button class="btn btn-sm btn-primary" onclick="openSimSettingsRemote()"><i class="fa-solid fa-sim-card"></i> Abrir Gestor de SIMs</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--text)" onclick="openSmsAppRemote()"><i class="fa-solid fa-comment-dots"></i> Abrir Mensagens SMS</button>
+            <button class="btn btn-sm btn-purple" onclick="launchScrcpyDesktop()"><i class="fa-solid fa-display"></i> Abrir Janela Nativa 60 FPS</button>
+          </div>
+        </div>
+
+        <!-- CARD 3: DISCADOR USSD LIVRE -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom:12px"><i class="fa-solid fa-phone"></i> Discador USSD Direto</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input class="form-input" type="text" id="remoteUssdInput" placeholder="Ex: *111# ou *150#" style="flex:1" value="*111#">
+            <button class="btn btn-success" onclick="sendRemoteUssd()"><i class="fa-solid fa-phone"></i> Discar USSD</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <button class="btn btn-sm" style="background:rgba(0,240,255,0.1);color:var(--cyan)" onclick="setUssdPreset('*111#')">Vodacom (*111#)</button>
+            <button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:var(--red)" onclick="setUssdPreset('*150#')">M-Pesa (*150#)</button>
+            <button class="btn btn-sm" style="background:rgba(245,158,11,0.1);color:var(--yellow)" onclick="setUssdPreset('*155#')">Movitel (*155#)</button>
+            <button class="btn btn-sm" style="background:rgba(16,185,129,0.1);color:var(--green)" onclick="setUssdPreset('*151#')">e-Mola (*151#)</button>
+            <button class="btn btn-sm" style="background:rgba(168,85,247,0.1);color:var(--purple)" onclick="setUssdPreset('*100*03#')">Saldo Megas (*100*03#)</button>
+          </div>
+        </div>
+
+        <!-- CARD 4: TECLADO & DIGITAÇÃO REMOTA -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom:12px"><i class="fa-solid fa-keyboard"></i> Digitação / Teclado Remoto</div>
+          <div style="display:flex;gap:8px">
+            <input class="form-input" type="text" id="remoteTypeInput" placeholder="Digite o texto ou número para escrever no celular..." style="flex:1" onkeydown="if(event.key==='Enter')sendRemoteType()">
+            <button class="btn btn-primary" onclick="sendRemoteType()"><i class="fa-solid fa-paper-plane"></i> Digitar</button>
+            <button class="btn btn-danger" onclick="sendRemoteKey('DELETE')" title="Apagar (Backspace)"><i class="fa-solid fa-delete-left"></i></button>
+            <button class="btn btn-success" onclick="sendRemoteKey('ENTER')" title="Enter / Confirmar"><i class="fa-solid fa-arrow-turn-down"></i></button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- TAB 2: RELATÓRIOS & FINANÇAS -->
+  <!-- ========================================== -->
+  <div id="tab-relatorios" class="tab-content">
+    
+    <div class="section-title"><i class="fa-solid fa-wallet"></i> Desempenho Financeiro & Vendas</div>
+    
+    <!-- FINANCIAL METRICS -->
+    <div class="grid-4">
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-calendar-day"></i> Vendas Hoje</div>
+        <div class="stat-val green" id="repTodayVal">0 MT</div>
+        <div class="stat-sub"><span id="repTodayMb">0 MB</span> entregues • <span id="repTodayCount">0</span> vendas</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-calendar-days"></i> Vendas do Mês</div>
+        <div class="stat-val cyan" id="repMonthVal">0 MT</div>
+        <div class="stat-sub"><span id="repMonthMb">0 MB</span> entregues • <span id="repMonthCount">0</span> vendas</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-money-bill-transfer"></i> Recebido M-Pesa (SMS)</div>
+        <div class="stat-val red" id="repMpesaVal">0 MT</div>
+        <div class="stat-sub"><span id="repMpesaCount">0</span> SMS confirmados</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-money-bill-wave"></i> Recebido e-Mola (SMS)</div>
+        <div class="stat-val yellow" id="repEmolaVal">0 MT</div>
+        <div class="stat-sub"><span id="repEmolaCount">0</span> SMS confirmados</div>
+      </div>
+    </div>
+
+    <!-- SALES HISTORY & SMS TRANSACTIONS -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Vendas & Entregas Recentes</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-primary" onclick="loadReports()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+        <button class="btn btn-sm btn-success" onclick="exportSalesCSV()"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+      </div>
+    </div>
+
+    <div class="table-container" style="margin-bottom:28px">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Ref / ID</th>
+            <th>Data & Hora</th>
+            <th>Destinatário</th>
+            <th>Volume</th>
+            <th>Valor MT</th>
+            <th>Tipo / Modo</th>
+            <th>Porta Gateway</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="salesTableBody">
+          <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px"><i class="fa-solid fa-spinner fa-spin"></i> A carregar vendas...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SMS PAYMENTS LOG -->
+    <div class="section-title"><i class="fa-solid fa-receipt"></i> Comprovativos de Pagamento SMS Recebidos</div>
+    <div class="table-container">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Código TxID</th>
+            <th>Método</th>
+            <th>Remetente</th>
+            <th>Valor Recebido</th>
+            <th>Data Processamento</th>
+          </tr>
+        </thead>
+        <tbody id="smsTableBody">
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px"><i class="fa-solid fa-spinner fa-spin"></i> A carregar pagamentos SMS...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- TAB 3: GRUPOS & TABELAS DE PREÇOS -->
+  <!-- ========================================== -->
+  <div id="tab-grupos" class="tab-content">
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-users"></i> Grupos WhatsApp Conectados & Autorizados</div>
+      <button class="btn btn-sm btn-primary" onclick="loadGroups()"><i class="fa-solid fa-rotate"></i> Atualizar Grupos</button>
+    </div>
+
+    <div class="grid-devices" id="groupsGrid" style="margin-bottom:32px">
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar grupos...</div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-tags"></i> Tabelas de Preços e Pacotes Configurados</div>
+      <button class="btn btn-sm btn-primary" onclick="loadPriceTables()"><i class="fa-solid fa-rotate"></i> Atualizar Tabelas</button>
+    </div>
+
+    <div class="grid-3" id="priceTablesGrid">
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar tabelas...</div>
+    </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 5: CLIENTES & SUPORTE HUB CRM -->
+  <!-- ========================================== -->
+  <div id="tab-crm" class="tab-content">
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="section-title" style="margin-bottom:4px"><i class="fa-solid fa-users-gear"></i> Gestão de Clientes Hub & Atendimento de Suporte</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Acompanhe cadastros no aplicativo de clientes, pedidos feitos via Hub e responda mensagens de suporte.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <a href="/hub/" target="_blank" class="btn btn-sm btn-primary"><i class="fa-solid fa-globe"></i> Abrir Client Hub Web</a>
+        <a href="/hub/KaNet-Client-Hub.apk" download class="btn btn-sm btn-success"><i class="fa-brands fa-android"></i> Baixar Client APK</a>
+        <a href="/KaNet-Admin-Master.apk" download class="btn btn-sm btn-purple"><i class="fa-solid fa-shield-halved"></i> Baixar Admin APK</a>
+        <button class="btn btn-sm btn-primary" onclick="loadCRMData()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+      </div>
+    </div>
+
+    <!-- CRM STATS -->
+    <div class="grid-4" style="margin-bottom:24px">
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-users"></i> Clientes Cadastrados</div><div class="stat-val cyan" id="crmTotalClients">0</div><div class="stat-sub">no Ka-Net Client Hub</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-cart-shopping"></i> Pedidos via Hub</div><div class="stat-val yellow" id="crmTotalOrders">0</div><div class="stat-sub">compras no app cliente</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-coins"></i> Receita no Hub</div><div class="stat-val green" id="crmTotalRevenue">0 MT</div><div class="stat-sub">volume total faturado</div></div>
+      <div class="card stat-card"><div class="stat-label"><i class="fa-solid fa-headset"></i> Tickets de Suporte</div><div class="stat-val purple" id="crmOpenTickets">0</div><div class="stat-sub">chamados de atendimento</div></div>
+    </div>
+
+    <!-- TICKETS LIST -->
+    <div class="section-title"><i class="fa-solid fa-comments"></i> Mensagens & Chamados de Suporte dos Clientes</div>
+    <div class="card" id="crmTicketsCard" style="padding:16px;min-height:220px;margin-bottom:24px">
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar tickets de suporte...</div>
+    </div>
+
+    <!-- SCHEDULED PLANS LIST -->
+    <div class="section-title"><i class="fa-solid fa-calendar-days"></i> Planos Agendados Activos (Renováveis & Faseados)</div>
+    <div class="card" id="crmPlansCard" style="padding:16px;min-height:160px">
+      <div style="text-align:center;padding:30px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar planos agendados...</div>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = 'https://kanet-cloud-api.onrender.com';
+const TOKEN = 'KaNetKelven2026Secure';
+const headers = { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' };
+let allOrders = [];
+let allSalesData = [];
+
+// TAB SWITCHING
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  
+  const target = document.getElementById('tab-' + tabId);
+  const btn = document.getElementById('tabBtn-' + tabId);
+  if (target) target.classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  if (tabId === 'remote') {
+    initRemoteControl();
+  } else {
+    stopScreenAutoRefresh();
+  }
+  if (tabId === 'relatorios') loadReports();
+  if (tabId === 'grupos') { loadGroups(); loadPriceTables(); }
+  if (tabId === 'crm') loadCRMData();
+}
+
+function toast(msg, type='ok') {
+  const el = document.createElement('div');
+  el.className = 'toast-msg ' + type;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// -------------------------------------------------------------------
+// CONTROLE REMOTO WEBADB & ESPELHAMENTO DE ECRÃ
+// -------------------------------------------------------------------
+let currentRemotePort = 8024;
+let screenRefreshTimer = null;
+let isScreenAutoRefresh = true;
+let isScreenLoading = false;
+let screenTouchStart = null;
+
+function initRemoteControl() {
+  selectRemoteDevice(currentRemotePort || 8024);
+  setupScreenTouchListeners();
+}
+
+function openRemoteTabForPort(port) {
+  switchTab('remote');
+  selectRemoteDevice(port);
+}
+
+function selectRemoteDevice(port) {
+  currentRemotePort = Number(port);
+  [8024, 8077].forEach(p => {
+    const btn = document.getElementById('rdev-' + p);
+    if (!btn) return;
+    if (p === currentRemotePort) {
+      btn.className = 'btn btn-sm btn-primary';
+      btn.style.boxShadow = '0 0 12px rgba(0, 240, 255, 0.4)';
+    } else {
+      btn.className = 'btn btn-sm';
+      btn.style.background = 'rgba(255,255,255,0.06)';
+      btn.style.color = 'var(--text)';
+      btn.style.boxShadow = 'none';
+    }
+  });
+
+  const devNameEl = document.getElementById('remoteDeviceName');
+  if (devNameEl) {
+    devNameEl.textContent = currentRemotePort === 8024 ? 'Huawei 8024 (SIM 2)' : (currentRemotePort === 8077 ? 'Xiaomi 8077 (Movitel)' : `Porta ${currentRemotePort}`);
+  }
+
+  loadRemoteScreen();
+  startScreenAutoRefresh();
+}
+
+async function loadRemoteScreen() {
+  if (isScreenLoading) return;
+  const img = document.getElementById('remoteScreenImg');
+  const overlay = document.getElementById('screenLoadingOverlay');
+  if (!img) return;
+
+  try {
+    isScreenLoading = true;
+    const url = `${API}/api/remote/${currentRemotePort}/screen?t=${Date.now()}`;
+    
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      img.src = tempImg.src;
+      if (overlay) overlay.style.display = 'none';
+      isScreenLoading = false;
+    };
+    tempImg.onerror = () => {
+      if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;color:var(--yellow)"></i><span>Aguardando sinal ADB da Porta ${currentRemotePort}...</span>`;
+      }
+      isScreenLoading = false;
+    };
+    tempImg.src = url;
+  } catch(e) {
+    isScreenLoading = false;
+  }
+}
+
+function startScreenAutoRefresh() {
+  stopScreenAutoRefresh();
+  isScreenAutoRefresh = true;
+  updateAutoRefreshBtnUI();
+  screenRefreshTimer = setInterval(() => {
+    const tab = document.getElementById('tab-remote');
+    if (tab && tab.classList.contains('active')) {
+      loadRemoteScreen();
+    }
+  }, 1200);
+}
+
+function stopScreenAutoRefresh() {
+  if (screenRefreshTimer) {
+    clearInterval(screenRefreshTimer);
+    screenRefreshTimer = null;
+  }
+  isScreenAutoRefresh = false;
+  updateAutoRefreshBtnUI();
+}
+
+function toggleScreenAutoRefresh() {
+  if (isScreenAutoRefresh) {
+    stopScreenAutoRefresh();
+    toast('Pausado espelhamento contínuo.', 'ok');
+  } else {
+    startScreenAutoRefresh();
+    toast('Espelhamento em tempo real ativado!', 'ok');
+  }
+}
+
+function updateAutoRefreshBtnUI() {
+  const btn = document.getElementById('btnAutoRefresh');
+  const txt = document.getElementById('autoRefreshText');
+  if (!btn || !txt) return;
+  if (isScreenAutoRefresh) {
+    btn.style.background = 'rgba(0,240,255,0.15)';
+    btn.style.color = 'var(--cyan)';
+    btn.innerHTML = '<i class="fa-solid fa-play"></i> Ao Vivo';
+  } else {
+    btn.style.background = 'rgba(255,255,255,0.08)';
+    btn.style.color = 'var(--muted)';
+    btn.innerHTML = '<i class="fa-solid fa-pause"></i> Pausado';
+  }
+}
+
+function refreshScreenManual() {
+  loadRemoteScreen();
+  toast('Ecrã atualizado.', 'ok');
+}
+
+// Interação com o Ecrã Touch (Mouse to Tap / Swipe)
+function setupScreenTouchListeners() {
+  const wrapper = document.getElementById('screenWrapper');
+  if (!wrapper || wrapper._touchConfigured) return;
+  wrapper._touchConfigured = true;
+
+  wrapper.addEventListener('mousedown', (e) => {
+    const rect = wrapper.getBoundingClientRect();
+    screenTouchStart = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      w: rect.width,
+      h: rect.height,
+      time: Date.now()
+    };
+  });
+
+  wrapper.addEventListener('mouseup', async (e) => {
+    if (!screenTouchStart) return;
+    const rect = wrapper.getBoundingClientRect();
+    const endX = e.clientX - rect.left;
+    const endY = e.clientY - rect.top;
+    const startX = screenTouchStart.x;
+    const startY = screenTouchStart.y;
+    const width = rect.width;
+    const height = rect.height;
+    const elapsed = Date.now() - screenTouchStart.time;
+    screenTouchStart = null;
+
+    const dist = Math.hypot(endX - startX, endY - startY);
+
+    if (dist < 12) {
+      showTouchRipple(startX, startY);
+      try {
+        await fetchAPI(`/api/remote/${currentRemotePort}/touch`, {
+          method: 'POST',
+          body: JSON.stringify({ x: startX, y: startY, width, height })
+        });
+        setTimeout(loadRemoteScreen, 350);
+      } catch(err) { console.error('Erro ao enviar toque:', err); }
+    } else {
+      try {
+        await fetchAPI(`/api/remote/${currentRemotePort}/swipe`, {
+          method: 'POST',
+          body: JSON.stringify({
+            x1: startX, y1: startY,
+            x2: endX, y2: endY,
+            duration: Math.max(150, Math.min(800, elapsed)),
+            width, height
+          })
+        });
+        setTimeout(loadRemoteScreen, 450);
+      } catch(err) { console.error('Erro ao enviar swipe:', err); }
+    }
+  });
+}
+
+function showTouchRipple(x, y) {
+  const ripple = document.getElementById('touchRipple');
+  if (!ripple) return;
+  ripple.style.left = x + 'px';
+  ripple.style.top = y + 'px';
+  ripple.style.transition = 'none';
+  ripple.style.transform = 'translate(-50%,-50%) scale(0)';
+  ripple.style.opacity = '1';
+
+  requestAnimationFrame(() => {
+    ripple.style.transition = 'transform 0.28s ease-out, opacity 0.28s ease-out';
+    ripple.style.transform = 'translate(-50%,-50%) scale(2.2)';
+    ripple.style.opacity = '0';
+  });
+}
+
+async function sendRemoteKey(key) {
+  try {
+    const d = await fetchAPI(`/api/remote/${currentRemotePort}/key`, {
+      method: 'POST',
+      body: JSON.stringify({ key })
+    });
+    if (d.success) {
+      setTimeout(loadRemoteScreen, 350);
+    }
+  } catch(e) {
+    toast(`Erro ao enviar tecla: ${e.message}`, 'err');
+  }
+}
+
+async function sendRemoteType() {
+  const inp = document.getElementById('remoteTypeInput');
+  const text = inp ? inp.value : '';
+  if (!text) return;
+
+  try {
+    toast(`A digitar "${text}" no celular...`, 'ok');
+    const d = await fetchAPI(`/api/remote/${currentRemotePort}/type`, {
+      method: 'POST',
+      body: JSON.stringify({ text })
+    });
+    if (d.success) {
+      if (inp) inp.value = '';
+      setTimeout(loadRemoteScreen, 400);
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha ao digitar'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+async function sendRemoteUssd() {
+  const inp = document.getElementById('remoteUssdInput');
+  const code = inp ? inp.value.trim() : '';
+  if (!code) { toast('Digite o código USSD!', 'err'); return; }
+
+  try {
+    toast(`A discar ${code} no celular...`, 'ok');
+    const d = await fetchAPI(`/api/remote/${currentRemotePort}/ussd`, {
+      method: 'POST',
+      body: JSON.stringify({ code })
+    });
+    if (d.success) {
+      toast(`✅ Código ${code} enviado para o discador!`, 'ok');
+      setTimeout(loadRemoteScreen, 1200);
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha ao discar'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+function setUssdPreset(code) {
+  const inp = document.getElementById('remoteUssdInput');
+  if (inp) inp.value = code;
+  sendRemoteUssd();
+}
+
+async function launchScrcpyDesktop() {
+  try {
+    toast(`A iniciar janela Scrcpy (60 FPS) para a Porta ${currentRemotePort}...`, 'ok');
+    const d = await fetchAPI(`/api/remote/${currentRemotePort}/launch-scrcpy`, { method: 'POST', body: JSON.stringify({}) });
+    if (d.success) {
+      toast(`🖥️ ${d.mensagem}`, 'ok');
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha ao iniciar Scrcpy'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+async function openGatewayAppRemote() {
+  try {
+    toast('A abrir App Ka-Net Gateway no celular...', 'ok');
+    await fetchAPI(`/api/remote/${currentRemotePort}/key`, {
+      method: 'POST',
+      body: JSON.stringify({ key: 'cmd monkey -p mz.kanet.gateway 1' })
+    });
+    setTimeout(loadRemoteScreen, 800);
+  } catch(e) { toast(`Erro: ${e.message}`, 'err'); }
+}
+
+async function restartGatewayAppRemote() {
+  try {
+    toast('A reiniciar App Ka-Net Gateway...', 'ok');
+    await fetchAPI(`/api/remote/${currentRemotePort}/key`, {
+      method: 'POST',
+      body: JSON.stringify({ key: 'cmd am force-stop mz.kanet.gateway' })
+    });
+    setTimeout(openGatewayAppRemote, 600);
+  } catch(e) { toast(`Erro: ${e.message}`, 'err'); }
+}
+
+async function openSimSettingsRemote() {
+  try {
+    await fetchAPI(`/api/remote/${currentRemotePort}/key`, {
+      method: 'POST',
+      body: JSON.stringify({ key: 'cmd am start -a android.settings.WIRELESS_SETTINGS' })
+    });
+    setTimeout(loadRemoteScreen, 600);
+  } catch(e) { toast(`Erro: ${e.message}`, 'err'); }
+}
+
+async function openSmsAppRemote() {
+  try {
+    await fetchAPI(`/api/remote/${currentRemotePort}/key`, {
+      method: 'POST',
+      body: JSON.stringify({ key: 'cmd am start -a android.intent.action.MAIN -c android.intent.category.APP_MESSAGING' })
+    });
+    setTimeout(loadRemoteScreen, 600);
+  } catch(e) { toast(`Erro: ${e.message}`, 'err'); }
+}
+
+async function fetchAPI(path, opts={}) {
+  const r = await fetch(API + path, { headers, ...opts });
+  return r.json();
+}
+
+// -------------------------------------------------------------------
+// 1. WHATSAPP STATUS & DEVICES
+// -------------------------------------------------------------------
+async function loadWAStatus() {
+  try {
+    const d = await fetchAPI('/api/whatsapp/status');
+    const el = document.getElementById('waStatus');
+    const tx = document.getElementById('waStatusText');
+    if (d.status === 'connected') {
+      el.className = 'wa-status';
+      const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
+      tx.textContent = '📱 WhatsApp Conectado: +' + phone;
+    } else if (d.hasQr || d.status === 'qr_ready') {
+      el.className = 'wa-status loading';
+      tx.textContent = '⏳ QR Code Pronto (Clique em Ver QR)';
+    } else {
+      el.className = 'wa-status offline';
+      tx.textContent = '❌ WhatsApp Desconectado';
+    }
+    // Atualizar botão de manutenção com o estado real
+    updateManutencaoBtn(!!d.modoManutencao);
+  } catch(e) {
+    document.getElementById('waStatus').className = 'wa-status offline';
+    document.getElementById('waStatusText').textContent = '❌ Desconectado';
+  }
+}
+
+function updateManutencaoBtn(ativo) {
+  const btn = document.getElementById('btnManutencao');
+  const lbl = document.getElementById('manutencaoLabel');
+  if (!btn || !lbl) return;
+  if (ativo) {
+    btn.style.background = '#b71c1c';
+    lbl.textContent = '🛑 Em Manutenção';
+    btn.title = 'Clique para voltar ao estado ONLINE (liberar vendas)';
+  } else {
+    btn.style.background = '#2e7d32';
+    lbl.textContent = '🟢 Sistema Online';
+    btn.title = 'Clique para ativar MANUTENÇÃO (bloquear vendas em grupos e privado)';
+  }
+  btn._modoAtivo = ativo;
+}
+
+async function toggleMaintenance() {
+  const btn = document.getElementById('btnManutencao');
+  const novoEstado = !btn._modoAtivo;
+  try {
+    btn.disabled = true;
+    document.getElementById('manutencaoLabel').textContent = '⏳ A processar...';
+    const d = await fetchAPI('/api/maintenance', { method: 'POST', body: JSON.stringify({ ativo: novoEstado }) });
+    if (d.success) {
+      updateManutencaoBtn(d.modoManutencao);
+      showToast(d.mensagem || (d.modoManutencao ? '🛑 Manutenção ativada' : '🟢 Sistema online'));
+    } else {
+      showToast('❌ Erro: ' + (d.error || 'Falha na operação'));
+    }
+  } catch(e) {
+    showToast('❌ Erro: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+
+
+async function loadDevices() {
+  try {
+    const d = await fetchAPI('/api/devices');
+    const devices = d.devices || [];
+    const grid = document.getElementById('devicesGrid');
+    
+    if (devices.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-mobile-screen-button" style="font-size:2rem;margin-bottom:10px;display:block"></i>Nenhum celular registado ainda.<br>Abra o Ka-Net Gateway nos celulares.</div>';
+      return devices;
+    }
+    
+    grid.innerHTML = devices.map(dev => {
+      const online = dev.online;
+      const apto = dev.is_apto;
+      const bat = dev.bateria || 0;
+      const batColor = bat > 50 ? 'green' : bat > 20 ? 'yellow' : 'red';
+      const saldo1 = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
+      const saldo2 = dev.sim2_saldo_mb !== undefined ? dev.sim2_saldo_mb : 0;
+      const saldoColor1 = saldo1 > 500 ? 'green' : saldo1 >= 100 ? 'yellow' : 'red';
+      const saldoColor2 = saldo2 > 500 ? 'green' : saldo2 >= 100 ? 'yellow' : 'red';
+      const isSpecial = dev.porta === 8077 || dev.porta === 8777;
+      const avail = dev.transfers_available !== undefined ? dev.transfers_available : '?';
+      const total = dev.total_envios || 0;
+      const pct = Math.min(100, (total / 20) * 100);
+      const pctColor = pct < 50 ? 'green' : pct < 80 ? 'yellow' : 'red';
+      const tipoPorta = dev.porta === 8077 ? '📅 Semanais / Mensais / VIP' : dev.porta === 8777 ? '💰 Saldo & Crédito' : '📦 Diários (24hrs)';
+      const activeSim = dev.active_sim_slot || 1;
+      const isPaused = !!dev.paused;
+      
+      const pendingHtml = dev.pending_order ? `
+        <div class="pending-order">
+          <div class="pending-label"><i class="fa-solid fa-spinner fa-spin"></i> EM PROCESSAMENTO</div>
+          <div>📲 <b>${dev.pending_order.numero}</b> • <b>${dev.pending_order.quantidade}MB</b> • <span style="color:var(--cyan)">${dev.pending_order.modo || 'diario'}</span></div>
+        </div>` : '';
+      
+      const lastResult = dev.last_result ? `
+        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">
+          Último envio: ${dev.last_result.success ? '✅' : '❌'} ${dev.last_result.numero || ''} ${dev.last_result.quantidade ? dev.last_result.quantidade+'MB' : ''}
+        </div>` : '';
+      
+      // Bloco de Saldo
+      const statBlocoSaldo = isSpecial ? `
+        <div class="device-stat">
+          <div class="device-stat-label">💰 Saldo Operacional</div>
+          <div class="device-stat-val" style="color:var(--green)">${dev.saldo_credito || (dev.saldo_mt !== undefined ? dev.saldo_mt + ' MT' : 'Ativo')}</div>
+          <div style="font-size:.68rem;color:var(--muted)">Crédito Principal</div>
+        </div>` : `
+        <div class="device-stat">
+          <div class="device-stat-label">📡 SIM 1 & SIM 2</div>
+          <div class="device-stat-val" style="font-size:.85rem">
+            <span style="color:var(--${saldoColor1})">S1: ${saldo1 >= 1024 ? (saldo1/1024).toFixed(1)+'GB' : saldo1+'MB'}</span> | 
+            <span style="color:var(--${saldoColor2})">S2: ${saldo2 >= 1024 ? (saldo2/1024).toFixed(1)+'GB' : saldo2+'MB'}</span>
+          </div>
+          <div style="font-size:.68rem;color:var(--cyan)">Slot Ativo: <b>SIM ${activeSim}</b></div>
+        </div>`;
+
+      // Bloco de Envios Diários
+      const statBlocoEnvios = isSpecial ? `
+        <div class="device-stat">
+          <div class="device-stat-label">📤 Ofertas Ativadas</div>
+          <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">hoje</span></div>
+          <div style="font-size:.68rem;color:var(--cyan)">Sem limite diário</div>
+        </div>` : `
+        <div class="device-stat">
+          <div class="device-stat-label">📤 Envios Hoje</div>
+          <div class="device-stat-val">${total} <span style="font-size:.7rem;color:var(--muted)">/ 20</span></div>
+          <div class="progress-bar"><div class="progress-fill ${pctColor}" style="width:${pct}%"></div></div>
+        </div>`;
+
+      // Bloco de Disponíveis
+      const statBlocoDisponiveis = isSpecial ? `
+        <div class="device-stat">
+          <div class="device-stat-label">⚡ Modo Ofertas</div>
+          <div class="device-stat-val" style="color:var(--cyan);font-size:.85rem">ILIMITADO</div>
+          <div style="font-size:.68rem;color:var(--muted)">Ativação via Saldo</div>
+        </div>` : `
+        <div class="device-stat">
+          <div class="device-stat-label">✅ Disponíveis</div>
+          <div class="device-stat-val" style="color:var(--${avail > 5 ? 'green' : avail > 0 ? 'yellow' : 'red'})">${avail}</div>
+          <div style="font-size:.68rem;color:var(--muted)">S1: ${dev.sim1_envios||0}/10 | S2: ${dev.sim2_envios||0}/10</div>
+        </div>`;
+
+      const modelName = dev.device_model || (dev.porta === 8023 ? 'Xiaomi Redmi' : dev.porta === 8077 ? 'Huawei Honor' : ('Celular Gateway'));
+
+      return `
+        <div class="card" style="${isPaused ? 'border-color:rgba(245,158,11,.4);opacity:0.85;' : ''}">
+          <div class="device-header">
+            <div>
+              <div class="device-name">📱 ${modelName} <span style="font-size:.8rem;color:var(--cyan)">(Porta ${dev.porta})</span></div>
+              <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${dev.carrier || 'Vodacom'} • ${tipoPorta}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+              <span class="badge ${online ? 'online' : 'offline'}">${online ? '● Online' : '● Offline'}</span>
+              <span class="badge ${isPaused ? 'inapto' : (apto ? 'apto' : 'inapto')}">${isPaused ? '⏸ Pausado' : (apto ? '✓ Apto' : (dev.sem_saldo ? '⚠ Sem Saldo' : (dev.limite_atingido ? '⛔ Limite' : '⚠ Inapto')))}</span>
+            </div>
+          </div>
+          <div class="device-grid">
+            <div class="device-stat">
+              <div class="device-stat-label">🔋 Bateria</div>
+              <div class="device-stat-val" style="color:var(--${batColor})">${bat}%</div>
+              <div class="progress-bar"><div class="progress-fill ${batColor}" style="width:${bat}%"></div></div>
+            </div>
+            ${statBlocoSaldo}
+            ${statBlocoEnvios}
+            ${statBlocoDisponiveis}
+          </div>
+          ${pendingHtml}
+          ${lastResult}
+          
+          <!-- PAINEL DE MANUSEIO E CONTROLO DIRETO -->
+          <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:10px;margin-top:12px;border:1px solid rgba(255,255,255,0.05)">
+            <div style="font-size:0.68rem;font-weight:700;color:var(--cyan);text-transform:uppercase;margin-bottom:6px;letter-spacing:0.05em">
+              <i class="fa-solid fa-gamepad"></i> Manuseio do Celular
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px">
+              <button class="btn btn-success btn-sm" onclick="resetDevice(${dev.porta})" title="Desbloquear e limpar travas"><i class="fa-solid fa-unlock"></i> Libertar</button>
+              <button class="btn btn-primary btn-sm" onclick="openSaldoModal(${dev.porta}, ${saldo1}, ${saldo2}, ${dev.saldo_mt || 0})" title="Definir saldo"><i class="fa-solid fa-coins"></i> Saldo</button>
+              <button class="btn btn-warn btn-sm" onclick="forceDispatch(${dev.porta})" title="Forçar despacho de pedido pendente"><i class="fa-solid fa-bolt"></i> Forçar</button>
+              <button class="btn btn-danger btn-sm" onclick="forceDispatchOverride(${dev.porta})" title="Despachar qualquer pedido (ignora tipo de pacote)"><i class="fa-solid fa-triangle-exclamation"></i> Override</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+              <button class="btn ${activeSim === 1 ? 'btn-primary' : 'btn-purple'} btn-sm" onclick="setDeviceSim(${dev.porta}, 1)" title="Ativar SIM 1">
+                <i class="fa-solid fa-sim-card"></i> SIM 1 ${activeSim === 1 ? '✓' : ''}
+              </button>
+              <button class="btn ${activeSim === 2 ? 'btn-primary' : 'btn-purple'} btn-sm" onclick="setDeviceSim(${dev.porta}, 2)" title="Ativar SIM 2">
+                <i class="fa-solid fa-sim-card"></i> SIM 2 ${activeSim === 2 ? '✓' : ''}
+              </button>
+              <button class="btn ${isPaused ? 'btn-success' : 'btn-danger'} btn-sm" onclick="togglePauseDevice(${dev.porta})" title="${isPaused ? 'Retomar celular' : 'Pausar celular'}">
+                <i class="fa-solid ${isPaused ? 'fa-play' : 'fa-pause'}"></i> ${isPaused ? 'Retomar' : 'Pausar'}
+              </button>
+            </div>
+            <button class="btn btn-purple btn-sm" onclick="openRemoteTabForPort(${dev.porta})" style="width:100%;margin-top:6px;justify-content:center" title="Ver e controlar tela com mouse e teclado">
+              <i class="fa-solid fa-gamepad"></i> Ver & Controlar Ecrã Remoto
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+    return devices;
+  } catch(e) {
+    document.getElementById('devicesGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:20px"><i class="fa-solid fa-triangle-exclamation"></i> Erro: ' + e.message + '</div>';
+    return [];
+  }
+}
+
+// ── MANUSEIO: LIBERTAR PORTA ──
+async function resetDevice(port) {
+  try {
+    toast(`A libertar porta ${port}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/reset`, { method: 'POST', body: JSON.stringify({}) });
+    if (d.success) {
+      toast(`✅ Porta ${port} desbloqueada e pronta!`, 'ok');
+      await loadDevices();
+      await loadQueue();
+    } else {
+      toast(`❌ Erro ao libertar: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: LIBERTAR TODOS OS CELULARES ──
+async function resetAllDevices() {
+  if (!confirm('Deseja libertar e desbloquear todos os celulares registados?')) return;
+  try {
+    toast('A libertar todos os celulares...', 'ok');
+    const d = await fetchAPI('/api/devices/reset-all', { method: 'POST', body: JSON.stringify({}) });
+    if (d.success) {
+      toast(`✅ Todos os celulares foram libertados com sucesso!`, 'ok');
+      await loadDevices();
+      await loadQueue();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: ALTERNAR SIM ATIVO ──
+async function setDeviceSim(port, slot) {
+  try {
+    toast(`A alterar porta ${port} para SIM ${slot}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/set-sim`, { method: 'POST', body: JSON.stringify({ slot }) });
+    if (d.success) {
+      toast(`✅ Porta ${port} agora está a usar SIM ${slot}!`, 'ok');
+      await loadDevices();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: PAUSAR / RETOMAR CELULAR ──
+async function togglePauseDevice(port) {
+  try {
+    const d = await fetchAPI(`/api/devices/${port}/toggle-pause`, { method: 'POST', body: JSON.stringify({}) });
+    if (d.success) {
+      toast(`✅ ${d.mensagem}`, 'ok');
+      await loadDevices();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: MODAL DE AJUSTE DE SALDO ──
+let currentSaldoModalPort = null;
+
+function openSaldoModal(port, sim1, sim2, saldoMt) {
+  currentSaldoModalPort = port;
+  document.getElementById('modalPortTitle').textContent = `Celular Porta ${port}`;
+  document.getElementById('modalSim1Saldo').value = sim1 || 0;
+  document.getElementById('modalSim2Saldo').value = sim2 || 0;
+  document.getElementById('modalSaldoMt').value = saldoMt || 0;
+  document.getElementById('saldoModal').style.display = 'flex';
+}
+
+function closeSaldoModal() {
+  document.getElementById('saldoModal').style.display = 'none';
+  currentSaldoModalPort = null;
+}
+
+async function saveSaldoModal() {
+  if (!currentSaldoModalPort) return;
+  const port = currentSaldoModalPort;
+  const s1 = Number(document.getElementById('modalSim1Saldo').value) || 0;
+  const s2 = Number(document.getElementById('modalSim2Saldo').value) || 0;
+  const smt = Number(document.getElementById('modalSaldoMt').value) || 0;
+
+  try {
+    toast(`A guardar saldo da Porta ${port}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/set-saldo`, {
+      method: 'POST',
+      body: JSON.stringify({
+        sim1_saldo_mb: s1,
+        sim2_saldo_mb: s2,
+        saldo_mb: Math.max(s1, s2),
+        saldo_mt: smt
+      })
+    });
+    if (d.success) {
+      toast(`✅ Saldo da Porta ${port} atualizado com sucesso!`, 'ok');
+      closeSaldoModal();
+      await loadDevices();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// ── MANUSEIO: FORÇAR DESPACHO OVERRIDE (Ignora compatibilidade de modo) ──
+async function forceDispatchOverride(port, orderId = null) {
+  try {
+    const confirm_msg = orderId
+      ? `Despachar pedido ${orderId} para porta ${port}?`
+      : `Despachar próximo pedido pendente (qualquer tipo) para porta ${port}?`;
+    if (!confirm(confirm_msg)) return;
+
+    toast(`⚡ A despachar override para Porta ${port}...`, 'ok');
+    const d = await fetchAPI(`/api/devices/${port}/force-dispatch-override`, {
+      method: 'POST',
+      body: JSON.stringify(orderId ? { orderId } : {})
+    });
+    if (d.success) {
+      toast(`✅ ${d.mensagem}`, 'ok');
+      await loadDevices();
+      await loadQueue();
+    } else {
+      toast(`❌ ${d.mensagem || 'Falha no override'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
+
+// -------------------------------------------------------------------
+// 2. FILA DE PEDIDOS INTELIGENTE COM FILTROS & AÇÕES RÁPIDAS
+// -------------------------------------------------------------------
+let currentQueueFilter = 'all';
+let cachedOrdersData = [];
+
+function setQueueFilter(filter) {
+  currentQueueFilter = filter;
+  const tabs = ['all', 'pending', 'active', 'failed', 'completed'];
+  tabs.forEach(tab => {
+    const btn = document.getElementById('qf-' + tab);
+    if (!btn) return;
+    if (tab === filter) {
+      btn.style.outline = '2px solid var(--cyan)';
+      btn.style.boxShadow = '0 0 12px rgba(0, 240, 255, 0.4)';
+    } else {
+      btn.style.outline = 'none';
+      btn.style.boxShadow = 'none';
+    }
+  });
+  renderQueue();
+}
+
+function renderQueue() {
+  const panel = document.getElementById('queuePanel');
+  if (!panel) return;
+
+  let list = [...cachedOrdersData];
+
+  // Aplicar filtro selecionado
+  if (currentQueueFilter === 'pending') {
+    list = list.filter(o => o.status === 'pending' || o.status === 'waiting_part1');
+  } else if (currentQueueFilter === 'active') {
+    list = list.filter(o => o.status === 'assigned' || o.status === 'processing');
+  } else if (currentQueueFilter === 'failed') {
+    list = list.filter(o => o.status === 'failed' || o.status === 'expired' || o.status === 'cancelled');
+  } else if (currentQueueFilter === 'completed') {
+    list = list.filter(o => o.status === 'completed');
+  }
+
+  if (list.length === 0) {
+    const filterLabels = {
+      all: 'Nenhum pedido na fila',
+      pending: 'Nenhum pedido pendente',
+      active: 'Nenhum pedido em processamento no momento',
+      failed: 'Nenhum pedido falhado',
+      completed: 'Nenhum pedido concluído recente'
+    };
+    panel.innerHTML = `<div style="text-align:center;color:var(--muted);padding:28px;font-size:.85rem">
+      <i class="fa-solid fa-inbox" style="font-size:1.8rem;margin-bottom:8px;display:block;opacity:0.6"></i>
+      ${filterLabels[currentQueueFilter] || 'Fila vazia'}
+    </div>`;
+    return;
+  }
+
+  panel.innerHTML = list.map(o => {
+    const oid = o.orderId || o.id || o.ref || '?';
+    const shortRef = oid.length > 14 ? '...' + oid.slice(-12) : oid;
+    const st = o.status || 'pending';
+    const qty = Number(o.quantidade) || 0;
+    const vol = o.volume || (qty < 1024 ? qty + 'MB' : (qty / 1024).toFixed(1) + 'GB');
+    const hora = o.createdAt ? new Date(o.createdAt).toLocaleTimeString('pt-PT') : '';
+    const porta = o.porta || o.assignedToPort || o.targetPort ? `Porta ${o.porta || o.assignedToPort || o.targetPort}` : 'Sem porta fixa';
+    const splitInfo = o.isSplit ? `<span style="background:rgba(168,85,247,0.2);color:var(--purple);padding:2px 6px;border-radius:4px;font-size:0.68rem;font-weight:700">Split P${o.splitPart || 1}</span>` : '';
+    const isPhantom = o.fantasma;
+
+    let statusBadgeClass = `status-${st}`;
+    let statusLabel = st;
+    if (st === 'pending') statusLabel = '⏳ Pendente';
+    else if (st === 'assigned' || st === 'processing') statusLabel = isPhantom ? '⚠️ Travado (>5m)' : '⚡ Processando';
+    else if (st === 'completed') statusLabel = '✅ Concluído';
+    else if (st === 'failed') statusLabel = '❌ Falhado';
+    else if (st === 'waiting_part1') statusLabel = '⏳ Aguardando P1';
+    else if (st === 'cancelled') statusLabel = '🚫 Cancelado';
+    else if (st === 'expired') statusLabel = '⌛ Expirado';
+
+    const errorMsg = (o.erro || o.lastError) ? `
+      <div style="background:rgba(239,68,68,0.12);border-left:3px solid var(--red);padding:6px 10px;border-radius:4px;color:#fca5a5;font-size:.73rem;margin-top:6px;font-weight:500;word-break:break-word">
+        <i class="fa-solid fa-circle-exclamation" style="margin-right:4px"></i> <b>Motivo:</b> ${o.erro || o.lastError}
+      </div>` : '';
+
+    const actions = `
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="retryOrder('${oid}')" title="Repetir e despachar novamente"><i class="fa-solid fa-rotate-right"></i> Repetir</button>
+        <button class="btn btn-warn btn-sm" onclick="changeOrderPort('${oid}')" title="Trocar porta do celular"><i class="fa-solid fa-arrow-right-arrow-left"></i> Trocar Porta</button>
+        ${(st !== 'cancelled' && st !== 'completed') ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder('${oid}')" title="Cancelar pedido"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
+        <button class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--muted)" onclick="deleteOrder('${oid}')" title="Remover da lista"><i class="fa-solid fa-trash-can"></i></button>
+      </div>`;
+
+    return `
+      <div class="order-item" style="${isPhantom ? 'border:1px solid #ef4444;background:rgba(239,68,68,0.06)' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="order-ref" title="${oid}">${shortRef}</span>
+            <span style="font-size:.7rem;color:var(--muted)">${hora}</span>
+            ${splitInfo}
+          </div>
+          <span class="order-status ${statusBadgeClass}">${statusLabel}</span>
+        </div>
+        <div style="margin-top:4px;font-size:.84rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <div>
+            <b>📲 ${o.numero || '?'}</b> • <span style="color:var(--cyan);font-weight:700">${vol}</span> • <span style="color:var(--muted);text-transform:capitalize">${o.modo || 'diario'}</span>
+          </div>
+          <span style="font-size:0.75rem;background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:6px;color:var(--muted)">
+            <i class="fa-solid fa-mobile-screen" style="font-size:0.7rem;margin-right:3px"></i> ${porta}
+          </span>
+        </div>
+        ${errorMsg}
+        ${actions}
+      </div>`;
+  }).join('');
+}
+
+async function loadQueue() {
+  try {
+    const d = await fetchAPI('/api/orders?all=true');
+    const all = d.all_orders || d.orders || (Array.isArray(d) ? d : Object.values(d)) || [];
+    cachedOrdersData = Array.isArray(all) ? all : [];
+
+    // Estatísticas dos botões de filtro
+    const sum = d.summary || {};
+    const totalCount = sum.total !== undefined ? sum.total : cachedOrdersData.length;
+    const pendingCount = (sum.pendentes || 0) + (sum.aguardando || 0) || cachedOrdersData.filter(o => o.status === 'pending' || o.status === 'waiting_part1').length;
+    const activeCount = sum.activos !== undefined ? sum.activos : cachedOrdersData.filter(o => o.status === 'assigned' || o.status === 'processing').length;
+    const failedCount = (sum.falhados || 0) + (sum.expirados || 0) || cachedOrdersData.filter(o => o.status === 'failed' || o.status === 'expired' || o.status === 'cancelled').length;
+    const completedCount = sum.concluidos !== undefined ? sum.concluidos : cachedOrdersData.filter(o => o.status === 'completed').length;
+
+    const elAll = document.getElementById('qc-all'); if (elAll) elAll.textContent = totalCount;
+    const elPending = document.getElementById('qc-pending'); if (elPending) elPending.textContent = pendingCount;
+    const elActive = document.getElementById('qc-active'); if (elActive) elActive.textContent = activeCount;
+    const elFailed = document.getElementById('qc-failed'); if (elFailed) elFailed.textContent = failedCount;
+    const elCompleted = document.getElementById('qc-completed'); if (elCompleted) elCompleted.textContent = completedCount;
+
+    // Métricas topo
+    const mPend = document.getElementById('mPending');
+    if (mPend) mPend.textContent = pendingCount + activeCount;
+
+    renderQueue();
+  } catch(e) {
+    const panel = document.getElementById('queuePanel');
+    if (panel) panel.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;font-size:.85rem">Erro ao carregar fila: ' + e.message + '</div>';
+  }
+}
+
+async function retryOrder(orderId, targetPort = null) {
+  try {
+    toast('A re-enfileirar pedido ' + orderId.slice(-8) + '...', 'ok');
+    const d = await fetchAPI('/api/orders/' + orderId + '/retry', {
+      method: 'POST',
+      body: JSON.stringify({ targetPort })
+    });
+    if (d.success) {
+      toast('✅ Pedido recolocado na fila com sucesso!', 'ok');
+      await loadQueue();
+      await loadDevices();
+    } else {
+      toast('❌ ' + (d.mensagem || 'Erro ao repetir pedido'), 'err');
+    }
+  } catch(e) { toast('❌ ' + e.message, 'err'); }
+}
+
+async function cancelOrder(orderId) {
+  if (!confirm('Deseja realmente CANCELAR o pedido ' + orderId.slice(-8) + '?')) return;
+  try {
+    const d = await fetchAPI('/api/orders/' + orderId + '/cancel', { method: 'POST' });
+    if (d.success) {
+      toast('Pedido cancelado com sucesso.', 'ok');
+      await loadQueue();
+    }
+  } catch(e) { toast('Erro ao cancelar: ' + e.message, 'err'); }
+}
+
+async function deleteOrder(orderId) {
+  try {
+    const d = await fetchAPI('/api/orders/' + orderId, { method: 'DELETE' });
+    if (d.success) {
+      toast('Pedido removido da lista.', 'ok');
+      await loadQueue();
+    }
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+async function changeOrderPort(orderId) {
+  const p = prompt('Digite a porta para onde deseja transferir este pedido:\n(Exemplos: 8023, 8024, 8077, 8777)');
+  if (!p) return;
+  const portNum = parseInt(p.trim());
+  if (isNaN(portNum)) { alert('Porta inválida!'); return; }
+  await retryOrder(orderId, portNum);
+}
+
+async function clearFailedOrders() {
+  if (!confirm('Deseja limpar todos os pedidos com status FALHADO / CANCELADO?')) return;
+  try {
+    const d = await fetchAPI('/api/orders/clear', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'failed' })
+    });
+    toast(`✅ ${d.cleared || 0} pedidos falhados limpos.`, 'ok');
+    await loadQueue();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+async function clearQueue() {
+  if (!confirm('Confirma limpar TODA a fila de pedidos da nuvem?')) return;
+  try {
+    const d = await fetchAPI('/api/orders/clear', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'all' })
+    });
+    toast(`✅ Fila limpa: ${d.cleared || 0} pedidos removidos.`, 'ok');
+    await loadQueue();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+async function clearCompletedQueue() {
+  try {
+    const d = await fetchAPI('/api/orders/clear', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'finalized' })
+    });
+    toast(`✅ ${d.cleared || 0} pedidos concluídos limpos.`, 'ok');
+    await loadQueue();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+async function pingDevice(porta) {
+  try {
+    const d = await fetchAPI('/api/devices/' + porta + '/health');
+    toast('Porta ' + porta + ': ' + (d.online ? '✅ Online' : '❌ Offline'), d.online ? 'ok' : 'err');
+  } catch(e) { toast('Erro ao pingar: ' + e.message, 'err'); }
+}
+
+async function forceDispatch(porta) {
+  toast('A forçar despacho na Porta ' + porta + '...', 'ok');
+  await pingDevice(porta);
+}
+
+// ─── SEND PANEL: PACKAGE SELECTION LOGIC ────────────────────────────────────
+const PACOTES_SEMANAL = [
+  { label: '1.7 GB (7 dias) – Opção 2', mb: 1700, input_val: 2 },
+  { label: '3.5 GB (7 dias) – Opção 3', mb: 3500, input_val: 3 },
+  { label: '5.3 GB (7 dias) – Opção 4', mb: 5300, input_val: 4 },
+  { label: '7.0 GB (7 dias) – Opção 5', mb: 7000, input_val: 5 },
+  { label: '8.8 GB (7 dias) – Opção 6', mb: 8800, input_val: 6 },
+  { label: '10.5 GB (7 dias) – Opção 7', mb: 10500, input_val: 7 },
+  { label: '12.3 GB (7 dias) – Opção 8', mb: 12300, input_val: 8 },
+  { label: '17.6 GB (7 dias) – Opção 9', mb: 17600, input_val: 9 },
+];
+const PACOTES_MENSAL = [
+  { label: '2.8 GB (30 dias) – 2867 MB',         mb: 2867,  input_val: 1 },
+  { label: '5.7 GB (30 dias) – 5734 MB (split)',  mb: 5734,  input_val: 1 },
+  { label: '8.5 GB (30 dias) – 8601 MB (split)',  mb: 8601,  input_val: 1 },
+  { label: '11.4 GB (30 dias) – 11468 MB (split)',mb: 11468, input_val: 1 },
+  { label: '14.3 GB (30 dias) – 14335 MB (split)',mb: 14335, input_val: 1 },
+  { label: '17.2 GB (30 dias) – 17202 MB (split)',mb: 17202, input_val: 1 },
+  { label: '20.0 GB (30 dias) – 20069 MB (split)',mb: 20069, input_val: 1 },
+];
+const PACOTES_ILIMITADO = [
+  { label: '11 GB Tudo Top – Opção 1 (*111#)', mb: 11000, input_val: 1 },
+  { label: '15 GB Tudo Top – Opção 2 (*111#)', mb: 15000, input_val: 2 },
+  { label: '25 GB Tudo Top – Opção 3 (*111#)', mb: 25000, input_val: 3 },
+];
+
+function onSendModoChange() {
+  const modo = document.getElementById('sendModo').value;
+  const grpQtd  = document.getElementById('groupSendQtd');
+  const grpPkg  = document.getElementById('groupSendPackage');
+  const pkgSel  = document.getElementById('sendPackageSelect');
+  const helpEl  = document.getElementById('sendHelpRoute');
+  pkgSel.innerHTML = '';
+
+  if (modo === 'diario' || modo === 'saldo') {
+    grpQtd.style.display  = '';
+    grpPkg.style.display  = 'none';
+    helpEl.innerHTML = modo === 'diario'
+      ? '📡 Rota: Porta 8024 (SIM 2 Huawei) – envio directo de MB diários'
+      : '💰 Rota: Porta 8777 – transferência de saldo/crédito';
+  } else {
+    grpQtd.style.display  = 'none';
+    grpPkg.style.display  = '';
+    let lista = modo === 'semanal' ? PACOTES_SEMANAL :
+                modo === 'mensal'  ? PACOTES_MENSAL  : PACOTES_ILIMITADO;
+    lista.forEach((p, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      o.textContent = p.label;
+      pkgSel.appendChild(o);
+    });
+    const rota = modo === 'semanal' ? '📡 Rota: *162# → 4 → [opção] | Porta 8077 SIM 1'
+               : modo === 'mensal'  ? '📡 Rota: *162# → 5 → 1 (2867MB) | Porta 8077 + split 8024'
+                                    : '📡 Rota: *111# → [opção] | Porta 8077 SIM 1 (Tudo Top)';
+    helpEl.innerHTML = rota;
+  }
+}
+
+async function enviarManual() {
+  const numero = document.getElementById('sendNumero').value.trim();
+  const modo   = document.getElementById('sendModo').value;
+  const res    = document.getElementById('sendResult');
+
+  if (!numero) { toast('Preencha o número de destino!', 'err'); return; }
+
+  let payload = { numero, modo, remetente: 'Painel-Web' };
+
+  if (modo === 'diario' || modo === 'saldo') {
+    const qtd = parseInt(document.getElementById('sendQtd').value);
+    if (!qtd || qtd < 10) { toast('Coloque uma quantidade válida (MB)!', 'err'); return; }
+    payload.quantidade = qtd;
+  } else {
+    const idx = parseInt(document.getElementById('sendPackageSelect').value);
+    const lista = modo === 'semanal' ? PACOTES_SEMANAL :
+                  modo === 'mensal'  ? PACOTES_MENSAL  : PACOTES_ILIMITADO;
+    const pkg = lista[idx];
+    if (!pkg) { toast('Escolha um pacote!', 'err'); return; }
+    payload.quantidade = pkg.mb;
+    payload.input_val  = pkg.input_val;
+  }
+
+  res.innerHTML = '<span style="color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A enviar pedido...</span>';
+
+  try {
+    const d = await fetchAPI('/api/send/manual', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (d.success || d.status === 'sucesso' || d.status === 'queued') {
+      res.innerHTML = '<span style="color:var(--green)">✅ Pedido enviado! Ref: <b>' + (d.orderId || d.ref || '?') + '</b></span>';
+      toast('Pedido enviado com sucesso!', 'ok');
+      setTimeout(loadQueue, 2000);
+    } else {
+      res.innerHTML = '<span style="color:var(--red)">❌ Erro: ' + (d.mensagem || d.error || 'Falha') + '</span>';
+    }
+  } catch(e) {
+    res.innerHTML = '<span style="color:var(--red)">❌ ' + e.message + '</span>';
+  }
+}
+
+async function restartBot() {
+  try {
+    toast('A reiniciar o bot na nuvem...', 'ok');
+    await fetchAPI('/api/admin/restart-bot', { method: 'POST' });
+    setTimeout(loadWAStatus, 5000);
+  } catch(e) { toast('Comando enviado!', 'ok'); }
+}
+
+async function showQr() {
+  const panel = document.getElementById('qrPanel');
+  const content = document.getElementById('qrContent');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') {
+    panel.scrollIntoView({ behavior: 'smooth' });
+    content.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--cyan)"></i><p style="margin-top:12px;color:var(--muted)">A carregar QR Code em tempo real...</p>';
+    try {
+      const d = await fetchAPI('/api/whatsapp/status');
+      if (d.status === 'connected') {
+        const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
+        content.innerHTML = `
+          <i class="fa-solid fa-circle-check" style="font-size:3.5rem;color:var(--green)"></i>
+          <p style="color:var(--green);font-size:1.1rem;font-weight:700;margin-top:12px">✅ WhatsApp Conectado com Sucesso!</p>
+          <p style="color:var(--muted);font-size:.85rem;margin-top:4px">Número: +${phone}</p>`;
+      } else if (d.qrImage || (d.hasQr && d.qrImage)) {
+        content.innerHTML = `
+          <div style="display:inline-block;padding:12px;background:#ffffff;border-radius:14px;box-shadow:0 0 35px rgba(0,240,255,0.25)">
+            <img src="${d.qrImage}" style="width:230px;height:230px;display:block" alt="QR Code WhatsApp">
+          </div>
+          <p style="margin-top:14px;font-weight:700;color:var(--text);font-size:.95rem">Escaneie com o WhatsApp no Celular do Bot</p>
+          <p style="color:var(--muted);font-size:.78rem;margin-top:4px">WhatsApp &gt; Aparelhos Conectados &gt; Conectar um Aparelho</p>
+          <div style="margin-top:12px">
+            <button class="btn btn-primary btn-sm" onclick="showQr()"><i class="fa-solid fa-rotate"></i> Atualizar Código</button>
+          </div>`;
+        content.innerHTML = `
+          <i class="fa-solid fa-clock" style="font-size:2.5rem;color:var(--yellow)"></i>
+          <p style="margin-top:10px;font-weight:600">A gerar sessão do WhatsApp na nuvem...</p>
+          <p style="color:var(--muted);font-size:.8rem;margin-top:4px">Aguarde alguns segundos ou force a geração de um novo QR Code.</p>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="showQr()"><i class="fa-solid fa-rotate"></i> Tentar Novamente</button>
+            <button class="btn btn-warn btn-sm" onclick="resetWhatsAppSession()"><i class="fa-solid fa-broom"></i> Forçar Novo QR Code</button>
+          </div>`;
+      }
+    } catch(e) {
+      content.innerHTML = '<p style="color:var(--red)">Erro ao carregar: ' + e.message + '</p>';
+    }
+  }
+}
+
+async function resetWhatsAppSession() {
+  if (!confirm('Deseja limpar a sessão desconectada e gerar um NOVO QR Code?')) return;
+  const content = document.getElementById('qrContent');
+  if (content) {
+    content.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:3rem;color:var(--cyan)"></i><p style="margin-top:12px;color:var(--muted)">A limpar sessão e a gerar novo QR Code...</p>';
+  }
+  try {
+    const res = await fetchAPI('/api/whatsapp/reset', { method: 'POST' });
+    toast(res.message || 'Sessão reiniciada com sucesso!', 'ok');
+    setTimeout(showQr, 4000);
+  } catch(e) {
+    toast('Erro: ' + e.message, 'err');
+    setTimeout(showQr, 2000);
+  }
+}
+
+// -------------------------------------------------------------------
+// 3. RELATÓRIOS & FINANÇAS
+// -------------------------------------------------------------------
+async function loadReports() {
+  try {
+    const d = await fetchAPI('/api/reports');
+    if (!d.success) return;
+
+    // Métricas principais
+    document.getElementById('repTodayVal').textContent = (d.today.valor_mt || 0) + ' MT';
+    const tMb = d.today.megas || 0;
+    document.getElementById('repTodayMb').textContent = tMb >= 1024 ? (tMb/1024).toFixed(1) + ' GB' : tMb + ' MB';
+    document.getElementById('repTodayCount').textContent = d.today.total_vendas || 0;
+
+    document.getElementById('repMonthVal').textContent = (d.month.valor_mt || 0) + ' MT';
+    const mMb = d.month.megas || 0;
+    document.getElementById('repMonthMb').textContent = mMb >= 1024 ? (mMb/1024).toFixed(1) + ' GB' : mMb + ' MB';
+    document.getElementById('repMonthCount').textContent = d.month.total_vendas || 0;
+
+    document.getElementById('repMpesaVal').textContent = (d.recebidos.mpesa_mt || 0) + ' MT';
+    const mCountEl = document.getElementById('repMpesaCount');
+    if (mCountEl) mCountEl.textContent = d.recebidos.mpesa_count || 0;
+    document.getElementById('repEmolaVal').textContent = (d.recebidos.emola_mt || 0) + ' MT';
+    const eCountEl = document.getElementById('repEmolaCount');
+    if (eCountEl) eCountEl.textContent = d.recebidos.emola_count || 0;
+
+    // Tabela de vendas
+    allSalesData = d.allSales || d.recentSales || [];
+    const tb = document.getElementById('salesTableBody');
+    if (allSalesData.length === 0) {
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Nenhuma venda registada ainda</td></tr>';
+    } else {
+      tb.innerHTML = allSalesData.map(s => {
+        const ref = (s.orderId || s.id || '?').slice(-12);
+        const dt = s.createdAt || s.completedAt || s.timestamp ? new Date(s.createdAt || s.completedAt || s.timestamp).toLocaleString('pt-PT') : '-';
+        const num = s.numero || s.destinatario || '-';
+        const qty = s.quantidade || 0;
+        const vol = qty >= 1024 ? (qty/1024).toFixed(1) + ' GB' : qty + ' MB';
+        const val = (s.valor_pago || s.valor || 0) + ' MT';
+        const modo = s.modo || 'diario';
+        const porta = s.assignedToPort || s.targetPort || s.porta || 'Auto';
+        const st = s.status || (s.success ? 'completed' : 'pending');
+        return `
+          <tr>
+            <td><span class="order-ref">${ref}</span></td>
+            <td style="font-size:.76rem;color:var(--muted)">${dt}</td>
+            <td><b>${num}</b></td>
+            <td style="color:var(--cyan);font-weight:600">${vol}</td>
+            <td style="color:var(--green);font-weight:700">${val}</td>
+            <td><span style="text-transform:capitalize">${modo}</span></td>
+            <td>Porta ${porta}</td>
+            <td><span class="order-status status-${st}">${st}</span></td>
+          </tr>`;
+      }).join('');
+    }
+
+    // Tabela de SMS Payments
+    const payments = d.recentPayments || [];
+    const smsTb = document.getElementById('smsTableBody');
+    if (payments.length === 0) {
+      smsTb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Nenhum SMS de pagamento recebido ainda</td></tr>';
+    } else {
+      smsTb.innerHTML = payments.map(p => {
+        const tid = p.txn_id || p.id || '-';
+        const met = String(p.metodo || 'M-Pesa').toUpperCase();
+        const metColor = met.includes('EMOLA') ? 'yellow' : 'red';
+        const rem = p.remetente || '-';
+        const val = (p.valor || 0) + ' MT';
+        const proc = p.processedAt ? new Date(p.processedAt).toLocaleString('pt-PT') : '-';
+        return `
+          <tr>
+            <td><span class="order-ref">${tid}</span></td>
+            <td><span style="font-weight:700;color:var(--${metColor})">${met}</span></td>
+            <td>${rem}</td>
+            <td style="font-weight:700;color:var(--green)">${val}</td>
+            <td style="font-size:.76rem;color:var(--muted)">${proc}</td>
+          </tr>`;
+      }).join('');
+    }
+
+  } catch(e) {
+    console.error('Erro ao carregar relatórios:', e);
+  }
+}
+
+function exportSalesCSV() {
+  if (allSalesData.length === 0) { toast('Nenhuma venda para exportar', 'err'); return; }
+  const headers = ['Ref', 'Data', 'Destinatario', 'Volume_MB', 'Valor_MT', 'Modo', 'Porta', 'Status'];
+  const rows = allSalesData.map(s => [
+    s.orderId || s.id || '',
+    s.createdAt || s.completedAt || '',
+    s.numero || s.destinatario || '',
+    s.quantidade || 0,
+    s.valor_pago || s.valor || 0,
+    s.modo || 'diario',
+    s.assignedToPort || s.porta || '',
+    s.status || ''
+  ]);
+  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', 'kanet_vendas_' + new Date().toISOString().slice(0,10) + '.csv');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+// -------------------------------------------------------------------
+// 4. GRUPOS WHATSAPP & TABELAS DE PREÇOS
+// -------------------------------------------------------------------
+let _gruposFechados = [];
+
+async function loadGroups() {
+  try {
+    const d = await fetchAPI('/api/groups');
+    const grid = document.getElementById('groupsGrid');
+    const groups = d.groups || [];
+    _gruposFechados = d.gruposFechados || [];
+
+    if (groups.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted)">Nenhum grupo registado</div>';
+      return;
+    }
+    grid.innerHTML = groups.map(g => {
+      const membros = g.membros || '?';
+      const fechado = _gruposFechados.includes(g.jid);
+      const btnStyle = fechado
+        ? 'background:#e53935;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.78rem;font-weight:700'
+        : 'background:#2e7d32;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.78rem;font-weight:700';
+      const btnLabel = fechado ? '🔒 Grupo Fechado' : '🔓 Grupo Aberto';
+      const statusBadge = fechado
+        ? '<span class="badge" style="background:#e53935;color:#fff">🔒 Fechado</span>'
+        : '<span class="badge online">🟢 Ativo</span>';
+      return `
+        <div class="group-card" id="gcard-${g.jid.replace(/[^a-z0-9]/gi,'_')}">
+          <div class="group-name"><i class="fa-brands fa-whatsapp"></i> ${g.nome || 'Grupo WhatsApp'}</div>
+          <div class="group-jid">${g.jid}</div>
+          <div class="group-meta">
+            <span style="color:var(--cyan);font-weight:600">${g.tipo || 'Grupo Autorizado'}</span>
+            ${statusBadge}
+          </div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:4px">
+            👥 Membros: <b>${membros}</b> • Tabela: <span style="color:var(--green);font-weight:600">${g.tabela_ativa || 'Padrão'}</span>
+          </div>
+          <div style="margin-top:10px">
+            <button style="${btnStyle}" onclick="toggleGrupo('${g.jid}', this)">${btnLabel}</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('groupsGrid').innerHTML = '<div style="grid-column:1/-1;color:var(--red);padding:20px">Erro ao carregar grupos: ' + e.message + '</div>';
+  }
+}
+
+async function toggleGrupo(jid, btn) {
+  try {
+    btn.disabled = true;
+    btn.textContent = '⏳ A processar...';
+    const d = await fetchAPI('/api/groups/' + encodeURIComponent(jid) + '/fechar', { method: 'POST' });
+    showToast(d.mensagem || (d.fechado ? '🔒 Grupo fechado' : '🔓 Grupo aberto'));
+    await loadGroups(); // Recarregar para refletir estado
+  } catch(e) {
+    showToast('❌ Erro: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Erro — Tentar novamente'; }
+  }
+}
+
+
+async function loadPriceTables() {
+  try {
+    const d = await fetchAPI('/api/price-tables');
+    const grid = document.getElementById('priceTablesGrid');
+    const tabs = d.tabelas || {};
+
+    let html = '';
+
+    // 24 Horas
+    if (tabs['24hrs']) {
+      const items = Object.entries(tabs['24hrs']).map(([valor, p]) => `
+        <div class="price-item">
+          <span>📦 <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-clock"></i> Pacotes 24 Horas (Diários)</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Ativados via USSD nas Portas 8023 e 8024</div>
+          ${items}
+        </div>`;
+    }
+
+    // Semanais
+    if (tabs['semanal']) {
+      const items = Object.entries(tabs['semanal']).map(([valor, p]) => `
+        <div class="price-item">
+          <span>📅 <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-calendar-week"></i> Pacotes Semanais (7 Dias)</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Ativados via Porta Especial 8077</div>
+          ${items}
+        </div>`;
+    }
+
+    // Mensais
+    if (tabs['mensal']) {
+      const items = Object.entries(tabs['mensal']).map(([valor, p]) => `
+        <div class="price-item">
+          <span>📆 <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-calendar"></i> Pacotes Mensais (30 Dias)</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Ativados via Porta Especial 8077</div>
+          ${items}
+        </div>`;
+    }
+
+    // Planos Especiais & VIP
+    if (d.planos_especiais && Object.keys(d.planos_especiais).length > 0) {
+      const items = Object.entries(d.planos_especiais).map(([valor, p]) => `
+        <div class="price-item">
+          <span>⭐ <b>${p.nome || p.quantidade_mb + 'MB'}</b></span>
+          <span class="price-item-val">${valor} MT</span>
+        </div>`).join('');
+      html += `
+        <div class="price-table-card">
+          <div class="price-table-title"><i class="fa-solid fa-star"></i> Planos Especiais & Revenda</div>
+          <div style="margin-bottom:8px;font-size:.72rem;color:var(--muted)">Configurados para Grupos VIP</div>
+          ${items}
+        </div>`;
+    }
+
+    grid.innerHTML = html || '<div style="grid-column:1/-1;padding:20px;color:var(--muted)">Nenhuma tabela configurada</div>';
+  } catch(e) {
+    document.getElementById('priceTablesGrid').innerHTML = '<div style="grid-column:1/-1;color:var(--red);padding:20px">Erro ao carregar tabelas: ' + e.message + '</div>';
+  }
+}
+
+// -------------------------------------------------------------------
+// 5. AUTO-REFRESH & INIT
+// -------------------------------------------------------------------
+async function reloadAll() {
+  document.getElementById('lastRefresh').textContent = 'A actualizar...';
+  const devices = await loadDevices();
+  await loadQueue();
+  await loadWAStatus();
+  
+  const online = devices.filter(d => d.online).length;
+  const dailyDevices = devices.filter(d => d.porta !== 8077 && d.porta !== 8777 && d.online);
+  const avail = dailyDevices.reduce((a, d) => a + (d.transfers_available || 0), 0);
+  const today = devices.reduce((a, d) => a + (d.total_envios || 0), 0);
+  
+  document.getElementById('mDevices').textContent = online + ' / ' + devices.length;
+  document.getElementById('mAvail').textContent = avail;
+  document.getElementById('mToday').textContent = today;
+  document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+}
+
+// Iniciar e manter atualizado a cada 8 segundos
+reloadAll();
+setInterval(reloadAll, 8000);
+
+// Inicializar o painel de envio manual ao carregar
+onSendModoChange();
+
+// ─── CRM: CLIENTES HUB & SUPORTE ────────────────────────────────────────────
+async function loadCRMData() {
+  try {
+    // Stats
+    const stats = await fetchAPI('/api/admin/crm/stats');
+    if (stats) {
+      document.getElementById('crmTotalClients').textContent = stats.totalClients ?? 0;
+      document.getElementById('crmTotalOrders').textContent  = stats.totalOrders  ?? 0;
+      document.getElementById('crmTotalRevenue').textContent = (stats.totalRevenue ?? 0) + ' MT';
+      document.getElementById('crmOpenTickets').textContent  = stats.openTickets  ?? 0;
+    }
+    // Support tickets
+    const t = await fetchAPI('/api/admin/crm/support-tickets');
+    const card = document.getElementById('crmTicketsCard');
+    const tickets = t.tickets || t || [];
+    if (!tickets.length) {
+      card.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-inbox"></i> Nenhuma mensagem de suporte ainda</div>';
+    } else {
+      card.innerHTML = tickets.map(tk => `
+        <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;background:rgba(0,0,0,.25)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-weight:700;color:var(--cyan)">${tk.clientPhone || tk.phone || '?'}</span>
+              <span class="badge ${tk.status === 'open' ? 'online' : 'offline'}">${tk.status === 'open' ? '🟢 Aberto' : '✅ Respondido'}</span>
+            </div>
+            <span style="font-size:.72rem;color:var(--muted)">${tk.createdAt ? new Date(tk.createdAt).toLocaleString('pt-PT') : ''}</span>
+          </div>
+          <div style="font-size:.85rem;color:var(--text);margin-bottom:10px;padding:8px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid var(--border)">
+            💬 ${tk.message || tk.lastMessage || '(sem mensagem)'}
+          </div>
+          ${tk.reply ? `<div style="font-size:.82rem;color:var(--green);padding:8px;border-radius:8px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);margin-bottom:8px">✅ Resposta Admin: ${tk.reply}</div>` : ''}
+          <button class="btn btn-sm btn-primary" onclick="openCRMReply('${tk.clientPhone || tk.phone}', '${tk._id || tk.id || ''}')">
+            <i class="fa-solid fa-reply"></i> Responder
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Scheduled Plans (Renováveis & Faseados)
+    const pData = await fetchAPI('/api/admin/plans');
+    const plansCard = document.getElementById('crmPlansCard');
+    const plans = pData.plans || [];
+    if (!plans.length) {
+      plansCard.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)"><i class="fa-solid fa-calendar-xmark"></i> Nenhum plano agendado ativo no momento</div>';
+    } else {
+      plansCard.innerHTML = plans.map(pl => {
+        const isFaseado = pl.tipo === 'faseado';
+        const progresso = `${pl.entregas_feitas} / ${pl.entregas_diarias_total} ${isFaseado ? 'fases' : 'renovações'}`;
+        const prox = pl.proxima_entrega ? new Date(pl.proxima_entrega).toLocaleString('pt-PT') : 'Concluído';
+        return `
+          <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;background:rgba(0,0,0,.25);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                <span style="font-weight:700;color:var(--cyan);font-size:1rem">${isFaseado ? '📉 Faseado' : '♻️ Renovável'}: ${pl.numero}</span>
+                <span class="badge ${pl.status === 'ativo' ? 'online' : 'offline'}">${pl.status.toUpperCase()}</span>
+              </div>
+              <div style="font-size:.78rem;color:var(--muted)">
+                Total: <b>${(pl.total_mb/1024).toFixed(1)} GB</b> • Diária: <b>${pl.mb_diaria} MB</b> • Progresso: <b style="color:var(--cyan)">${progresso}</b>
+              </div>
+              <div style="font-size:.75rem;color:var(--yellow);margin-top:4px">
+                ⏰ Próxima Entrega: <b>${prox}</b> (1h antes do dia anterior)
+              </div>
+            </div>
+            ${pl.status === 'ativo' ? `
+              <button class="btn btn-sm btn-danger" onclick="cancelPlan('${pl.planId}')">
+                <i class="fa-solid fa-ban"></i> Cancelar Plano
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+  } catch(e) {
+    document.getElementById('crmTicketsCard').innerHTML =
+      '<div style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao carregar CRM: ' + e.message + '</div>';
+  }
+}
+
+function openCRMReply(phone, ticketId) {
+  const msg = prompt(`💬 Responder ao cliente ${phone}:\n\nDigite a mensagem de resposta:`);
+  if (!msg) return;
+  fetchAPI('/api/admin/crm/support-reply', {
+    method: 'POST',
+    body: JSON.stringify({ phone, ticketId, reply: msg })
+  }).then(d => {
+    if (d.success) {
+      toast('✅ Resposta enviada ao cliente!', 'ok');
+      loadCRMData();
+    } else {
+      toast('❌ Erro: ' + (d.error || 'Falha ao enviar'), 'err');
+    }
+  }).catch(e => toast('❌ ' + e.message, 'err'));
+}
+
+function cancelPlan(planId) {
+  if (!confirm(`Tem a certeza que deseja cancelar o plano ${planId}? As entregas agendadas seguintes serão interrompidas.`)) return;
+  fetchAPI(`/api/admin/plans/${planId}`, { method: 'DELETE' }).then(d => {
+    if (d.success) {
+      toast('✅ Plano cancelado!', 'ok');
+      loadCRMData();
+    } else {
+      toast('❌ Erro: ' + (d.error || 'Falha ao cancelar'), 'err');
+    }
+  }).catch(e => toast('❌ ' + e.message, 'err'));
+}
+</script>
+
+<!-- MODAL DE AJUSTE DE SALDO DO CELULAR -->
+<div id="saldoModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--header-bg);border:1px solid var(--cyan);border-radius:18px;max-width:440px;width:100%;padding:24px;box-shadow:0 0 30px rgba(0,240,255,0.25);animation:fadeIn .2s ease">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+      <div style="font-size:1.1rem;font-weight:800;color:var(--cyan);display:flex;align-items:center;gap:8px">
+        <i class="fa-solid fa-coins"></i> Ajustar Saldo - <span id="modalPortTitle">Porta</span>
+      </div>
+      <button onclick="closeSaldoModal()" style="background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+      <div class="form-group">
+        <label class="form-label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)</label>
+        <input class="form-input" type="number" id="modalSim1Saldo" placeholder="Ex: 2048 (para 2GB) ou 500">
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 2 (em Megabytes / MB)</label>
+        <input class="form-input" type="number" id="modalSim2Saldo" placeholder="Ex: 1500 ou 0">
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="fa-solid fa-money-bill"></i> Saldo Principal (em Meticais / MT)</label>
+        <input class="form-input" type="number" id="modalSaldoMt" placeholder="Ex: 100 MT">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-primary" onclick="closeSaldoModal()" style="background:rgba(255,255,255,0.08);color:var(--text)">Cancelar</button>
+      <button class="btn btn-success" onclick="saveSaldoModal()"><i class="fa-solid fa-check"></i> Guardar Saldo</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-PT" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#10b981">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Ka-Net Pro</title>
+  <link rel="manifest" href="/app/manifest.json">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class', theme: { extend: { colors: { brand: { 500: '#10b981', 600: '#059669' } } } } }</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Inter', sans-serif; background: #080C14; color: #e2e8f0; min-height: 100dvh; overflow-x: hidden; }
+    .glass { background: rgba(17,24,39,.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.07); }
+    .card  { background: rgba(22,30,49,.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.06); border-radius: 1rem; padding: 1.25rem; }
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: rgba(8,12,20,.95); backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,.07); padding-bottom: env(safe-area-inset-bottom); }
+    .tab-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: .5rem .25rem; font-size: .65rem; font-weight: 500; color: #64748b; transition: color .2s; flex: 1; cursor: pointer; border: none; background: none; }
+    .tab-btn.active { color: #10b981; }
+    .tab-btn svg { width: 22px; height: 22px; }
+    .section { display: none; padding: 1rem; padding-bottom: 5.5rem; }
+    .section.active { display: block; }
+    .badge-online  { background: #065f46; color: #6ee7b7; }
+    .badge-offline { background: #450a0a; color: #fca5a5; }
+    .badge-busy    { background: #451a03; color: #fcd34d; }
+    .stat-card { border-radius: .875rem; padding: 1rem 1.25rem; }
+    .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1.1rem; border-radius: .6rem; font-size: .82rem; font-weight: 600; border: none; cursor: pointer; transition: all .15s; white-space: nowrap; }
+    .btn-green  { background: #065f46; color: #6ee7b7; }
+    .btn-green:hover  { background: #047857; }
+    .btn-red    { background: #450a0a; color: #fca5a5; }
+    .btn-red:hover    { background: #7f1d1d; }
+    .btn-amber  { background: #451a03; color: #fde68a; }
+    .btn-amber:hover  { background: #78350f; }
+    .btn-blue   { background: #0c1a3a; color: #93c5fd; }
+    .btn-blue:hover   { background: #1e3a5f; }
+    .btn-purple { background: #2e1065; color: #d8b4fe; }
+    .btn-purple:hover { background: #4c1d95; }
+    .progress-bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 99px; transition: width .5s ease; }
+    .toast { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 1000; padding: .65rem 1.4rem; border-radius: .75rem; font-size: .85rem; font-weight: 600; display: none; }
+    .toast.show { display: block; animation: fadeUp .3s ease; }
+    @keyframes fadeUp { from { opacity:0; transform: translate(-50%,10px); } to { opacity:1; transform: translate(-50%,0); } }
+    .skeleton { background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: .5rem; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .sidebar { display: none; }
+    @media (min-width: 768px) {
+      .sidebar { display: flex; flex-direction: column; width: 240px; position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; padding: 1.5rem 1rem; gap: .25rem; background: rgba(10,14,24,.95); border-right: 1px solid rgba(255,255,255,.06); }
+      .main-content { margin-left: 240px; }
+      .tab-bar { display: none; }
+      .section { padding: 1.5rem; padding-bottom: 2rem; }
+      .sidebar-btn { display: flex; align-items: center; gap: .75rem; padding: .65rem 1rem; border-radius: .6rem; font-size: .88rem; font-weight: 500; color: #64748b; cursor: pointer; border: none; background: none; transition: all .15s; width: 100%; }
+      .sidebar-btn:hover { background: rgba(255,255,255,.05); color: #e2e8f0; }
+      .sidebar-btn.active { background: rgba(16,185,129,.12); color: #10b981; }
+      .sidebar-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toast -->
+<div id="toast" class="toast glass"></div>
+
+<!-- ═══ SIDEBAR (Desktop) ═════════════════════════════════════ -->
+<div class="sidebar">
+  <div class="flex items-center gap-3 mb-6 px-1">
+    <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;color:white;">K</div>
+    <div>
+      <div style="font-weight:700;font-size:.95rem;color:#e2e8f0;">Ka-Net Pro</div>
+      <div id="bot-status-badge-desk" style="font-size:.7rem;color:#6ee7b7;">● Online</div>
+    </div>
+  </div>
+  <button class="sidebar-btn active" onclick="showTab('dashboard',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Dashboard
+  </button>
+  <button class="sidebar-btn" onclick="showTab('devices',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18" r="1"/></svg>
+    Dispositivos
+  </button>
+  <button class="sidebar-btn" onclick="showTab('queue',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    Fila de Pedidos
+  </button>
+  <button class="sidebar-btn" onclick="showTab('bot',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2z"/><path d="M6 8h12l2 4-1 7H5L4 12l2-4z"/></svg>
+    Controlo Bot
+  </button>
+  <button class="sidebar-btn" onclick="showTab('groups',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+    Grupos
+  </button>
+  <button class="sidebar-btn" onclick="showTab('packages',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    Pacotes Especiais
+  </button>
+  <div style="flex:1;"></div>
+  <div style="font-size:.7rem;color:#334155;padding:.5rem 1rem;">
+    <div id="last-sync-desk">—</div>
+    <div style="margin-top:.25rem;">Ka-Net Pro v2.0</div>
+  </div>
+</div>
+
+<!-- ═══ MAIN CONTENT ══════════════════════════════════════════ -->
+<div class="main-content">
+
+  <!-- Header Mobile -->
+  <div class="flex items-center justify-between px-4 pt-4 pb-2 md:hidden">
+    <div class="flex items-center gap-2">
+      <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-weight:800;color:white;font-size:.9rem;">K</div>
+      <span style="font-weight:700;font-size:1rem;">Ka-Net Pro</span>
+    </div>
+    <div id="bot-status-badge" class="text-xs px-2 py-1 rounded-full badge-online">● Online</div>
+  </div>
+
+  <!-- ─── DASHBOARD ───────────────────────────────────────── -->
+  <div id="tab-dashboard" class="section active">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-bold" style="color:#e2e8f0;">Dashboard Financeiro</h2>
+      <button class="btn btn-amber" onclick="confirmResetTransfers()" style="font-size:.72rem;padding:.35rem .75rem;">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Zerar Transferências
+      </button>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <div class="card stat-card">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">HOJE</div>
+        <div id="lucro-hoje" class="text-lg font-bold" style="color:#10b981;">—</div>
+        <div id="vendas-hoje" style="font-size:.7rem;color:#475569;">— vendas</div>
+        <div id="megas-hoje" style="font-size:.7rem;color:#475569;">— MB</div>
+      </div>
+      <div class="card stat-card">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">SEMANA</div>
+        <div id="lucro-semana" class="text-lg font-bold" style="color:#6366f1;">—</div>
+        <div id="vendas-semana" style="font-size:.7rem;color:#475569;">— vendas</div>
+        <div id="megas-semana" style="font-size:.7rem;color:#475569;">— MB</div>
+      </div>
+      <div class="card stat-card">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">MÊS</div>
+        <div id="lucro-mes" class="text-lg font-bold" style="color:#f59e0b;">—</div>
+        <div id="vendas-mes" style="font-size:.7rem;color:#475569;">— vendas</div>
+        <div id="megas-mes" style="font-size:.7rem;color:#475569;">— MB</div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card mb-4" style="padding:1rem;">
+      <div style="font-size:.8rem;font-weight:600;color:#94a3b8;margin-bottom:.75rem;">Receita — Últimos 7 Dias (MT)</div>
+      <canvas id="chartRevenue" height="120"></canvas>
+    </div>
+
+    <!-- Recent Sales -->
+    <div class="card">
+      <div style="font-size:.8rem;font-weight:600;color:#94a3b8;margin-bottom:.75rem;">Últimas Transações</div>
+      <div id="recent-sales" style="font-size:.8rem;"></div>
+    </div>
+  </div>
+
+  <!-- ─── DISPOSITIVOS ─────────────────────────────────────── -->
+  <div id="tab-devices" class="section">
+    <h2 class="text-lg font-bold mb-3" style="color:#e2e8f0;">Dispositivos Conectados</h2>
+    <div id="devices-list" class="space-y-3">
+      <div class="card skeleton" style="height:120px;"></div>
+      <div class="card skeleton" style="height:120px;"></div>
+    </div>
+  </div>
+
+  <!-- ─── FILA DE PEDIDOS ──────────────────────────────────── -->
+  <div id="tab-queue" class="section">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-bold" style="color:#e2e8f0;">Fila de Pedidos</h2>
+      <span id="queue-count" class="text-xs px-2 py-1 rounded-full" style="background:rgba(99,102,241,.15);color:#a5b4fc;">0 pendentes</span>
+    </div>
+    <div id="queue-list" class="space-y-3">
+      <div class="card skeleton" style="height:80px;"></div>
+    </div>
+  </div>
+
+  <!-- ─── BOT CONTROL ──────────────────────────────────────── -->
+  <div id="tab-bot" class="section">
+    <h2 class="text-lg font-bold mb-4" style="color:#e2e8f0;">Controlo do Bot</h2>
+
+    <!-- Status Card -->
+    <div class="card mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <span style="font-size:.9rem;font-weight:600;">WhatsApp Bot</span>
+        <span id="bot-status-card" class="text-xs px-3 py-1 rounded-full badge-online">● Online</span>
+      </div>
+      <div id="bot-last-seen" style="font-size:.75rem;color:#64748b;margin-bottom:1rem;">Último sinal: —</div>
+
+      <!-- Control Buttons -->
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button class="btn btn-green" onclick="sendBotCmd('restart')" style="justify-content:center;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+          Reiniciar
+        </button>
+        <button class="btn btn-red" onclick="sendBotCmd('stop')" style="justify-content:center;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          Desligar
+        </button>
+      </div>
+      <button class="btn btn-green w-full" onclick="sendBotCmd('start')" style="justify-content:center;width:100%;">
+        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Iniciar Bot
+      </button>
+    </div>
+
+    <!-- WhatsApp Change -->
+    <div class="card">
+      <div style="font-size:.9rem;font-weight:600;margin-bottom:.5rem;">Trocar Número WhatsApp</div>
+      <p style="font-size:.75rem;color:#64748b;margin-bottom:1rem;">Apaga a sessão actual e reinicia o bot. O QR Code novo aparecerá no terminal do PC onde o bot está a correr.</p>
+      <button class="btn btn-purple" onclick="confirmReset()" style="width:100%;justify-content:center;">
+        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.09 13a19.79 19.79 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.72 6.72l1.28-1.28a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+        Trocar WhatsApp
+      </button>
+    
+    <!-- Live Log Terminal Viewer -->
+    <div class="card mt-4">
+      <div class="flex items-center justify-between mb-2">
+        <span style="font-size:.85rem;font-weight:600;color:#94a3b8;">Log do Bot em Tempo Real</span>
+        <span style="font-size:.7rem;color:#10b981;">● Ao Vivo</span>
+      </div>
+      <pre id="bot-live-log" style="background:#04070d;color:#34d399;font-family:'JetBrains Mono',monospace;font-size:.7rem;padding:.75rem;border-radius:.5rem;height:180px;overflow-y:auto;white-space:pre-wrap;border:1px solid rgba(255,255,255,.05);">Conectando aos logs do bot...</pre>
+    </div>
+  </div></div>
+  </div>
+
+  <!-- ─── GRUPOS ───────────────────────────────────────────── -->
+  <div id="tab-groups" class="section">
+    <h2 class="text-lg font-bold mb-3" style="color:#e2e8f0;">Grupos WhatsApp</h2>
+    <div id="groups-list" class="space-y-3">
+      <div class="card skeleton" style="height:80px;"></div>
+    </div>
+  </div>
+
+  <!-- ─── PACOTES ESPECIAIS ────────────────────────────────── -->
+  <div id="tab-packages" class="section">
+    <h2 class="text-lg font-bold mb-3" style="color:#e2e8f0;">Pacotes Especiais Activos</h2>
+    <div id="packages-list" class="space-y-3">
+      <div class="card skeleton" style="height:100px;"></div>
+    </div>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- ═══ BOTTOM TAB BAR (Mobile) ══════════════════════════════ -->
+<nav class="tab-bar md:hidden">
+  <div class="flex">
+    <button class="tab-btn active" id="mob-tab-dashboard" onclick="showTab('dashboard',this,'mob')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Início
+    </button>
+    <button class="tab-btn" id="mob-tab-devices" onclick="showTab('devices',this,'mob')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18" r="1"/></svg>
+      Celulares
+    </button>
+    <button class="tab-btn" id="mob-tab-queue" onclick="showTab('queue',this,'mob')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Pedidos
+    </button>
+    <button class="tab-btn" id="mob-tab-bot" onclick="showTab('bot',this,'mob')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2z"/><path d="M6 8h12l2 4-1 7H5L4 12l2-4z"/></svg>
+      Bot
+    </button>
+    <button class="tab-btn" id="mob-tab-packages" onclick="showTab('packages',this,'mob')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Pacotes
+    </button>
+  </div>
+</nav>
+
+<script>
+const API = 'https://kanet-cloud-api.onrender.com';
+let chartInst = null;
+let currentTab = 'dashboard';
+
+// ── Tab Navigation ─────────────────────────────────────────────
+function showTab(name, btn, type='desk') {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  currentTab = name;
+
+  if (type === 'mob') {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  } else {
+    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+  }
+  btn.classList.add('active');
+
+  loadTabData(name);
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function toast(msg, color = '#10b981') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color === 'red' ? 'rgba(127,29,29,.95)' : 'rgba(6,95,70,.95)';
+  t.style.color = color === 'red' ? '#fca5a5' : '#6ee7b7';
+  t.style.border = '1px solid ' + (color === 'red' ? 'rgba(252,165,165,.2)' : 'rgba(110,231,183,.2)');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── API Fetch ──────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const r = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  return r.json();
+}
+
+// ── Format helpers ─────────────────────────────────────────────
+const fmt   = n => (n || 0).toFixed(2) + ' MT';
+const fmtMB = n => n >= 1024 ? (n/1024).toFixed(1)+' GB' : (n||0)+' MB';
+const timeAgo = ts => {
+  if (!ts) return '—';
+  const d = Math.floor((Date.now() - new Date(ts)) / 1000);
+  if (d < 60) return d + 's atrás';
+  if (d < 3600) return Math.floor(d/60) + 'min atrás';
+  return Math.floor(d/3600) + 'h atrás';
+};
+
+// ══════════════════════════════════════════════════════════════
+// LOAD FUNCTIONS
+// ══════════════════════════════════════════════════════════════
+
+// ── Dashboard ──────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const d = await apiFetch('/api/admin/metrics');
+    if (!d.success) return;
+
+    document.getElementById('lucro-hoje').textContent   = fmt(d.today?.lucro);
+    document.getElementById('vendas-hoje').textContent  = (d.today?.vendas||0) + ' vendas';
+    document.getElementById('megas-hoje').textContent   = fmtMB(d.today?.megas);
+    document.getElementById('lucro-semana').textContent = fmt(d.week?.lucro);
+    document.getElementById('vendas-semana').textContent= (d.week?.vendas||0) + ' vendas';
+    document.getElementById('megas-semana').textContent = fmtMB(d.week?.megas);
+    document.getElementById('lucro-mes').textContent    = fmt(d.month?.lucro);
+    document.getElementById('vendas-mes').textContent   = (d.month?.vendas||0) + ' vendas';
+    document.getElementById('megas-mes').textContent    = fmtMB(d.month?.megas);
+
+    // Chart
+    const labels = (d.chartData||[]).map(r => r.label);
+    const valores = (d.chartData||[]).map(r => r.valor||0);
+    const ctx = document.getElementById('chartRevenue').getContext('2d');
+    if (chartInst) chartInst.destroy();
+    chartInst = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: 'MT', data: valores, backgroundColor: 'rgba(16,185,129,.35)', borderColor: '#10b981', borderWidth: 1.5, borderRadius: 5 }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#475569', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+    });
+
+    // Recent Sales
+    const sales = d.recentSales || [];
+    const statusColor = s => ({ finalizado:'#6ee7b7', concluido:'#6ee7b7', realizado:'#6ee7b7', sucesso:'#6ee7b7', COMPLETED:'#6ee7b7', cancelado:'#fca5a5', aguardando_comprovativo:'#fde68a', aguardando_resposta:'#fde68a' }[s] || '#94a3b8');
+    document.getElementById('recent-sales').innerHTML = sales.length === 0
+      ? '<div style="color:#475569;text-align:center;padding:1rem;">Sem transações</div>'
+      : sales.map(s => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.04);">
+          <div>
+            <div style="font-weight:600;color:#e2e8f0;">${s.numero||'—'}</div>
+            <div style="font-size:.7rem;color:#475569;">${s.tipo||'—'} · ${fmtMB(s.quantidade)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="color:${statusColor(s.status)};font-size:.75rem;font-weight:600;">${s.status}</div>
+            <div style="font-size:.7rem;color:#475569;">${s.valor ? fmt(s.valor) : '—'}</div>
+          </div>
+        </div>`).join('');
+
+    if (d.synced_at) {
+      const txt = 'Sync: ' + timeAgo(d.synced_at);
+      const el = document.getElementById('last-sync-desk');
+      if (el) el.textContent = txt;
+    }
+  } catch(e) { console.error('loadDashboard', e); }
+}
+
+// ── Devices ────────────────────────────────────────────────────
+async function loadDevices() {
+  try {
+    const d = await apiFetch('/api/devices');
+    const list = document.getElementById('devices-list');
+    if (!d.success || !d.devices?.length) {
+      list.innerHTML = '<div class="card" style="color:#475569;text-align:center;padding:2rem;">Nenhum dispositivo encontrado</div>';
+      return;
+    }
+    const names = { 8023: 'Huawei Honor 8', 8077: 'Redmi 9A (Ilimitados)' };
+    list.innerHTML = d.devices.map(dev => {
+      const name  = names[dev.porta] || 'Dispositivo ' + dev.porta;
+      const bat   = dev.bateria || 0;
+      const batC  = bat > 50 ? '#10b981' : bat > 20 ? '#f59e0b' : '#ef4444';
+      const badge = dev.online ? (dev.is_busy ? 'badge-busy' : 'badge-online') : 'badge-offline';
+      const bText = dev.online ? (dev.is_busy ? '⏳ Ocupado' : '● Online') : '○ Offline';
+      const sim1  = fmtMB(dev.sim1_saldo_mb || dev.saldo_mb || 0);
+      const sim2  = fmtMB(dev.sim2_saldo_mb || 0);
+      const slot  = dev.active_sim_slot || 1;
+      return `
+        <div class="card">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div style="font-weight:700;color:#e2e8f0;">${name}</div>
+              <div style="font-size:.7rem;color:#64748b;">Porta ${dev.porta} · ${dev.carrier||'—'}</div>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full ${badge}">${bText}</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2" style="font-size:.75rem;">
+            <div class="card" style="padding:.6rem;text-align:center;">
+              <div style="font-size:1.1rem;font-weight:700;color:${batC};">${bat}%</div>
+              <div style="color:#475569;font-size:.65rem;">Bateria</div>
+            </div>
+            <div class="card" style="padding:.6rem;text-align:center;${slot===1?'border-color:rgba(16,185,129,.3);':''}">
+              <div style="font-weight:700;color:#e2e8f0;">${sim1}</div>
+              <div style="color:#475569;font-size:.65rem;">SIM 1${slot===1?' ⚡':''}</div>
+            </div>
+            <div class="card" style="padding:.6rem;text-align:center;${slot===2?'border-color:rgba(16,185,129,.3);':''}">
+              <div style="font-weight:700;color:#e2e8f0;">${sim2}</div>
+              <div style="color:#475569;font-size:.65rem;">SIM 2${slot===2?' ⚡':''}</div>
+            </div>
+          </div>
+          <div style="font-size:.65rem;color:#334155;margin-top:.5rem;text-align:right;">Último sinal: ${timeAgo(dev.lastSeen)}</div>
+        </div>`;
+    }).join('');
+  } catch(e) { console.error('loadDevices', e); }
+}
+
+// ── Queue ──────────────────────────────────────────────────────
+async function loadQueue() {
+  try {
+    const d = await apiFetch('/api/admin/queue');
+    const list = document.getElementById('queue-list');
+    const count = d.pending?.length || 0;
+    document.getElementById('queue-count').textContent = count + ' pendentes';
+    if (!count) {
+      list.innerHTML = '<div class="card" style="color:#475569;text-align:center;padding:2rem;">✅ Nenhum pedido pendente</div>';
+      return;
+    }
+    list.innerHTML = (d.pending||[]).map(p => `
+      <div class="card" style="border-left:3px solid #f59e0b;">
+        <div class="flex items-start justify-between">
+          <div>
+            <div style="font-weight:700;color:#e2e8f0;font-size:.85rem;">${p.numero||'—'}</div>
+            <div style="font-size:.72rem;color:#64748b;">${p.ref} · ${p.tipo||'—'} · ${fmtMB(p.quantidade)}</div>
+            <div style="font-size:.7rem;color:#f59e0b;margin-top:.2rem;">${p.status}</div>
+          </div>
+          <button class="btn btn-red" style="font-size:.72rem;padding:.35rem .75rem;" onclick="cancelOrder('${p.ref}',this)">
+            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Cancelar
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(e) { console.error('loadQueue', e); }
+}
+
+// ── Bot Status ─────────────────────────────────────────────────
+async function loadBotStatus() {
+  try {
+    const d = await apiFetch('/api/admin/bot/status');
+    const online = d.online;
+    const badgeEl = document.getElementById('bot-status-badge');
+    const badgeDesk = document.getElementById('bot-status-badge-desk');
+    const cardBadge = document.getElementById('bot-status-card');
+    const lastSeen = document.getElementById('bot-last-seen');
+    const cls = online ? 'badge-online' : 'badge-offline';
+    const txt = online ? '● Online' : '○ Offline';
+    [badgeEl, cardBadge].forEach(el => { if(el) { el.className = el.className.replace(/badge-\w+/,''); el.classList.add(cls); el.textContent = txt; } });
+    if (badgeDesk) badgeDesk.textContent = (online ? '● ' : '○ ') + (online ? 'Online' : 'Offline');
+    if (lastSeen) lastSeen.textContent = 'Último sinal: ' + timeAgo(d.last_seen);
+    if (d.last_log && d.last_log.length) {
+      const logBox = document.getElementById('bot-live-log');
+      if (logBox) {
+        logBox.textContent = d.last_log.join('\n');
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+    }
+  } catch(e) {}
+}
+
+// ── Groups ─────────────────────────────────────────────────────
+async function loadGroups() {
+  try {
+    const d = await apiFetch('/api/admin/groups');
+    const list = document.getElementById('groups-list');
+    if (!d.count) {
+      list.innerHTML = '<div class="card" style="color:#475569;text-align:center;padding:2rem;">Nenhum grupo configurado</div>';
+      return;
+    }
+    list.innerHTML = (d.groups||[]).map(g => `
+      <div class="card">
+        <div style="font-weight:700;color:#e2e8f0;margin-bottom:.25rem;">${g.nome||'Grupo'}</div>
+        <div style="font-size:.72rem;color:#475569;">Tabela: ${g.tabela_id||'—'}</div>
+        ${g.modo_silencioso ? '<div style="font-size:.7rem;color:#64748b;margin-top:.2rem;">🔇 Modo silencioso</div>' : ''}
+      </div>`).join('');
+  } catch(e) { console.error('loadGroups', e); }
+}
+
+// ── Packages ───────────────────────────────────────────────────
+async function loadPackages() {
+  try {
+    const d = await apiFetch('/api/admin/subscriptions');
+    const list = document.getElementById('packages-list');
+    if (!d.count) {
+      list.innerHTML = '<div class="card" style="color:#475569;text-align:center;padding:2rem;">Nenhum pacote especial activo</div>';
+      return;
+    }
+    list.innerHTML = (d.plans||[]).map(p => {
+      const pct = p.total_mb > 0 ? Math.min(100, Math.round((p.entregue_mb||0) / p.total_mb * 100)) : 0;
+      const badgeC = p.status === 'ativo' ? 'badge-online' : 'badge-offline';
+      return `
+        <div class="card">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <div style="font-weight:700;color:#e2e8f0;">${p.numero||'—'}</div>
+              <div style="font-size:.72rem;color:#64748b;">${p.tipo||'—'} · ${fmtMB(p.total_mb)} total</div>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full ${badgeC}">${p.status||'—'}</span>
+          </div>
+          <div class="flex items-center justify-between mb-1" style="font-size:.7rem;color:#475569;">
+            <span>Entregue: ${fmtMB(p.entregue_mb||0)}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${pct}%;"></div>
+          </div>
+          ${p.data_proxima_entrega ? `<div style="font-size:.68rem;color:#475569;margin-top:.35rem;">Próxima entrega: ${p.data_proxima_entrega?.slice(0,10)||'—'}</div>` : ''}
+        </div>`;
+    }).join('');
+  } catch(e) { console.error('loadPackages', e); }
+}
+
+// ── Bot Commands ───────────────────────────────────────────────
+async function sendBotCmd(cmd) {
+  const labels = { start:'Iniciar', stop:'Desligar', restart:'Reiniciar', reset_whatsapp:'Trocar WhatsApp' };
+  try {
+    const d = await apiFetch('/api/admin/bot/command', { method:'POST', body: JSON.stringify({ cmd }) });
+    if (d.success) toast('✅ ' + labels[cmd] + ' — ' + d.message);
+    else toast('❌ Erro: ' + d.error, 'red');
+  } catch(e) { toast('❌ Sem conexão com a nuvem', 'red'); }
+}
+
+function confirmReset() {
+  if (confirm('Tem a certeza? A sessão WhatsApp actual será apagada e o bot irá reiniciar. O QR Code novo aparecerá no terminal do PC.')) {
+    sendBotCmd('reset_whatsapp');
+  }
+}
+
+async function cancelOrder(ref, btn) {
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    const d = await apiFetch('/api/admin/queue/cancel/' + ref, { method:'POST' });
+    if (d.success) { toast('✅ Pedido cancelado'); loadQueue(); }
+    else toast('❌ Erro ao cancelar', 'red');
+  } catch(e) { toast('❌ Erro de conexão', 'red'); btn.disabled = false; btn.textContent = 'Cancelar'; }
+}
+
+// ── Load Tab Data ──────────────────────────────────────────────
+function loadTabData(name) {
+  switch(name) {
+    case 'dashboard': loadDashboard(); break;
+    case 'devices':   loadDevices();   break;
+    case 'queue':     loadQueue();     break;
+    case 'bot':       loadBotStatus(); break;
+    case 'groups':    loadGroups();    break;
+    case 'packages':  loadPackages();  break;
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────
+loadDashboard();
+loadBotStatus();
+setInterval(() => loadTabData(currentTab), 10000);
+setInterval(loadDevices, 10000); // refresh a cada 30s
+setInterval(loadBotStatus, 20000); // bot status a cada 20s
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/app/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
