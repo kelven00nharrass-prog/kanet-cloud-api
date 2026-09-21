@@ -347,6 +347,13 @@ function extrairValor(body) {
 async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
     if (!sender || !body) return;
     const cleanSender = String(sender).replace(/\D/g, '').slice(-9);
+    
+    // Ignorar remetentes que não sejam números de celulares moçambicanos de clientes (82, 83, 84, 85, 86, 87)
+    if (!cleanSender || cleanSender.length !== 9 || !/^8[2-7]\d{7}$/.test(cleanSender)) {
+        console.log(`ℹ️ [SMS BOT] Mensagem de operadora/sistema ignorada pelo bot de clientes: "${sender}"`);
+        return;
+    }
+
     const text = String(body).trim();
     const cleanText = text.toLowerCase();
 

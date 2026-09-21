@@ -2960,13 +2960,16 @@ function findAvailablePort() {
 
 app.post('/api/sms/payment', (req, res) => {
   try {
-    const { txn_id, valor, remetente, metodo, raw_sms, timestamp } = req.body;
+    let { txn_id, valor, remetente, metodo, raw_sms, timestamp } = req.body || {};
 
-    if (!txn_id || !valor || !remetente) {
+    if (!txn_id || !valor) {
       return res.status(400).json({
         success: false,
-        mensagem: 'Campos obrigatórios: txn_id, valor, remetente'
+        mensagem: 'Campos obrigatórios: txn_id, valor'
       });
+    }
+    if (!remetente || String(remetente).trim() === '') {
+      remetente = 'OPERADORA';
     }
 
     let cleanTxnId = String(txn_id || '').trim().toUpperCase();
