@@ -685,9 +685,13 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         splitMensalOrderIfEligible(order);
 
         let isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
-        // GARANTIA: Porta 8077 JAMAIS assume pacotes diários
-        if (port === 8077 && (order.modo === 'diario' || order.modo === '24hrs' || !order.modo)) {
-          isCompatible = false;
+        // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA diários)
+        if (port === 8077) {
+          const m = String(order.modo || '').toLowerCase().trim();
+          const isEspecial = m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top');
+          if (!isEspecial) {
+            isCompatible = false;
+          }
         }
         if (isCompatible) {
           const orderMb = Number(order.quantidade) || 0;
