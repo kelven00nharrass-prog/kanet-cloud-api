@@ -132,7 +132,7 @@ async function sendSms(destinatario, mensagem, simSlot = 0) {
     };
 
     // 1. Tentar envio direto se o Gateway estiver rodando localmente (ex: localhost com adb forward ou IP local)
-    const gatewayPort = process.env.SMS_GATEWAY_PORT || 8090;
+    const gatewayPort = process.env.SMS_GATEWAY_PORT || 8077;
     const gatewayHost = process.env.SMS_GATEWAY_HOST;
     if (gatewayHost && gatewayHost !== '127.0.0.1') {
         try {
@@ -148,7 +148,7 @@ async function sendSms(destinatario, mensagem, simSlot = 0) {
         }
     }
 
-    // 2. Colocar na fila em Nuvem para o Gateway Android coletar a cada 3s via /api/devices/8090/health
+    // 2. Colocar na fila em Nuvem para o Gateway Android coletar a cada 3s via /api/devices/8077/health
     pendingOutgoingSms.push(smsItem);
     console.log(`📥 [SMS ENGINE FILA] SMS ${smsId} enfileirado para ${cleanNum} (${pendingOutgoingSms.length} na fila da Nuvem)`);
     return { success: true, queued: true, id: smsId };

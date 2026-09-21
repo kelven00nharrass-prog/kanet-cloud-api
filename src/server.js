@@ -956,7 +956,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   dev.pending_commands = null; // consumido
 
   let pendingSms = null;
-  if ((port === 8090 || dev.tipo === 'sms_dedicated') && smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
+  if ((port === 8077 || port === 8090 || dev.tipo === 'sms_dedicated' || dev.tipo === 'sms_and_ussd') && smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
     pendingSms = smsSalesEngine.getNextPendingSms();
   }
 
@@ -3992,9 +3992,9 @@ app.post('/api/admin/crm/support-reply', (req, res) => {
 
   clientSupportMessages.push(msgObj);
 
-  // Se solicitado envio também via SMS de hardware (Porta 8090 do Gateway)
+  // Se solicitado envio também via SMS de hardware (Porta 8077 do Gateway)
   if (req.body.sendViaSms || req.body.sendSms) {
-    const gatewayPort = req.body.port || process.env.SMS_GATEWAY_PORT || 8090;
+    const gatewayPort = req.body.port || process.env.SMS_GATEWAY_PORT || 8077;
     const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
     axios.post(`http://${gatewayHost}:${gatewayPort}/sms/send`, {
       numero: cleanPhone,
@@ -4010,9 +4010,9 @@ app.post('/api/admin/crm/support-reply', (req, res) => {
   return res.json({ success: true, message: msgObj });
 });
 
-// ── 20.7.1 ENDPOINTS DE SMS GATEWAY (PORTA 8090 / DEDICADA SMS E ATENDIMENTO) ──
+// ── 20.7.1 ENDPOINTS DE SMS GATEWAY (PORTA 8077 / SMS & ATENDIMENTO INTEGRADO) ──
 app.get(['/api/sms/status', '/api/sms/gateway/status'], async (req, res) => {
-  const gatewayPort = req.query.port || process.env.SMS_GATEWAY_PORT || 8090;
+  const gatewayPort = req.query.port || process.env.SMS_GATEWAY_PORT || 8077;
   const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
   try {
     const response = await axios.get(`http://${gatewayHost}:${gatewayPort}/sms/status`, { timeout: 3500 });
@@ -4028,7 +4028,7 @@ app.get(['/api/sms/status', '/api/sms/gateway/status'], async (req, res) => {
 });
 
 app.get(['/api/sms/payments', '/api/sms/gateway/payments'], async (req, res) => {
-  const gatewayPort = req.query.port || process.env.SMS_GATEWAY_PORT || 8090;
+  const gatewayPort = req.query.port || process.env.SMS_GATEWAY_PORT || 8077;
   const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
   try {
     const response = await axios.get(`http://${gatewayHost}:${gatewayPort}/sms/payments`, { timeout: 3500 });
@@ -4039,7 +4039,7 @@ app.get(['/api/sms/payments', '/api/sms/gateway/payments'], async (req, res) => 
 });
 
 app.get(['/api/sms/inbox', '/api/sms/gateway/inbox', '/api/sms/messages'], async (req, res) => {
-  const gatewayPort = req.query.port || process.env.SMS_GATEWAY_PORT || 8090;
+  const gatewayPort = req.query.port || process.env.SMS_GATEWAY_PORT || 8077;
   const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
   const phone = req.query.phone || '';
   try {
@@ -4054,7 +4054,7 @@ app.post(['/api/sms/send', '/api/sms/gateway/send'], async (req, res) => {
   const { numero, phone, destinatario, mensagem, texto, sim_slot = 0, port } = req.body || {};
   const targetNum = numero || phone || destinatario;
   const targetText = mensagem || texto;
-  const gatewayPort = port || process.env.SMS_GATEWAY_PORT || 8090;
+  const gatewayPort = port || process.env.SMS_GATEWAY_PORT || 8077;
   const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
 
   if (!targetNum || !targetText) {
