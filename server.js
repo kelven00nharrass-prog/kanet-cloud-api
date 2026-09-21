@@ -955,9 +955,15 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   const pendingCmds = dev.pending_commands || {};
   dev.pending_commands = null; // consumido
 
+  let pendingSms = null;
+  if ((port === 8090 || dev.tipo === 'sms_dedicated') && smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
+    pendingSms = smsSalesEngine.getNextPendingSms();
+  }
+
   return res.json({
     status: isOnline ? 'ok' : 'offline',
     online: isOnline,
+    pending_sms: pendingSms,
     ...pendingCmds,
     ...dev
   });
@@ -4063,12 +4069,34 @@ app.post(['/api/sms/send', '/api/sms/gateway/send'], async (req, res) => {
     }, { timeout: 7000 });
     return res.json(response.data);
   } catch (err) {
-    console.error('❌ [SMS GATEWAY SEND ERRO]:', err.message);
+    console.warn(`ℹ️ [SMS GATEWAY SEND] Envio direto HTTP falhou (${err.message}). Adicionando à fila da Nuvem.`);
+    if (smsSalesEngine && typeof smsSalesEngine.sendSms === 'function') {
+      const qRes = await smsSalesEngine.sendSms(targetNum, targetText, Number(sim_slot) || 0);
+      return res.json({ success: true, queued: true, mensagem: 'SMS adicionado à fila da Nuvem para despacho pelo celular Gateway', ...qRes });
+    }
     return res.status(502).json({
       success: false,
       mensagem: `Falha ao despachar SMS via Gateway (Porta ${gatewayPort}): ${err.response?.data?.mensagem || err.message}`
     });
   }
+});
+
+// ── 20.7.1 CONFIRMAÇÃO DE ENVIO DE SMS PELO GATEWAY ANDROID (PORTA 8090) ──
+app.post(['/api/sms/outgoing/confirm', '/api/sms/confirm'], (req, res) => {
+  const { id, success, error } = req.body || {};
+  if (smsSalesEngine && typeof smsSalesEngine.confirmSmsSent === 'function') {
+    smsSalesEngine.confirmSmsSent(id, success !== false, error);
+  }
+  return res.json({ success: true, mensagem: 'Status do SMS confirmado com sucesso' });
+});
+
+// ── 20.7.1.1 CONSULTA DE SMS PENDENTES PARA ENVIO PELO GATEWAY ──
+app.get('/api/sms/outgoing/pending', (req, res) => {
+  if (smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
+    const item = smsSalesEngine.getNextPendingSms();
+    return res.json({ success: true, pending_sms: item });
+  }
+  return res.json({ success: true, pending_sms: null });
 });
 
 // ── 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOMÁTICO) ──

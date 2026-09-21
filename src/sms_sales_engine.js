@@ -71,24 +71,87 @@ function getSuporteDetails() {
     return { supportNum, sysName };
 }
 
+// Fila em memória de SMS pendentes para o Gateway Android coletar e enviar
+const pendingOutgoingSms = [];
+
+/**
+ * Retorna o próximo SMS pendente para envio pelo Gateway Android (Porta 8090)
+ */
+function getNextPendingSms() {
+    const now = Date.now();
+    // Limpar mensagens com mais de 10 minutos
+    for (let i = pendingOutgoingSms.length - 1; i >= 0; i--) {
+        if (now - pendingOutgoingSms[i].createdAt > 10 * 60 * 1000) {
+            pendingOutgoingSms.splice(i, 1);
+        }
+    }
+    // Procurar a primeira mensagem não atribuída ou cujo lease expirou (>30s)
+    const item = pendingOutgoingSms.find(s => !s.assignedAt || (now - s.assignedAt > 30000));
+    if (item) {
+        item.assignedAt = now;
+        return {
+            id: item.id,
+            numero: item.numero,
+            mensagem: item.mensagem,
+            sim_slot: item.sim_slot || 0
+        };
+    }
+    return null;
+}
+
+/**
+ * Confirmação de envio recebida do Gateway Android
+ */
+function confirmSmsSent(smsId, success = true, error = null) {
+    const idx = pendingOutgoingSms.findIndex(s => s.id === smsId);
+    if (idx !== -1) {
+        const item = pendingOutgoingSms[idx];
+        pendingOutgoingSms.splice(idx, 1);
+        console.log(`✉️ [SMS ENGINE CONFIRMADO] SMS ${smsId} para ${item.numero}: ${success ? 'SUCESSO' : 'FALHA (' + error + ')'}`);
+        return true;
+    }
+    return false;
+}
+
 /**
  * Envia SMS para o cliente usando a Porta 8090 do Gateway Android
+ * (Suporta envio direto HTTP local e fila em nuvem para o Gateway Android)
  */
 async function sendSms(destinatario, mensagem, simSlot = 0) {
+    const cleanNum = String(destinatario).trim();
+    const cleanMsg = String(mensagem).trim();
+    const smsId = 'SMS-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+
+    const smsItem = {
+        id: smsId,
+        numero: cleanNum,
+        mensagem: cleanMsg,
+        sim_slot: simSlot,
+        createdAt: Date.now(),
+        assignedAt: null
+    };
+
+    // 1. Tentar envio direto se o Gateway estiver rodando localmente (ex: localhost com adb forward ou IP local)
     const gatewayPort = process.env.SMS_GATEWAY_PORT || 8090;
-    const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
-    try {
-        const response = await axios.post(`http://${gatewayHost}:${gatewayPort}/sms/send`, {
-            numero: destinatario,
-            mensagem: String(mensagem).trim(),
-            sim_slot: simSlot
-        }, { timeout: 8000 });
-        console.log(`📱 [SMS ENGINE ENVIADO] Porta ${gatewayPort} -> ${destinatario}`);
-        return response.data;
-    } catch (err) {
-        console.warn(`⚠️ [SMS ENGINE AVISO] Falha ao enviar SMS para ${destinatario} na porta ${gatewayPort}:`, err.message);
-        return { success: false, erro: err.message };
+    const gatewayHost = process.env.SMS_GATEWAY_HOST;
+    if (gatewayHost && gatewayHost !== '127.0.0.1') {
+        try {
+            const response = await axios.post(`http://${gatewayHost}:${gatewayPort}/sms/send`, {
+                numero: cleanNum,
+                mensagem: cleanMsg,
+                sim_slot: simSlot
+            }, { timeout: 4000 });
+            console.log(`📱 [SMS ENGINE ENVIADO DIRETO] Porta ${gatewayPort} -> ${cleanNum}`);
+            return response.data;
+        } catch (err) {
+            console.log(`ℹ️ [SMS ENGINE] Envio direto HTTP falhou (${err.message}). Adicionando à fila da Nuvem para coleta pelo celular.`);
+        }
     }
+
+    // 2. Colocar na fila em Nuvem para o Gateway Android coletar a cada 3s via /api/devices/8090/health
+    pendingOutgoingSms.push(smsItem);
+    console.log(`📥 [SMS ENGINE FILA] SMS ${smsId} enfileirado para ${cleanNum} (${pendingOutgoingSms.length} na fila da Nuvem)`);
+    return { success: true, queued: true, id: smsId };
 }
 
 /**
@@ -503,6 +566,9 @@ module.exports = {
     notifyOrderCompleted,
     setOrderDispatcher,
     sendSms,
+    getNextPendingSms,
+    confirmSmsSent,
+    pendingOutgoingSms,
     gerarTabelaCompactaSms,
     gerarPagamentoCompactaSms,
     gerarSuporteCompactaSms
