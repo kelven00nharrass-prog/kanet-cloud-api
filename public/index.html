@@ -600,9 +600,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
 <div id="toast"></div>
 
 <script>
-const API = 'https://kanet-cloud-api.onrender.com';
-const TOKEN = 'KaNetKelven2026Secure';
-const headers = { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' };
+const API = '';
 let allOrders = [];
 let allSalesData = [];
 
@@ -952,7 +950,12 @@ async function openSmsAppRemote() {
 }
 
 async function fetchAPI(path, opts={}) {
-  const r = await fetch(API + path, { headers, ...opts });
+  const reqHeaders = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const r = await fetch(API + path, { ...opts, headers: reqHeaders });
+  if (!r.ok) {
+    const errText = await r.text().catch(() => '');
+    throw new Error(`HTTP ${r.status}${errText ? ': ' + errText : ''}`);
+  }
   return r.json();
 }
 
