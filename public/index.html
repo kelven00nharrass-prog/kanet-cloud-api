@@ -714,7 +714,7 @@ function startScreenAutoRefresh() {
     if (tab && tab.classList.contains('active')) {
       loadRemoteScreen();
     }
-  }, 1200);
+  }, 5000); // era 1200ms — aumentado para 5s (modo poupança < 5GB/mês)
 }
 
 function stopScreenAutoRefresh() {
@@ -1971,9 +1971,9 @@ async function reloadAll() {
   document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
 }
 
-// Iniciar e manter atualizado a cada 8 segundos
+// Iniciar e manter atualizado a cada 30 segundos (modo poupança < 5GB/mês — era 8s)
 reloadAll();
-setInterval(reloadAll, 8000);
+setInterval(reloadAll, 30000);
 
 // Inicializar o painel de envio manual ao carregar
 onSendModoChange();
