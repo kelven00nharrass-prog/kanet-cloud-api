@@ -544,6 +544,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
           <p style="margin:4px 0 0 0; font-size:12.5px; color:var(--muted)">Altera as definições do WhatsApp para apenas Administradores enviarem mensagens e notifica todos os grupos com o seu comunicado/motivo personalizado.</p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary" onclick="abrirModalComunicadoGrupos()" style="font-weight:600"><i class="fa-solid fa-bullhorn"></i> Enviar Comunicado aos Grupos</button>
           <button class="btn btn-sm btn-danger" onclick="abrirModalFecharGrupos()" style="font-weight:600"><i class="fa-solid fa-lock"></i> Fechar Grupos com Motivo</button>
           <button class="btn btn-sm btn-success" onclick="reabrirTodosGrupos()" style="font-weight:600"><i class="fa-solid fa-lock-open"></i> Reabrir Todos os Grupos</button>
         </div>
@@ -628,6 +629,28 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
       <button class="btn btn-secondary" onclick="fecharModalFecharGrupos()">Cancelar</button>
       <button class="btn btn-danger" onclick="executarFechoGrupos()"><i class="fa-solid fa-paper-plane"></i> Alterar Definições & Notificar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ENVIAR COMUNICADO AOS GRUPOS -->
+<div id="modalComunicadoGrupos" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+  <div class="card" style="max-width:550px; width:90%; padding:24px; border-radius:16px; background:var(--bg-card); border:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+      <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--text)"><i class="fa-solid fa-bullhorn" style="color:var(--cyan)"></i> Enviar Comunicado aos Grupos</h3>
+      <button onclick="fecharModalComunicadoGrupos()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer;">&times;</button>
+    </div>
+    <div>
+      <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13.5px; color:var(--text)">Escreva a mensagem do comunicado geral para enviar a todos os grupos:</label>
+      <textarea id="comunicadoGrupoInput" rows="5" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text); font-family:inherit; font-size:13.5px; resize:vertical" placeholder="Ex: Informamos que temos novos pacotes promocionais de dados e saldo disponíveis a partir de hoje! Envie 'Menu' no chat para consultar as opções."></textarea>
+      
+      <p style="font-size:12px; color:var(--cyan); margin-top:12px; background:rgba(6, 182, 212, 0.1); padding:10px; border-radius:8px;">
+        ℹ️ Esta ação envia uma mensagem formatada de anúncio em todos os grupos <b>sem fechar ou alterar permissões do grupo</b>.
+      </p>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button class="btn btn-secondary" onclick="fecharModalComunicadoGrupos()">Cancelar</button>
+      <button class="btn btn-primary" onclick="executarEnvioComunicado()"><i class="fa-solid fa-paper-plane"></i> Enviar Comunicado aos Grupos</button>
     </div>
   </div>
 </div>
@@ -1961,6 +1984,40 @@ async function reabrirTodosGrupos() {
     }
   } catch(e) {
     alert('❌ Erro ao reabrir grupos: ' + e.message);
+  }
+}
+
+function abrirModalComunicadoGrupos() {
+  document.getElementById('modalComunicadoGrupos').style.display = 'flex';
+}
+
+function fecharModalComunicadoGrupos() {
+  document.getElementById('modalComunicadoGrupos').style.display = 'none';
+}
+
+async function executarEnvioComunicado() {
+  const msgInput = document.getElementById('comunicadoGrupoInput');
+  const mensagem = msgInput ? msgInput.value.trim() : '';
+  if (!mensagem) {
+    alert('Por favor, escreva a mensagem do comunicado!');
+    return;
+  }
+  if (!confirm('Tem a certeza que deseja enviar este comunicado para TODOS os grupos?')) return;
+
+  try {
+    showToast('⏳ A enviar comunicado para os grupos...');
+    const data = await fetchAPI('/api/admin/groups/announce', {
+      method: 'POST',
+      body: JSON.stringify({ mensagem })
+    });
+    if (data && data.success) {
+      alert('✅ ' + (data.mensagem || 'Comunicado enviado com sucesso!'));
+      fecharModalComunicadoGrupos();
+    } else {
+      alert('❌ Erro: ' + (data ? (data.error || data.mensagem) : 'Falha na requisição'));
+    }
+  } catch(e) {
+    alert('❌ Erro ao enviar comunicado: ' + e.message);
   }
 }
 
