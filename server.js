@@ -2401,6 +2401,27 @@ app.post('/api/admin/groups/open-all', async (req, res) => {
   }
 });
 
+// ── ENVIAR COMUNICADO / ANÚNCIO AOS GRUPOS NO WHATSAPP ──
+app.post('/api/admin/groups/announce', async (req, res) => {
+  try {
+    const { mensagem, targetJids } = req.body || {};
+    if (!mensagem || typeof mensagem !== 'string' || !mensagem.trim()) {
+      return res.status(400).json({ success: false, error: 'A mensagem do comunicado é obrigatória.' });
+    }
+    if (!baileysEngine || typeof baileysEngine.sendAnnouncementToGroups !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.sendAnnouncementToGroups(mensagem.trim(), targetJids);
+    return res.json({
+      success: true,
+      mensagem: `Comunicado enviado com sucesso para ${result.count} grupo(s)!`,
+      details: result
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ── TABELAS DE PREÇOS DO SISTEMA ──
 app.get('/api/price-tables', (req, res) => {
   try {
