@@ -2444,6 +2444,96 @@ async function resetSession(db) {
     }
 }
 
+/**
+ * Altera as definições de todos ou de grupos específicos no WhatsApp para 'announcement' (apenas admins enviam mensagens)
+ * e envia o comunicado com a mensagem/motivo especificado pelo operador.
+ */
+async function closeGroupsWithReason(motivo, targetJids = null) {
+    if (!sock || connectionStatus !== 'connected') {
+        throw new Error('WhatsApp não está conectado');
+    }
+    const allGroups = await getGroups();
+    const jidsToClose = targetJids && Array.isArray(targetJids) && targetJids.length > 0
+        ? targetJids
+        : allGroups.map(g => g.jid);
+
+    if (!DYN_CFG.GRUPOS_FECHADOS) DYN_CFG.GRUPOS_FECHADOS = [];
+    const results = [];
+    const msgTexto = 
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  🛑 *GRUPO TEMPORARIAMENTE FECHADO* 🛑\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `📢 *Comunicado Oficial:*\n` +
+        `${motivo || 'Atendimento suspenso temporariamente.'}\n\n` +
+        `⏱️ *O bot informará assim que as vendas e o atendimento forem reabertos.*\n` +
+        `_Agradecemos a compreensão de todos!_ 🙏`;
+
+    for (const jid of jidsToClose) {
+        try {
+            // 1. Alterar definições do grupo no WhatsApp (apenas admins podem enviar mensagens)
+            await sock.groupSettingUpdate(jid, 'announcement');
+            
+            // 2. Enviar mensagem explicativa no grupo
+            await sock.sendMessage(jid, { text: msgTexto });
+
+            // 3. Registar no estado interno do bot
+            if (!DYN_CFG.GRUPOS_FECHADOS.includes(jid)) {
+                DYN_CFG.GRUPOS_FECHADOS.push(jid);
+            }
+            results.push({ jid, ok: true });
+        } catch(e) {
+            console.error(`⚠️ [FECHAR GRUPO ERRO] ${jid}: ${e.message}`);
+            results.push({ jid, ok: false, error: e.message });
+        }
+    }
+    salvarBotConfig();
+    return { count: results.filter(r => r.ok).length, total: jidsToClose.length, results };
+}
+
+/**
+ * Reabre grupos no WhatsApp (not_announcement) permitindo que todos enviem mensagens
+ * e notifica a reabertura no grupo.
+ */
+async function openAllGroups(targetJids = null) {
+    if (!sock || connectionStatus !== 'connected') {
+        throw new Error('WhatsApp não está conectado');
+    }
+    const allGroups = await getGroups();
+    const jidsToOpen = targetJids && Array.isArray(targetJids) && targetJids.length > 0
+        ? targetJids
+        : (DYN_CFG.GRUPOS_FECHADOS && DYN_CFG.GRUPOS_FECHADOS.length > 0 ? DYN_CFG.GRUPOS_FECHADOS : allGroups.map(g => g.jid));
+
+    const results = [];
+    const msgTexto = 
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  🟢 *GRUPO REABERTO COM SUCESSO!* 🎉\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `✅ *As vendas e o atendimento já estão 100% operacionais!*\n` +
+        `_Envie a palavra desejada para realizar o seu pedido._ 📶`;
+
+    for (const jid of jidsToOpen) {
+        try {
+            // 1. Alterar definições no WhatsApp (todos podem enviar mensagens)
+            await sock.groupSettingUpdate(jid, 'not_announcement');
+
+            // 2. Enviar mensagem de abertura
+            await sock.sendMessage(jid, { text: msgTexto });
+
+            // 3. Remover do estado interno de fechados
+            if (DYN_CFG.GRUPOS_FECHADOS) {
+                const idx = DYN_CFG.GRUPOS_FECHADOS.indexOf(jid);
+                if (idx !== -1) DYN_CFG.GRUPOS_FECHADOS.splice(idx, 1);
+            }
+            results.push({ jid, ok: true });
+        } catch(e) {
+            console.error(`⚠️ [ABRIR GRUPO ERRO] ${jid}: ${e.message}`);
+            results.push({ jid, ok: false, error: e.message });
+        }
+    }
+    salvarBotConfig();
+    return { count: results.filter(r => r.ok).length, total: jidsToOpen.length, results };
+}
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -2456,6 +2546,8 @@ module.exports = {
     getGroups,
     setModoManutencao,
     toggleGrupoFechado,
+    closeGroupsWithReason,
+    openAllGroups,
     getJidForOrder,
     registrarSmsPayment,
     smsPaymentsMap,
