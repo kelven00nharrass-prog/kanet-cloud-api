@@ -275,6 +275,8 @@ app.post('/api/devices/:port/reset', (req, res) => {
   dev.is_apto = true;
   dev.paused = false;
   dev.pending_order = null;
+  dev.currentOrder = null;
+  dev.isBusy = false;
   dev._lastBlockLogTime = 0;
   dev.manual_saldo_override = Date.now();
 
@@ -477,6 +479,8 @@ app.post('/api/devices/reset-all', (req, res) => {
     dev.is_apto = true;
     dev.paused = false;
     dev.pending_order = null;
+    dev.currentOrder = null;
+    dev.isBusy = false;
     dev._lastBlockLogTime = 0;
     count++;
   }
@@ -1016,6 +1020,19 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       bodyClean.is_apto = true;
       bodyClean.livre = true;
     }
+  }
+
+  // Auto-expirar currentOrder preso por mais de 10 min
+  if (currentDev.currentOrder && currentDev.currentOrder.timestamp) {
+    if (Date.now() - Number(currentDev.currentOrder.timestamp) > 10 * 60 * 1000) {
+      currentDev.currentOrder = null;
+      currentDev.isBusy = false;
+    }
+  }
+  if (req.body.last_result) {
+    currentDev.currentOrder = null;
+    currentDev.isBusy = false;
+    pendingOrder = null;
   }
 
   inMemoryDevices[port] = {
