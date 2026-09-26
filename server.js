@@ -2362,6 +2362,45 @@ app.post('/api/groups/:jid/fechar', (req, res) => {
   }
 });
 
+// ── FECHAR GRUPOS NO WHATSAPP COM MOTIVO / COMUNICADO ──
+app.post('/api/admin/groups/close-with-reason', async (req, res) => {
+  try {
+    const { motivo, targetJids } = req.body || {};
+    if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
+      return res.status(400).json({ success: false, error: 'O motivo / mensagem do fecho é obrigatório.' });
+    }
+    if (!baileysEngine || typeof baileysEngine.closeGroupsWithReason !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.closeGroupsWithReason(motivo.trim(), targetJids);
+    return res.json({
+      success: true,
+      mensagem: `${result.count} grupo(s) foram fechados no WhatsApp e o comunicado foi enviado!`,
+      details: result
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── REABRIR TODOS OS GRUPOS NO WHATSAPP ──
+app.post('/api/admin/groups/open-all', async (req, res) => {
+  try {
+    const { targetJids } = req.body || {};
+    if (!baileysEngine || typeof baileysEngine.openAllGroups !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.openAllGroups(targetJids);
+    return res.json({
+      success: true,
+      mensagem: `${result.count} grupo(s) foram reabertos no WhatsApp para todos os membros!`,
+      details: result
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ── TABELAS DE PREÇOS DO SISTEMA ──
 app.get('/api/price-tables', (req, res) => {
   try {
