@@ -2534,6 +2534,39 @@ async function openAllGroups(targetJids = null) {
     return { count: results.filter(r => r.ok).length, total: jidsToOpen.length, results };
 }
 
+/**
+ * Envia um comunicado / anúncio formatado para todos os grupos (ou grupos específicos)
+ * sem alterar as definições de quem pode digitar no grupo.
+ */
+async function sendAnnouncementToGroups(mensagem, targetJids = null) {
+    if (!sock || connectionStatus !== 'connected') {
+        throw new Error('WhatsApp não está conectado');
+    }
+    const allGroups = await getGroups();
+    const jidsToAnnounce = targetJids && Array.isArray(targetJids) && targetJids.length > 0
+        ? targetJids
+        : allGroups.map(g => g.jid);
+
+    const results = [];
+    const msgTexto = 
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  📢 *COMUNICADO KA-NET* 📢\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `${mensagem || 'Comunicado geral para todos os clientes.'}\n\n` +
+        `_Atenciosamente, Equipa KA-NET_ 📶`;
+
+    for (const jid of jidsToAnnounce) {
+        try {
+            await sock.sendMessage(jid, { text: msgTexto });
+            results.push({ jid, ok: true });
+        } catch(e) {
+            console.error(`⚠️ [COMUNICADO GRUPO ERRO] ${jid}: ${e.message}`);
+            results.push({ jid, ok: false, error: e.message });
+        }
+    }
+    return { count: results.filter(r => r.ok).length, total: jidsToAnnounce.length, results };
+}
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -2548,6 +2581,7 @@ module.exports = {
     toggleGrupoFechado,
     closeGroupsWithReason,
     openAllGroups,
+    sendAnnouncementToGroups,
     getJidForOrder,
     registrarSmsPayment,
     smsPaymentsMap,
