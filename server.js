@@ -1114,18 +1114,37 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           );
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de CONCLUSÃO TOTAL (Parte 2) do pedido ${resId}`);
         } else {
+          const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
+          let headerText = 'PACOTE ATIVADO COM SUCESSO! 📶';
+          let modoBadge = '';
+          let duracaoText = 'A sua recarga já está pronta para uso!';
+
+          if (modoStr === 'semanal') {
+            headerText = 'PACOTE SEMANAL ATIVADO! 🗓️';
+            modoBadge = ' (Semanal - 7 Dias)';
+            duracaoText = 'O seu pacote Semanal de 7 Dias já está ativo e pronto para uso!';
+          } else if (modoStr === 'mensal') {
+            headerText = 'PACOTE MENSAL ATIVADO! 📅';
+            modoBadge = ' (Mensal - 30 Dias)';
+            duracaoText = 'O seu pacote Mensal de 30 Dias já está ativo e pronto para uso!';
+          } else if (modoStr === 'tudo_top' || modoStr === 'ilimitado') {
+            headerText = 'PACOTE TUDO TOP ATIVADO! 💎';
+            modoBadge = ' (Tudo Top / Ilimitado)';
+            duracaoText = 'O seu pacote Tudo Top já está ativo e pronto para uso!';
+          }
+
           baileysEngine.sendTextMessage(clientJid,
             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-            `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
+            `  🎉 *${headerText}*\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
             `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Volume:* *${volStr}*\n` +
+            `📦 *Volume:* *${volStr}*${modoBadge}\n` +
             `🔖 *Ref:* \`${resId}\`\n\n` +
-            `⚡ *A sua recarga já está pronta para uso!*\n` +
+            `⚡ *${duracaoText}*\n` +
             `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
             `📞 *Suporte / Dúvidas:* Envie *Suporte*`
           );
-          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${resId}`);
+          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
         }
       } else {
         baileysEngine.sendTextMessage(clientJid,
