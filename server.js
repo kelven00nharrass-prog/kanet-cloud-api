@@ -1471,9 +1471,14 @@ async function restoreAllDataFromFirestore() {
       snapOrders.docs.forEach(doc => {
         const orderData = doc.data();
         const orderId = orderData.orderId || orderData.id || doc.id;
-        if (orderId && !inMemoryOrders.has(orderId)) {
-          inMemoryOrders.set(orderId, orderData);
-          count++;
+        if (orderId) {
+          if (!inMemoryOrders.has(orderId)) {
+            inMemoryOrders.set(orderId, orderData);
+            count++;
+          }
+          // Marcar historico como ja notificado para nao disparar mensagens no WhatsApp
+          clientRemindersSent.add(`${orderId}_D3`);
+          clientRemindersSent.add(`${orderId}_D0`);
         }
       });
       console.log(`📦 [FIRESTORE RESTORE] ${count} pedidos de vendas históricos restaurados do Firestore.`);
@@ -4344,8 +4349,8 @@ function processClientPackageReminders() {
       }
     }
 
-    // 2. Alerta no Próprio Dia de Expiração (D-0)
-    if (diasRestantes <= 0) {
+    // 2. Alerta no Próprio Dia de Expiração (D-0) — APENAS no próprio dia (não em pedidos antigos)
+    if (diasRestantes === 0 && (now - createdAtTime) <= (duracaoDias + 1) * ONE_DAY_MS) {
       const reminderKey = `${order.id || order.orderId}_D0`;
       if (!clientRemindersSent.has(reminderKey)) {
         clientRemindersSent.add(reminderKey);
