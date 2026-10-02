@@ -4589,7 +4589,7 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     console.log(`   📦 Entrega Inicial: ${mbInicial}MB (enviando agora via celular diário)`);
     console.log(`   ⏰ Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias adicionais | Próxima: ${plan.proxima_entrega}`);
 
-    // Notificar cliente no WhatsApp com explicação detalhada do plano
+    // Notificar cliente no WhatsApp com explicação detalhada, clara e tranquilizadora do plano
     let clientJid = orderDoc.jid;
     if (!clientJid && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
       clientJid = baileysEngine.getJidForOrder(orderDoc.id || orderDoc.orderId);
@@ -4600,25 +4600,37 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     }
 
     if (clientJid && baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
+      const horaProx = new Date(plan.proxima_entrega).toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
       const msgTexto = tipo === 'faseado'
         ? `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
           `  📉 *PLANO FASEADO ACTIVADO!* ⚡\n` +
           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-          `Olá! O seu pacote *${plano.nome}* foi configurado com sucesso:\n\n` +
-          `1️⃣ *1ª Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (A enviar agora...)\n` +
+          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `1️⃣ *1ª Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
           `📅 *Próximas Fases:* *${plan.entregas_diarias_total} entregas diárias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
+          `⏰ *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
           `📲 *Destino:* *${orderDoc.numero}*\n` +
           `✨ *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
-          `⚡ _Cada fase será transferida automaticamente cerca de 1 hora antes de expirar a anterior para os seus dados acumularem!_`
+          `💡 *Como funciona o Plano Faseado?*\n` +
+          `• A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
+          `• O envio é feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
+          `• Você receberá uma notificação aqui no WhatsApp a cada fase entregue!\n\n` +
+          `📞 *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
         : `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
           `  ♻️ *PLANO RENOVÁVEL ACTIVADO!* ⚡\n` +
           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-          `Olá! O seu pacote *${plano.nome}* foi configurado com sucesso:\n\n` +
-          `1️⃣ *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (A enviar agora...)\n` +
-          `📅 *Renovação Diária:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
+          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `1️⃣ *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
+          `📅 *Renovações Diárias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
+          `⏰ *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
           `📲 *Destino:* *${orderDoc.numero}*\n` +
-          `✨ *Total:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
-          `⚡ _Os 100MB diários serão transferidos automaticamente todos os dias para renovar a validade e não deixar os seus megas expirarem!_`;
+          `✨ *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
+          `💡 *Como funciona o Plano Renovável?*\n` +
+          `• Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
+          `• Durante os próximos 7 dias, o sistema transfere *${mbDiaria} MB diários* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
+          `• Assim, os seus dados duram a semana toda sem expirar!\n` +
+          `• Você receberá uma notificação aqui no WhatsApp a cada renovação diária.\n\n` +
+          `📞 *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`;
 
       baileysEngine.enviarMensagemTexto(clientJid, msgTexto).catch(() => {});
     }
@@ -4667,16 +4679,67 @@ async function executarEntregaPlano(planId) {
   plan.historico.push({ entrega: entregaN, orderId, timestamp, mb: plan.mb_diaria });
   plan.entregas_feitas = entregaN;
 
+  const isFinal = plan.entregas_feitas >= plan.entregas_diarias_total;
   const label = plan.tipo === 'faseado'
     ? `Fase ${entregaN + 1}/${plan.entregas_diarias_total + 1}`
     : `Renovação ${entregaN}/${plan.entregas_diarias_total}`;
   console.log(`📦 [PLANO ${plan.tipo.toUpperCase()}] ${label} → ${plan.mb_diaria}MB → ${plan.numero} | Ordem: ${orderId}`);
 
-  // Notificar cliente via WhatsApp
+  // Calcular próxima hora de envio
+  const proxima = new Date(plan.proxima_entrega);
+  proxima.setDate(proxima.getDate() + 1);
+  proxima.setHours(proxima.getHours() - 1);
+  if (proxima.getHours() < 7) proxima.setHours(7);
+  proxima.setSeconds(0);
+  proxima.setMilliseconds(0);
+  plan.proxima_entrega = proxima.toISOString();
+
+  const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
   const restantes = plan.entregas_diarias_total - plan.entregas_feitas;
-  const textoNotif = plan.tipo === 'faseado'
-    ? `📦 [Ka-Net] *${label}*: Enviados *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*! ${restantes > 0 ? `Restam ${restantes} fases.` : '✅ Plano concluído com sucesso!'}`
-    : `♻️ [Ka-Net] *Renovação Automática*: Enviados *+${plan.mb_diaria} MB* para o número *${plan.numero}* para manter os seus dados ativos! ${restantes > 0 ? `Restam ${restantes} renovações.` : '✅ Plano de renovação concluído com sucesso!'}`;
+
+  let textoNotif = '';
+  if (plan.tipo === 'faseado') {
+    if (isFinal) {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  🎉 *PLANO FASEADO CONCLUÍDO!* 🏆\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de enviar a *Última Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*!\n\n` +
+                   `✨ *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
+                   `✅ Todas as fases foram concluídas com sucesso.\n\n` +
+                   `Muito obrigado pela confiança na *Ka-Net Internet*!`;
+    } else {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  📦 *${label.toUpperCase()} ENTREGUE!* 📶\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de transferir mais *${(plan.mb_diaria/1024).toFixed(1)} GB* para o seu número *${plan.numero}*.\n\n` +
+                   `📊 *Progresso do seu Plano Faseado:*\n` +
+                   `• *Fases Concluídas:* ${entregaN + 1} de ${plan.entregas_diarias_total + 1}\n` +
+                   `• *Fases Restantes:* ${restantes} fase(s)\n` +
+                   `• *Próximo Envio:* Amanhã às *${horaProx}* (1 hora antes de expirar a anterior)\n\n` +
+                   `⚡ _Os dados acumularam com o saldo anterior. Boa navegação!_`;
+    }
+  } else {
+    // Renovável
+    if (isFinal) {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  🎉 *PLANO RENOVÁVEL CONCLUÍDO!* 🏆\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de enviar a *Última Renovação (${label})* de *+${plan.mb_diaria} MB* para o número *${plan.numero}*!\n\n` +
+                   `✨ *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
+                   `✅ O ciclo de 7 dias de renovações automáticas foi concluído com sucesso.\n\n` +
+                   `Muito obrigado pela confiança na *Ka-Net Internet*!`;
+    } else {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  ♻️ *${label.toUpperCase()} ENTREGUE!* 📶\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de transferir *+${plan.mb_diaria} MB* de renovação para o seu número *${plan.numero}*.\n\n` +
+                   `📊 *Progresso da sua Renovação:*\n` +
+                   `• *Renovações Concluídas:* ${entregaN} de ${plan.entregas_diarias_total}\n` +
+                   `• *Renovações Restantes:* ${restantes} dia(s)\n` +
+                   `• *Próxima Renovação:* Amanhã às *${horaProx}* (1 hora antes de expirar)\n\n` +
+                   `⚡ _A validade dos seus megas foi renovada com sucesso para não expirar!_`;
+    }
+  }
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(() => {});
@@ -4694,22 +4757,13 @@ async function executarEntregaPlano(planId) {
   });
 
   // Verificar se o plano terminou
-  if (plan.entregas_feitas >= plan.entregas_diarias_total) {
+  if (isFinal) {
     plan.status = 'concluido';
     plan.concluido_em = timestamp;
     console.log(`🏁 [PLANO ${plan.tipo.toUpperCase()}] ${planId} CONCLUÍDO! Total entregue: ${plan.total_mb}MB ao ${plan.numero}`);
     saveScheduledPlans();
     return;
   }
-
-  // Agendar próxima entrega: amanhã, 1 hora antes da entrega anterior (para renovar antes de expirar)
-  const proxima = new Date(plan.proxima_entrega);
-  proxima.setDate(proxima.getDate() + 1);
-  proxima.setHours(proxima.getHours() - 1);
-  if (proxima.getHours() < 7) proxima.setHours(7);
-  proxima.setSeconds(0);
-  proxima.setMilliseconds(0);
-  plan.proxima_entrega = proxima.toISOString();
 
   saveScheduledPlans();
   console.log(`⏰ [PLANO] Próxima entrega agendada: ${plan.proxima_entrega}`);
