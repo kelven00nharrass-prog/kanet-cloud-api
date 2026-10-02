@@ -414,7 +414,7 @@ module.exports = {
                 "quantidade_mb": 15360,
                 "periodo": "ilimitado",
                 "tipo": "ilimitado",
-                "input_val": "2"
+                "input_val": "1"
             },
             "850": {
                 "quantidade": 25600,
@@ -422,7 +422,7 @@ module.exports = {
                 "quantidade_mb": 25600,
                 "periodo": "ilimitado",
                 "tipo": "ilimitado",
-                "input_val": "3"
+                "input_val": "1"
             },
             "950": {
                 "quantidade": 23552,

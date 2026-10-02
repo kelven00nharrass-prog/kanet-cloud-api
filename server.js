@@ -531,25 +531,27 @@ function getPortForModo(modo) {
   return 8025; // fallback padrão (Huawei)
 }
 
-// ── REGRA OFICIAL KA-NET: PACOTES MENSAIS (1ª Oferta Vodacom + Diferença Diária) ──
-// Vodacom *162# -> 5 -> 1 entrega 2.8GB (2867MB) por 95 MT.
-// Para pedidos mensais > 2867MB (ex: 5GB = 5120MB, 8GB = 8192MB, 10GB = 10240MB):
-// 1ª Parte: 2867MB via Porta 8077 (Modo Mensal, Opção 1).
-// 2ª Parte: (Total - 2867MB) via Portas Diárias (Modo Diário / 24hrs).
-const MENSAL_BASE_MB = 2867; // 2.8 GB
+// ── REGRA OFICIAL KA-NET: DIVISÃO INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) ──
+// 1. Mensal: Vodacom *162# -> 5 -> 1 entrega 2.8GB (2867MB) por 95 MT.
+//    Se pedido > 2867MB (ex: 5GB, 8GB, 10GB): Parte 1 (2867MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
+// 2. Tudo Top: Vodacom *111# -> 4 -> 3 -> 1 entrega 11GB (11264MB) + Minutos por 500 MT.
+//    Se pedido > 11264MB (ex: 15GB, 25GB): Parte 1 (11264MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
+const MENSAL_BASE_MB = 2867;     // 2.8 GB
+const TUDO_TOP_BASE_MB = 11264;  // 11 GB
 
-function splitMensalOrderIfEligible(orderDoc) {
-  if (!orderDoc) return false;
+function splitSpecialOrderIfEligible(orderDoc) {
+  if (!orderDoc || orderDoc.isSplit) return false;
   const modo = String(orderDoc.modo || '').toLowerCase().trim();
   const qty = Number(orderDoc.quantidade) || 0;
-  if (modo === 'mensal' && qty > MENSAL_BASE_MB && !orderDoc.isSplit) {
+
+  // 1. Split de Pacote Mensal
+  if (modo === 'mensal' && qty > MENSAL_BASE_MB) {
     const totalMb = qty;
     const parte1 = MENSAL_BASE_MB;
     const parte2 = totalMb - parte1;
     const parentId = orderDoc.id || orderDoc.orderId;
     const part2Id = `${parentId}-DIARIO`;
 
-    // Configurar Parte 1: Mensal (Porta 8077)
     orderDoc.isSplit = true;
     orderDoc.splitPart = 1;
     orderDoc.splitTotalParts = 2;
@@ -560,7 +562,6 @@ function splitMensalOrderIfEligible(orderDoc) {
     orderDoc.targetPort = 8077;
     orderDoc.input_val = '1'; // 1ª oferta mensal
 
-    // Criar Parte 2: Diário (Portas Diárias)
     const orderPart2 = {
       id: part2Id,
       orderId: part2Id,
@@ -593,7 +594,64 @@ function splitMensalOrderIfEligible(orderDoc) {
 
     return true;
   }
+
+  // 2. Split de Pacote Tudo Top / Ilimitado
+  const isTop = modo === 'ilimitado' || modo === 'ilimitados' || modo.includes('top');
+  if (isTop && qty > TUDO_TOP_BASE_MB) {
+    const totalMb = qty;
+    const parte1 = TUDO_TOP_BASE_MB;
+    const parte2 = totalMb - parte1;
+    const parentId = orderDoc.id || orderDoc.orderId;
+    const part2Id = `${parentId}-DIARIO`;
+
+    orderDoc.isSplit = true;
+    orderDoc.splitPart = 1;
+    orderDoc.splitTotalParts = 2;
+    orderDoc.splitTotalMb = totalMb;
+    orderDoc.splitOtherPartMb = parte2;
+    orderDoc.part2Id = part2Id;
+    orderDoc.quantidade = parte1;
+    orderDoc.targetPort = 8077;
+    orderDoc.input_val = '1'; // 1ª oferta Tudo Top (11GB)
+
+    const orderPart2 = {
+      id: part2Id,
+      orderId: part2Id,
+      parentOrderId: parentId,
+      numero: orderDoc.numero,
+      quantidade: parte2,
+      modo: 'diario',
+      input_val: '',
+      jid: orderDoc.jid || null,
+      remetente: orderDoc.remetente || 'Bot',
+      targetPort: null,
+      isSplit: true,
+      splitPart: 2,
+      splitTotalParts: 2,
+      splitTotalMb: totalMb,
+      splitOtherPartMb: parte1,
+      status: 'waiting_part1',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      notified: false,
+      groupNotified: false
+    };
+
+    inMemoryOrders.set(part2Id, orderPart2);
+    saveOrdersToCache();
+
+    console.log(`📦 [SPLIT TUDO TOP KA-NET] Pedido Tudo Top ${parentId} (${totalMb}MB) dividido automaticamente:`);
+    console.log(`   👉 Parte 1 (Tudo Top): ${parte1}MB -> Porta 8077 (1ª Oferta *111# 11GB + Minutos)`);
+    console.log(`   👉 Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
+
+    return true;
+  }
+
   return false;
+}
+
+function splitMensalOrderIfEligible(orderDoc) {
+  return splitSpecialOrderIfEligible(orderDoc);
 }
 
 function isDeviceApto(dev) {
