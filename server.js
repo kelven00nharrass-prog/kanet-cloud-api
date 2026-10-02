@@ -58,9 +58,15 @@ const inMemoryOrders = new Map();
 // ----------------------------------------------------
 // 2. MIDDLEWARES
 // ----------------------------------------------------
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const compression = require('compression');
+app.use(compression()); // Compressão gzip — reduz respostas JSON/HTML em 60-80%
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
@@ -269,6 +275,8 @@ app.post('/api/devices/:port/reset', (req, res) => {
   dev.is_apto = true;
   dev.paused = false;
   dev.pending_order = null;
+  dev.currentOrder = null;
+  dev.isBusy = false;
   dev._lastBlockLogTime = 0;
   dev.manual_saldo_override = Date.now();
 
@@ -471,6 +479,8 @@ app.post('/api/devices/reset-all', (req, res) => {
     dev.is_apto = true;
     dev.paused = false;
     dev.pending_order = null;
+    dev.currentOrder = null;
+    dev.isBusy = false;
     dev._lastBlockLogTime = 0;
     count++;
   }
@@ -1012,6 +1022,19 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     }
   }
 
+  // Auto-expirar currentOrder preso por mais de 10 min
+  if (currentDev.currentOrder && currentDev.currentOrder.timestamp) {
+    if (Date.now() - Number(currentDev.currentOrder.timestamp) > 10 * 60 * 1000) {
+      currentDev.currentOrder = null;
+      currentDev.isBusy = false;
+    }
+  }
+  if (req.body.last_result) {
+    currentDev.currentOrder = null;
+    currentDev.isBusy = false;
+    pendingOrder = null;
+  }
+
   inMemoryDevices[port] = {
     ...currentDev,
     ...bodyClean,
@@ -1091,18 +1114,37 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           );
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de CONCLUSÃO TOTAL (Parte 2) do pedido ${resId}`);
         } else {
+          const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
+          let headerText = 'PACOTE ATIVADO COM SUCESSO! 📶';
+          let modoBadge = '';
+          let duracaoText = 'A sua recarga já está pronta para uso!';
+
+          if (modoStr === 'semanal') {
+            headerText = 'PACOTE SEMANAL ATIVADO! 🗓️';
+            modoBadge = ' (Semanal - 7 Dias)';
+            duracaoText = 'O seu pacote Semanal de 7 Dias já está ativo e pronto para uso!';
+          } else if (modoStr === 'mensal') {
+            headerText = 'PACOTE MENSAL ATIVADO! 📅';
+            modoBadge = ' (Mensal - 30 Dias)';
+            duracaoText = 'O seu pacote Mensal de 30 Dias já está ativo e pronto para uso!';
+          } else if (modoStr === 'tudo_top' || modoStr === 'ilimitado') {
+            headerText = 'PACOTE TUDO TOP ATIVADO! 💎';
+            modoBadge = ' (Tudo Top / Ilimitado)';
+            duracaoText = 'O seu pacote Tudo Top já está ativo e pronto para uso!';
+          }
+
           baileysEngine.sendTextMessage(clientJid,
             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-            `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
+            `  🎉 *${headerText}*\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
             `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Volume:* *${volStr}*\n` +
+            `📦 *Volume:* *${volStr}*${modoBadge}\n` +
             `🔖 *Ref:* \`${resId}\`\n\n` +
-            `⚡ *A sua recarga já está pronta para uso!*\n` +
+            `⚡ *${duracaoText}*\n` +
             `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
             `📞 *Suporte / Dúvidas:* Envie *Suporte*`
           );
-          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${resId}`);
+          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
         }
       } else {
         baileysEngine.sendTextMessage(clientJid,
@@ -2315,6 +2357,66 @@ app.post('/api/groups/:jid/fechar', (req, res) => {
       fechado = baileysEngine.toggleGrupoFechado(jid);
     }
     return res.json({ success: true, jid, fechado, mensagem: fechado ? '🔒 Grupo fechado — bot não responde neste grupo.' : '🔓 Grupo aberto — bot volta a responder normalmente.' });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── FECHAR GRUPOS NO WHATSAPP COM MOTIVO / COMUNICADO ──
+app.post('/api/admin/groups/close-with-reason', async (req, res) => {
+  try {
+    const { motivo, targetJids } = req.body || {};
+    if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
+      return res.status(400).json({ success: false, error: 'O motivo / mensagem do fecho é obrigatório.' });
+    }
+    if (!baileysEngine || typeof baileysEngine.closeGroupsWithReason !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.closeGroupsWithReason(motivo.trim(), targetJids);
+    return res.json({
+      success: true,
+      mensagem: `${result.count} grupo(s) foram fechados no WhatsApp e o comunicado foi enviado!`,
+      details: result
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── REABRIR TODOS OS GRUPOS NO WHATSAPP ──
+app.post('/api/admin/groups/open-all', async (req, res) => {
+  try {
+    const { targetJids } = req.body || {};
+    if (!baileysEngine || typeof baileysEngine.openAllGroups !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.openAllGroups(targetJids);
+    return res.json({
+      success: true,
+      mensagem: `${result.count} grupo(s) foram reabertos no WhatsApp para todos os membros!`,
+      details: result
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── ENVIAR COMUNICADO / ANÚNCIO AOS GRUPOS NO WHATSAPP ──
+app.post('/api/admin/groups/announce', async (req, res) => {
+  try {
+    const { mensagem, targetJids } = req.body || {};
+    if (!mensagem || typeof mensagem !== 'string' || !mensagem.trim()) {
+      return res.status(400).json({ success: false, error: 'A mensagem do comunicado é obrigatória.' });
+    }
+    if (!baileysEngine || typeof baileysEngine.sendAnnouncementToGroups !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.sendAnnouncementToGroups(mensagem.trim(), targetJids);
+    return res.json({
+      success: true,
+      mensagem: `Comunicado enviado com sucesso para ${result.count} grupo(s)!`,
+      details: result
+    });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }

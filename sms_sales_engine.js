@@ -3,13 +3,9 @@
  * KA-NET SMS SALES ENGINE (BOT DE ATENDIMENTO E VENDAS AUTOMÁTICAS POR SMS)
  * ==============================================================================
  * Funciona de forma equivalente ao bot do WhatsApp, porém otimizado para SMS GSM:
- * 1. Pedido de Tabela: Envia tabela formatada e compacta de Diários, Semanais e Mensais
+ * 1. Pedido de Comprovativo: Detecta transações M-Pesa / e-Mola primeiro
  * 2. Pedido de Formas de Pagamento: Envia números M-Pesa e e-Mola + instruções
- * 3. Envio de Comprovativo pelo Cliente:
- *    - Detecta Código de Transação (TXN), Valor e Número de Destino
- *    - Confirma com a operadora (verificação anti-fraude)
- *    - Se confirmado: Notifica cliente -> Despacha transferência USSD -> Notifica conclusão
- *    - Se aguardando operadora: Notifica cliente e ativa assim que o SMS da rede chegar
+ * 3. Pedido de Tabela: Envia tabela formatada e compacta de Diários, Semanais e Mensais
  * 4. Suporte e Menu de Boas-Vindas
  */
 
@@ -40,10 +36,11 @@ function carregarConfigs() {
 carregarConfigs();
 
 // Fila de pedidos de SMS aguardando confirmação da operadora
-// txn_id -> { txn_id, valor, senderPhone, numDestino, pacote, timestamp, timer }
 const smsAguardandoOperadora = new Map();
 // Histórico de transações processadas por SMS para evitar duplicações
 const smsTransacoesProcessadas = new Set();
+// Cache de deduplicação de mensagens de entrada recentes (remetente_texto -> timestamp)
+const recentIncomingSmsCache = new Map();
 
 let dispatchOrderCallback = null;
 
@@ -75,7 +72,8 @@ function getSuporteDetails() {
 const pendingOutgoingSms = [];
 
 /**
- * Retorna o próximo SMS pendente para envio pelo Gateway Android (Porta 8090)
+ * Retorna o próximo SMS pendente para envio pelo Gateway Android (Porta 8090/8077)
+ * Remove a mensagem da fila imediatamente para evitar reenvios em loop!
  */
 function getNextPendingSms() {
     const now = Date.now();
@@ -85,10 +83,11 @@ function getNextPendingSms() {
             pendingOutgoingSms.splice(i, 1);
         }
     }
-    // Procurar a primeira mensagem não atribuída ou cujo lease expirou (>30s)
-    const item = pendingOutgoingSms.find(s => !s.assignedAt || (now - s.assignedAt > 30000));
-    if (item) {
-        item.assignedAt = now;
+    
+    if (pendingOutgoingSms.length > 0) {
+        // Pop o primeiro SMS pendente
+        const item = pendingOutgoingSms.shift();
+        console.log(`📤 [SMS ENGINE DISPATCHED] SMS ${item.id} entregue ao celular para ${item.numero}`);
         return {
             id: item.id,
             numero: item.numero,
@@ -100,22 +99,15 @@ function getNextPendingSms() {
 }
 
 /**
- * Confirmação de envio recebida do Gateway Android
+ * Confirmação de envio recebida do Gateway Android (Mantida para compatibilidade/logs)
  */
 function confirmSmsSent(smsId, success = true, error = null) {
-    const idx = pendingOutgoingSms.findIndex(s => s.id === smsId);
-    if (idx !== -1) {
-        const item = pendingOutgoingSms[idx];
-        pendingOutgoingSms.splice(idx, 1);
-        console.log(`✉️ [SMS ENGINE CONFIRMADO] SMS ${smsId} para ${item.numero}: ${success ? 'SUCESSO' : 'FALHA (' + error + ')'}`);
-        return true;
-    }
-    return false;
+    console.log(`✉️ [SMS ENGINE CONFIRMADO] Status do SMS ${smsId}: ${success ? 'SUCESSO' : 'FALHA (' + error + ')'}`);
+    return true;
 }
 
 /**
- * Envia SMS para o cliente usando a Porta 8090 do Gateway Android
- * (Suporta envio direto HTTP local e fila em nuvem para o Gateway Android)
+ * Envia SMS para o cliente usando a Porta do Gateway Android
  */
 async function sendSms(destinatario, mensagem, simSlot = 0) {
     const cleanNum = String(destinatario).trim();
@@ -127,11 +119,10 @@ async function sendSms(destinatario, mensagem, simSlot = 0) {
         numero: cleanNum,
         mensagem: cleanMsg,
         sim_slot: simSlot,
-        createdAt: Date.now(),
-        assignedAt: null
+        createdAt: Date.now()
     };
 
-    // 1. Tentar envio direto se o Gateway estiver rodando localmente (ex: localhost com adb forward ou IP local)
+    // 1. Tentar envio direto se o Gateway estiver rodando em IP configurado
     const gatewayPort = process.env.SMS_GATEWAY_PORT || 8077;
     const gatewayHost = process.env.SMS_GATEWAY_HOST;
     if (gatewayHost && gatewayHost !== '127.0.0.1') {
@@ -144,11 +135,11 @@ async function sendSms(destinatario, mensagem, simSlot = 0) {
             console.log(`📱 [SMS ENGINE ENVIADO DIRETO] Porta ${gatewayPort} -> ${cleanNum}`);
             return response.data;
         } catch (err) {
-            console.log(`ℹ️ [SMS ENGINE] Envio direto HTTP falhou (${err.message}). Adicionando à fila da Nuvem para coleta pelo celular.`);
+            console.log(`ℹ️ [SMS ENGINE] Envio direto HTTP falhou (${err.message}). Adicionando à fila para coleta pelo celular.`);
         }
     }
 
-    // 2. Colocar na fila em Nuvem para o Gateway Android coletar a cada 3s via /api/devices/8077/health
+    // 2. Colocar na fila em Nuvem para o Gateway Android coletar via /api/devices/:port/health
     pendingOutgoingSms.push(smsItem);
     console.log(`📥 [SMS ENGINE FILA] SMS ${smsId} enfileirado para ${cleanNum} (${pendingOutgoingSms.length} na fila da Nuvem)`);
     return { success: true, queued: true, id: smsId };
@@ -195,7 +186,7 @@ function gerarTabelaCompactaSms() {
         msg += "\n";
     }
 
-    msg += "Pague via M-Pesa ou e-Mola e envie aqui o comprovativo com seu número Vodacom para ativar!";
+    msg += "Pague via M-Pesa ou e-Mola e reenvie aqui o comprovativo com o seu número Vodacom para ativar!";
     return msg;
 }
 
@@ -210,10 +201,10 @@ function gerarPagamentoCompactaSms() {
 ▫️ E-MOLA: ${emola_num} (${emola_name})
 
 Como comprar:
-1. Faça a transferência do valor do pacote.
+1. Faça a transferência do valor do pacote escolhido.
 2. Encaminhe o SMS do comprovativo para este número.
 3. Se o número que vai receber os megas for diferente, escreva o número na mensagem.
-Ativação imediata 24 horas!`;
+Ativação imediata 24h!`;
 }
 
 /**
@@ -236,11 +227,11 @@ function gerarBoasVindasSms() {
     return `Olá! Bem-vindo ao atendimento automático da ${sysName} 🇲🇿
 
 Responda com uma opção:
-1 - Tabela de Preços e Pacotes
-2 - Formas de Pagamento
+1 - Formas de Pagamento
+2 - Tabela de Preços e Pacotes
 3 - Suporte
 
-⚡ Se já pagou, basta reenviar o comprovativo da operadora para ativar seus megas!`;
+⚡ Se já pagou, basta reenviar o comprovativo da operadora para ativar os seus megas!`;
 }
 
 /**
@@ -278,20 +269,45 @@ function buscarPacotePorValor(valorPago) {
 }
 
 /**
- * Extrai número de destino Vodacom (84/85) do texto
+ * NÚMEROS DE SISTEMA / CONTA QUE NUNCA DEVEM SER CONSIDERADOS COMO DESTINO DOS MEGAS
+ */
+const SYSTEM_PAYMENT_NUMBERS = new Set([
+    '856268811', '864882152', '856116039', '84100', '86100', '82100', '87100', '4004',
+    '258856268811', '258864882152', '258856116039'
+]);
+
+/**
+ * Extrai número de destino Vodacom (84/85) do texto do cliente ou comprovativo
  */
 function extrairNumeroDestino(texto, remetenteOrigem) {
-    if (!texto) return remetenteOrigem;
-    const clean = String(texto).replace(/[\r\n]+/g, ' ');
+    const cleanRemetente = String(remetenteOrigem || '').replace(/\D/g, '').slice(-9);
 
-    // Procurar 84 ou 85 com 7 dígitos após
-    const match = clean.match(/\b(?:258)?(8[45]\d{7})\b/);
-    if (match && match[1]) {
-        return match[1];
+    if (texto) {
+        const cleanText = String(texto).replace(/[\r\n]+/g, ' ');
+
+        // 1. Verificar se há um comando explícito: "para 84...", "numero 84...", "destinatario 84..."
+        const explicitMatch = cleanText.match(/(?:para|numero|número|destinatario|destinatário|enviar\s+para|recarga\s+para)\s*[:.]?\s*(?:258)?(8[45]\s*\d[\d\s-]{6,8}\d)/i);
+        if (explicitMatch && explicitMatch[1]) {
+            const candidate = explicitMatch[1].replace(/\D/g, '');
+            if (candidate.length === 9 && (candidate.startsWith('84') || candidate.startsWith('85')) && !SYSTEM_PAYMENT_NUMBERS.has(candidate)) {
+                return candidate;
+            }
+        }
+
+        // 2. Buscar qualquer número 84 ou 85 de 9 dígitos no texto (desconsiderando espaços/traços)
+        const allNumbers = cleanText.match(/(?:258)?(8[45]\s*\d[\d\s-]{6,8}\d)/g) || [];
+        for (const numStr of allNumbers) {
+            const candidate = numStr.replace(/\D/g, '').slice(-9);
+            if (candidate.length === 9 && (candidate.startsWith('84') || candidate.startsWith('85'))) {
+                // Se for um número de pagamento do sistema (ex: M-Pesa 856268811), IGNORED!
+                if (!SYSTEM_PAYMENT_NUMBERS.has(candidate)) {
+                    return candidate;
+                }
+            }
+        }
     }
 
-    // Se o próprio remetente for Vodacom (84/85), usa ele
-    const cleanRemetente = String(remetenteOrigem).replace(/\D/g, '').slice(-9);
+    // 3. Se não houver número explícito no texto, usar o próprio remetente se for Vodacom (84/85)
     if (/^8[45]\d{7}$/.test(cleanRemetente)) {
         return cleanRemetente;
     }
@@ -357,44 +373,18 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
     const text = String(body).trim();
     const cleanText = text.toLowerCase();
 
+    // Deduplicação anti-loop
+    const dedupKey = `${cleanSender}_${cleanText.slice(0, 35)}`;
+    const now = Date.now();
+    if (recentIncomingSmsCache.has(dedupKey) && (now - recentIncomingSmsCache.get(dedupKey)) < 8000) {
+        console.log(`🛡️ [SMS BOT DEDUP] Ignorando SMS duplicado recente de ${cleanSender}`);
+        return;
+    }
+    recentIncomingSmsCache.set(dedupKey, now);
+
     console.log(`📩 [SMS BOT] Mensagem de ${cleanSender}: "${text.slice(0, 80)}"`);
 
-    // ── 1. VERIFICAR SE É PEDIDO DE TABELA ──
-    const ehTabela = [
-        '1', 'tabela', 'tabelas', 'preco', 'precos', 'preço', 'preços', 'pacote', 'pacotes',
-        'valores', 'megas', 'gigas', 'comprar', 'planos'
-    ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('manda tabela') || cleanText.includes('quero megas'));
-
-    if (ehTabela) {
-        console.log(`📋 [SMS BOT] Enviando tabela para ${cleanSender}`);
-        await sendSms(cleanSender, gerarTabelaCompactaSms());
-        return;
-    }
-
-    // ── 2. VERIFICAR SE É PEDIDO DE PAGAMENTO ──
-    const ehPagamento = [
-        '2', 'pagamento', 'pagamentos', 'pagar', 'como pagar', 'formas de pagamento',
-        'mpesa', 'm-pesa', 'emola', 'e-mola', 'conta', 'contas', 'dados de pagamento'
-    ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('como pagar') || cleanText.includes('formas de pagamento'));
-
-    if (ehPagamento) {
-        console.log(`💳 [SMS BOT] Enviando formas de pagamento para ${cleanSender}`);
-        await sendSms(cleanSender, gerarPagamentoCompactaSms());
-        return;
-    }
-
-    // ── 3. VERIFICAR SE É PEDIDO DE SUPORTE ──
-    const ehSuporte = [
-        '3', 'suporte', 'ajuda', 'socorro', 'contato', 'contacto', 'admin', 'humano'
-    ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('falar com'));
-
-    if (ehSuporte) {
-        console.log(`📞 [SMS BOT] Enviando suporte para ${cleanSender}`);
-        await sendSms(cleanSender, gerarSuporteCompactaSms());
-        return;
-    }
-
-    // ── 4. DETECTAR SE É UM COMPROVATIVO ENCAMINHADO PELO CLIENTE ──
+    // ── 1. DETECTAR SE É UM COMPROVATIVO ENCAMINHADO PELO CLIENTE (PRIMEIRA PRIORIDADE!) ──
     const isComprovativo = (
         cleanText.includes('confirmado') ||
         cleanText.includes('transferiste') ||
@@ -404,8 +394,9 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
         cleanText.includes('transação') ||
         cleanText.includes('id da transacao') ||
         cleanText.includes('id trans') ||
-        cleanText.includes('m-pesa') ||
-        cleanText.includes('emola')
+        cleanText.includes('pp2') ||
+        (cleanText.includes('m-pesa') && (cleanText.includes('mzn') || cleanText.includes('mt'))) ||
+        (cleanText.includes('emola') && (cleanText.includes('mzn') || cleanText.includes('mt')))
     );
 
     if (isComprovativo) {
@@ -418,7 +409,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
             return;
         }
 
-        console.log(`💳 [SMS COMPROVATIVO DETECTADO] Ref=${txnId} | ${valor} MT | Destino=${numDestino || cleanSender}`);
+        console.log(`💳 [SMS COMPROVATIVO DETECTADO] Ref=${txnId} | ${valor} MT | Destino=${numDestino || 'Aguardando Vodacom'}`);
 
         // Anti-duplicação
         if (smsTransacoesProcessadas.has(txnId)) {
@@ -428,7 +419,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
 
         const pacote = buscarPacotePorValor(valor);
 
-        // Se o número de destino não for Vodacom (84/85) e não conseguimos inferir:
+        // Se o número de destino não for Vodacom (84/85) e não conseguimos extrair no texto:
         if (!numDestino) {
             await sendSms(cleanSender, `Ka-Net: Identificamos o seu comprovativo ${txnId} (${valor} MT - ${pacote.nome})! Por favor, responda com o seu número Vodacom (84 ou 85) que receberá os megas.`);
             // Salva na fila aguardando número
@@ -476,6 +467,41 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
         return;
     }
 
+    // ── 2. VERIFICAR SE É PEDIDO DE FORMAS DE PAGAMENTO ──
+    const ehPagamento = [
+        '1', 'pagamento', 'pagamentos', 'pagar', 'como pagar', 'formas de pagamento',
+        'mpesa', 'm-pesa', 'emola', 'e-mola', 'conta', 'contas', 'dados de pagamento'
+    ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('pagamento') || cleanText.includes('como pagar') || cleanText.includes('formas de pagamento'));
+
+    if (ehPagamento) {
+        console.log(`💳 [SMS BOT] Enviando formas de pagamento para ${cleanSender}`);
+        await sendSms(cleanSender, gerarPagamentoCompactaSms());
+        return;
+    }
+
+    // ── 3. VERIFICAR SE É PEDIDO DE TABELA ──
+    const ehTabela = [
+        '2', 'tabela', 'tabelas', 'preco', 'precos', 'preço', 'preços', 'pacote', 'pacotes',
+        'valores', 'megas', 'gigas', 'comprar', 'planos'
+    ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('manda tabela') || cleanText.includes('quero megas') || cleanText.includes('ver tabela')) && !cleanText.includes('pagam');
+
+    if (ehTabela) {
+        console.log(`📋 [SMS BOT] Enviando tabela para ${cleanSender}`);
+        await sendSms(cleanSender, gerarTabelaCompactaSms());
+        return;
+    }
+
+    // ── 4. VERIFICAR SE É PEDIDO DE SUPORTE ──
+    const ehSuporte = [
+        '3', 'suporte', 'ajuda', 'socorro', 'contato', 'contacto', 'admin', 'humano'
+    ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('falar com'));
+
+    if (ehSuporte) {
+        console.log(`📞 [SMS BOT] Enviando suporte para ${cleanSender}`);
+        await sendSms(cleanSender, gerarSuporteCompactaSms());
+        return;
+    }
+
     // ── 5. SE ESTIVER AGUARDANDO NÚMERO DE UM COMPROVATIVO ANTERIOR ──
     for (const [txnId, item] of smsAguardandoOperadora.entries()) {
         if (item.senderPhone === cleanSender && !item.numDestino) {
@@ -484,6 +510,18 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
                 item.numDestino = numDetectado;
                 console.log(`📲 [SMS BOT] Número ${numDetectado} vinculado ao comprovativo ${txnId}`);
                 await sendSms(cleanSender, `Ka-Net: Número ${numDetectado} registado! Assim que a operadora confirmar os ${item.valor} MT, o pacote ${item.pacote.nome} será ativado.`);
+                
+                // Se a operadora já tiver confirmado enquanto aguardava número
+                if (inMemoryPayments && inMemoryPayments.has(txnId)) {
+                    smsAguardandoOperadora.delete(txnId);
+                    await ativarPedidoSms({
+                        txnId,
+                        valor: item.valor,
+                        numDestino: item.numDestino,
+                        senderPhone: cleanSender,
+                        pacote: item.pacote
+                    });
+                }
                 return;
             }
         }
