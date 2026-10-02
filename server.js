@@ -698,7 +698,19 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
         splitMensalOrderIfEligible(order);
 
-        let isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
+        let isCompatible = isPortCompatibleWithModo(port, order.modo);
+        if (order.targetPort && order.targetPort !== port) {
+          const targetDev = inMemoryDevices[order.targetPort];
+          const nowMs = Date.now();
+          const targetLastSeen = targetDev ? new Date(targetDev.lastSeen || 0).getTime() : 0;
+          const targetOnline = targetDev && (nowMs - targetLastSeen < 35000);
+          const targetApto = targetDev && isDeviceApto(targetDev);
+          if (targetOnline && targetApto && !targetDev.isBusy) {
+            // A porta alvo original está online, apta e livre -> dar prioridade à porta alvo
+            isCompatible = false;
+          }
+          // Caso contrário (porta alvo offline/ocupada/sem saldo), a porta atual apta assume o pedido imediatamente!
+        }
         // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA diários)
         if (port === 8077) {
           const m = String(order.modo || '').toLowerCase().trim();
