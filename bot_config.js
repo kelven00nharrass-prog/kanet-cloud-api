@@ -391,7 +391,8 @@ module.exports = {
                 "nome": "Vodacom 11GB + Minutos",
                 "quantidade_mb": 11264,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado"
+                "tipo": "ilimitado",
+                "input_val": "1"
             },
             "469": {
                 "quantidade": 9216,
@@ -412,14 +413,16 @@ module.exports = {
                 "nome": "Vodacom 15GB + Minutos",
                 "quantidade_mb": 15360,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado"
+                "tipo": "ilimitado",
+                "input_val": "2"
             },
             "850": {
                 "quantidade": 25600,
                 "nome": "Vodacom 25GB + Minutos",
                 "quantidade_mb": 25600,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado"
+                "tipo": "ilimitado",
+                "input_val": "3"
             },
             "950": {
                 "quantidade": 23552,
