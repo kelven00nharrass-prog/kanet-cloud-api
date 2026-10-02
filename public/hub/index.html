@@ -573,7 +573,7 @@
     // URL Base da API do Render (funciona tanto no navegador como dentro do APK local)
     const API_BASE = (window.location.protocol.startsWith('http') && !window.location.host.includes('localhost:')) 
       ? '' 
-      : 'https://kanet-cloud-api.onrender.com';
+      : '';
 
     // ESTADO GLOBAL DA SESSÃO
     let currentUser = null;
@@ -753,7 +753,7 @@
 
     // Função para Download do APK Nativo 100% Funcional
     function handleDownloadApk() {
-      const apkUrl = 'https://kanet-cloud-api.onrender.com/hub/KaNet-Client-Hub.apk';
+      const apkUrl = '/hub/KaNet-Client-Hub.apk';
       showToast('A iniciar o download do aplicativo...', 'info');
       if (window.KaNetAndroid && typeof window.KaNetAndroid.downloadApk === 'function') {
         window.KaNetAndroid.downloadApk(apkUrl);
