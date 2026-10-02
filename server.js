@@ -252,13 +252,17 @@ app.post('/api/send/manual', async (req, res) => {
 
 // ----------------------------------------------------
 app.get('/api/devices', async (req, res) => {
+  delete inMemoryDevices[0];
+  delete inMemoryDevices['0'];
   const now = Date.now();
-  const devices = Object.values(inMemoryDevices).map(dev => {
-    const lastSeen = new Date(dev.lastSeen || 0).getTime();
-    const online = (now - lastSeen) < 35000; // 35 segundos (heartbeat a cada 3s)
-    const apto = isDeviceApto(dev);
-    return { ...dev, online, is_apto: apto };
-  });
+  const devices = Object.values(inMemoryDevices)
+    .filter(dev => dev && dev.porta && Number(dev.porta) > 0)
+    .map(dev => {
+      const lastSeen = new Date(dev.lastSeen || 0).getTime();
+      const online = (now - lastSeen) < 35000; // 35 segundos
+      const apto = isDeviceApto(dev);
+      return { ...dev, online, is_apto: apto };
+    });
   return res.json({ success: true, count: devices.length, devices });
 });
 
@@ -1441,7 +1445,7 @@ const ORDERS_CACHE_FILE = path.resolve(__dirname, 'orders_cache.json');
 
 function saveOrdersToCache() {
   try {
-    const list = Array.from(inMemoryOrders.entries()).slice(-100);
+    const list = Array.from(inMemoryOrders.entries()).slice(-2000);
     fs.writeFileSync(ORDERS_CACHE_FILE, JSON.stringify(list), 'utf8');
   } catch(e) {}
 }
@@ -1452,13 +1456,66 @@ function loadOrdersFromCache() {
       const data = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
       if (Array.isArray(data)) {
         data.forEach(([k, v]) => inMemoryOrders.set(k, v));
-        console.log(`📦 [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histórico.`);
+        console.log(`📦 [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histórico local.`);
       }
     }
   } catch(e) {}
 }
 
+async function restoreAllDataFromFirestore() {
+  if (!db) return;
+  try {
+    const snapOrders = await db.collection('orders').orderBy('createdAt', 'desc').limit(2000).get();
+    if (!snapOrders.empty) {
+      let count = 0;
+      snapOrders.docs.forEach(doc => {
+        const orderData = doc.data();
+        const orderId = orderData.orderId || orderData.id || doc.id;
+        if (orderId && !inMemoryOrders.has(orderId)) {
+          inMemoryOrders.set(orderId, orderData);
+          count++;
+        }
+      });
+      console.log(`📦 [FIRESTORE RESTORE] ${count} pedidos de vendas históricos restaurados do Firestore.`);
+      saveOrdersToCache();
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE RESTORE ERRO] Pedidos:', err.message);
+  }
+
+  try {
+    const snapPayments = await db.collection('sms_payments').orderBy('timestamp', 'desc').limit(2000).get();
+    if (!snapPayments.empty) {
+      let countP = 0;
+      snapPayments.docs.forEach(doc => {
+        const pData = doc.data();
+        const ref = pData.ref || pData.txn_id || pData.id || doc.id;
+        if (ref && !adminReceiptsHistory.some(p => (p.ref || p.id || p.txn_id) === ref)) {
+          adminReceiptsHistory.push({
+            id: ref,
+            ref,
+            operadora: pData.operadora || pData.metodo || 'M-Pesa',
+            metodo: pData.metodo || pData.operadora || 'M-Pesa',
+            valor: Number(pData.valor || 0),
+            numero: pData.numero || pData.remetente || '',
+            remetente: pData.remetente || pData.numero || '',
+            timestamp: pData.timestamp || pData.createdAt || new Date().toISOString(),
+            status: pData.status || 'ativado',
+            detalhes: pData.detalhes || ''
+          });
+          countP++;
+        }
+      });
+      console.log(`💳 [FIRESTORE RESTORE] ${countP} extratos de pagamentos históricos restaurados do Firestore.`);
+      savePaymentsToCache();
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE RESTORE ERRO] Pagamentos:', err.message);
+  }
+}
+
 loadOrdersFromCache();
+setTimeout(() => restoreAllDataFromFirestore(), 2000);
 
 // ── ENDPOINTS DE FILA PARA O PAINEL CLOUD ──
 app.get('/api/orders', (req, res) => {
@@ -2180,7 +2237,8 @@ app.get('/api/reports', async (req, res) => {
     let emolaCount = 0;
     payments.forEach(p => {
       const val = Number(p.valor) || 0;
-      if (String(p.metodo || '').toLowerCase().includes('emola')) {
+      const met = String(p.metodo || p.operadora || p.metodoNome || p.tipo || '').toLowerCase();
+      if (met.includes('emola') || met.includes('e-mola') || met.includes('movitel')) {
         emolaTotal += val;
         emolaCount++;
       } else {

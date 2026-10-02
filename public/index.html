@@ -1164,13 +1164,22 @@ async function loadDevices() {
           <div style="font-size:.68rem;color:var(--muted)">S1: ${dev.sim1_envios||0}/10 | S2: ${dev.sim2_envios||0}/10</div>
         </div>`;
 
-      const modelName = dev.device_model || (dev.porta === 8023 ? 'Xiaomi Redmi' : dev.porta === 8077 ? 'Huawei Honor' : ('Celular Gateway'));
+      const pNum = Number(dev.porta) || 0;
+      const modelName = (pNum === 8021 ? 'Celular 8021 (Vodacom)' :
+                         pNum === 8022 ? 'Celular 8022 (Vodacom)' :
+                         pNum === 8023 ? 'Celular 8023 (Xiaomi Redmi)' :
+                         pNum === 8024 ? 'Celular 8024 (Huawei SIM 2)' :
+                         pNum === 8025 ? 'Celular 8025 (Vodacom)' :
+                         pNum === 8077 ? 'Celular 8077 (Porta Especial)' :
+                         pNum === 8090 ? 'Celular 8090 (Atendimento SMS)' :
+                         pNum === 8777 ? 'Celular 8777 (Saldo Crédito)' :
+                         (dev.device_model ? `${dev.device_model}` : `Celular ${pNum || 'Gateway'}`));
 
       return `
         <div class="card" style="${isPaused ? 'border-color:rgba(245,158,11,.4);opacity:0.85;' : ''}">
           <div class="device-header">
             <div>
-              <div class="device-name">📱 ${modelName} <span style="font-size:.8rem;color:var(--cyan)">(Porta ${dev.porta})</span></div>
+              <div class="device-name">📱 ${modelName} <span style="font-size:.8rem;color:var(--cyan)">(Porta ${pNum})</span></div>
               <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${dev.carrier || 'Vodacom'} • ${tipoPorta}</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
