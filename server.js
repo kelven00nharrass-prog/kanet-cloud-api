@@ -227,8 +227,11 @@ app.post('/api/send/manual', async (req, res) => {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB)
+    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB) ou Tudo Top (> 11GB)
     splitMensalOrderIfEligible(orderDoc);
+
+    // Aplicar detector e ativador de Planos Especiais (Renovável e Faseado)
+    handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(orderId, orderDoc);
     saveOrdersToCache();
@@ -4116,8 +4119,13 @@ app.get('/api/client/orders/:phone', (req, res) => {
     })
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
     .slice(0, 30);
+  const clientPlans = [...scheduledPlans.values()].filter(p => {
+    const cp = String(p.clientPhone || '').replace(/\D/g, '');
+    const num = String(p.numero || '').replace(/\D/g, '');
+    return cp.includes(cleanPhone) || num.includes(cleanPhone);
+  });
 
-  return res.json({ success: true, count: orders.length, orders });
+  return res.json({ success: true, count: orders.length, orders, scheduledPlans: clientPlans });
 });
 
 // ── 20.6 Suporte Bidirecional (Cliente ↔ Admin) ──
@@ -4960,6 +4968,20 @@ app.delete('/api/admin/plans/:planId', (req, res) => {
   saveScheduledPlans();
   console.log(`🚫 [PLANO] Cancelado pelo admin: ${planId}`);
   return res.json({ success: true, mensagem: `Plano ${planId} cancelado.` });
+});
+
+// ── API: Disparar Próxima Entrega Manualmente (Admin) ─────────────────────────
+app.post('/api/admin/plans/:planId/trigger', async (req, res) => {
+  const { planId } = req.params;
+  const plan = scheduledPlans.get(planId);
+  if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
+  if (plan.status !== 'ativo') return res.status(400).json({ success: false, error: 'Plano não está activo.' });
+  try {
+    await executarEntregaPlano(planId);
+    return res.json({ success: true, mensagem: `Entrega disparada com sucesso para o plano ${planId}!` });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

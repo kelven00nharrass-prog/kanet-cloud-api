@@ -573,7 +573,7 @@
     // URL Base da API do Render (funciona tanto no navegador como dentro do APK local)
     const API_BASE = (window.location.protocol.startsWith('http') && !window.location.host.includes('localhost:')) 
       ? '' 
-      : '';
+      : 'https://kanet-cloud-api.onrender.com';
 
     // ESTADO GLOBAL DA SESSÃO
     let currentUser = null;
@@ -1324,12 +1324,63 @@
         const container = document.getElementById('orders-list-container');
         container.innerHTML = '';
 
-        if (!data.success || !data.orders || data.orders.length === 0) {
+        if (!data.success || ((!data.orders || data.orders.length === 0) && (!data.scheduledPlans || data.scheduledPlans.length === 0))) {
           container.innerHTML = '<div class="glass-card p-6 text-center text-xs text-slate-400">Ainda não realizou nenhuma compra. Os seus pedidos aparecerão aqui.</div>';
           return;
         }
 
-        data.orders.forEach(o => {
+        // 1. Planos Agendados Ativos (Faseados / Renováveis)
+        if (data.scheduledPlans && data.scheduledPlans.length > 0) {
+          const plansTitle = document.createElement('h4');
+          plansTitle.className = 'text-[11px] font-bold uppercase tracking-wider text-purple-400 mb-2 mt-1 flex items-center gap-1.5';
+          plansTitle.innerHTML = '<span>⏳</span><span>Planos com Entregas Diárias Automáticas</span>';
+          container.appendChild(plansTitle);
+
+          data.scheduledPlans.forEach(p => {
+            const pCard = document.createElement('div');
+            const isAtivo = p.status === 'ativo';
+            const isFaseado = p.tipo === 'faseado';
+            const horaProx = p.proxima_entrega ? new Date(p.proxima_entrega).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            const entregasTotal = (p.entregas_diarias_total || 0) + (isFaseado ? 1 : 0);
+            const entregasFeitas = (p.entregas_feitas || 0) + (isFaseado ? 1 : 0);
+
+            pCard.className = `p-3.5 rounded-2xl border mb-3 relative overflow-hidden ${
+              isAtivo ? 'bg-gradient-to-r from-purple-950/40 to-slate-900 border-purple-500/30' : 'bg-slate-900/60 border-slate-800'
+            }`;
+
+            pCard.innerHTML = `
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                  isFaseado ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                }">
+                  ${isFaseado ? '📉 FASEADO (1GB/DIA)' : '♻️ RENOVÁVEL (+100MB/DIA)'}
+                </span>
+                <span class="text-[9px] font-bold ${isAtivo ? 'text-cyan-400' : 'text-slate-500'}">
+                  ${isAtivo ? '● ACTIVO' : 'CONCLUÍDO'}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 class="text-xs font-bold text-white">${(p.total_mb/1024).toFixed(1)} GB Total (${p.mb_diaria >= 1024 ? (p.mb_diaria/1024).toFixed(1) + ' GB' : p.mb_diaria + ' MB'}/dia)</h4>
+                  <p class="text-[10px] text-slate-400">Linha: <span class="text-slate-200 font-mono">+258 ${p.numero}</span></p>
+                  <p class="text-[10px] text-purple-300 mt-1">📊 Progresso: <b>${entregasFeitas} de ${entregasTotal} entregas</b></p>
+                  ${isAtivo ? `<p class="text-[10px] text-cyan-300">⏰ Próxima Entrega: <b>Amanhã às ${horaProx}</b></p>` : ''}
+                </div>
+                <span class="text-sm font-extrabold text-purple-400">${p.valor || '--'} MT</span>
+              </div>
+            `;
+            container.appendChild(pCard);
+          });
+
+          if (data.orders && data.orders.length > 0) {
+            const histTitle = document.createElement('h4');
+            histTitle.className = 'text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 mt-3';
+            histTitle.innerText = 'Histórico Geral de Pedidos';
+            container.appendChild(histTitle);
+          }
+        }
+
+        (data.orders || []).forEach(o => {
           const item = document.createElement('div');
           item.className = 'glass-card p-3.5 rounded-2xl border border-slate-800 space-y-2';
           const isDone = o.status === 'completed' || o.status === 'done' || o.status === 'sucesso';
