@@ -1529,6 +1529,24 @@ async function restoreAllDataFromFirestore() {
   } catch (err) {
     console.warn('⚠️ [FIRESTORE RESTORE ERRO] Pagamentos:', err.message);
   }
+
+  try {
+    const snapPlans = await db.collection('scheduled_plans').where('status', '==', 'ativo').get();
+    if (!snapPlans.empty) {
+      let countPlans = 0;
+      snapPlans.docs.forEach(doc => {
+        const pData = doc.data();
+        if (pData && pData.planId) {
+          scheduledPlans.set(pData.planId, pData);
+          countPlans++;
+        }
+      });
+      console.log(`📋 [FIRESTORE RESTORE] ${countPlans} planos agendados (faseado/renovável) ativos restaurados.`);
+      saveScheduledPlans();
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE RESTORE ERRO] Planos agendados:', err.message);
+  }
 }
 
 loadOrdersFromCache();
@@ -4408,8 +4426,43 @@ setTimeout(processClientPackageReminders, 15000);
 //            Ex: 5GB Faseado (5×1024MB) | 10GB Faseado (10×1024MB)
 // ══════════════════════════════════════════════════════════════════════════════
 
-const PLANS_CACHE_FILE = path.join(__dirname, '..', 'cache_scheduled_plans.json');
+const PLANS_CACHE_FILE = path.join(__dirname, 'cache_scheduled_plans.json');
 const scheduledPlans   = new Map(); // planId → planDoc
+
+// ── Tabela Oficial de Planos Especiais com Fallback Permanente ───────────────
+const DEFAULT_PLANOS_ESPECIAIS = {
+  "76":  { nome: "♻️ 3GB+700 (Renovação)", tipo: "renovavel", total: 3772, inicial: 3072, diaria: 100 },
+  "120": { nome: "♻️ 5GB+700 (Renovação)", tipo: "renovavel", total: 5820, inicial: 5120, diaria: 100 },
+  "130": { nome: "📉 5GB Faseado (1GB/dia)", tipo: "faseado", total: 5120, inicial: 1024, diaria: 1024 },
+  "195": { nome: "♻️ 8GB+700 (Renovação)", tipo: "renovavel", total: 8892, inicial: 8192, diaria: 100 },
+  "240": { nome: "♻️ 10GB+700 (Renovação)", tipo: "renovavel", total: 10940, inicial: 10240, diaria: 100 },
+  "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado", total: 10240, inicial: 1024, diaria: 1024 },
+  "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado", total: 15360, inicial: 1024, diaria: 1024 },
+  "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado", total: 20480, inicial: 1024, diaria: 1024 }
+};
+
+function getPlanosEspeciaisConfig() {
+  let planos = {};
+  try {
+    const p1 = path.join(__dirname, 'bot_config.js');
+    if (fs.existsSync(p1)) {
+      delete require.cache[require.resolve(p1)];
+      const c1 = require(p1);
+      if (c1 && c1.PLANOS_ESPECIAIS) planos = { ...c1.PLANOS_ESPECIAIS };
+    }
+  } catch(e) {}
+  if (Object.keys(planos).length === 0) {
+    try {
+      const p2 = path.resolve(__dirname, '..', 'bot_config.js');
+      if (fs.existsSync(p2)) {
+        delete require.cache[require.resolve(p2)];
+        const c2 = require(p2);
+        if (c2 && c2.PLANOS_ESPECIAIS) planos = { ...c2.PLANOS_ESPECIAIS };
+      }
+    } catch(e) {}
+  }
+  return { ...DEFAULT_PLANOS_ESPECIAIS, ...planos };
+}
 
 // ── Persistência ──────────────────────────────────────────────────────────────
 function loadScheduledPlans() {
@@ -4419,15 +4472,22 @@ function loadScheduledPlans() {
       for (const [id, plan] of Object.entries(raw)) {
         if (plan.status === 'ativo') scheduledPlans.set(id, plan);
       }
-      console.log(`📋 [PLANOS] ${scheduledPlans.size} planos activos carregados do cache.`);
+      console.log(`📋 [PLANOS] ${scheduledPlans.size} planos activos carregados do cache local.`);
     }
-  } catch(e) { console.warn('⚠️ [PLANOS] Erro ao carregar cache:', e.message); }
+  } catch(e) { console.warn('⚠️ [PLANOS] Erro ao carregar cache local:', e.message); }
 }
 
 function saveScheduledPlans() {
   try {
     const obj = {};
-    for (const [id, plan] of scheduledPlans.entries()) obj[id] = plan;
+    for (const [id, plan] of scheduledPlans.entries()) {
+      obj[id] = plan;
+      if (db) {
+        db.collection('scheduled_plans').doc(id).set(plan).catch(e =>
+          console.warn('Firebase scheduled_plan save err:', e.message)
+        );
+      }
+    }
     fs.writeFileSync(PLANS_CACHE_FILE, JSON.stringify(obj, null, 2), 'utf8');
   } catch(e) { console.warn('⚠️ [PLANOS] Erro ao guardar cache:', e.message); }
 }
@@ -4439,14 +4499,14 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
   const planId   = `PLAN-${tipo.toUpperCase()}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const now      = new Date();
 
-  // Total de entregas diárias (após a inicial)
-  const entregas_diarias_total = Math.round((total_mb - (mb_inicial || mb_diaria)) / mb_diaria);
+  // Total de entregas diárias adicionais após a entrega inicial
+  const entregas_diarias_total = Math.max(1, Math.round((total_mb - (mb_inicial || mb_diaria)) / mb_diaria));
 
-  // Próxima entrega = amanhã, 1 hora antes da hora actual
+  // Próxima entrega = amanhã, 1 hora antes da hora da recarga de hoje (para renovar antes de expirar)
   const proxima = new Date(now);
   proxima.setDate(proxima.getDate() + 1);
   proxima.setHours(proxima.getHours() - 1);
-  // Ajustar minutos/segundos para coincidir com a hora exacta
+  if (proxima.getHours() < 7) proxima.setHours(7); // Não enviar de madrugada
   proxima.setSeconds(0);
   proxima.setMilliseconds(0);
 
@@ -4461,7 +4521,7 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
     entregas_diarias_total,
     entregas_feitas: 0,
     valor,
-    sms_ref,
+    sms_ref: sms_ref || '',
     hora_compra: now.toISOString(),
     proxima_entrega: proxima.toISOString(),
     historico: [],
@@ -4471,7 +4531,7 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
 
   scheduledPlans.set(planId, plan);
   saveScheduledPlans();
-  console.log(`✅ [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | ${total_mb}MB total | ${mb_diaria}MB/dia | Próxima: ${proxima.toISOString()}`);
+  console.log(`✅ [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | Total: ${total_mb}MB | Inicial: ${mb_inicial}MB | Diária: ${mb_diaria}MB/dia | Total dias: ${entregas_diarias_total} | Próxima: ${proxima.toISOString()}`);
   return plan;
 }
 
@@ -4479,51 +4539,96 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
 function handleSpecialPlanIfApplicable(orderDoc) {
   if (!orderDoc || orderDoc.isSpecialPlanHandled) return false;
   const val = Number(orderDoc.valor) || Number(orderDoc.valor_pago);
-  if (!val) return false;
+  const planos = getPlanosEspeciaisConfig();
+  const vKey = val ? String(Math.round(val)) : null;
 
-  let botCfg = {};
-  try {
-    const cfgPath = path.resolve(__dirname, '..', 'bot_config.js');
-    if (fs.existsSync(cfgPath)) {
-      botCfg = require(cfgPath);
+  let plano = vKey ? planos[vKey] : null;
+
+  // Fallback por nome do pacote ou modo se o valor exato divergir
+  if (!plano) {
+    const modoLower = String(orderDoc.modo || '').toLowerCase();
+    const pkgLower = String(orderDoc.package_name || '').toLowerCase();
+    if (modoLower === 'faseado' || pkgLower.includes('faseado')) {
+      const matchKey = Object.keys(planos).find(k => planos[k].tipo === 'faseado' && (orderDoc.quantidade >= planos[k].total * 0.8));
+      if (matchKey) plano = planos[matchKey];
+    } else if (modoLower.includes('renov') || pkgLower.includes('renov')) {
+      const matchKey = Object.keys(planos).find(k => (planos[k].tipo === 'renovacao' || planos[k].tipo === 'renovavel') && (orderDoc.quantidade >= planos[k].total * 0.8));
+      if (matchKey) plano = planos[matchKey];
     }
-  } catch(e) {}
-
-  const planos = (botCfg && botCfg.PLANOS_ESPECIAIS) || {};
-  const plano = planos[String(Math.round(val))];
+  }
 
   if (plano && (plano.tipo === 'renovacao' || plano.tipo === 'renovavel' || plano.tipo === 'faseado')) {
     orderDoc.isSpecialPlanHandled = true;
     const tipo = (plano.tipo === 'renovacao' || plano.tipo === 'renovavel') ? 'renovavel' : 'faseado';
-    const mbInicial = plano.inicial || plano.diaria || 1024;
-    const totalMb = plano.total || (mbInicial + ((plano.diaria || 1024) * 7));
+    const mbInicial = plano.inicial || (tipo === 'faseado' ? 1024 : 3072);
+    const mbDiaria = plano.diaria || (tipo === 'faseado' ? 1024 : 100);
+    const totalMb = plano.total || (mbInicial + (mbDiaria * (tipo === 'faseado' ? 4 : 7)));
 
-    // Ajustar a quantidade da ordem inicial (entrega imediata de hoje)
+    // ⚠️ CRÍTICO: Pacotes Renovável e Faseado são transferidos como pacotes DIÁRIOS normais (*162# -> 8 -> 2)
+    // pelas portas diárias disponíveis (8021, 8023, 8024, etc.)
     orderDoc.quantidade = mbInicial;
     orderDoc.origem = tipo;
+    orderDoc.modo = 'diario';
+    orderDoc.targetPort = null; // Qualquer celular diário online e apto assume de imediato
+    orderDoc.input_val = '';
     orderDoc.remetente = `Ka-Net ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`;
 
-    // Criar o plano agendado para as próximas entregas diárias (1 hora antes a cada dia)
+    // Criar o plano agendado para as próximas entregas diárias automáticas
     const plan = criarPlano({
       numero: orderDoc.numero,
       tipo,
       total_mb: totalMb,
       mb_inicial: mbInicial,
-      mb_diaria: plano.diaria || (tipo === 'renovavel' ? 100 : 1024),
-      valor: val,
+      mb_diaria: mbDiaria,
+      valor: val || plano.preco || 0,
       sms_ref: orderDoc.sms_ref || orderDoc.orderId,
       clientPhone: orderDoc.cliente_solicitante || orderDoc.numero
     });
 
-    console.log(`✨ [PLANO ESPECIAL DETECTADO] Ordem ${orderDoc.orderId} (${val}MT) configurada como ${tipo.toUpperCase()}!`);
-    console.log(`   📦 Entrega Inicial: ${mbInicial}MB (agora)`);
-    console.log(`   ⏰ Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias | Próxima: ${plan.proxima_entrega}`);
+    console.log(`✨ [PLANO ESPECIAL DETECTADO] Ordem ${orderDoc.orderId} (${val || 0}MT) configurada como ${tipo.toUpperCase()}!`);
+    console.log(`   📦 Entrega Inicial: ${mbInicial}MB (enviando agora via celular diário)`);
+    console.log(`   ⏰ Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias adicionais | Próxima: ${plan.proxima_entrega}`);
+
+    // Notificar cliente no WhatsApp com explicação detalhada do plano
+    let clientJid = orderDoc.jid;
+    if (!clientJid && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
+      clientJid = baileysEngine.getJidForOrder(orderDoc.id || orderDoc.orderId);
+    }
+    if (!clientJid && (orderDoc.cliente_solicitante || orderDoc.numero)) {
+      const p = String(orderDoc.cliente_solicitante || orderDoc.numero).replace(/\D/g, '').slice(-9);
+      clientJid = `258${p}@s.whatsapp.net`;
+    }
+
+    if (clientJid && baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
+      const msgTexto = tipo === 'faseado'
+        ? `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  📉 *PLANO FASEADO ACTIVADO!* ⚡\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `Olá! O seu pacote *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `1️⃣ *1ª Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (A enviar agora...)\n` +
+          `📅 *Próximas Fases:* *${plan.entregas_diarias_total} entregas diárias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
+          `📲 *Destino:* *${orderDoc.numero}*\n` +
+          `✨ *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
+          `⚡ _Cada fase será transferida automaticamente cerca de 1 hora antes de expirar a anterior para os seus dados acumularem!_`
+        : `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  ♻️ *PLANO RENOVÁVEL ACTIVADO!* ⚡\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `Olá! O seu pacote *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `1️⃣ *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (A enviar agora...)\n` +
+          `📅 *Renovação Diária:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
+          `📲 *Destino:* *${orderDoc.numero}*\n` +
+          `✨ *Total:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
+          `⚡ _Os 100MB diários serão transferidos automaticamente todos os dias para renovar a validade e não deixar os seus megas expirarem!_`;
+
+      baileysEngine.enviarMensagemTexto(clientJid, msgTexto).catch(() => {});
+    }
+
     return true;
   }
   return false;
 }
 
-// ── Executar entrega diária ───────────────────────────────────────────────────
+// ── Executar entrega diária agendada ──────────────────────────────────────────
 async function executarEntregaPlano(planId) {
   const plan = scheduledPlans.get(planId);
   if (!plan || plan.status !== 'ativo') return;
@@ -4532,7 +4637,7 @@ async function executarEntregaPlano(planId) {
   const orderId  = `${planId}-D${entregaN}`;
   const timestamp = new Date().toISOString();
 
-  // Criar ordem normal na fila de processamento
+  // Criar ordem diária normal na fila de processamento
   const orderDoc = {
     orderId,
     id:       orderId,
@@ -4540,11 +4645,12 @@ async function executarEntregaPlano(planId) {
     quantidade: plan.mb_diaria,
     valor:    0, // já pago na compra inicial
     valor_pago: 0,
-    modo:     'diario',
+    modo:     'diario', // USSD diário padrão
+    targetPort: null,   // Qualquer porta diária apta pega na hora
     status:   'pending',
-    origem:   plan.tipo,          // 'renovavel' | 'faseado'
+    origem:   plan.tipo, // 'renovavel' | 'faseado'
     planId,
-    remetente: `Ka-Net Auto (${plan.tipo})`,
+    remetente: `Ka-Net Auto (${plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renovação ${entregaN}`})`,
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -4561,14 +4667,16 @@ async function executarEntregaPlano(planId) {
   plan.historico.push({ entrega: entregaN, orderId, timestamp, mb: plan.mb_diaria });
   plan.entregas_feitas = entregaN;
 
-  const label = plan.tipo === 'faseado' ? `Fase ${entregaN}/${plan.entregas_diarias_total + 1}` : `Renovação ${entregaN}/${plan.entregas_diarias_total}`;
+  const label = plan.tipo === 'faseado'
+    ? `Fase ${entregaN + 1}/${plan.entregas_diarias_total + 1}`
+    : `Renovação ${entregaN}/${plan.entregas_diarias_total}`;
   console.log(`📦 [PLANO ${plan.tipo.toUpperCase()}] ${label} → ${plan.mb_diaria}MB → ${plan.numero} | Ordem: ${orderId}`);
 
   // Notificar cliente via WhatsApp
   const restantes = plan.entregas_diarias_total - plan.entregas_feitas;
   const textoNotif = plan.tipo === 'faseado'
-    ? `📦 [Ka-Net] ${label}: ${(plan.mb_diaria/1024).toFixed(1)}GB activado agora! ${restantes > 0 ? `Restam ${restantes} fases.` : '✅ Plano concluído!'}`
-    : `♻️ [Ka-Net] Renovação automática: +${plan.mb_diaria}MB adicionados! ${restantes > 0 ? `${restantes} renovações restantes.` : '✅ Plano de renovação concluído!'}`;
+    ? `📦 [Ka-Net] *${label}*: Enviados *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*! ${restantes > 0 ? `Restam ${restantes} fases.` : '✅ Plano concluído com sucesso!'}`
+    : `♻️ [Ka-Net] *Renovação Automática*: Enviados *+${plan.mb_diaria} MB* para o número *${plan.numero}* para manter os seus dados ativos! ${restantes > 0 ? `Restam ${restantes} renovações.` : '✅ Plano de renovação concluído com sucesso!'}`;
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(() => {});
@@ -4594,10 +4702,13 @@ async function executarEntregaPlano(planId) {
     return;
   }
 
-  // Agendar próxima entrega: amanhã, 1 hora antes da entrega anterior
+  // Agendar próxima entrega: amanhã, 1 hora antes da entrega anterior (para renovar antes de expirar)
   const proxima = new Date(plan.proxima_entrega);
   proxima.setDate(proxima.getDate() + 1);
   proxima.setHours(proxima.getHours() - 1);
+  if (proxima.getHours() < 7) proxima.setHours(7);
+  proxima.setSeconds(0);
+  proxima.setMilliseconds(0);
   plan.proxima_entrega = proxima.toISOString();
 
   saveScheduledPlans();
@@ -4620,6 +4731,12 @@ function checkScheduledPlans() {
 
 setInterval(checkScheduledPlans, 60 * 1000); // Verificar a cada 1 minuto
 setTimeout(checkScheduledPlans, 5000);        // Primeira checagem 5s após boot
+
+// ── ENDPOINT: Listar Planos Agendados Activos ────────────────────────────────
+app.get('/api/plans/scheduled', (req, res) => {
+  const plans = Array.from(scheduledPlans.values());
+  res.json({ success: true, count: plans.length, plans });
+});
 
 // ── API: Criar plano renovável / faseado ─────────────────────────────────────
 app.post('/api/subscribe/plan', async (req, res) => {

@@ -338,7 +338,19 @@ function gerarMenuOriginal(jid = null) {
     
     // Se a mensagem veio de um grupo e esse grupo tiver uma tabela customizada, exibi-la
     let _tabelas = DYN_CFG.TABELAS || {};
-    let _especiais = DYN_CFG.PLANOS_ESPECIAIS || {};
+    const DEFAULT_PLANOS_ESPECIAIS = {
+        "76":  { nome: "♻️ 3GB+700 (Renovação)", tipo: "renovavel", total: 3772, inicial: 3072, diaria: 100 },
+        "120": { nome: "♻️ 5GB+700 (Renovação)", tipo: "renovavel", total: 5820, inicial: 5120, diaria: 100 },
+        "130": { nome: "📉 5GB Faseado (1GB/dia)", tipo: "faseado", total: 5120, inicial: 1024, diaria: 1024 },
+        "195": { nome: "♻️ 8GB+700 (Renovação)", tipo: "renovavel", total: 8892, inicial: 8192, diaria: 100 },
+        "240": { nome: "♻️ 10GB+700 (Renovação)", tipo: "renovavel", total: 10940, inicial: 10240, diaria: 100 },
+        "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado", total: 10240, inicial: 1024, diaria: 1024 },
+        "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado", total: 15360, inicial: 1024, diaria: 1024 },
+        "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado", total: 20480, inicial: 1024, diaria: 1024 }
+    };
+    let _especiais = (DYN_CFG.PLANOS_ESPECIAIS && Object.keys(DYN_CFG.PLANOS_ESPECIAIS).length > 0)
+        ? { ...DEFAULT_PLANOS_ESPECIAIS, ...DYN_CFG.PLANOS_ESPECIAIS }
+        : DEFAULT_PLANOS_ESPECIAIS;
 
     if (jid && String(jid).endsWith('@g.us') && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
         const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
@@ -628,9 +640,23 @@ function buscarPacotePorValor(valor, jid = null) {
         const p = DYN_CFG.TABELAS['ilimitado'][vStr];
         return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: 'ilimitado', preco: vNum };
     }
-    if (DYN_CFG.PLANOS_ESPECIAIS && DYN_CFG.PLANOS_ESPECIAIS[vStr]) {
-        const p = DYN_CFG.PLANOS_ESPECIAIS[vStr];
-        return { nome: p.nome, mb: p.quantidade_mb || p.quantidade || 1024, tipo: p.tipo || 'especial', preco: vNum };
+    const pEspeciais = (DYN_CFG.PLANOS_ESPECIAIS && Object.keys(DYN_CFG.PLANOS_ESPECIAIS).length > 0)
+        ? { ...DEFAULT_PLANOS_ESPECIAIS, ...DYN_CFG.PLANOS_ESPECIAIS }
+        : DEFAULT_PLANOS_ESPECIAIS;
+
+    if (pEspeciais && pEspeciais[vStr]) {
+        const p = pEspeciais[vStr];
+        const isFaseado = (p.tipo === 'faseado') || String(p.nome).toLowerCase().includes('faseado');
+        const tipoFinal = isFaseado ? 'faseado' : 'renovavel';
+        const mbInicial = p.inicial || (isFaseado ? 1024 : 3072);
+        const mbTotal = p.total || (mbInicial + (p.diaria || (isFaseado ? 1024 : 100)) * (isFaseado ? 4 : 7));
+        return { 
+            nome: p.nome, 
+            mb: mbTotal, 
+            mb_inicial: mbInicial,
+            tipo: tipoFinal, 
+            preco: vNum 
+        };
     }
     if (DYN_CFG.TABELAS_FORNECIMENTO && DYN_CFG.TABELAS_FORNECIMENTO[vStr]) {
         const p = DYN_CFG.TABELAS_FORNECIMENTO[vStr];
