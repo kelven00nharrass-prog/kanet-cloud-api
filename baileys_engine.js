@@ -500,6 +500,32 @@ function gerarMensagemBoasVindas(nomeCliente) {
     );
 }
 
+function gerarMensagemBoasVindasGrupo(groupName, participantJids) {
+    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
+    const { supportNum, sysName } = getSuporteDetails();
+    const mentions = Array.isArray(participantJids) ? participantJids : [participantJids];
+    const mentionsText = mentions.map(j => `@${String(j).split('@')[0].split(':')[0].replace(/\D/g, '')}`).join(' ');
+
+    return {
+        text:
+            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+            `  👋 *BEM-VINDO(A) AO GRUPO!* 🎉\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+            `Olá ${mentionsText}! Seja muito bem-vindo(a) ao *${groupName || sysName}*! 🚀\n\n` +
+            `Aqui você adquire os seus pacotes de dados Vodacom com envio *100% automático* e aos melhores preços de Moçambique:\n\n` +
+            `📌 *COMO COMPRAR AQUI NO GRUPO OU NO PRIVADO:*\n` +
+            `1️⃣ Digite *Menu* para consultar todos os pacotes e preços disponíveis.\n` +
+            `2️⃣ Faça o pagamento para uma das nossas contas oficiais:\n` +
+            `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+            `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+            `3️⃣ Envie o comprovativo aqui ou no privado do bot junto com o seu *número Vodacom* (ex: 84XXXXXXX).\n\n` +
+            `⚡ *Ativação instantânea 24h por dia!*\n` +
+            `📞 *Dúvidas ou Suporte:* Digite *Suporte* ou ligue para *${supportNum}*.\n\n` +
+            `Boas compras e excelente navegação! 🌐✨`,
+        mentions
+    };
+}
+
 function gerarMensagemPagamento(nomeCliente) {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
     const { supportNum } = getSuporteDetails();
@@ -1205,6 +1231,36 @@ async function startWhatsApp(orderCallback, db = null) {
             }
             return null;
         }
+
+        // ── BOAS-VINDAS AUTOMÁTICAS PARA NOVOS PARTICIPANTES EM GRUPOS ──
+        sock.ev.on('group-participants.update', async (update) => {
+            try {
+                const { id, participants, action } = update || {};
+                if (!id || !Array.isArray(participants) || participants.length === 0) return;
+
+                if (action === 'add') {
+                    addLog(`👥 [NOVO MEMBRO NO GRUPO] ${participants.length} participante(s) entraram no grupo ${id}`);
+                    
+                    // Pequeno atraso de 1.5s para sincronização do WhatsApp
+                    await new Promise(r => setTimeout(r, 1500));
+
+                    let groupName = 'Grupo Ka-Net';
+                    try {
+                        const meta = await getCachedGroupMetadata(id);
+                        if (meta && meta.subject) groupName = meta.subject;
+                    } catch (_) {}
+
+                    const welcomeObj = gerarMensagemBoasVindasGrupo(groupName, participants);
+                    await sock.sendMessage(id, {
+                        text: welcomeObj.text,
+                        mentions: welcomeObj.mentions
+                    });
+                    addLog(`✅ [BOAS-VINDAS ENVIADAS NO GRUPO] "${groupName}" para: ${participants.join(', ')}`);
+                }
+            } catch (err) {
+                console.warn('⚠️ [GRUPO BOAS-VINDAS ERRO]:', err.message);
+            }
+        });
 
         // ── PROCESSADOR DE MENSAGENS ─────────────────────────────
         sock.ev.on('messages.upsert', async (m) => {
@@ -2171,7 +2227,15 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (APENAS PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
                     const isGroupMsg = jid.endsWith('@g.us');
-                    const ehSaudacaoExplicita = ['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'iniciar', 'start', 'começar', 'bot', 'ka-net', 'kanet'].some(w => cleanCmd === w || cleanCmd.startsWith(w + ' '));
+                    const saudacoesList = [
+                        'oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite',
+                        'iniciar', 'start', 'começar', 'comecar', 'bot', 'ka-net', 'kanet',
+                        'opa', 'salve', 'tudo bem', 'td bem', 'alô', 'alo', 'hello', 'hi',
+                        'boa', 'eae', 'eai', 'preciso de megas', 'quero megas', 'comprar'
+                    ];
+                    const ehSaudacaoExplicita = saudacoesList.some(w => 
+                        cleanCmd === w || cleanCmd.startsWith(w + ' ') || cleanText === w || cleanText.startsWith(w + ' ')
+                    );
 
                     if (ehSaudacaoExplicita) {
                         await reply(gerarMensagemBoasVindas(nomeCliente));
