@@ -2498,10 +2498,15 @@ async function openAllGroups(targetJids = null) {
     if (!sock || connectionStatus !== 'connected') {
         throw new Error('WhatsApp não está conectado');
     }
+    modoManutencao = false;
+    DYN_CFG.MODO_MANUTENCAO = false;
+    DYN_CFG.GRUPOS_FECHADOS = [];
+    salvarBotConfig();
+
     const allGroups = await getGroups();
     const jidsToOpen = targetJids && Array.isArray(targetJids) && targetJids.length > 0
         ? targetJids
-        : (DYN_CFG.GRUPOS_FECHADOS && DYN_CFG.GRUPOS_FECHADOS.length > 0 ? DYN_CFG.GRUPOS_FECHADOS : allGroups.map(g => g.jid));
+        : allGroups.map(g => g.jid);
 
     const results = [];
     const msgTexto = 
