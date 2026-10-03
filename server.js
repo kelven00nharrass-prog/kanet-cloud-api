@@ -1116,6 +1116,15 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   // O app Android envia null quando o saldo ainda não foi consultado via USSD.
   // Preservar o último saldo real para não confundir o roteador de pedidos.
   const bodyClean = { ...req.body };
+
+  // ── REGRA OBRIGATÓRIA PORTA 8077: Apenas 1 Cartão SIM (SIM 1) ──
+  if (port === 8077) {
+    bodyClean.sim2_saldo_mb = 0;
+    bodyClean.sim2_envios = 0;
+    bodyClean.active_sim_slot = 1;
+    bodyClean.carrier = 'Vodacom (1 Cartão - SIM 1)';
+  }
+
   const saldoFields = ['sim1_saldo_mb', 'sim2_saldo_mb', 'saldo_mb'];
   for (const field of saldoFields) {
     if (field in bodyClean && (bodyClean[field] === null || bodyClean[field] === undefined || bodyClean[field] < 0)) {
