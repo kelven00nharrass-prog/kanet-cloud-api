@@ -860,7 +860,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
                 numero: order.numero,
                 quantidade: parte1,
                 modo: order.modo || 'diario',
-                input_val: '', // ⚠️ Limpar input_val para que a Parte 1 envie estritamente a quantidade da parte1
+                input_val: '',
                 jid: order.jid || null,
                 timestamp: Date.now()
               };
@@ -868,27 +868,6 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
               console.log(`🔀 [ENVIO INTELIGENTE DIVIDIDO] Pedido ${parentId} de ${totalMb}MB dividido em 2 partes:`);
               console.log(`   👉 Parte 1: ${parte1}MB atribuído à Porta ${port}`);
               console.log(`   👉 Parte 2: ${parte2}MB aguardando conclusão da Parte 1 para despacho por outra porta.`);
-
-              // Notificar cliente via WhatsApp sobre a divisão
-              let clientJid = order.jid;
-              if (!clientJid && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
-                clientJid = baileysEngine.getJidForOrder(parentId);
-              }
-              if (clientJid && baileysEngine && !order.splitAnnounced) {
-                order.splitAnnounced = true;
-                baileysEngine.sendTextMessage(clientJid,
-                  `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                  `  📦 *ENVIO DE PACOTE EM 2 PARTES* 📶\n` +
-                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                  `Olá! Para agilizar a entrega do seu pacote de *${totalMb} MB*, ele será transferido em *2 partes* usando as nossas linhas disponíveis:\n\n` +
-                  `1️⃣ *1ª Parte:* *${parte1} MB* (A enviar agora...)\n` +
-                  `2️⃣ *2ª Parte:* *${parte2} MB* (A enviar logo a seguir por outra linha)\n\n` +
-                  `📲 *Destino:* *${order.numero}*\n` +
-                  `✨ *Total:* *${totalMb} MB*\n\n` +
-                  `⚡ _Você receberá a confirmação de cada parte assim que for concluída!_`
-                );
-                console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} informado sobre divisão em 2 partes do pedido ${parentId}`);
-              }
 
               break;
             }
@@ -1167,36 +1146,12 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     }
 
     if (clientJid && (!order || !order.notified) && baileysEngine) {
-      if (order) order.notified = true;
       if (success) {
         if (order && order.isSplit && order.splitPart === 1) {
-          baileysEngine.sendTextMessage(clientJid,
-            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-            `  ✅ *1ª PARTE ENTREGUE COM SUCESSO!* (1/2) 📶\n` +
-            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-            `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Transferido agora:* *${volStr}* (1ª parte)\n` +
-            `🔖 *Ref:* \`${resId}\`\n\n` +
-            `⚡ *A 1ª parte já está na sua conta!*\n` +
-            `⏳ *A enviar a 2ª parte de ${order.splitOtherPartMb} MB por outra linha disponível...*\n\n` +
-            `📞 *Suporte / Dúvidas:* Envie *Suporte*`
-          );
-          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO na Parte 1 do pedido ${resId}`);
-        } else if (order && order.isSplit && order.splitPart === 2) {
-          baileysEngine.sendTextMessage(clientJid,
-            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-            `  🎉 *PACOTE 100% CONCLUÍDO!* (2/2) 📶\n` +
-            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-            `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *2ª Parte entregue:* *${volStr}*\n` +
-            `✨ *Total recebido:* *${order.splitTotalMb} MB*\n` +
-            `🔖 *Ref:* \`${resId}\`\n\n` +
-            `⚡ *Todas as partes do seu pacote foram entregues com sucesso e já estão prontas para uso!*\n` +
-            `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
-            `📞 *Suporte / Dúvidas:* Envie *Suporte*`
-          );
-          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de CONCLUSÃO TOTAL (Parte 2) do pedido ${resId}`);
+          order.notified = true;
+          console.log(`ℹ️ [SILENT SPLIT] Parte 1 do pedido ${resId} entregue com sucesso. Notificação ao cliente aguarda conclusão da Parte 2.`);
         } else {
+          order.notified = true;
           const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
           let headerText = 'PACOTE ATIVADO COM SUCESSO! 📶';
           let modoBadge = '';
@@ -1230,17 +1185,9 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
         }
       } else {
-        baileysEngine.sendTextMessage(clientJid,
-          `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-          `  ⚠️ *AVISO DE ENVIO DE DADOS* ⚠️\n` +
-          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-          `📲 *Destino:* *${targetNum}*\n` +
-          `📦 *Volume:* *${volStr}*\n\n` +
-          `Detectamos uma instabilidade temporária na rede da operadora ao processar a recarga.\n` +
-          `⚡ O sistema tentará reenviar automaticamente em instantes!\n\n` +
-          `📞 Caso precise de assistência imediata, envie *Suporte*!`
-        );
-        console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de FALHA no pedido ${resId}`);
+        // 🛡️ NUNCA enviar mensagem de aviso de instabilidade ao cliente no WhatsApp!
+        // O reenvio acontece automaticamente no background. Enviar aviso assusta o cliente, que exige reembolso.
+        console.log(`ℹ️ [RETRY SILENCIOSO] Instabilidade temporária no pedido ${resId}. Cliente não notificado para evitar falsos alarmes.`);
       }
     }
 

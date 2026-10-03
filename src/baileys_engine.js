@@ -27,6 +27,7 @@ let connectionStatus = 'connecting';
 let connectedUser = null;
 let orderDispatchCallback = null;
 let modoManutencao = false;
+let botSilenciado = false;
 
 const AUTH_DIR = path.join(__dirname, '..', 'auth_info_baileys');
 if (!fs.existsSync(AUTH_DIR)) {
@@ -75,6 +76,12 @@ function carregarTransacoes() {
 
 function salvarTransacoes() {
     try {
+        // Proteção de armazenamento: manter no máximo as últimas 5.000 transações
+        while (transacoesProcessadasMap.size > 5000) {
+            const firstKey = transacoesProcessadasMap.keys().next().value;
+            transacoesProcessadasMap.delete(firstKey);
+            transacoesProcessadas.delete(firstKey);
+        }
         const obj = {};
         for (const [id, val] of transacoesProcessadasMap.entries()) {
             obj[id] = val;
@@ -101,6 +108,11 @@ function carregarSmsPayments() {
 
 function salvarSmsPayments() {
     try {
+        // Proteção de armazenamento: manter no máximo os últimos 5.000 SMS
+        while (smsPaymentsMap.size > 5000) {
+            const firstKey = smsPaymentsMap.keys().next().value;
+            smsPaymentsMap.delete(firstKey);
+        }
         const obj = {};
         for (const [id, val] of smsPaymentsMap.entries()) {
             obj[id] = val;
@@ -268,8 +280,12 @@ function getPaymentDetails() {
 }
 
 function getSuporteDetails() {
-    let supportNum = '856116039';
-    if (LOCAL_CFG.master_number) {
+    let supportNum = '850401416';
+    if (LOCAL_CFG.support_number) {
+        supportNum = String(LOCAL_CFG.support_number).split(',')[0].trim();
+    } else if (DYN_CFG.support_number || DYN_CFG.SUPPORT_NUMBER) {
+        supportNum = String(DYN_CFG.support_number || DYN_CFG.SUPPORT_NUMBER).split(',')[0].trim();
+    } else if (LOCAL_CFG.master_number) {
         supportNum = String(LOCAL_CFG.master_number).split(',')[0].trim();
     } else if (DYN_CFG.master_number || DYN_CFG.admin_number) {
         supportNum = String(DYN_CFG.master_number || DYN_CFG.admin_number).split(',')[0].trim();
@@ -338,7 +354,19 @@ function gerarMenuOriginal(jid = null) {
     
     // Se a mensagem veio de um grupo e esse grupo tiver uma tabela customizada, exibi-la
     let _tabelas = DYN_CFG.TABELAS || {};
-    let _especiais = DYN_CFG.PLANOS_ESPECIAIS || {};
+    const DEFAULT_PLANOS_ESPECIAIS = {
+        "76":  { nome: "♻️ 3GB+700 (Renovação)", tipo: "renovavel", total: 3772, inicial: 3072, diaria: 100 },
+        "120": { nome: "♻️ 5GB+700 (Renovação)", tipo: "renovavel", total: 5820, inicial: 5120, diaria: 100 },
+        "130": { nome: "📉 5GB Faseado (1GB/dia)", tipo: "faseado", total: 5120, inicial: 1024, diaria: 1024 },
+        "195": { nome: "♻️ 8GB+700 (Renovação)", tipo: "renovavel", total: 8892, inicial: 8192, diaria: 100 },
+        "240": { nome: "♻️ 10GB+700 (Renovação)", tipo: "renovavel", total: 10940, inicial: 10240, diaria: 100 },
+        "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado", total: 10240, inicial: 1024, diaria: 1024 },
+        "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado", total: 15360, inicial: 1024, diaria: 1024 },
+        "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado", total: 20480, inicial: 1024, diaria: 1024 }
+    };
+    let _especiais = (DYN_CFG.PLANOS_ESPECIAIS && Object.keys(DYN_CFG.PLANOS_ESPECIAIS).length > 0)
+        ? { ...DEFAULT_PLANOS_ESPECIAIS, ...DYN_CFG.PLANOS_ESPECIAIS }
+        : DEFAULT_PLANOS_ESPECIAIS;
 
     if (jid && String(jid).endsWith('@g.us') && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
         const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
@@ -488,6 +516,32 @@ function gerarMensagemBoasVindas(nomeCliente) {
     );
 }
 
+function gerarMensagemBoasVindasGrupo(groupName, participantJids) {
+    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
+    const { supportNum, sysName } = getSuporteDetails();
+    const mentions = Array.isArray(participantJids) ? participantJids : [participantJids];
+    const mentionsText = mentions.map(j => `@${String(j).split('@')[0].split(':')[0].replace(/\D/g, '')}`).join(' ');
+
+    return {
+        text:
+            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+            `  👋 *BEM-VINDO(A) AO GRUPO!* 🎉\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+            `Olá ${mentionsText}! Seja muito bem-vindo(a) ao *${groupName || sysName}*! 🚀\n\n` +
+            `Aqui você adquire os seus pacotes de dados Vodacom com envio *100% automático* e aos melhores preços de Moçambique:\n\n` +
+            `📌 *COMO COMPRAR AQUI NO GRUPO OU NO PRIVADO:*\n` +
+            `1️⃣ Digite *Menu* para consultar todos os pacotes e preços disponíveis.\n` +
+            `2️⃣ Faça o pagamento para uma das nossas contas oficiais:\n` +
+            `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+            `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+            `3️⃣ Envie o comprovativo aqui ou no privado do bot junto com o seu *número Vodacom* (ex: 84XXXXXXX).\n\n` +
+            `⚡ *Ativação instantânea 24h por dia!*\n` +
+            `📞 *Dúvidas ou Suporte:* Digite *Suporte* ou ligue para *${supportNum}*.\n\n` +
+            `Boas compras e excelente navegação! 🌐✨`,
+        mentions
+    };
+}
+
 function gerarMensagemPagamento(nomeCliente) {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
     const { supportNum } = getSuporteDetails();
@@ -628,9 +682,23 @@ function buscarPacotePorValor(valor, jid = null) {
         const p = DYN_CFG.TABELAS['ilimitado'][vStr];
         return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: 'ilimitado', preco: vNum };
     }
-    if (DYN_CFG.PLANOS_ESPECIAIS && DYN_CFG.PLANOS_ESPECIAIS[vStr]) {
-        const p = DYN_CFG.PLANOS_ESPECIAIS[vStr];
-        return { nome: p.nome, mb: p.quantidade_mb || p.quantidade || 1024, tipo: p.tipo || 'especial', preco: vNum };
+    const pEspeciais = (DYN_CFG.PLANOS_ESPECIAIS && Object.keys(DYN_CFG.PLANOS_ESPECIAIS).length > 0)
+        ? { ...DEFAULT_PLANOS_ESPECIAIS, ...DYN_CFG.PLANOS_ESPECIAIS }
+        : DEFAULT_PLANOS_ESPECIAIS;
+
+    if (pEspeciais && pEspeciais[vStr]) {
+        const p = pEspeciais[vStr];
+        const isFaseado = (p.tipo === 'faseado') || String(p.nome).toLowerCase().includes('faseado');
+        const tipoFinal = isFaseado ? 'faseado' : 'renovavel';
+        const mbInicial = p.inicial || (isFaseado ? 1024 : 3072);
+        const mbTotal = p.total || (mbInicial + (p.diaria || (isFaseado ? 1024 : 100)) * (isFaseado ? 4 : 7));
+        return { 
+            nome: p.nome, 
+            mb: mbTotal, 
+            mb_inicial: mbInicial,
+            tipo: tipoFinal, 
+            preco: vNum 
+        };
     }
     if (DYN_CFG.TABELAS_FORNECIMENTO && DYN_CFG.TABELAS_FORNECIMENTO[vStr]) {
         const p = DYN_CFG.TABELAS_FORNECIMENTO[vStr];
@@ -1180,6 +1248,36 @@ async function startWhatsApp(orderCallback, db = null) {
             return null;
         }
 
+        // ── BOAS-VINDAS AUTOMÁTICAS PARA NOVOS PARTICIPANTES EM GRUPOS ──
+        sock.ev.on('group-participants.update', async (update) => {
+            try {
+                const { id, participants, action } = update || {};
+                if (!id || !Array.isArray(participants) || participants.length === 0) return;
+
+                if (action === 'add') {
+                    addLog(`👥 [NOVO MEMBRO NO GRUPO] ${participants.length} participante(s) entraram no grupo ${id}`);
+                    
+                    // Pequeno atraso de 1.5s para sincronização do WhatsApp
+                    await new Promise(r => setTimeout(r, 1500));
+
+                    let groupName = 'Grupo Ka-Net';
+                    try {
+                        const meta = await getCachedGroupMetadata(id);
+                        if (meta && meta.subject) groupName = meta.subject;
+                    } catch (_) {}
+
+                    const welcomeObj = gerarMensagemBoasVindasGrupo(groupName, participants);
+                    await sock.sendMessage(id, {
+                        text: welcomeObj.text,
+                        mentions: welcomeObj.mentions
+                    });
+                    addLog(`✅ [BOAS-VINDAS ENVIADAS NO GRUPO] "${groupName}" para: ${participants.join(', ')}`);
+                }
+            } catch (err) {
+                console.warn('⚠️ [GRUPO BOAS-VINDAS ERRO]:', err.message);
+            }
+        });
+
         // ── PROCESSADOR DE MENSAGENS ─────────────────────────────
         sock.ev.on('messages.upsert', async (m) => {
             try {
@@ -1260,6 +1358,12 @@ async function startWhatsApp(orderCallback, db = null) {
                     clientesLeads.add(senderNumber);
 
                     console.log(`🔎 [DEBUG] sender=${senderNumber} | isMaster=${senderIsMaster} | isGrupo=${jid.endsWith('@g.us')} | banido=${banidosSet.has(senderNumber)} | modoManut=${modoManutencao}`);
+
+                    // Se o bot estiver silenciado, ignorar TUDO (exceto master)
+                    if (botSilenciado && !senderIsMaster) {
+                        console.log(`🤫 [DEBUG] Bloqueado: bot silenciado`);
+                        continue;
+                    }
 
                     // Se estiver banido, ignorar
                     if (banidosSet.has(senderNumber) && !senderIsMaster) {
@@ -2001,20 +2105,10 @@ async function startWhatsApp(orderCallback, db = null) {
                                 try {
                                     if (aguardandoOperadora.has(txn_id)) {
                                         aguardandoOperadora.delete(txn_id);
-                                        const { supportNum } = getSuporteDetails();
-                                        await sock.sendMessage(jid, {
-                                            text: `⚠️ *COMPROVATIVO AINDA NÃO RECEBIDO PELA OPERADORA* ⚠️\n` +
-                                                  `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                                                  `Olá, *${nomeCliente}*.\n` +
-                                                  `O seu comprovativo da transação \`${txn_id}\` (*${valor} MT*) ainda *não foi confirmado* pela operadora (${metodoNome}) após 2 minutos de espera.\n\n` +
-                                                  `📌 *O que aconteceu?*\n` +
-                                                  `• O SMS da operadora pode estar com atraso na rede; ou\n` +
-                                                  `• A transferência pode não ter sido concluída.\n\n` +
-                                                  `💡 *O que fazer:*\n` +
-                                                  `1. Se o dinheiro já foi debitado da sua conta, envie mensagem ao nosso suporte com o extrato/captura de tela.\n` +
-                                                  `2. Se a rede estava lenta, tente reenviar o comprovativo dentro de alguns minutos.\n\n` +
-                                                  `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
-                                        });
+                                        // 🛑 NUNCA enviar mensagem alarmista ao cliente no WhatsApp!
+                                        // O SMS da operadora pode levar mais tempo por lentidão na rede. Se notificar o cliente,
+                                        // ele exige reembolso ao admin e depois a recarga cai automaticamente, gerando prejuízo.
+                                        console.log(`⏱️ [TIMER 2 MIN] Transação ${txn_id} não confirmada pela operadora em 2min. Notificando apenas o grupo do admin.`);
 
                                         const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
                                         enviarNotificacaoGrupo(
@@ -2145,7 +2239,15 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (APENAS PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
                     const isGroupMsg = jid.endsWith('@g.us');
-                    const ehSaudacaoExplicita = ['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'iniciar', 'start', 'começar', 'bot', 'ka-net', 'kanet'].some(w => cleanCmd === w || cleanCmd.startsWith(w + ' '));
+                    const saudacoesList = [
+                        'oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite',
+                        'iniciar', 'start', 'começar', 'comecar', 'bot', 'ka-net', 'kanet',
+                        'opa', 'salve', 'tudo bem', 'td bem', 'alô', 'alo', 'hello', 'hi',
+                        'boa', 'eae', 'eai', 'preciso de megas', 'quero megas', 'comprar'
+                    ];
+                    const ehSaudacaoExplicita = saudacoesList.some(w => 
+                        cleanCmd === w || cleanCmd.startsWith(w + ' ') || cleanText === w || cleanText.startsWith(w + ' ')
+                    );
 
                     if (ehSaudacaoExplicita) {
                         await reply(gerarMensagemBoasVindas(nomeCliente));
@@ -2234,6 +2336,23 @@ function setModoManutencao(ativo) {
     DYN_CFG.MODO_MANUTENCAO = modoManutencao;
     salvarBotConfig();
     return modoManutencao;
+}
+
+function getModoManutencao() {
+    return modoManutencao;
+}
+
+/**
+ * Silencia completamente o bot — ignora todas as mensagens de não-admins.
+ * Útil para manutenção silenciosa ou quando o admin não quer resposta automática.
+ */
+function setBotSilenciado(ativo) {
+    botSilenciado = !!ativo;
+    return botSilenciado;
+}
+
+function getBotSilenciado() {
+    return botSilenciado;
 }
 
 /**
@@ -2444,6 +2563,134 @@ async function resetSession(db) {
     }
 }
 
+/**
+ * Altera as definições de todos ou de grupos específicos no WhatsApp para 'announcement' (apenas admins enviam mensagens)
+ * e envia o comunicado com a mensagem/motivo especificado pelo operador.
+ */
+async function closeGroupsWithReason(motivo, targetJids = null) {
+    if (!sock || connectionStatus !== 'connected') {
+        throw new Error('WhatsApp não está conectado');
+    }
+    const allGroups = await getGroups();
+    const jidsToClose = targetJids && Array.isArray(targetJids) && targetJids.length > 0
+        ? targetJids
+        : allGroups.map(g => g.jid);
+
+    if (!DYN_CFG.GRUPOS_FECHADOS) DYN_CFG.GRUPOS_FECHADOS = [];
+    const results = [];
+    const msgTexto = 
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  🛑 *GRUPO TEMPORARIAMENTE FECHADO* 🛑\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `📢 *Comunicado Oficial:*\n` +
+        `${motivo || 'Atendimento suspenso temporariamente.'}\n\n` +
+        `⏱️ *O bot informará assim que as vendas e o atendimento forem reabertos.*\n` +
+        `_Agradecemos a compreensão de todos!_ 🙏`;
+
+    for (const jid of jidsToClose) {
+        try {
+            // 1. Alterar definições do grupo no WhatsApp (apenas admins podem enviar mensagens)
+            await sock.groupSettingUpdate(jid, 'announcement');
+            
+            // 2. Enviar mensagem explicativa no grupo
+            await sock.sendMessage(jid, { text: msgTexto });
+
+            // 3. Registar no estado interno do bot
+            if (!DYN_CFG.GRUPOS_FECHADOS.includes(jid)) {
+                DYN_CFG.GRUPOS_FECHADOS.push(jid);
+            }
+            results.push({ jid, ok: true });
+        } catch(e) {
+            console.error(`⚠️ [FECHAR GRUPO ERRO] ${jid}: ${e.message}`);
+            results.push({ jid, ok: false, error: e.message });
+        }
+    }
+    salvarBotConfig();
+    return { count: results.filter(r => r.ok).length, total: jidsToClose.length, results };
+}
+
+/**
+ * Reabre grupos no WhatsApp (not_announcement) permitindo que todos enviem mensagens
+ * e notifica a reabertura no grupo.
+ */
+async function openAllGroups(targetJids = null) {
+    if (!sock || connectionStatus !== 'connected') {
+        throw new Error('WhatsApp não está conectado');
+    }
+    modoManutencao = false;
+    DYN_CFG.MODO_MANUTENCAO = false;
+    DYN_CFG.GRUPOS_FECHADOS = [];
+    salvarBotConfig();
+
+    const allGroups = await getGroups();
+    const jidsToOpen = targetJids && Array.isArray(targetJids) && targetJids.length > 0
+        ? targetJids
+        : allGroups.map(g => g.jid);
+
+    const results = [];
+    const msgTexto = 
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  🟢 *GRUPO REABERTO COM SUCESSO!* 🎉\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `✅ *As vendas e o atendimento já estão 100% operacionais!*\n` +
+        `_Envie a palavra desejada para realizar o seu pedido._ 📶`;
+
+    for (const jid of jidsToOpen) {
+        try {
+            // 1. Alterar definições no WhatsApp (todos podem enviar mensagens)
+            await sock.groupSettingUpdate(jid, 'not_announcement');
+
+            // 2. Enviar mensagem de abertura
+            await sock.sendMessage(jid, { text: msgTexto });
+
+            // 3. Remover do estado interno de fechados
+            if (DYN_CFG.GRUPOS_FECHADOS) {
+                const idx = DYN_CFG.GRUPOS_FECHADOS.indexOf(jid);
+                if (idx !== -1) DYN_CFG.GRUPOS_FECHADOS.splice(idx, 1);
+            }
+            results.push({ jid, ok: true });
+        } catch(e) {
+            console.error(`⚠️ [ABRIR GRUPO ERRO] ${jid}: ${e.message}`);
+            results.push({ jid, ok: false, error: e.message });
+        }
+    }
+    salvarBotConfig();
+    return { count: results.filter(r => r.ok).length, total: jidsToOpen.length, results };
+}
+
+/**
+ * Envia um comunicado / anúncio formatado para todos os grupos (ou grupos específicos)
+ * sem alterar as definições de quem pode digitar no grupo.
+ */
+async function sendAnnouncementToGroups(mensagem, targetJids = null) {
+    if (!sock || connectionStatus !== 'connected') {
+        throw new Error('WhatsApp não está conectado');
+    }
+    const allGroups = await getGroups();
+    const jidsToAnnounce = targetJids && Array.isArray(targetJids) && targetJids.length > 0
+        ? targetJids
+        : allGroups.map(g => g.jid);
+
+    const results = [];
+    const msgTexto = 
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  📢 *COMUNICADO KA-NET* 📢\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `${mensagem || 'Comunicado geral para todos os clientes.'}\n\n` +
+        `_Atenciosamente, Equipa KA-NET_ 📶`;
+
+    for (const jid of jidsToAnnounce) {
+        try {
+            await sock.sendMessage(jid, { text: msgTexto });
+            results.push({ jid, ok: true });
+        } catch(e) {
+            console.error(`⚠️ [COMUNICADO GRUPO ERRO] ${jid}: ${e.message}`);
+            results.push({ jid, ok: false, error: e.message });
+        }
+    }
+    return { count: results.filter(r => r.ok).length, total: jidsToAnnounce.length, results };
+}
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -2455,7 +2702,13 @@ module.exports = {
     getGrupoErros,
     getGroups,
     setModoManutencao,
+    getModoManutencao,
+    setBotSilenciado,
+    getBotSilenciado,
     toggleGrupoFechado,
+    closeGroupsWithReason,
+    openAllGroups,
+    sendAnnouncementToGroups,
     getJidForOrder,
     registrarSmsPayment,
     smsPaymentsMap,

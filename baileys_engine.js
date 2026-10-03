@@ -27,6 +27,7 @@ let connectionStatus = 'connecting';
 let connectedUser = null;
 let orderDispatchCallback = null;
 let modoManutencao = false;
+let botSilenciado = false;
 
 const AUTH_DIR = path.join(__dirname, '..', 'auth_info_baileys');
 if (!fs.existsSync(AUTH_DIR)) {
@@ -75,6 +76,12 @@ function carregarTransacoes() {
 
 function salvarTransacoes() {
     try {
+        // Proteção de armazenamento: manter no máximo as últimas 5.000 transações
+        while (transacoesProcessadasMap.size > 5000) {
+            const firstKey = transacoesProcessadasMap.keys().next().value;
+            transacoesProcessadasMap.delete(firstKey);
+            transacoesProcessadas.delete(firstKey);
+        }
         const obj = {};
         for (const [id, val] of transacoesProcessadasMap.entries()) {
             obj[id] = val;
@@ -101,6 +108,11 @@ function carregarSmsPayments() {
 
 function salvarSmsPayments() {
     try {
+        // Proteção de armazenamento: manter no máximo os últimos 5.000 SMS
+        while (smsPaymentsMap.size > 5000) {
+            const firstKey = smsPaymentsMap.keys().next().value;
+            smsPaymentsMap.delete(firstKey);
+        }
         const obj = {};
         for (const [id, val] of smsPaymentsMap.entries()) {
             obj[id] = val;
@@ -268,8 +280,12 @@ function getPaymentDetails() {
 }
 
 function getSuporteDetails() {
-    let supportNum = '856116039';
-    if (LOCAL_CFG.master_number) {
+    let supportNum = '850401416';
+    if (LOCAL_CFG.support_number) {
+        supportNum = String(LOCAL_CFG.support_number).split(',')[0].trim();
+    } else if (DYN_CFG.support_number || DYN_CFG.SUPPORT_NUMBER) {
+        supportNum = String(DYN_CFG.support_number || DYN_CFG.SUPPORT_NUMBER).split(',')[0].trim();
+    } else if (LOCAL_CFG.master_number) {
         supportNum = String(LOCAL_CFG.master_number).split(',')[0].trim();
     } else if (DYN_CFG.master_number || DYN_CFG.admin_number) {
         supportNum = String(DYN_CFG.master_number || DYN_CFG.admin_number).split(',')[0].trim();
@@ -1343,6 +1359,12 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     console.log(`🔎 [DEBUG] sender=${senderNumber} | isMaster=${senderIsMaster} | isGrupo=${jid.endsWith('@g.us')} | banido=${banidosSet.has(senderNumber)} | modoManut=${modoManutencao}`);
 
+                    // Se o bot estiver silenciado, ignorar TUDO (exceto master)
+                    if (botSilenciado && !senderIsMaster) {
+                        console.log(`🤫 [DEBUG] Bloqueado: bot silenciado`);
+                        continue;
+                    }
+
                     // Se estiver banido, ignorar
                     if (banidosSet.has(senderNumber) && !senderIsMaster) {
                         console.log(`🚫 [DEBUG] Bloqueado: banido`);
@@ -2083,20 +2105,10 @@ async function startWhatsApp(orderCallback, db = null) {
                                 try {
                                     if (aguardandoOperadora.has(txn_id)) {
                                         aguardandoOperadora.delete(txn_id);
-                                        const { supportNum } = getSuporteDetails();
-                                        await sock.sendMessage(jid, {
-                                            text: `⚠️ *COMPROVATIVO AINDA NÃO RECEBIDO PELA OPERADORA* ⚠️\n` +
-                                                  `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                                                  `Olá, *${nomeCliente}*.\n` +
-                                                  `O seu comprovativo da transação \`${txn_id}\` (*${valor} MT*) ainda *não foi confirmado* pela operadora (${metodoNome}) após 2 minutos de espera.\n\n` +
-                                                  `📌 *O que aconteceu?*\n` +
-                                                  `• O SMS da operadora pode estar com atraso na rede; ou\n` +
-                                                  `• A transferência pode não ter sido concluída.\n\n` +
-                                                  `💡 *O que fazer:*\n` +
-                                                  `1. Se o dinheiro já foi debitado da sua conta, envie mensagem ao nosso suporte com o extrato/captura de tela.\n` +
-                                                  `2. Se a rede estava lenta, tente reenviar o comprovativo dentro de alguns minutos.\n\n` +
-                                                  `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
-                                        });
+                                        // 🛑 NUNCA enviar mensagem alarmista ao cliente no WhatsApp!
+                                        // O SMS da operadora pode levar mais tempo por lentidão na rede. Se notificar o cliente,
+                                        // ele exige reembolso ao admin e depois a recarga cai automaticamente, gerando prejuízo.
+                                        console.log(`⏱️ [TIMER 2 MIN] Transação ${txn_id} não confirmada pela operadora em 2min. Notificando apenas o grupo do admin.`);
 
                                         const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
                                         enviarNotificacaoGrupo(
@@ -2324,6 +2336,23 @@ function setModoManutencao(ativo) {
     DYN_CFG.MODO_MANUTENCAO = modoManutencao;
     salvarBotConfig();
     return modoManutencao;
+}
+
+function getModoManutencao() {
+    return modoManutencao;
+}
+
+/**
+ * Silencia completamente o bot — ignora todas as mensagens de não-admins.
+ * Útil para manutenção silenciosa ou quando o admin não quer resposta automática.
+ */
+function setBotSilenciado(ativo) {
+    botSilenciado = !!ativo;
+    return botSilenciado;
+}
+
+function getBotSilenciado() {
+    return botSilenciado;
 }
 
 /**
@@ -2673,6 +2702,9 @@ module.exports = {
     getGrupoErros,
     getGroups,
     setModoManutencao,
+    getModoManutencao,
+    setBotSilenciado,
+    getBotSilenciado,
     toggleGrupoFechado,
     closeGroupsWithReason,
     openAllGroups,
