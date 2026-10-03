@@ -301,42 +301,46 @@ app.post('/api/devices/:port/reset', (req, res) => {
   return res.json({ success: true, mensagem: `Porta ${port} libertada e desbloqueada com sucesso!`, device: dev });
 });
 
-// ── FUNÇÃO DE DECREMENTO AUTOMÁTICO DE SALDO (PORTA 8077) ──
+// ── FUNÇÃO DE DECREMENTO AUTOMÁTICO DE SALDO EM METICAIS (PORTA 8077) ──
 function decrementDeviceSaldo(port, order) {
   const pNum = Number(port);
   if (pNum === 8077) {
     const dev = inMemoryDevices[pNum];
     if (dev) {
-      let qtdMb = Number(order.quantidade) || 1024;
       const modoStr = String(order.modo || '').toLowerCase();
-      if (modoStr === 'tudo_top' || modoStr === 'ilimitado') {
-        qtdMb = Math.max(qtdMb, 11264);
+      let orderCostMt = Number(order.valor || order.valor_pago) || 0;
+      if (!orderCostMt || orderCostMt <= 0) {
+        if (typeof getValorFromMb === 'function') {
+          orderCostMt = getValorFromMb(order.quantidade, order.modo);
+        }
+      }
+      if (!orderCostMt || orderCostMt <= 0) {
+        orderCostMt = (modoStr === 'tudo_top' || modoStr === 'ilimitado') ? 500 : 500;
       }
 
-      const currentSaldo = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
-      const newSaldo = Math.max(0, currentSaldo - qtdMb);
+      const currentMt = Number(dev.saldo_mt) || 0;
+      const newMt = Math.max(0, currentMt - orderCostMt);
 
-      dev.sim1_saldo_mb = newSaldo;
-      dev.saldo_mb = newSaldo;
-      dev.sim2_saldo_mb = 0;
+      dev.saldo_mt = newMt;
+      dev.saldo_credito = `${newMt} MT`;
       dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 dias de override
 
-      console.log(`📉 [SALDO 8077 DECREMENTADO] Ativação de ${qtdMb}MB no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newSaldo}MB (${(newSaldo/1024).toFixed(1)}GB)`);
+      console.log(`📉 [SALDO 8077 DECREMENTADO] Ativação de ${orderCostMt} MT no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newMt} MT`);
 
-      if (newSaldo < 100) {
+      if (newMt <= 0) {
         dev.sem_saldo = true;
         dev.is_apto = false;
-        console.warn(`🚨 [ALERTA SALDO 8077 ZERADO] Saldo da Porta 8077 ESGOTADO (${newSaldo} MB)!`);
+        console.warn(`🚨 [ALERTA SALDO 8077 ZERADO] Saldo da Porta 8077 ESGOTADO (${newMt} MT)!`);
 
         if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
           baileysEngine.enviarNotificacaoGrupo(
             `🚨 *ALERTA CRÍTICO: SALDO 8077 ZERADO!* 🚨\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
             `📲 *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
-            `📦 *Última Ativação:* ${qtdMb >= 1024 ? (qtdMb/1024).toFixed(1)+'GB' : qtdMb+'MB'} (Ref: \`${order.id || order.orderId}\`)\n` +
-            `🔴 *Saldo Restante:* *${newSaldo} MB (${(newSaldo/1024).toFixed(1)} GB)* - *ESGOTADO*\n` +
+            `📦 *Última Ativação:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
+            `🔴 *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `⚠️ *Atendimento Pausado!* O saldo esgotou. Por favor escreva o novo saldo disponível no Painel Admin para reativar.`
+            `⚠️ *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
           );
         }
       }
@@ -357,10 +361,9 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
   if (saldo_mt !== undefined) dev.saldo_mt = Number(saldo_mt);
 
   if (port === 8077) {
-    const val = Number(sim1_saldo_mb !== undefined ? sim1_saldo_mb : (saldo_mb || 0));
-    dev.sim1_saldo_mb = val;
-    dev.saldo_mb = val;
-    dev.sim2_saldo_mb = 0;
+    const valMt = Number(saldo_mt !== undefined ? saldo_mt : (saldo_mb || sim1_saldo_mb || 0));
+    dev.saldo_mt = valMt;
+    dev.saldo_credito = `${valMt} MT`;
   }
 
   dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000);
@@ -370,9 +373,10 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
   if (sim1_saldo_mb !== undefined) dev.pending_commands.set_sim1_saldo_mb = Number(sim1_saldo_mb);
   if (sim2_saldo_mb !== undefined) dev.pending_commands.set_sim2_saldo_mb = Number(sim2_saldo_mb);
 
-  // Se o saldo configurado for >= 100MB, desmarcar sem_saldo
+  // Se o saldo configurado for > 0 MT (ou MB >= 100 em portas normais), desmarcar sem_saldo
+  const isOk8077 = port === 8077 && (dev.saldo_mt || 0) > 0;
   const maxMb = Math.max(dev.sim1_saldo_mb || 0, dev.sim2_saldo_mb || 0, dev.saldo_mb || 0);
-  if (maxMb >= 100 || (dev.saldo_mt !== undefined && dev.saldo_mt > 0)) {
+  if (isOk8077 || maxMb >= 100 || (dev.saldo_mt !== undefined && dev.saldo_mt > 0)) {
     dev.sem_saldo = false;
     dev.is_apto = true;
     dev.livre = true;
