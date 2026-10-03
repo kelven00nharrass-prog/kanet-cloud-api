@@ -1124,15 +1124,15 @@ async function loadDevices() {
         </div>` : '';
       
       const is8077 = dev.porta === 8077;
-      const saldo8077 = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
-      const is8077Zerado = is8077 && (saldo8077 < 100 || dev.sem_saldo);
-      const ativTudoTop = Math.floor(saldo8077 / 11264);
+      const saldo8077Mt = dev.saldo_mt !== undefined ? Number(dev.saldo_mt) : Number(dev.sim1_saldo_mb || 0);
+      const is8077Zerado = is8077 && (saldo8077Mt <= 0 || dev.sem_saldo);
+      const ativTudoTop = Math.floor(saldo8077Mt / 500);
 
       // Bloco de Saldo
       const statBlocoSaldo = is8077 ? `
         <div class="device-stat" style="${is8077Zerado ? 'border:1px solid var(--red);background:rgba(239,68,68,0.12)' : ''}">
-          <div class="device-stat-label">💰 Saldo Disponível</div>
-          <div class="device-stat-val" style="color:var(--${is8077Zerado ? 'red' : 'green'})">${saldo8077 >= 1024 ? (saldo8077/1024).toFixed(1)+' GB' : saldo8077+' MB'}</div>
+          <div class="device-stat-label">💰 Saldo Disponível (MT)</div>
+          <div class="device-stat-val" style="color:var(--${is8077Zerado ? 'red' : 'green'})">${saldo8077Mt} MT</div>
           <div style="font-size:.68rem;color:var(--muted)">1 Cartão • Decrementa por envio</div>
         </div>` : (isSpecial ? `
         <div class="device-stat">
@@ -1167,7 +1167,7 @@ async function loadDevices() {
         <div class="device-stat">
           <div class="device-stat-label">⚡ Ativações Restantes</div>
           <div class="device-stat-val" style="color:var(--${is8077Zerado ? 'red' : 'cyan'});font-size:.85rem">${is8077Zerado ? '0 (ESGOTADO)' : '~'+ativTudoTop+' Tudo Top'}</div>
-          <div style="font-size:.68rem;color:var(--muted)">${is8077Zerado ? '🚨 RECARREGUE SALDO' : 'Capacidade Estimada'}</div>
+          <div style="font-size:.68rem;color:var(--muted)">${is8077Zerado ? '🚨 RECARREGUE SALDO' : 'Estimativa em MT'}</div>
         </div>` : (isSpecial ? `
         <div class="device-stat">
           <div class="device-stat-label">⚡ Modo Ofertas</div>
@@ -1218,8 +1218,8 @@ async function loadDevices() {
           <div style="background:rgba(239,68,68,0.25);border:1px solid var(--red);color:#fca5a5;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:0.78rem;font-weight:700;display:flex;align-items:center;gap:8px">
             <i class="fa-solid fa-triangle-exclamation fa-beat" style="color:var(--red);font-size:1.1rem"></i>
             <div>
-              <div style="color:#ef4444">🚨 SALDO DA PORTA 8077 ESGOTADO (${saldo8077} MB)</div>
-              <div style="font-size:0.7rem;font-weight:400;color:var(--muted)">Escreva o novo saldo no botão <b>💰 Saldo</b> abaixo para reativar.</div>
+              <div style="color:#ef4444">🚨 SALDO DA PORTA 8077 ESGOTADO (${saldo8077Mt} MT)</div>
+              <div style="font-size:0.7rem;font-weight:400;color:var(--muted)">Escreva o novo saldo em MT no botão <b>💰 Saldo</b> abaixo para reativar.</div>
             </div>
           </div>` : ''}
           
@@ -1331,26 +1331,29 @@ function openSaldoModal(port, sim1, sim2, saldoMt) {
   const is8077 = Number(port) === 8077;
   document.getElementById('modalPortTitle').textContent = is8077 ? `Celular Porta 8077 (Tudo Top / Ofertas)` : `Celular Porta ${port}`;
 
+  const sim1Group = document.getElementById('modalSim1Group');
   const sim2Group = document.getElementById('modalSim2Group');
-  const sim1Label = document.getElementById('modalSim1Label');
+  const mtLabel = document.getElementById('modalSaldoMtLabel');
   const quickBtns = document.getElementById('modalQuickBtns8077');
 
+  if (sim1Group) sim1Group.style.display = is8077 ? 'none' : 'block';
   if (sim2Group) sim2Group.style.display = is8077 ? 'none' : 'block';
   if (quickBtns) quickBtns.style.display = is8077 ? 'flex' : 'none';
-  if (sim1Label) {
-    sim1Label.innerHTML = is8077
-      ? '<i class="fa-solid fa-coins"></i> Saldo Disponível no Cartão (em Megabytes / MB)'
-      : '<i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)';
+
+  if (mtLabel) {
+    mtLabel.innerHTML = is8077
+      ? '<i class="fa-solid fa-coins"></i> Saldo Disponível no Cartão (em Meticais / MT)'
+      : '<i class="fa-solid fa-money-bill"></i> Saldo Principal (em Meticais / MT)';
   }
 
-  document.getElementById('modalSim1Saldo').value = sim1 || 0;
+  document.getElementById('modalSim1Saldo').value = is8077 ? 0 : (sim1 || 0);
   document.getElementById('modalSim2Saldo').value = is8077 ? 0 : (sim2 || 0);
-  document.getElementById('modalSaldoMt').value = saldoMt || 0;
+  document.getElementById('modalSaldoMt').value = saldoMt || (is8077 ? sim1 : 0);
   document.getElementById('saldoModal').style.display = 'flex';
 }
 
-function setQuickSaldo8077(mbVal) {
-  document.getElementById('modalSim1Saldo').value = mbVal;
+function setQuickSaldo8077(mtVal) {
+  document.getElementById('modalSaldoMt').value = mtVal;
 }
 
 function closeSaldoModal() {
@@ -1361,6 +1364,7 @@ function closeSaldoModal() {
 async function saveSaldoModal() {
   if (!currentSaldoModalPort) return;
   const port = currentSaldoModalPort;
+  const is8077 = Number(port) === 8077;
   const s1 = Number(document.getElementById('modalSim1Saldo').value) || 0;
   const s2 = Number(document.getElementById('modalSim2Saldo').value) || 0;
   const smt = Number(document.getElementById('modalSaldoMt').value) || 0;
@@ -1370,14 +1374,23 @@ async function saveSaldoModal() {
     const d = await fetchAPI(`/api/devices/${port}/set-saldo`, {
       method: 'POST',
       body: JSON.stringify({
-        sim1_saldo_mb: s1,
-        sim2_saldo_mb: s2,
-        saldo_mb: Math.max(s1, s2),
+        sim1_saldo_mb: is8077 ? smt : s1,
+        sim2_saldo_mb: is8077 ? 0 : s2,
+        saldo_mb: is8077 ? smt : Math.max(s1, s2),
         saldo_mt: smt
       })
     });
     if (d.success) {
       toast(`✅ Saldo da Porta ${port} atualizado com sucesso!`, 'ok');
+      closeSaldoModal();
+      await loadDevices();
+    } else {
+      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
+    }
+  } catch(e) {
+    toast(`❌ Erro: ${e.message}`, 'err');
+  }
+}
       closeSaldoModal();
       await loadDevices();
     } else {
@@ -2297,24 +2310,25 @@ function cancelPlan(planId) {
     </div>
     
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
-      <div class="form-group">
-        <label class="form-label" id="modalSim1Label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)</label>
-        <input class="form-input" type="number" id="modalSim1Saldo" placeholder="Ex: 51200 (para 50GB) ou 102400 (para 100GB)">
+      <div class="form-group" id="modalSaldoMtGroup">
+        <label class="form-label" id="modalSaldoMtLabel"><i class="fa-solid fa-money-bill"></i> Saldo Principal (em Meticais / MT)</label>
+        <input class="form-input" type="number" id="modalSaldoMt" placeholder="Ex: 5000 MT">
         <div id="modalQuickBtns8077" style="display:none;gap:6px;flex-wrap:wrap;margin-top:8px">
-          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(11264)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+11 GB (1 Tudo Top)</button>
-          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(51200)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+50 GB</button>
-          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(102400)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+100 GB</button>
-          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(204800)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+200 GB</button>
-          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(0)" style="background:rgba(239,68,68,0.2);color:var(--red);font-size:0.72rem">Zerar (0 MB)</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(500)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+500 MT (1 Tudo Top)</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(1000)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+1.000 MT</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(2500)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+2.500 MT</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(5000)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+5.000 MT</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(10000)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+10.000 MT</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(0)" style="background:rgba(239,68,68,0.2);color:var(--red);font-size:0.72rem">Zerar (0 MT)</button>
         </div>
+      </div>
+      <div class="form-group" id="modalSim1Group">
+        <label class="form-label" id="modalSim1Label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)</label>
+        <input class="form-input" type="number" id="modalSim1Saldo" placeholder="Ex: 2048 (para 2GB) ou 500">
       </div>
       <div class="form-group" id="modalSim2Group">
         <label class="form-label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 2 (em Megabytes / MB)</label>
         <input class="form-input" type="number" id="modalSim2Saldo" placeholder="Ex: 1500 ou 0">
-      </div>
-      <div class="form-group">
-        <label class="form-label"><i class="fa-solid fa-money-bill"></i> Saldo Principal (em Meticais / MT)</label>
-        <input class="form-input" type="number" id="modalSaldoMt" placeholder="Ex: 100 MT">
       </div>
     </div>
 
