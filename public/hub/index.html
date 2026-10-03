@@ -27,7 +27,14 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap">
 
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Plus Jakarta Sans', sans-serif; }
+    * { 
+      box-sizing: border-box; 
+      -webkit-tap-highlight-color: transparent; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+      -webkit-font-smoothing: antialiased; 
+      -moz-osx-font-smoothing: grayscale; 
+      text-rendering: optimizeLegibility; 
+    }
     body { background: #070b14; color: #f1f5f9; min-height: 100dvh; overflow-x: hidden; }
     .glass-panel { background: rgba(14, 21, 38, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
     .glass-card { background: rgba(21, 32, 59, 0.65); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.06); }
@@ -177,6 +184,14 @@
     </div>
   </header>
 
+  <!-- BANNER DE MANUTENÇÃO TÉCNICA PROGRAMADA -->
+  <div id="maintenance-banner" class="hidden bg-red-950/90 border-b border-red-500/50 px-4 py-2.5 text-center transition-all">
+    <p class="text-xs text-red-200 font-bold flex items-center justify-center gap-2">
+      <span class="animate-pulse">🛑</span>
+      <span id="maintenance-banner-text">SISTEMA EM MANUTENÇÃO TÉCNICA: Vendas automáticas pausadas momentaneamente. Voltaremos em breve!</span>
+    </p>
+  </div>
+
   <!-- BANNER DE AVISO DE PREVENÇÃO (Se alguma porta estiver em reposição) -->
   <div id="warning-banner" class="hidden bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center">
     <p class="text-[11px] text-amber-300 font-medium flex items-center justify-center gap-1.5">
@@ -201,8 +216,8 @@
             </div>
             <div>
               <div class="flex items-center gap-2 mb-0.5">
-                <span id="announcement-badge-text" class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider bg-white/20 text-white">PROMOÇÃO</span>
-                <span id="announcement-time-text" class="text-[9px] text-slate-300 font-mono">Oficial Ka-Net</span>
+                <span id="announcement-badge-text" class="text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider bg-white/20 text-white">PROMOÇÃO</span>
+                <span id="announcement-time-text" class="text-[11px] text-slate-300 font-mono">Oficial Ka-Net</span>
               </div>
               <h3 id="announcement-title" class="text-sm font-extrabold text-white leading-tight">Título do Anúncio</h3>
               <p id="announcement-message" class="text-xs text-slate-200 mt-1 leading-relaxed">Mensagem detalhada do anúncio...</p>
@@ -231,7 +246,7 @@
       <div class="flex items-center justify-between mb-3 px-1">
         <div class="flex items-center gap-2">
           <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider truncate max-w-[200px]" id="active-category-title">Pacotes Diários (24 Horas)</h2>
-          <span id="cat-door-badge" class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Porta 8024 Apta</span>
+          <span id="cat-door-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Porta 8024 Apta</span>
         </div>
         <span class="text-[10px] text-slate-400" id="cat-count">10 ofertas</span>
       </div>
@@ -240,7 +255,7 @@
       <div id="diamante-banner" class="hidden mb-3 p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-cyan-950/40 to-blue-950/40 border border-cyan-500/30 text-xs text-cyan-200 space-y-1">
         <div class="flex items-center gap-1.5 font-bold text-white text-sm">
           <span class="text-cyan-400">📞</span> <span>ILIMITADOS + LIGAÇÕES</span>
-          <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-red-600 text-white ml-auto">🔴 VODACOM [30 Dias]</span>
+          <span class="px-1.5 py-0.2 rounded text-[11px] font-bold bg-red-600 text-white ml-auto">🔴 VODACOM [30 Dias]</span>
         </div>
         <p class="text-[11px] text-slate-300 leading-relaxed pt-1">
           Pacotes de alto rendimento para 30 dias com dados e chamadas incluídas!
@@ -268,13 +283,47 @@
     <!-- ABA 2: HISTÓRICO DE COMPRAS -->
     <!-- ═══════════════════════════════════════════════════ -->
     <section id="view-orders" class="section-view">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-sm font-bold text-white uppercase tracking-wide">Minhas Compras</h2>
-        <button onclick="loadClientOrders()" class="text-xs text-cyan-400 hover:underline flex items-center gap-1">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wide">Meus Pedidos</h2>
+          <p class="text-[10px] text-slate-400">Actualização automática em tempo real</p>
+        </div>
+        <button onclick="loadClientOrders()" class="text-xs text-cyan-400 hover:underline flex items-center gap-1 bg-cyan-950/50 px-2.5 py-1 rounded-xl border border-cyan-800/40">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           Actualizar
         </button>
       </div>
+
+      <!-- RASTREADOR VISUAL DO ÚLTIMO PEDIDO (STATUS PASSO A PASSO) -->
+      <div id="live-order-tracker" class="hidden mb-4 p-4 rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/40 to-slate-900 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[10px] font-extrabold uppercase text-cyan-400 tracking-wider flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+            Acompanhamento em Tempo Real
+          </span>
+          <span id="tracker-order-id" class="text-[10px] font-mono text-slate-400">#PED-0000</span>
+        </div>
+        <h4 id="tracker-pkg-title" class="text-xs font-bold text-white mb-2">Pacote a Carregar...</h4>
+
+        <!-- Barra de Progresso em 4 Etapas -->
+        <div class="grid grid-cols-4 gap-1 mb-3 text-center">
+          <div id="step-1" class="p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300">
+            1. Recebido ✅
+          </div>
+          <div id="step-2" class="p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400">
+            2. Operadora ⏳
+          </div>
+          <div id="step-3" class="p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400">
+            3. Envio ⚡
+          </div>
+          <div id="step-4" class="p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400">
+            4. Concluído 🟢
+          </div>
+        </div>
+
+        <p id="tracker-status-desc" class="text-[11px] text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 leading-relaxed"></p>
+      </div>
+
       <div id="orders-list-container" class="space-y-3">
         <!-- Renderizado dinamicamente -->
       </div>
@@ -284,39 +333,61 @@
     <!-- ABA 3: SUPORTE IA INTELIGENTE & CHAT COM ADM KELVEN -->
     <!-- ═══════════════════════════════════════════════════ -->
     <section id="view-support" class="section-view">
-      <div class="glass-panel rounded-2xl flex flex-col h-[72dvh] overflow-hidden border border-slate-800">
+      <div class="glass-panel rounded-2xl flex flex-col h-[74dvh] overflow-hidden border border-slate-800">
         <!-- Topo do Chat -->
-        <div class="px-4 py-3 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between">
+        <div class="px-4 py-2.5 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between">
           <div class="flex items-center gap-2.5">
             <div class="relative">
-              <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-400 p-[1.5px] flex items-center justify-center text-slate-950 font-extrabold text-xs">
-                <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center text-cyan-400">
-                  IA
+              <div id="chat-header-avatar" class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-400 p-[1.5px] flex items-center justify-center text-slate-950 font-extrabold text-xs">
+                <div id="chat-header-avatar-inner" class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center text-cyan-400">
+                  🤖
                 </div>
               </div>
               <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900"></span>
             </div>
             <div>
               <div class="flex items-center gap-1.5">
-                <h3 class="text-xs font-bold text-white">Ka-Net Assistente IA</h3>
-                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">Bot & ADM</span>
+                <h3 id="chat-header-title" class="text-xs font-bold text-white">Ka-Net Assistente IA</h3>
+                <span id="chat-header-badge" class="px-1.5 py-0.2 rounded text-[11px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">Bot 24h</span>
               </div>
-              <p class="text-[10px] text-emerald-400">● Resposta Instantânea • Kelven Nharrava</p>
+              <p id="chat-header-sub" class="text-[10px] text-emerald-400">● Resposta Automática Instantânea</p>
             </div>
           </div>
-          <button onclick="clearChatMemory()" title="Limpar Chat" class="text-slate-400 hover:text-slate-200 text-xs p-1">
+          <button onclick="clearChatMemory()" title="Reiniciar Chat" class="text-slate-400 hover:text-slate-200 text-xs p-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
         </div>
 
+        <!-- SELETOR DE MODO: [🤖 ASSISTENTE IA] OU [👨‍💼 CHAT DIRECTO COM ADMIN] -->
+        <div class="flex items-center border-b border-slate-800 bg-slate-950 px-2 py-1.5 gap-1.5 text-[11px] font-bold">
+          <button id="btn-mode-ai" onclick="setChatMode('ai')" class="flex-1 py-1.5 px-2 rounded-xl bg-cyan-950 text-cyan-300 border border-cyan-700/60 flex items-center justify-center gap-1.5 transition-all shadow-sm">
+            <span>🤖</span> Assistente IA (24h)
+          </button>
+          <button id="btn-mode-admin" onclick="setChatMode('admin')" class="flex-1 py-1.5 px-2 rounded-xl text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition-all">
+            <span>👨‍💼</span> Falar com Admin (Kelven)
+          </button>
+        </div>
+
+        <!-- AVISO DE MODO DIRECTO COM ADMIN (quando ativado) -->
+        <div id="direct-admin-alert" class="hidden px-3 py-1.5 bg-rose-950/50 border-b border-rose-800/40 text-[10px] text-rose-300 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-rose-400 animate-ping"></span>
+            <b>Modo Directo Activo:</b> A IA está pausada. Mensagens vão directo para o Admin Kelven.
+          </span>
+          <button onclick="setChatMode('ai')" class="underline text-cyan-400 hover:text-cyan-300 font-bold ml-2">Voltar à IA</button>
+        </div>
+
         <!-- Chips de Dúvidas Rápidas / Atalhos Inteligentes -->
-        <div class="p-2 bg-slate-950/80 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto hide-scrollbar text-[10px]">
+        <div id="quick-prompts-bar" class="p-2 bg-slate-950/80 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto hide-scrollbar text-[10px]">
           <button onclick="askQuickPrompt('Como comprar pacotes?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 hover:bg-cyan-900/60 active:scale-95 transition-all">💡 Como Comprar?</button>
           <button onclick="askQuickPrompt('Quais são as contas para transferir?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 hover:bg-emerald-900/60 active:scale-95 transition-all">💳 Contas M-Pesa / e-Mola</button>
           <button onclick="askQuickPrompt('Quais são os pacotes Diamante com minutos?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-800/60 text-amber-300 hover:bg-amber-900/60 active:scale-95 transition-all">💎 Pacotes Diamante</button>
           <button onclick="askQuickPrompt('Como funciona o pacote Diário Faseado?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-purple-950/60 border border-purple-800/60 text-purple-300 hover:bg-purple-900/60 active:scale-95 transition-all">📉 O que é Faseado?</button>
           <button onclick="askQuickPrompt('Como funciona o pacote de Renovação?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-blue-950/60 border border-blue-800/60 text-blue-300 hover:bg-blue-900/60 active:scale-95 transition-all">♻️ O que é Renovação?</button>
-          <button onclick="askQuickPrompt('Quero falar diretamente com o Administrador Kelven')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-rose-950/60 border border-rose-800/60 text-rose-300 hover:bg-rose-900/60 active:scale-95 transition-all">📞 Falar com Kelven</button>
+          <button onclick="askQuickPrompt('Quanto tempo demora a entrega dos megas?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-teal-950/60 border border-teal-800/60 text-teal-300 hover:bg-teal-900/60 active:scale-95 transition-all">⏱️ Tempo de Entrega</button>
+          <button onclick="askQuickPrompt('Como enviar o comprovativo no chat?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-indigo-950/60 border border-indigo-800/60 text-indigo-300 hover:bg-indigo-900/60 active:scale-95 transition-all">🧾 Enviar Comprovativo</button>
+          <button onclick="askQuickPrompt('Não recebi os megas o que fazer?')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-orange-950/60 border border-orange-800/60 text-orange-300 hover:bg-orange-900/60 active:scale-95 transition-all">⚠️ Não Recebi os Megas</button>
+          <button onclick="setChatMode('admin')" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-rose-950/60 border border-rose-800/60 text-rose-300 hover:bg-rose-900/60 active:scale-95 transition-all">👨‍💼 Falar com Kelven</button>
         </div>
 
         <!-- Área de Mensagens -->
@@ -326,8 +397,9 @@
             <div class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">🤖</div>
             <div class="max-w-[85%] bg-slate-800/90 border border-slate-700/70 rounded-2xl rounded-tl-sm p-3 text-slate-200 leading-relaxed">
               <p class="font-bold text-cyan-400 mb-1">Olá! Eu sou a IA de Suporte do Ka-Net System ⚡</p>
-              Estou aqui 24h para responder qualquer dúvida sobre <b>preços, transferências, pacotes Diamante, faseados e renovação</b>. O Administrador Kelven também recebe as mensagens diretamente!
-              <span class="block text-[9px] text-slate-400 mt-1.5 text-right">Ka-Net Bot IA • Agora</span>
+              Estou aqui 24h para responder sobre <b>preços, transferências, pacotes Diamante, faseados e renovação</b>.<br><br>
+              💡 <b>Dica:</b> Você pode colar o seu comprovativo de pagamento (SMS do M-Pesa / e-Mola) directamente aqui no chat que o sistema reconhece e valida automaticamente! Se preferir atendimento humano, clique em <b>"Falar com Admin (Kelven)"</b> acima.
+              <span class="block text-[11px] text-slate-400 mt-1.5 text-right">Ka-Net Bot IA • Agora</span>
             </div>
           </div>
         </div>
@@ -401,11 +473,27 @@
             </button>
           </div>
 
-          <!-- Download do Aplicativo APK Nativo -->
-          <button onclick="handleDownloadApk()" type="button" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-98">
-            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            <span>Baixar Aplicativo Android (.APK)</span>
-          </button>
+          <!-- Card de Versão do Sistema & Auto-Atualização -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700/60 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400">Versão da Aplicação</span>
+                <p id="app-version-label" class="text-xs font-mono font-bold text-cyan-400">v2.2.0 • Nuvem Ka-Net</p>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢 Actualizado</span>
+            </div>
+
+            <button onclick="checkForAppUpdates(true)" type="button" class="w-full py-2.5 rounded-xl bg-cyan-950 text-cyan-300 border border-cyan-800/80 hover:bg-cyan-900/60 text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-98">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Verificar &amp; Actualizar Aplicação</span>
+            </button>
+
+            <!-- Download do Aplicativo APK Nativo -->
+            <button onclick="handleDownloadApk()" type="button" class="w-full py-2 rounded-xl bg-slate-800/70 text-slate-300 hover:text-white text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Baixar Ficheiro APK Completo</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -417,6 +505,22 @@
     </section>
 
   </main>
+
+  <!-- BANNER FLUTUANTE DE NOVA ACTUALIZAÇÃO (AUTO-UPDATE) -->
+  <div id="app-update-banner" class="hidden fixed bottom-20 left-4 right-4 z-[90] bg-gradient-to-r from-cyan-950 via-slate-900 to-slate-950 border-2 border-cyan-400 p-3.5 rounded-2xl shadow-2xl flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-lg animate-bounce">
+        🚀
+      </div>
+      <div>
+        <h4 class="text-xs font-bold text-white">Nova Actualização Disponível!</h4>
+        <p class="text-[10px] text-cyan-200">Toque para actualizar o sistema na hora.</p>
+      </div>
+    </div>
+    <button onclick="applyAppUpdate()" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-extrabold text-xs shadow-md active:scale-95 transition-all">
+      Actualizar
+    </button>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
   <!-- MODAL DE CHECKOUT / COMPRA (DESIGN ROBUSTO E VISÍVEL) -->
@@ -523,7 +627,7 @@
         <div class="p-3 rounded-xl bg-[#070b14] border border-slate-800">
           <div class="flex items-center justify-between mb-1">
             <span class="font-bold text-white">Portas Diárias (8024 / Celulares)</span>
-            <span id="radar-daily-badge" class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400">DISPONÍVEL</span>
+            <span id="radar-daily-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400">DISPONÍVEL</span>
           </div>
           <p class="text-[11px] text-slate-400" id="radar-daily-desc">Pronto para processar pacotes diários normais de 24 horas.</p>
         </div>
@@ -532,7 +636,7 @@
         <div class="p-3 rounded-xl bg-[#070b14] border border-slate-800">
           <div class="flex items-center justify-between mb-1">
             <span class="font-bold text-white">Porta Especial 8077 (Xiaomi)</span>
-            <span id="radar-special-badge" class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400">DISPONÍVEL</span>
+            <span id="radar-special-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400">DISPONÍVEL</span>
           </div>
           <p class="text-[11px] text-slate-400" id="radar-special-desc">Atende pedidos Semanais, Mensais, Diamante e Planos Especiais.</p>
         </div>
@@ -573,7 +677,7 @@
     // URL Base da API do Render (funciona tanto no navegador como dentro do APK local)
     const API_BASE = (window.location.protocol.startsWith('http') && !window.location.host.includes('localhost:')) 
       ? '' 
-      : 'https://kanet-cloud-api.onrender.com';
+      : 'https://kanet-cloud-api-v0gg.onrender.com';
 
     // ESTADO GLOBAL DA SESSÃO
     let currentUser = null;
@@ -709,7 +813,7 @@
 
         card.className = `mb-4 p-4 rounded-2xl border relative overflow-hidden transition-all duration-300 shadow-xl ${cfg.bg}`;
         document.getElementById('announcement-icon-badge').innerText = cfg.icon;
-        document.getElementById('announcement-badge-text').className = `text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider ${cfg.badgeBg}`;
+        document.getElementById('announcement-badge-text').className = `text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider ${cfg.badgeBg}`;
         document.getElementById('announcement-badge-text').innerText = cfg.label;
         document.getElementById('announcement-title').innerText = ann.title;
         document.getElementById('announcement-message').innerText = ann.message;
@@ -1043,11 +1147,11 @@
         }
 
         document.getElementById('radar-daily-badge').innerText = data.diario?.disponivel ? 'DISPONÍVEL' : 'OCUPADO';
-        document.getElementById('radar-daily-badge').className = `px-2 py-0.5 rounded-full text-[9px] font-bold ${data.diario?.disponivel ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`;
+        document.getElementById('radar-daily-badge').className = `px-2 py-0.5 rounded-full text-[11px] font-bold ${data.diario?.disponivel ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`;
         document.getElementById('radar-daily-desc').innerText = data.diario?.mensagem || 'Pronto para processar pacotes diários.';
 
         document.getElementById('radar-special-badge').innerText = data.saldo_especial?.disponivel ? 'DISPONÍVEL' : 'AGUARDANDO';
-        document.getElementById('radar-special-badge').className = `px-2 py-0.5 rounded-full text-[9px] font-bold ${data.saldo_especial?.disponivel ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`;
+        document.getElementById('radar-special-badge').className = `px-2 py-0.5 rounded-full text-[11px] font-bold ${data.saldo_especial?.disponivel ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`;
         document.getElementById('radar-special-desc').innerText = data.saldo_especial?.mensagem || 'Processa Semanais, Mensais, Diamante e Especiais.';
 
       } catch(e) {}
@@ -1138,18 +1242,18 @@
 
       if (cat === 'diario') {
         badge.innerText = 'Porta 8024 Apta';
-        badge.className = 'px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
       } else if (cat === 'diamante') {
         badge.innerText = 'Vodacom (30 Dias)';
-        badge.className = 'px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/20';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 text-red-400 border border-red-500/20';
         diamBanner.classList.remove('hidden');
       } else if (cat === 'especiais') {
         badge.innerText = 'Porta 8077 (Especiais)';
-        badge.className = 'px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20';
         espBanner.classList.remove('hidden');
       } else {
         badge.innerText = 'Porta 8077 (Xiaomi)';
-        badge.className = 'px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
       }
 
       renderPackages();
@@ -1350,12 +1454,12 @@
 
             pCard.innerHTML = `
               <div class="flex items-center justify-between mb-2">
-                <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                <span class="text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
                   isFaseado ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 }">
                   ${isFaseado ? '📉 FASEADO (1GB/DIA)' : '♻️ RENOVÁVEL (+100MB/DIA)'}
                 </span>
-                <span class="text-[9px] font-bold ${isAtivo ? 'text-cyan-400' : 'text-slate-500'}">
+                <span class="text-[11px] font-bold ${isAtivo ? 'text-cyan-400' : 'text-slate-500'}">
                   ${isAtivo ? '● ACTIVO' : 'CONCLUÍDO'}
                 </span>
               </div>
@@ -1386,17 +1490,17 @@
           const isDone = o.status === 'completed' || o.status === 'done' || o.status === 'sucesso';
           const isAguardando = o.status === 'aguardando_operadora';
           const isFailed = o.status === 'failed' || o.status === 'cancelled';
-          const isSplit = o.isSplit ? `<span class="px-1.5 py-0.5 rounded text-[8px] bg-cyan-950 text-cyan-400 border border-cyan-800">Parte ${o.splitPart || 1}</span>` : '';
+          const isSplit = o.isSplit ? `<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800">Parte ${o.splitPart || 1}</span>` : '';
 
           let badgeHtml = '';
           if (isDone) {
-            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✅ CONCLUÍDO</span>';
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✅ CONCLUÍDO</span>';
           } else if (isAguardando) {
-            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">⏳ AGUARDANDO REDE</span>';
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">⏳ AGUARDANDO REDE</span>';
           } else if (isFailed) {
-            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">❌ CANCELADO</span>';
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">❌ CANCELADO</span>';
           } else {
-            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">⚡ A PROCESSAR</span>';
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">⚡ A PROCESSAR</span>';
           }
 
           item.innerHTML = `
@@ -1408,7 +1512,7 @@
               <div>
                 <h4 class="text-xs font-bold text-white">${o.quantidade || o.mb || '--'} MB (${o.modo || 'diário'}) ${isSplit}</h4>
                 <p class="text-[10px] text-slate-400">Destinatário: <span class="text-slate-200 font-mono">+258 ${o.numero || o.destinatario || currentUser.phone}</span></p>
-                ${o.motivo ? `<p class="text-[9px] text-red-400 mt-0.5">${o.motivo}</p>` : ''}
+                ${o.motivo ? `<p class="text-[11px] text-red-400 mt-0.5">${o.motivo}</p>` : ''}
               </div>
               <span class="text-sm font-extrabold text-cyan-400">${o.valor || o.valor_pago || o.preco || '--'} MT</span>
             </div>
@@ -1418,77 +1522,150 @@
       } catch(e) {}
     }
 
+    // ── GESTÃO DE MODOS DE CHAT (IA 24H vs CHAT DIRECTO COM ADMIN) ──
+    let currentChatMode = 'ai'; // 'ai' ou 'admin'
+    let supportPollingInterval = null;
+    let ordersPollingInterval = null;
+
+    function setChatMode(mode) {
+      currentChatMode = mode;
+      const btnAi = document.getElementById('btn-mode-ai');
+      const btnAdm = document.getElementById('btn-mode-admin');
+      const alertDirect = document.getElementById('direct-admin-alert');
+      const avatarInner = document.getElementById('chat-header-avatar-inner');
+      const title = document.getElementById('chat-header-title');
+      const badge = document.getElementById('chat-header-badge');
+      const sub = document.getElementById('chat-header-sub');
+      const input = document.getElementById('chat-input');
+
+      if (mode === 'admin') {
+        btnAdm.className = 'flex-1 py-1.5 px-2 rounded-xl bg-rose-950 text-rose-300 border border-rose-700/70 flex items-center justify-center gap-1.5 transition-all shadow-sm';
+        btnAi.className = 'flex-1 py-1.5 px-2 rounded-xl text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition-all';
+        alertDirect.classList.remove('hidden');
+        avatarInner.innerText = '👨‍💼';
+        title.innerText = 'Kelven Nharrava (Administrador)';
+        badge.innerText = 'Directo';
+        badge.className = 'px-1.5 py-0.2 rounded text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-800';
+        sub.innerText = '● Chat Humano em Tempo Real • Atendimento Prioritário';
+        sub.className = 'text-[10px] text-rose-400';
+        input.placeholder = 'Escreva a sua mensagem para o Admin Kelven...';
+
+        appendChatMessage(
+          `👨‍💼 <b>Modo de Atendimento Directo com o Administrador Activado!</b><br><br>` +
+          `A sua conversa foi encaminhada com <b>Prioridade Alta</b> para o painel Master do Kelven Nharrava.<br>` +
+          `Pode tirar dúvidas, pedir suporte de pagamentos ou solicitar auxílio. O Kelven responderá diretamente aqui nesta tela!`,
+          'admin',
+          true
+        );
+      } else {
+        btnAi.className = 'flex-1 py-1.5 px-2 rounded-xl bg-cyan-950 text-cyan-300 border border-cyan-700/60 flex items-center justify-center gap-1.5 transition-all shadow-sm';
+        btnAdm.className = 'flex-1 py-1.5 px-2 rounded-xl text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition-all';
+        alertDirect.classList.add('hidden');
+        avatarInner.innerText = '🤖';
+        title.innerText = 'Ka-Net Assistente IA';
+        badge.innerText = 'Bot 24h';
+        badge.className = 'px-1.5 py-0.2 rounded text-[11px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800';
+        sub.innerText = '● Resposta Automática Instantânea';
+        sub.className = 'text-[10px] text-emerald-400';
+        input.placeholder = 'Escreva a sua dúvida ou cole o comprovativo...';
+      }
+    }
+
     // ── MOTOR DE IA INTELIGENTE DE SUPORTE EM TEMPO REAL ──
     const AI_KNOWLEDGE_BASE = [
       {
-        keywords: ['como comprar', 'como pagar', 'como funciona', 'passo a passo', 'comprar'],
+        keywords: ['como comprar', 'como pagar', 'como funciona', 'passo a passo', 'comprar', 'instrucoes'],
         response: `📱 <b>Como Comprar no Ka-Net:</b><br><br>
 1️⃣ Escolha o pacote desejado na aba <b>Loja</b>.<br>
 2️⃣ Digite o número que vai receber os megas.<br>
 3️⃣ Copie o nosso número (<b>856268811</b> M-Pesa ou <b>864882152</b> e-Mola) e faça a transferência do valor exato.<br>
 4️⃣ Cole a mensagem de confirmação da operadora no aplicativo e clique em <b>Confirmar</b>.<br>
-✨ O envio é processado imediatamente!`
+💡 <i>Você também pode colar o SMS do M-Pesa/e-Mola directamente aqui no chat para validação imediata!</i>`
+      },
+      {
+        keywords: ['conta', 'numero', 'transferir', 'mpesa', 'emola', 'm-pesa', 'e-mola', 'pagar', 'carteira', 'titular'],
+        response: `💳 <b>Contas Oficiais para Transferência Ka-Net:</b><br><br>
+🔴 <b>Vodacom M-Pesa:</b> <code class="text-cyan-400 font-bold font-mono text-xs">856268811</code><br>
+Titular: <i>Kelven Junior Anabela Nharrava</i><br><br>
+🟡 <b>Movitel e-Mola:</b> <code class="text-amber-400 font-bold font-mono text-xs">864882152</code><br>
+Titular: <i>Catia Anabela Nharrava</i><br><br>
+⚠️ <b>Atenção:</b> Transfira sempre o valor exacto do pacote escolhido para que a validação seja automática.`
       },
       {
         keywords: ['diamante', 'ilimitado', 'ligacao', 'chamada', 'minutos', '450', '570', '850', 'vodacom 30 dias'],
-        response: `💎 <b>Pacotes Diamante (Ilimitados + Ligações • Vodacom 30 Dias):</b><br><br>
+        response: `💎 <b>Pacotes Diamante Vodacom (30 Dias • Dados + Voz):</b><br><br>
 • <b>11 GB + Minutos:</b> 450 MT<br>
 • <b>15 GB + Minutos:</b> 570 MT<br>
 • <b>25 GB + Minutos:</b> 850 MT<br><br>
-⚡ Incluem dados em alta velocidade e minutos para ligar para qualquer rede em Moçambique durante 30 dias!`
+⚡ <b>Vantagens:</b> Internet de alta velocidade sem cortes diários e minutos para ligar para qualquer rede nacional em Moçambique durante 30 dias completos!`
       },
       {
-        keywords: ['conta', 'numero', 'transferir', 'mpesa', 'emola', 'm-pesa', 'e-mola', 'pagar'],
-        response: `💳 <b>Contas Oficiais para Transferência:</b><br><br>
-🔴 <b>M-Pesa:</b> <code class="text-cyan-400 font-bold font-mono">856268811</code><br>
-Titular: <i>Kelven Junior Anabela Nharrava</i><br><br>
-🟡 <b>e-Mola:</b> <code class="text-amber-400 font-bold font-mono">864882152</code><br>
-Titular: <i>Catia Anabela Nharrava</i><br><br>
-⚠️ Transfira sempre o valor exato do pacote escolhido.`
-      },
-      {
-        keywords: ['faseado', 'diario faseado', '1gb por dia', '130', '255', '381', '510'],
-        response: `📉 <b>Como funcionam os Pacotes Faseados:</b><br><br>
-Nos pacotes faseados (ex: <b>5GB por 130 MT</b>, <b>10GB por 255 MT</b>), você recebe <b>1024 MB (1GB) por dia</b> de forma 100% automatizada!<br><br>
-⏰ <b>Regra Inteligente de Horário:</b> A cada dia, o pacote é entregue <b>1 hora antes</b> do dia anterior (ex: comprou às 10:00 hoje ➔ amanhã recebe às 09:00 ➔ depois às 08:00), garantindo que a sua internet nunca expire nem fique sem conexão!`
+        keywords: ['faseado', 'diario faseado', '1gb por dia', '130', '255', '381', '510', 'faseados'],
+        response: `📉 <b>Como funcionam os Pacotes Faseados (1GB/dia):</b><br><br>
+Nos pacotes faseados (ex: <b>5GB por 130 MT</b>, <b>10GB por 255 MT</b>, <b>15GB por 381 MT</b>, <b>20GB por 510 MT</b>):<br><br>
+1️⃣ Você recebe <b>1024 MB (1GB)</b> a cada dia de forma 100% automatizada!<br>
+⏰ <b>Regra Inteligente de Horário:</b> O sistema entrega a dose diária <b>1 hora mais cedo</b> a cada dia consecutivo (ex: hoje às 10:00 ➔ amanhã às 09:00 ➔ depois às 08:00), garantindo que a sua internet nunca expire nem haja corte na navegação!`
       },
       {
         keywords: ['renovavel', 'renovacao', '3gb+700', '5gb+700', '8gb+700', '10gb+700', '76', '120', '195', '240'],
         response: `♻️ <b>Como funcionam os Pacotes de Renovação (+100MB/dia):</b><br><br>
-Comprando o pacote renovável (ex: <b>3GB+700 por 76 MT</b>):<br>
-1️⃣ Você recebe <b>3072 MB (3GB)</b> imediatamente.<br>
-2️⃣ Durante <b>7 dias consecutivos</b>, o sistema envia automaticamente <b>+100MB todo dia</b> para manter a sua oferta ativa sem interrupções!`
+Comprando o pacote renovável (ex: <b>3GB+700 por 76 MT</b>, <b>5GB+700 por 120 MT</b>):<br><br>
+1️⃣ Você recebe o bloco principal (ex: <b>3GB</b>) imediatamente no primeiro dia.<br>
+2️⃣ Durante <b>7 dias consecutivos</b>, o sistema entrega automaticamente <b>+100MB diários</b> para manter a sua oferta Vodacom renovada e ativa sem expirar!`
       },
       {
-        keywords: ['tempo', 'demora', 'quanto tempo', 'status', 'demorou', 'atraso'],
+        keywords: ['tempo', 'demora', 'quanto tempo', 'status', 'demorou', 'atraso', 'velocidade', 'prazo'],
         response: `⏱️ <b>Tempo de Entrega dos Megas:</b><br><br>
-O envio é <b>automático</b> e costuma levar entre <b>30 segundos a 3 minutos</b> após a validação do SMS.<br>
-Se a sua porta estiver em pico de tráfego, o sistema coloca o pedido em fila prioritária na porta secundária.`
+⚡ <b>Normal:</b> Entre <b>30 segundos a 2 minutos</b> após a rede confirmar o pagamento.<br>
+⏳ <b>Horários de Pico:</b> Pode levar até 3 a 5 minutos se as portas dos modems estiverem com fila intensa.<br>
+🔍 Você pode acompanhar o progresso em tempo real na aba <b>Meus Pedidos</b>!`
       },
       {
-        keywords: ['kelven', 'adm', 'humano', 'atendente', 'falar com kelven', 'suporte humano', 'pessoa'],
-        response: `👨‍💼 <b>Contacto com o Administrador Kelven Nharrava:</b><br><br>
-A sua mensagem foi sinalizada com <b>Prioridade Alta</b> no painel de administração do Kelven. Ele responderá assim que possível pelo sistema ou WhatsApp oficial.<br><br>
-💬 WhatsApp Direto: <b>+258 856268811</b>`
+        keywords: ['comprovativo', 'enviar comprovativo', 'sms', 'onde colar', 'comprovante', 'codigo', 'pp'],
+        response: `🧾 <b>Como Enviar o Comprovativo de Pagamento:</b><br><br>
+Você tem 2 formas super fáceis:<br>
+1️⃣ <b>Directamente aqui no Chat:</b> Copie o SMS completo recebido do M-Pesa ou e-Mola e cole aqui no campo de texto! O nosso sistema inteligente lê a referência, o valor e valida na hora!<br>
+2️⃣ <b>Na Loja:</b> Escolha o pacote, clique em Comprar e cole no campo de comprovativo do checkout.`
       },
       {
-        keywords: ['ola', 'oi', 'bom dia', 'boa tarde', 'boa noite', 'hey'],
-        response: `👋 Olá! Seja bem-vindo ao <b>Ka-Net Client Hub</b>. Como posso te ajudar hoje? Pergunte sobre preços de pacotes, transferências, dúvidas sobre megas ou fale com a nossa equipa!`
+        keywords: ['nao recebi', 'atrasou', 'problema', 'erro', 'falhou', 'reclamacao', 'ajuda', 'suporte', 'onde estao os megas'],
+        response: `⚠️ <b>Não recebeu os megas? Vamos resolver agora:</b><br><br>
+1️⃣ Verifique na aba <b>Meus Pedidos</b> se o status está em <i>"Aguardando Confirmação da Operadora"</i> (às vezes a Vodacom/Movitel demora até 60s para emitir o SMS).<br>
+2️⃣ Cole o SMS do M-Pesa / e-Mola aqui no chat para forçarmos a validação imediata.<br>
+3️⃣ Ou toque em <b>"Falar com Kelven"</b> no topo do chat para falar directamente com o Administrador!`
       },
       {
-        keywords: ['precos', 'tabela', 'valores', 'quanto custa', 'pacotes'],
-        response: `📊 <b>Tabela de Preços Resumida:</b><br><br>
+        keywords: ['kelven', 'adm', 'admin', 'humano', 'atendente', 'falar com kelven', 'suporte humano', 'pessoa', 'ligar'],
+        response: `👨‍💼 <b>Atendimento Directo com o Administrador Kelven Nharrava:</b><br><br>
+Clique no botão <b>"Falar com Admin (Kelven)"</b> no topo deste chat para activar a conversa directa!<br><br>
+📞 <b>Linha Directa / WhatsApp:</b> <a href="https://wa.me/258850401416" target="_blank" class="text-cyan-400 font-bold underline">+258 850401416</a><br>
+O Kelven recebe alertas imediatos no aplicativo Master quando você solicita atendimento humano.`
+      },
+      {
+        keywords: ['precos', 'tabela', 'valores', 'quanto custa', 'pacotes', 'promocao', 'catalogo'],
+        response: `📊 <b>Tabela de Preços Oficiais Ka-Net:</b><br><br>
 • <b>Diários (24h):</b> 350MB (9MT) | 550MB (14MT) | 1GB (22MT) | 2GB (44MT) | 5GB (105MT)<br>
 • <b>Semanais (7d):</b> 1.7GB (47MT) | 2.9GB (70MT) | 5.3GB (130MT)<br>
 • <b>Mensais (30d):</b> 2.8GB (75MT) | 5.0GB (130MT) | 8.5GB (215MT) | 20GB (480MT)<br>
 • <b>Diamante (30d + Voz):</b> 11GB+Min (450MT) | 15GB+Min (570MT) | 25GB+Min (850MT)<br>
-• <b>Especiais:</b> 3GB+700 (76MT) | 5GB Faseado (130MT)<br><br>
-Consulte a aba <b>Loja</b> para ver todas as categorias!`
+• <b>Faseados:</b> 5GB (130MT) | 10GB (255MT) | 15GB (381MT)<br>
+• <b>Renováveis:</b> 3GB+700 (76MT) | 5GB+700 (120MT)<br><br>
+Consulte a aba <b>Loja</b> para comprar qualquer um com ativação automática!`
+      },
+      {
+        keywords: ['ola', 'oi', 'bom dia', 'boa tarde', 'boa noite', 'hey', 'opa', 'tudo bem'],
+        response: `👋 Olá! Bem-vindo ao <b>Ka-Net Client Hub</b> ⚡<br><br>
+Como posso ajudar? Você pode perguntar preços de pacotes, formas de pagamento, regras de envio ou colar aqui o comprovativo da sua transferência M-Pesa / e-Mola!`
       }
     ];
 
     function generateAIResponse(userText) {
       const lower = userText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      // Se for pedido de falar com humano/admin, muda modo automaticamente
+      if (/kelven|humano|atendente|falar com|admin|pessoa/i.test(lower)) {
+        setTimeout(() => setChatMode('admin'), 600);
+      }
       
       for (const item of AI_KNOWLEDGE_BASE) {
         for (const kw of item.keywords) {
@@ -1499,8 +1676,8 @@ Consulte a aba <b>Loja</b> para ver todas as categorias!`
         }
       }
 
-      return `🤖 Entendido! Recebi a sua mensagem: <i>"${userText}"</i>.<br><br>
-O sistema registou o seu pedido e notificou o <b>Administrador Kelven Nharrava</b>. Se tiver dúvidas sobre pacotes ou pagamentos, toque num dos botões rápidos acima ou envie o comprovativo da transferência!`;
+      return `🤖 Entendido! Recebi a sua mensagem:<br><i>"${userText}"</i><br><br>
+Se tiver dúvidas específicas, utilize os <b>atalhos rápidos acima</b> ou toque em <b>"Falar com Admin (Kelven)"</b> para falar directamente com o responsável técnico do sistema!`;
     }
 
     function askQuickPrompt(text) {
@@ -1515,42 +1692,67 @@ O sistema registou o seu pedido e notificou o <b>Administrador Kelven Nharrava</
           <div class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">🤖</div>
           <div class="max-w-[85%] bg-slate-800/90 border border-slate-700/70 rounded-2xl rounded-tl-sm p-3 text-slate-200 leading-relaxed">
             <p class="font-bold text-cyan-400 mb-1">Chat Reiniciado ⚡</p>
-            Em que posso ajudar agora? Pergunte sobre pacotes ou fale com o suporte.
+            Em que posso ajudar agora? Pergunte sobre pacotes, cole o seu comprovativo ou fale com o suporte.
           </div>
         </div>
       `;
     }
 
     async function loadSupportMessages() {
-      if (!currentUser) return;
+      if (!currentUser || !currentUser.phone) return;
       try {
         const res = await fetch(API_BASE + `/api/client/support/messages/${currentUser.phone}`);
         const data = await res.json();
         if (data.success && data.messages && data.messages.length > 0) {
           const container = document.getElementById('chat-messages');
-          data.messages.forEach(m => appendChatMessage(m.text, m.sender, false));
+          container.innerHTML = '';
+          data.messages.forEach(m => appendChatMessage(m.text, m.sender, true, m.hasPaymentProof, m.paymentDetails));
         }
       } catch(e) {}
     }
 
-    function appendChatMessage(text, sender, isHtml = false) {
+    function appendChatMessage(text, sender, isHtml = false, hasProof = false, proofDetails = null) {
       const container = document.getElementById('chat-messages');
       const msgDiv = document.createElement('div');
       const isClient = sender === 'client';
       const isAI = sender === 'ai' || sender === 'bot';
+      const isAdmin = sender === 'admin';
 
       msgDiv.className = isClient ? 'flex items-end justify-end' : 'flex items-start justify-start gap-2';
       
-      const avatar = isClient ? '' : `<div class="w-6 h-6 rounded-lg ${isAI ? 'bg-cyan-500/20 text-cyan-400' : 'bg-emerald-500/20 text-emerald-400'} flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">${isAI ? '🤖' : 'ADM'}</div>`;
+      let avatar = '';
+      if (!isClient) {
+        if (isAdmin) {
+          avatar = `<div class="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center justify-center font-bold text-[11px] flex-shrink-0 mt-0.5">ADM</div>`;
+        } else {
+          avatar = `<div class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">🤖</div>`;
+        }
+      }
       
       const content = isHtml ? text : text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+      let proofBadge = '';
+      if (hasProof && proofDetails) {
+        proofBadge = `
+          <div class="mt-2 p-2 rounded-xl bg-slate-950/80 border border-emerald-500/40 text-[10px]">
+            <span class="text-emerald-400 font-bold">💳 Comprovativo Detectado:</span> Ref: <b>${proofDetails.txnId}</b> • Valor: <b>${proofDetails.valor} MT</b> (${proofDetails.metodo})
+          </div>
+        `;
+      }
+
       msgDiv.innerHTML = `
         ${avatar}
-        <div class="max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${isClient ? 'bg-cyan-500 text-slate-950 font-medium rounded-br-sm' : 'bg-slate-800/90 border border-slate-700/80 text-slate-200 rounded-tl-sm'}">
+        <div class="max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+          isClient
+            ? 'bg-cyan-500 text-slate-950 font-medium rounded-br-sm'
+            : (isAdmin
+                ? 'bg-slate-900 border-2 border-rose-500/50 text-slate-100 rounded-tl-sm shadow-md'
+                : 'bg-slate-800/90 border border-slate-700/80 text-slate-200 rounded-tl-sm')
+        }">
           ${content}
-          <span class="block text-[9px] ${isClient ? 'text-slate-800' : 'text-slate-400'} mt-1 text-right">
-            ${isClient ? 'Você' : (isAI ? 'Ka-Net Bot IA' : 'Kelven Nharrava (ADM)')}
+          ${proofBadge}
+          <span class="block text-[11px] ${isClient ? 'text-slate-800' : 'text-slate-400'} mt-1 text-right">
+            ${isClient ? 'Você' : (isAdmin ? '✔✔ Kelven Nharrava (Admin)' : 'Ka-Net Assistente IA')}
           </span>
         </div>
       `;
@@ -1559,7 +1761,7 @@ O sistema registou o seu pedido e notificou o <b>Administrador Kelven Nharrava</
     }
 
     async function handleSendSupportMsg(e) {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
       const input = document.getElementById('chat-input');
       const text = input.value.trim();
       if (!text) return;
@@ -1567,11 +1769,45 @@ O sistema registou o seu pedido e notificou o <b>Administrador Kelven Nharrava</
       appendChatMessage(text, 'client');
       input.value = '';
 
-      setTimeout(() => {
-        const aiReply = generateAIResponse(text);
-        appendChatMessage(aiReply, 'ai', true);
-      }, 450);
+      // ── VERIFICAÇÃO INTELIGENTE: É UM COMPROVATIVO DE PAGAMENTO M-PESA OU E-MOLA? ──
+      const isSmsProof = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transa[çc][ãa]o|PP2\d{5})/i.test(text) && /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(text);
 
+      if (isSmsProof) {
+        // Enviar para o processador inteligente de comprovativo
+        appendChatMessage(`⏳ <i>A analisar comprovativo junto dos servidores da rede...</i>`, 'ai', true);
+
+        try {
+          const res = await fetch(API_BASE + '/api/client/support/process-proof', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: currentUser ? currentUser.phone : 'Visitante',
+              name: currentUser ? currentUser.name : 'Cliente Hub',
+              smsText: text
+            })
+          });
+          const data = await res.json();
+          if (data.success && data.recognized) {
+            appendChatMessage(data.respostaTexto, 'ai', true);
+            showToast('Comprovativo detectado e registado com sucesso!', 'success');
+          } else {
+            appendChatMessage(data.mensagem || 'Não foi possível validar este comprovativo.', 'ai', true);
+          }
+        } catch(err) {
+          appendChatMessage('Falha de conexão ao validar comprovativo. Tente novamente.', 'ai', true);
+        }
+        return;
+      }
+
+      // Se estiver no MODO IA, gera resposta automática inteligente
+      if (currentChatMode === 'ai') {
+        setTimeout(() => {
+          const aiReply = generateAIResponse(text);
+          appendChatMessage(aiReply, 'ai', true);
+        }, 400);
+      }
+
+      // Enviar mensagem para o servidor para que o Admin Kelven receba no painel
       try {
         await fetch(API_BASE + '/api/client/support/send', {
           method: 'POST',
@@ -1580,9 +1816,176 @@ O sistema registou o seu pedido e notificou o <b>Administrador Kelven Nharrava</
             phone: currentUser ? currentUser.phone : 'Visitante',
             name: currentUser ? currentUser.name : 'Cliente Hub',
             text,
-            sender: 'client'
+            sender: 'client',
+            isDirectAdmin: currentChatMode === 'admin'
           })
         });
+      } catch(e) {}
+    }
+
+    // ── HISTÓRICO DE COMPRAS & ACOMPANHAMENTO AO VIVO ──
+    async function loadClientOrders(silent = false) {
+      if (!currentUser || !currentUser.phone) return;
+      try {
+        const res = await fetch(API_BASE + `/api/client/orders/${currentUser.phone}`);
+        const data = await res.json();
+        const container = document.getElementById('orders-list-container');
+        const tracker = document.getElementById('live-order-tracker');
+
+        if (!data.success || ((!data.orders || data.orders.length === 0) && (!data.scheduledPlans || data.scheduledPlans.length === 0))) {
+          if (!silent) {
+            container.innerHTML = '<div class="glass-card p-6 text-center text-xs text-slate-400">Ainda não realizou nenhuma compra. Os seus pedidos aparecerão aqui.</div>';
+            tracker.classList.add('hidden');
+          }
+          return;
+        }
+
+        // ── ACTUALIZAR O RASTREADOR AO VIVO DO ÚLTIMO PEDIDO ──
+        const latestOrder = (data.orders && data.orders.length > 0) ? data.orders[0] : null;
+        if (latestOrder) {
+          tracker.classList.remove('hidden');
+          document.getElementById('tracker-order-id').innerText = `#${latestOrder.id || latestOrder.orderId || 'PED'}`;
+          document.getElementById('tracker-pkg-title').innerText = `${latestOrder.quantidade || latestOrder.mb || '--'} MB (${latestOrder.modo || 'diário'}) • ${latestOrder.valor || '--'} MT`;
+
+          const s1 = document.getElementById('step-1');
+          const s2 = document.getElementById('step-2');
+          const s3 = document.getElementById('step-3');
+          const s4 = document.getElementById('step-4');
+          const desc = document.getElementById('tracker-status-desc');
+
+          const st = latestOrder.status;
+
+          if (st === 'aguardando_operadora') {
+            s1.className = 'p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300';
+            s2.className = 'p-1 rounded-lg bg-amber-500/30 border border-amber-500 text-[11px] font-bold text-amber-300 animate-pulse';
+            s3.className = 'p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400';
+            s4.className = 'p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400';
+            desc.innerHTML = `⏳ <b>Aguardando Notificação da Operadora:</b> O seu comprovativo foi submetido. Estamos a aguardar que a Vodacom/Movitel entregue o SMS oficial no nosso número (30 a 90 segundos).`;
+          } else if (st === 'pending' || st === 'processing') {
+            s1.className = 'p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300';
+            s2.className = 'p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300';
+            s3.className = 'p-1 rounded-lg bg-cyan-500/30 border border-cyan-400 text-[11px] font-bold text-cyan-300 animate-pulse';
+            s4.className = 'p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400';
+            desc.innerHTML = `⚡ <b>Em Envio pelo Modem Gateway:</b> Pagamento confirmado! O nosso modem está a discar USSD para transferir os megas para o número destinatário.`;
+          } else if (st === 'completed' || st === 'done' || st === 'sucesso') {
+            s1.className = 'p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300';
+            s2.className = 'p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300';
+            s3.className = 'p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300';
+            s4.className = 'p-1 rounded-lg bg-emerald-500/30 border border-emerald-400 text-[11px] font-bold text-emerald-300';
+            desc.innerHTML = `🟢 <b>Megas Entregues com Sucesso!</b> A recarga foi concluída e creditada na sua linha. Aproveite a sua internet!`;
+          } else {
+            s1.className = 'p-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300';
+            s2.className = 'p-1 rounded-lg bg-red-500/20 border border-red-500/40 text-[11px] font-bold text-red-300';
+            s3.className = 'p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400';
+            s4.className = 'p-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-400';
+            desc.innerHTML = `❌ <b>Falha ou Cancelado:</b> ${latestOrder.motivo || 'Ocorreu um erro no processamento. Fale com o suporte no chat com o seu comprovativo para resolver.'}`;
+          }
+        } else {
+          tracker.classList.add('hidden');
+        }
+
+        container.innerHTML = '';
+
+        // 1. Planos Agendados Ativos (Faseados / Renováveis)
+        if (data.scheduledPlans && data.scheduledPlans.length > 0) {
+          const plansTitle = document.createElement('h4');
+          plansTitle.className = 'text-[11px] font-bold uppercase tracking-wider text-purple-400 mb-2 mt-1 flex items-center gap-1.5';
+          plansTitle.innerHTML = '<span>⏳</span><span>Planos com Entregas Diárias Automáticas</span>';
+          container.appendChild(plansTitle);
+
+          data.scheduledPlans.forEach(p => {
+            const pCard = document.createElement('div');
+            const isAtivo = p.status === 'ativo';
+            const isFaseado = p.tipo === 'faseado';
+            const horaProx = p.proxima_entrega ? new Date(p.proxima_entrega).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            const entregasTotal = (p.entregas_diarias_total || 0) + (isFaseado ? 1 : 0);
+            const entregasFeitas = (p.entregas_feitas || 0) + (isFaseado ? 1 : 0);
+
+            pCard.className = `p-3.5 rounded-2xl border mb-3 relative overflow-hidden ${
+              isAtivo ? 'bg-gradient-to-r from-purple-950/40 to-slate-900 border-purple-500/30' : 'bg-slate-900/60 border-slate-800'
+            }`;
+
+            pCard.innerHTML = `
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                  isFaseado ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                }">
+                  ${isFaseado ? '📉 FASEADO (1GB/DIA)' : '♻️ RENOVÁVEL (+100MB/DIA)'}
+                </span>
+                <span class="text-[11px] font-bold ${isAtivo ? 'text-cyan-400' : 'text-slate-500'}">
+                  ${isAtivo ? '● ACTIVO' : 'CONCLUÍDO'}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 class="text-xs font-bold text-white">${(p.total_mb/1024).toFixed(1)} GB Total (${p.mb_diaria >= 1024 ? (p.mb_diaria/1024).toFixed(1) + ' GB' : p.mb_diaria + ' MB'}/dia)</h4>
+                  <p class="text-[10px] text-slate-400">Linha: <span class="text-slate-200 font-mono">+258 ${p.numero}</span></p>
+                  <p class="text-[10px] text-purple-300 mt-1">📊 Progresso: <b>${entregasFeitas} de ${entregasTotal} entregas</b></p>
+                  ${isAtivo ? `<p class="text-[10px] text-cyan-300">⏰ Próxima Entrega: <b>Amanhã às ${horaProx}</b></p>` : ''}
+                </div>
+                <span class="text-sm font-extrabold text-purple-400">${p.valor || '--'} MT</span>
+              </div>
+            `;
+            container.appendChild(pCard);
+          });
+
+          if (data.orders && data.orders.length > 0) {
+            const histTitle = document.createElement('h4');
+            histTitle.className = 'text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 mt-3';
+            histTitle.innerText = 'Histórico Geral de Pedidos';
+            container.appendChild(histTitle);
+          }
+        }
+
+        (data.orders || []).forEach(o => {
+          const item = document.createElement('div');
+          item.className = 'glass-card p-3.5 rounded-2xl border border-slate-800 space-y-2';
+          const isDone = o.status === 'completed' || o.status === 'done' || o.status === 'sucesso';
+          const isAguardando = o.status === 'aguardando_operadora';
+          const isFailed = o.status === 'failed' || o.status === 'cancelled';
+          const isSplit = o.isSplit ? `<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800">Parte ${o.splitPart || 1}</span>` : '';
+
+          let badgeHtml = '';
+          if (isDone) {
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✅ CONCLUÍDO</span>';
+          } else if (isAguardando) {
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">⏳ AGUARDANDO REDE</span>';
+          } else if (isFailed) {
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">❌ CANCELADO</span>';
+          } else {
+            badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">⚡ A PROCESSAR</span>';
+          }
+
+          item.innerHTML = `
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono text-slate-400">#${o.id || o.orderId || 'PED'}</span>
+              ${badgeHtml}
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="text-xs font-bold text-white">${o.quantidade || o.mb || '--'} MB (${o.modo || 'diário'}) ${isSplit}</h4>
+                <p class="text-[10px] text-slate-400">Destinatário: <span class="text-slate-200 font-mono">+258 ${o.numero || o.destinatario || currentUser.phone}</span></p>
+                ${o.motivo ? `<p class="text-[11px] text-red-400 mt-0.5">${o.motivo}</p>` : ''}
+              </div>
+              <span class="text-sm font-extrabold text-cyan-400">${o.valor || o.valor_pago || o.preco || '--'} MT</span>
+            </div>
+          `;
+          container.appendChild(item);
+        });
+      } catch(e) {}
+    }
+
+    // ── VERIFICADOR DO ESTADO DO SISTEMA (ONLINE / MANUTENÇÃO) ──
+    async function checkSystemStatus() {
+      try {
+        const res = await fetch(API_BASE + '/api/system/status');
+        const data = await res.json();
+        const banner = document.getElementById('maintenance-banner');
+        if (data.success && data.modoManutencao) {
+          banner.classList.remove('hidden');
+        } else {
+          banner.classList.add('hidden');
+        }
       } catch(e) {}
     }
 
@@ -1601,9 +2004,26 @@ O sistema registou o seu pedido e notificou o <b>Administrador Kelven Nharrava</
         }
       });
 
-      if (view === 'orders') loadClientOrders();
-      if (view === 'support') loadSupportMessages();
+      // Limpar intervalos de polling anteriores
+      if (ordersPollingInterval) { clearInterval(ordersPollingInterval); ordersPollingInterval = null; }
+      if (supportPollingInterval) { clearInterval(supportPollingInterval); supportPollingInterval = null; }
+
+      if (view === 'orders') {
+        loadClientOrders();
+        // Polling a cada 4 segundos enquanto estiver na aba de pedidos
+        ordersPollingInterval = setInterval(() => loadClientOrders(true), 4000);
+      }
+      if (view === 'support') {
+        loadSupportMessages();
+        // Polling a cada 3 segundos enquanto estiver na aba de suporte
+        supportPollingInterval = setInterval(loadSupportMessages, 3000);
+      }
     }
+
+    // Inicialização periódica do status do sistema
+    setInterval(checkSystemStatus, 12000);
+    checkSystemStatus();
+
 
     // ── UTILITÁRIO DE TOAST NOTIFICATIONS ──
     function showToast(msg, type = 'info') {
@@ -1623,6 +2043,100 @@ O sistema registou o seu pedido e notificou o <b>Administrador Kelven Nharrava</
         toast.style.transform = 'translate(-50%, -10px)';
       }, 3200);
     }
+    // ── GESTÃO DE AUTO-UPDATE E VERSÕES DA APLICAÇÃO ──
+    const CURRENT_PWA_VERSION = '2026.10.02-v2';
+    let newWorkerPending = null;
+
+    async function checkForAppUpdates(manual = false) {
+      if (manual) {
+        showToast('A verificar actualizações no servidor...', 'info');
+      }
+
+      try {
+        // 1. Verificar Service Worker por novas versões em cache
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg) {
+            reg.update();
+            if (reg.waiting) {
+              newWorkerPending = reg.waiting;
+              showUpdateBanner();
+              return;
+            }
+          }
+        }
+
+        // 2. Verificar API de versão
+        const res = await fetch(API_BASE + '/api/app/hub/version', { cache: 'no-store' });
+        const data = await res.json();
+        if (data.success) {
+          const savedVer = localStorage.getItem('kanet_pwa_version') || CURRENT_PWA_VERSION;
+          const label = document.getElementById('app-version-label');
+          if (label) label.innerText = `v${data.version || '2.2.0'} • Nuvem Ka-Net`;
+
+          if (data.pwaVersion && data.pwaVersion !== savedVer) {
+            showUpdateBanner();
+          } else if (manual) {
+            showToast('A sua aplicação já está na versão mais recente!', 'success');
+          }
+        }
+      } catch(e) {
+        if (manual) showToast('Não foi possível verificar actualizações de momento.', 'warning');
+      }
+    }
+
+    function showUpdateBanner() {
+      const banner = document.getElementById('app-update-banner');
+      if (banner) banner.classList.remove('hidden');
+    }
+
+    async function applyAppUpdate() {
+      showToast('A actualizar a aplicação...', 'info');
+
+      // 1. Limpar caches do navegador
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+
+      // 2. Salvar nova versão
+      localStorage.setItem('kanet_pwa_version', '2026.10.02-v2');
+
+      // 3. Forçar Service Worker novo
+      if (newWorkerPending) {
+        newWorkerPending.postMessage({ type: 'SKIP_WAITING' });
+      }
+
+      // 4. Recarregar página
+      setTimeout(() => {
+        window.location.reload(true);
+      }, 500);
+    }
+
+    // Registrar listener no Service Worker para avisar quando houver nova versão
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+
+      navigator.serviceWorker.ready.then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorkerPending = newWorker;
+                showUpdateBanner();
+              }
+            });
+          }
+        });
+      });
+    }
+
+    // Verificar na inicialização e a cada 10 minutos
+    setTimeout(() => checkForAppUpdates(false), 3000);
+    setInterval(() => checkForAppUpdates(false), 10 * 60 * 1000);
   </script>
 </body>
 </html>
