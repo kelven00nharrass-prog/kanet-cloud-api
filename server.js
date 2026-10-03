@@ -1436,7 +1436,34 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       order.failedPorts = order.failedPorts || [];
       if (!order.failedPorts.includes(Number(port))) order.failedPorts.push(Number(port));
 
-      if (order.retryCount < 5) {
+      const errorLower = (mensagem || '').toLowerCase();
+      const isSaldoError = errorLower.includes('saldo') || errorLower.includes('limite') ||
+                           errorLower.includes('inapto') || errorLower.includes('insuficiente');
+
+      // 🛡️ PROTECÇÃO ANTI-DUPLA ACTIVAÇÃO:
+      // Tudo Top, Mensal e Semanal disparam USSD que a Vodacom pode processar mesmo após timeout.
+      // NUNCA fazer retry automático nesses modos a não ser que o erro seja claramente "sem saldo".
+      const modoOrder = String(order.modo || '').toLowerCase();
+      const isHighValueMode = modoOrder === 'tudo_top' || modoOrder === 'ilimitado' ||
+                              modoOrder === 'mensal' || modoOrder === 'semanal';
+
+      if (isSaldoError && order.retryCount < 5) {
+        // Sem saldo: seguro para repassar para outro cartão
+        order.status = 'pending';
+        order.assignedToPort = null;
+        order.processingAt = null;
+        order.targetPort = null;
+        order.lastError = mensagem || 'Sem saldo / Limite atingido';
+        console.log(`🔄 [APP RESULT RETRY] Pedido ${orderId} falhou por saldo no Celular ${port}. Repassando para outro cartão (Tentativa #${order.retryCount})`);
+      } else if (isHighValueMode && !isSaldoError) {
+        // Tudo Top / Mensal / Semanal com erro de timeout ou USSD: NÃO tentar de novo!
+        // A Vodacom pode já ter activado. Reenvio apenas manual pelo operador.
+        order.status = 'failed';
+        order.resultMessage = mensagem || '';
+        order.completedAt = new Date().toISOString();
+        order.lastError = mensagem || 'Falha USSD / Timeout';
+        console.warn(`🛑 [ANTI-DUPLA ACTIVAÇÃO] Pedido ${orderId} (${modoOrder}) falhou com erro não-saldo: "${mensagem}". Marcado como FALHADO sem retry automático para evitar dupla activação. Reenvio apenas manual no painel.`);
+      } else if (order.retryCount < 5) {
         order.status = 'pending';
         order.assignedToPort = null;
         order.processingAt = null;
