@@ -1123,8 +1123,18 @@ async function loadDevices() {
           Último envio: ${dev.last_result.success ? '✅' : '❌'} ${dev.last_result.numero || ''} ${dev.last_result.quantidade ? dev.last_result.quantidade+'MB' : ''}
         </div>` : '';
       
+      const is8077 = dev.porta === 8077;
+      const saldo8077 = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
+      const is8077Zerado = is8077 && (saldo8077 < 100 || dev.sem_saldo);
+      const ativTudoTop = Math.floor(saldo8077 / 11264);
+
       // Bloco de Saldo
-      const statBlocoSaldo = isSpecial ? `
+      const statBlocoSaldo = is8077 ? `
+        <div class="device-stat" style="${is8077Zerado ? 'border:1px solid var(--red);background:rgba(239,68,68,0.12)' : ''}">
+          <div class="device-stat-label">💰 Saldo Disponível</div>
+          <div class="device-stat-val" style="color:var(--${is8077Zerado ? 'red' : 'green'})">${saldo8077 >= 1024 ? (saldo8077/1024).toFixed(1)+' GB' : saldo8077+' MB'}</div>
+          <div style="font-size:.68rem;color:var(--muted)">1 Cartão • Decrementa por envio</div>
+        </div>` : (isSpecial ? `
         <div class="device-stat">
           <div class="device-stat-label">💰 Saldo Operacional</div>
           <div class="device-stat-val" style="color:var(--green)">${dev.saldo_credito || (dev.saldo_mt !== undefined ? dev.saldo_mt + ' MT' : 'Ativo')}</div>
@@ -1137,7 +1147,7 @@ async function loadDevices() {
             <span style="color:var(--${saldoColor2})">S2: ${saldo2 >= 1024 ? (saldo2/1024).toFixed(1)+'GB' : saldo2+'MB'}</span>
           </div>
           <div style="font-size:.68rem;color:var(--cyan)">Slot Ativo: <b>SIM ${activeSim}</b></div>
-        </div>`;
+        </div>`);
 
       // Bloco de Envios Diários
       const statBlocoEnvios = isSpecial ? `
@@ -1153,7 +1163,12 @@ async function loadDevices() {
         </div>`;
 
       // Bloco de Disponíveis
-      const statBlocoDisponiveis = isSpecial ? `
+      const statBlocoDisponiveis = is8077 ? `
+        <div class="device-stat">
+          <div class="device-stat-label">⚡ Ativações Restantes</div>
+          <div class="device-stat-val" style="color:var(--${is8077Zerado ? 'red' : 'cyan'});font-size:.85rem">${is8077Zerado ? '0 (ESGOTADO)' : '~'+ativTudoTop+' Tudo Top'}</div>
+          <div style="font-size:.68rem;color:var(--muted)">${is8077Zerado ? '🚨 RECARREGUE SALDO' : 'Capacidade Estimada'}</div>
+        </div>` : (isSpecial ? `
         <div class="device-stat">
           <div class="device-stat-label">⚡ Modo Ofertas</div>
           <div class="device-stat-val" style="color:var(--cyan);font-size:.85rem">ILIMITADO</div>
@@ -1163,7 +1178,7 @@ async function loadDevices() {
           <div class="device-stat-label">✅ Disponíveis</div>
           <div class="device-stat-val" style="color:var(--${avail > 5 ? 'green' : avail > 0 ? 'yellow' : 'red'})">${avail}</div>
           <div style="font-size:.68rem;color:var(--muted)">S1: ${dev.sim1_envios||0}/10 | S2: ${dev.sim2_envios||0}/10</div>
-        </div>`;
+        </div>`);
 
       const pNum = Number(dev.porta) || 0;
       // Usar o nome real do dispositivo enviado pelo Gateway automaticamente
@@ -1199,6 +1214,14 @@ async function loadDevices() {
           </div>
           ${pendingHtml}
           ${lastResult}
+          ${is8077Zerado ? `
+          <div style="background:rgba(239,68,68,0.25);border:1px solid var(--red);color:#fca5a5;padding:8px 12px;border-radius:10px;margin-top:8px;font-size:0.78rem;font-weight:700;display:flex;align-items:center;gap:8px">
+            <i class="fa-solid fa-triangle-exclamation fa-beat" style="color:var(--red);font-size:1.1rem"></i>
+            <div>
+              <div style="color:#ef4444">🚨 SALDO DA PORTA 8077 ESGOTADO (${saldo8077} MB)</div>
+              <div style="font-size:0.7rem;font-weight:400;color:var(--muted)">Escreva o novo saldo no botão <b>💰 Saldo</b> abaixo para reativar.</div>
+            </div>
+          </div>` : ''}
           
           <!-- PAINEL DE MANUSEIO E CONTROLO DIRETO -->
           <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:10px;margin-top:12px;border:1px solid rgba(255,255,255,0.05)">
@@ -1301,16 +1324,33 @@ async function togglePauseDevice(port) {
   }
 }
 
-// ── MANUSEIO: MODAL DE AJUSTE DE SALDO ──
 let currentSaldoModalPort = null;
 
 function openSaldoModal(port, sim1, sim2, saldoMt) {
   currentSaldoModalPort = port;
-  document.getElementById('modalPortTitle').textContent = `Celular Porta ${port}`;
+  const is8077 = Number(port) === 8077;
+  document.getElementById('modalPortTitle').textContent = is8077 ? `Celular Porta 8077 (Tudo Top / Ofertas)` : `Celular Porta ${port}`;
+
+  const sim2Group = document.getElementById('modalSim2Group');
+  const sim1Label = document.getElementById('modalSim1Label');
+  const quickBtns = document.getElementById('modalQuickBtns8077');
+
+  if (sim2Group) sim2Group.style.display = is8077 ? 'none' : 'block';
+  if (quickBtns) quickBtns.style.display = is8077 ? 'flex' : 'none';
+  if (sim1Label) {
+    sim1Label.innerHTML = is8077
+      ? '<i class="fa-solid fa-coins"></i> Saldo Disponível no Cartão (em Megabytes / MB)'
+      : '<i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)';
+  }
+
   document.getElementById('modalSim1Saldo').value = sim1 || 0;
-  document.getElementById('modalSim2Saldo').value = sim2 || 0;
+  document.getElementById('modalSim2Saldo').value = is8077 ? 0 : (sim2 || 0);
   document.getElementById('modalSaldoMt').value = saldoMt || 0;
   document.getElementById('saldoModal').style.display = 'flex';
+}
+
+function setQuickSaldo8077(mbVal) {
+  document.getElementById('modalSim1Saldo').value = mbVal;
 }
 
 function closeSaldoModal() {
@@ -2258,10 +2298,17 @@ function cancelPlan(planId) {
     
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
       <div class="form-group">
-        <label class="form-label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)</label>
-        <input class="form-input" type="number" id="modalSim1Saldo" placeholder="Ex: 2048 (para 2GB) ou 500">
+        <label class="form-label" id="modalSim1Label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 1 (em Megabytes / MB)</label>
+        <input class="form-input" type="number" id="modalSim1Saldo" placeholder="Ex: 51200 (para 50GB) ou 102400 (para 100GB)">
+        <div id="modalQuickBtns8077" style="display:none;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(11264)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+11 GB (1 Tudo Top)</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(51200)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+50 GB</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(102400)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+100 GB</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(204800)" style="background:rgba(0,240,255,0.15);color:var(--cyan);font-size:0.72rem">+200 GB</button>
+          <button type="button" class="btn btn-sm" onclick="setQuickSaldo8077(0)" style="background:rgba(239,68,68,0.2);color:var(--red);font-size:0.72rem">Zerar (0 MB)</button>
+        </div>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="modalSim2Group">
         <label class="form-label"><i class="fa-solid fa-sim-card"></i> Saldo SIM 2 (em Megabytes / MB)</label>
         <input class="form-input" type="number" id="modalSim2Saldo" placeholder="Ex: 1500 ou 0">
       </div>
