@@ -301,6 +301,49 @@ app.post('/api/devices/:port/reset', (req, res) => {
   return res.json({ success: true, mensagem: `Porta ${port} libertada e desbloqueada com sucesso!`, device: dev });
 });
 
+// ── FUNÇÃO DE DECREMENTO AUTOMÁTICO DE SALDO (PORTA 8077) ──
+function decrementDeviceSaldo(port, order) {
+  const pNum = Number(port);
+  if (pNum === 8077) {
+    const dev = inMemoryDevices[pNum];
+    if (dev) {
+      let qtdMb = Number(order.quantidade) || 1024;
+      const modoStr = String(order.modo || '').toLowerCase();
+      if (modoStr === 'tudo_top' || modoStr === 'ilimitado') {
+        qtdMb = Math.max(qtdMb, 11264);
+      }
+
+      const currentSaldo = dev.sim1_saldo_mb !== undefined ? dev.sim1_saldo_mb : (dev.saldo_mb || 0);
+      const newSaldo = Math.max(0, currentSaldo - qtdMb);
+
+      dev.sim1_saldo_mb = newSaldo;
+      dev.saldo_mb = newSaldo;
+      dev.sim2_saldo_mb = 0;
+      dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 dias de override
+
+      console.log(`📉 [SALDO 8077 DECREMENTADO] Ativação de ${qtdMb}MB no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newSaldo}MB (${(newSaldo/1024).toFixed(1)}GB)`);
+
+      if (newSaldo < 100) {
+        dev.sem_saldo = true;
+        dev.is_apto = false;
+        console.warn(`🚨 [ALERTA SALDO 8077 ZERADO] Saldo da Porta 8077 ESGOTADO (${newSaldo} MB)!`);
+
+        if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+          baileysEngine.enviarNotificacaoGrupo(
+            `🚨 *ALERTA CRÍTICO: SALDO 8077 ZERADO!* 🚨\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `📲 *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
+            `📦 *Última Ativação:* ${qtdMb >= 1024 ? (qtdMb/1024).toFixed(1)+'GB' : qtdMb+'MB'} (Ref: \`${order.id || order.orderId}\`)\n` +
+            `🔴 *Saldo Restante:* *${newSaldo} MB (${(newSaldo/1024).toFixed(1)} GB)* - *ESGOTADO*\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `⚠️ *Atendimento Pausado!* O saldo esgotou. Por favor escreva o novo saldo disponível no Painel Admin para reativar.`
+          );
+        }
+      }
+    }
+  }
+}
+
 // ── AJUSTAR SALDO MANUALMENTE (operador) ──
 app.post('/api/devices/:port/set-saldo', (req, res) => {
   const port = Number(req.params.port);
@@ -313,7 +356,14 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
   if (saldo_mb !== undefined) dev.saldo_mb = Number(saldo_mb);
   if (saldo_mt !== undefined) dev.saldo_mt = Number(saldo_mt);
 
-  dev.manual_saldo_override = Date.now();
+  if (port === 8077) {
+    const val = Number(sim1_saldo_mb !== undefined ? sim1_saldo_mb : (saldo_mb || 0));
+    dev.sim1_saldo_mb = val;
+    dev.saldo_mb = val;
+    dev.sim2_saldo_mb = 0;
+  }
+
+  dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000);
 
   // Enviar novo saldo ao aplicativo no celular
   dev.pending_commands = dev.pending_commands || {};
@@ -326,6 +376,9 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
     dev.sem_saldo = false;
     dev.is_apto = true;
     dev.livre = true;
+  } else {
+    dev.sem_saldo = true;
+    dev.is_apto = false;
   }
 
   console.log(`💰 [MANUSEIO PAINEL] Saldo da Porta ${port} ajustado para: SIM1=${dev.sim1_saldo_mb}MB | SIM2=${dev.sim2_saldo_mb}MB | Saldo=${dev.saldo_mb}MB / ${dev.saldo_mt}MT`);
@@ -1202,6 +1255,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.completedAt = new Date().toISOString();
         order.lastError = null;
         console.log(`🎉 [PEDIDO SUCESSO] Pedido ${resId} concluído com sucesso pelo Celular Porta ${port}!`);
+        decrementDeviceSaldo(port, order);
 
         if (smsSalesEngine) {
           smsSalesEngine.notifyOrderCompleted(order);
@@ -1431,6 +1485,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       order.resultMessage = mensagem || '';
       order.completedAt = new Date().toISOString();
       order.lastError = null;
+      decrementDeviceSaldo(port, order);
     } else {
       order.retryCount = (order.retryCount || 0) + 1;
       order.failedPorts = order.failedPorts || [];
