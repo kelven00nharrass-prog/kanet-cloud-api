@@ -2592,7 +2592,7 @@ app.get('/api/app/hub/version', (req, res) => {
       version: '2.2.0',
       versionCode: 22,
       pwaVersion: '2026.10.02-v2',
-      apkUrl: 'https://kanet-cloud-api.onrender.com/hub/KaNet-Client-Hub.apk',
+      apkUrl: 'https://kanet-cloud-api-v0gg.onrender.com/hub/KaNet-Client-Hub.apk',
       changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
       releasedAt: new Date().toISOString()
     });
