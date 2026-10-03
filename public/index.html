@@ -1395,15 +1395,7 @@ async function saveSaldoModal() {
     toast(`❌ Erro: ${e.message}`, 'err');
   }
 }
-      closeSaldoModal();
-      await loadDevices();
-    } else {
-      toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
-    }
-  } catch(e) {
-    toast(`❌ Erro: ${e.message}`, 'err');
-  }
-}
+
 
 // ── MANUSEIO: FORÇAR DESPACHO OVERRIDE (Ignora compatibilidade de modo) ──
 async function forceDispatchOverride(port, orderId = null) {
