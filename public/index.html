@@ -658,7 +658,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
 <div id="toast"></div>
 
 <script>
-const API = '';
+const API = (window.location.hostname === 'kanet-cloud-api.onrender.com') ? '' : 'https://kanet-cloud-api.onrender.com';
 let allOrders = [];
 let allSalesData = [];
 
@@ -1027,8 +1027,9 @@ async function loadWAStatus() {
     const tx = document.getElementById('waStatusText');
     if (d.status === 'connected') {
       el.className = 'wa-status';
-      const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
-      tx.textContent = '📱 WhatsApp Conectado: +' + phone;
+      const userStr = typeof d.user === 'string' ? d.user : (d.user && d.user.id ? d.user.id : '');
+      const phone = userStr ? userStr.split(':')[0].replace(/\D/g, '') : 'Conectado';
+      tx.textContent = '📱 WhatsApp Conectado' + (phone !== 'Conectado' ? ': +' + phone : '');
     } else if (d.hasQr || d.status === 'qr_ready') {
       el.className = 'wa-status loading';
       tx.textContent = '⏳ QR Code Pronto (Clique em Ver QR)';
@@ -1727,11 +1728,12 @@ async function showQr() {
     try {
       const d = await fetchAPI('/api/whatsapp/status');
       if (d.status === 'connected') {
-        const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
+        const userStr = typeof d.user === 'string' ? d.user : (d.user && d.user.id ? d.user.id : '');
+        const phone = userStr ? userStr.split(':')[0].replace(/\D/g, '') : 'Conectado';
         content.innerHTML = `
           <i class="fa-solid fa-circle-check" style="font-size:3.5rem;color:var(--green)"></i>
           <p style="color:var(--green);font-size:1.1rem;font-weight:700;margin-top:12px">✅ WhatsApp Conectado com Sucesso!</p>
-          <p style="color:var(--muted);font-size:.85rem;margin-top:4px">Número: +${phone}</p>`;
+          <p style="color:var(--cyan);font-size:.9rem;font-weight:600;margin-top:4px">${phone !== 'Conectado' ? '+' + phone : 'Sessão Ativa'}</p>`;
       } else if (d.qrImage || (d.hasQr && d.qrImage)) {
         content.innerHTML = `
           <div style="display:inline-block;padding:12px;background:#ffffff;border-radius:14px;box-shadow:0 0 35px rgba(0,240,255,0.25)">
@@ -2108,20 +2110,26 @@ async function loadPriceTables() {
 // 5. AUTO-REFRESH & INIT
 // -------------------------------------------------------------------
 async function reloadAll() {
-  document.getElementById('lastRefresh').textContent = 'A actualizar...';
-  const devices = await loadDevices();
-  await loadQueue();
-  await loadWAStatus();
-  
-  const online = devices.filter(d => d.online).length;
-  const dailyDevices = devices.filter(d => d.porta !== 8077 && d.porta !== 8777 && d.online);
-  const avail = dailyDevices.reduce((a, d) => a + (d.transfers_available || 0), 0);
-  const today = devices.reduce((a, d) => a + (d.total_envios || 0), 0);
-  
-  document.getElementById('mDevices').textContent = online + ' / ' + devices.length;
-  document.getElementById('mAvail').textContent = avail;
-  document.getElementById('mToday').textContent = today;
-  document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+  try {
+    const refreshEl = document.getElementById('lastRefresh');
+    if (refreshEl) refreshEl.textContent = 'A actualizar...';
+    
+    const devices = (await loadDevices().catch(() => [])) || [];
+    await loadQueue().catch(e => console.error('Erro loadQueue:', e));
+    await loadWAStatus().catch(e => console.error('Erro loadWAStatus:', e));
+    
+    const online = devices.filter(d => d && d.online).length;
+    const dailyDevices = devices.filter(d => d && d.porta !== 8077 && d.porta !== 8777 && d.online);
+    const avail = dailyDevices.reduce((a, d) => a + (d && d.transfers_available || 0), 0);
+    const today = devices.reduce((a, d) => a + (d && d.total_envios || 0), 0);
+    
+    const mDev = document.getElementById('mDevices'); if (mDev) mDev.textContent = online + ' / ' + devices.length;
+    const mAv = document.getElementById('mAvail'); if (mAv) mAv.textContent = avail;
+    const mTod = document.getElementById('mToday'); if (mTod) mTod.textContent = today;
+    if (refreshEl) refreshEl.textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+  } catch(err) {
+    console.error('Erro no reloadAll:', err);
+  }
 }
 
 // Iniciar e manter atualizado a cada 30 segundos (modo poupança < 5GB/mês — era 8s)

@@ -76,8 +76,9 @@ const pendingOutgoingSms = [];
 /**
  * Retorna o próximo SMS pendente para envio pelo Gateway Android
  * Dá prioridade a mensagens destinadas à porta que solicitou (forPort)
+ * Se for mensagem genérica, entrega APENAS a portas com capacidade de SMS (isSmsCapable)
  */
-function getNextPendingSms(forPort = null) {
+function getNextPendingSms(forPort = null, isSmsCapable = true) {
     const now = Date.now();
     // Limpar mensagens com mais de 10 minutos
     for (let i = pendingOutgoingSms.length - 1; i >= 0; i--) {
@@ -94,11 +95,11 @@ function getNextPendingSms(forPort = null) {
     if (p) {
         // Procurar por SMS especificamente destinado a esta porta
         idx = pendingOutgoingSms.findIndex(item => item.targetPort && Number(item.targetPort) === p);
-        // Se não houver específico, pegar um genérico
-        if (idx === -1) {
+        // Se não houver específico, pegar um genérico APENAS se esta porta puder enviar SMS!
+        if (idx === -1 && isSmsCapable) {
             idx = pendingOutgoingSms.findIndex(item => !item.targetPort);
         }
-    } else {
+    } else if (isSmsCapable) {
         idx = 0;
     }
 
@@ -560,8 +561,8 @@ async function ativarPedidoSms({ txnId, valor, numDestino, senderPhone, pacote }
 
     console.log(`⚡ [SMS ATIVAÇÃO] Despachando ordem ${orderId}: ${pacote.mb}MB para ${numDestino}`);
 
-    // Avisar o cliente que a ativação iniciou
-    await sendSms(senderPhone, `🎉 Ka-Net: Comprovativo validado! A ativar ${pacote.nome} para o número ${numDestino}. Aguarde alguns segundos.`);
+    // Avisar o cliente que a ativação iniciou (usando porta 8077 dedicada de SMS)
+    await sendSms(senderPhone, `🎉 Ka-Net: Comprovativo validado! A ativar ${pacote.nome} para o número ${numDestino}. Aguarde alguns segundos.`, 0, 8077);
 
     // Se temos dispatcher configurado, enfileirar ordem
     if (dispatchOrderCallback) {
@@ -619,9 +620,10 @@ async function notifyOrderCompleted(order) {
     const mb = order.quantidade || 0;
     const num = order.numero;
     const ref = order.txn_id || order.orderId;
+    const targetPort = order.targetPort || order.assignedToPort || 8077;
 
     const msg = `✅ Ka-Net: O seu pacote de ${mb >= 1024 ? (mb/1024).toFixed(1) + 'GB' : mb + 'MB'} foi ativado com SUCESSO no número ${num}!\nRef: ${ref}.\nObrigado pela preferência! Volte sempre!`;
-    await sendSms(targetPhone, msg);
+    await sendSms(targetPhone, msg, 0, targetPort);
 }
 
 module.exports = {

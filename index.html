@@ -537,6 +537,20 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
   <!-- ========================================== -->
   <div id="tab-grupos" class="tab-content">
     
+    <div class="card" style="margin-bottom:20px; border-left: 4px solid var(--amber); background: rgba(245, 158, 11, 0.05); padding:16px 20px; border-radius:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
+        <div>
+          <h3 style="margin:0; font-size:15px; color:var(--text); font-weight:700;"><i class="fa-solid fa-lock" style="color:var(--amber)"></i> Controlo Global de Grupos (Alterar Definições & Notificar)</h3>
+          <p style="margin:4px 0 0 0; font-size:12.5px; color:var(--muted)">Altera as definições do WhatsApp para apenas Administradores enviarem mensagens e notifica todos os grupos com o seu comunicado/motivo personalizado.</p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary" onclick="abrirModalComunicadoGrupos()" style="font-weight:600"><i class="fa-solid fa-bullhorn"></i> Enviar Comunicado aos Grupos</button>
+          <button class="btn btn-sm btn-danger" onclick="abrirModalFecharGrupos()" style="font-weight:600"><i class="fa-solid fa-lock"></i> Fechar Grupos com Motivo</button>
+          <button class="btn btn-sm btn-success" onclick="reabrirTodosGrupos()" style="font-weight:600"><i class="fa-solid fa-lock-open"></i> Reabrir Todos os Grupos</button>
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div class="section-title" style="margin-bottom:0"><i class="fa-solid fa-users"></i> Grupos WhatsApp Conectados & Autorizados</div>
       <button class="btn btn-sm btn-primary" onclick="loadGroups()"><i class="fa-solid fa-rotate"></i> Atualizar Grupos</button>
@@ -597,10 +611,54 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
 
 </div>
 
+<!-- MODAL: FECHAR GRUPOS COM MOTIVO -->
+<div id="modalFecharGrupos" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+  <div class="card" style="max-width:550px; width:90%; padding:24px; border-radius:16px; background:var(--bg-card); border:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+      <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--text)"><i class="fa-solid fa-lock" style="color:var(--amber)"></i> Fechar Grupos no WhatsApp com Motivo</h3>
+      <button onclick="fecharModalFecharGrupos()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer;">&times;</button>
+    </div>
+    <div>
+      <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13.5px; color:var(--text)">Escreva a mensagem / motivo do fecho para enviar aos grupos:</label>
+      <textarea id="motivoFechoInput" rows="4" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text); font-family:inherit; font-size:13.5px; resize:vertical" placeholder="Ex: Informamos que o atendimento nos grupos está suspenso temporariamente para manutenção no servidor. Voltamos em breve!"></textarea>
+      
+      <p style="font-size:12px; color:var(--amber); margin-top:12px; background:rgba(245, 158, 11, 0.1); padding:10px; border-radius:8px;">
+        ⚠️ Esta ação altera as definições do WhatsApp para <b>apenas Administradores enviarem mensagens</b> e envia o comunicado em todos os grupos.
+      </p>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button class="btn btn-secondary" onclick="fecharModalFecharGrupos()">Cancelar</button>
+      <button class="btn btn-danger" onclick="executarFechoGrupos()"><i class="fa-solid fa-paper-plane"></i> Alterar Definições & Notificar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ENVIAR COMUNICADO AOS GRUPOS -->
+<div id="modalComunicadoGrupos" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+  <div class="card" style="max-width:550px; width:90%; padding:24px; border-radius:16px; background:var(--bg-card); border:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+      <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--text)"><i class="fa-solid fa-bullhorn" style="color:var(--cyan)"></i> Enviar Comunicado aos Grupos</h3>
+      <button onclick="fecharModalComunicadoGrupos()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer;">&times;</button>
+    </div>
+    <div>
+      <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13.5px; color:var(--text)">Escreva a mensagem do comunicado geral para enviar a todos os grupos:</label>
+      <textarea id="comunicadoGrupoInput" rows="5" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text); font-family:inherit; font-size:13.5px; resize:vertical" placeholder="Ex: Informamos que temos novos pacotes promocionais de dados e saldo disponíveis a partir de hoje! Envie 'Menu' no chat para consultar as opções."></textarea>
+      
+      <p style="font-size:12px; color:var(--cyan); margin-top:12px; background:rgba(6, 182, 212, 0.1); padding:10px; border-radius:8px;">
+        ℹ️ Esta ação envia uma mensagem formatada de anúncio em todos os grupos <b>sem fechar ou alterar permissões do grupo</b>.
+      </p>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button class="btn btn-secondary" onclick="fecharModalComunicadoGrupos()">Cancelar</button>
+      <button class="btn btn-primary" onclick="executarEnvioComunicado()"><i class="fa-solid fa-paper-plane"></i> Enviar Comunicado aos Grupos</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-const API = '';
+const API = (window.location.hostname === 'kanet-cloud-api.onrender.com') ? '' : 'https://kanet-cloud-api.onrender.com';
 let allOrders = [];
 let allSalesData = [];
 
@@ -714,7 +772,7 @@ function startScreenAutoRefresh() {
     if (tab && tab.classList.contains('active')) {
       loadRemoteScreen();
     }
-  }, 1200);
+  }, 5000); // era 1200ms — aumentado para 5s (modo poupança < 5GB/mês)
 }
 
 function stopScreenAutoRefresh() {
@@ -969,8 +1027,9 @@ async function loadWAStatus() {
     const tx = document.getElementById('waStatusText');
     if (d.status === 'connected') {
       el.className = 'wa-status';
-      const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
-      tx.textContent = '📱 WhatsApp Conectado: +' + phone;
+      const userStr = typeof d.user === 'string' ? d.user : (d.user && d.user.id ? d.user.id : '');
+      const phone = userStr ? userStr.split(':')[0].replace(/\D/g, '') : 'Conectado';
+      tx.textContent = '📱 WhatsApp Conectado' + (phone !== 'Conectado' ? ': +' + phone : '');
     } else if (d.hasQr || d.status === 'qr_ready') {
       el.className = 'wa-status loading';
       tx.textContent = '⏳ QR Code Pronto (Clique em Ver QR)';
@@ -1106,13 +1165,21 @@ async function loadDevices() {
           <div style="font-size:.68rem;color:var(--muted)">S1: ${dev.sim1_envios||0}/10 | S2: ${dev.sim2_envios||0}/10</div>
         </div>`;
 
-      const modelName = dev.device_model || (dev.porta === 8023 ? 'Xiaomi Redmi' : dev.porta === 8077 ? 'Huawei Honor' : ('Celular Gateway'));
+      const pNum = Number(dev.porta) || 0;
+      // Usar o nome real do dispositivo enviado pelo Gateway automaticamente
+      const rawModel = dev.device_model ? dev.device_model.trim() : '';
+      const portLabel = pNum === 8090 ? 'Atendimento SMS' :
+                        pNum === 8777 ? 'Saldo Crédito' :
+                        pNum === 8077 ? 'Porta Especial' : '';
+      const modelName = rawModel
+        ? (portLabel ? `Celular ${pNum} - ${rawModel} (${portLabel})` : `Celular ${pNum} - ${rawModel}`)
+        : (portLabel ? `Celular ${pNum} (${portLabel})` : `Celular ${pNum}`);
 
       return `
         <div class="card" style="${isPaused ? 'border-color:rgba(245,158,11,.4);opacity:0.85;' : ''}">
           <div class="device-header">
             <div>
-              <div class="device-name">📱 ${modelName} <span style="font-size:.8rem;color:var(--cyan)">(Porta ${dev.porta})</span></div>
+              <div class="device-name">📱 ${modelName} <span style="font-size:.8rem;color:var(--cyan)">(Porta ${pNum})</span></div>
               <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${dev.carrier || 'Vodacom'} • ${tipoPorta}</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
@@ -1661,11 +1728,12 @@ async function showQr() {
     try {
       const d = await fetchAPI('/api/whatsapp/status');
       if (d.status === 'connected') {
-        const phone = d.user && d.user.id ? d.user.id.split(':')[0] : 'Conectado';
+        const userStr = typeof d.user === 'string' ? d.user : (d.user && d.user.id ? d.user.id : '');
+        const phone = userStr ? userStr.split(':')[0].replace(/\D/g, '') : 'Conectado';
         content.innerHTML = `
           <i class="fa-solid fa-circle-check" style="font-size:3.5rem;color:var(--green)"></i>
           <p style="color:var(--green);font-size:1.1rem;font-weight:700;margin-top:12px">✅ WhatsApp Conectado com Sucesso!</p>
-          <p style="color:var(--muted);font-size:.85rem;margin-top:4px">Número: +${phone}</p>`;
+          <p style="color:var(--cyan);font-size:.9rem;font-weight:600;margin-top:4px">${phone !== 'Conectado' ? '+' + phone : 'Sessão Ativa'}</p>`;
       } else if (d.qrImage || (d.hasQr && d.qrImage)) {
         content.innerHTML = `
           <div style="display:inline-block;padding:12px;background:#ffffff;border-radius:14px;box-shadow:0 0 35px rgba(0,240,255,0.25)">
@@ -1676,6 +1744,7 @@ async function showQr() {
           <div style="margin-top:12px">
             <button class="btn btn-primary btn-sm" onclick="showQr()"><i class="fa-solid fa-rotate"></i> Atualizar Código</button>
           </div>`;
+      } else {
         content.innerHTML = `
           <i class="fa-solid fa-clock" style="font-size:2.5rem;color:var(--yellow)"></i>
           <p style="margin-top:10px;font-weight:600">A gerar sessão do WhatsApp na nuvem...</p>
@@ -1875,6 +1944,93 @@ async function toggleGrupo(jid, btn) {
   }
 }
 
+function abrirModalFecharGrupos() {
+  document.getElementById('modalFecharGrupos').style.display = 'flex';
+}
+
+function fecharModalFecharGrupos() {
+  document.getElementById('modalFecharGrupos').style.display = 'none';
+}
+
+async function executarFechoGrupos() {
+  const motivoInput = document.getElementById('motivoFechoInput');
+  const motivo = motivoInput ? motivoInput.value.trim() : '';
+  if (!motivo) {
+    alert('Por favor, escreva o motivo ou mensagem para os grupos!');
+    return;
+  }
+  if (!confirm('Tem a certeza que deseja FECHAR TODOS OS GRUPOS no WhatsApp e enviar este comunicado?')) return;
+
+  try {
+    showToast('⏳ A fechar grupos e a enviar comunicados...');
+    const data = await fetchAPI('/api/admin/groups/close-with-reason', {
+      method: 'POST',
+      body: JSON.stringify({ motivo })
+    });
+    if (data && data.success) {
+      alert('✅ ' + (data.mensagem || 'Grupos fechados com sucesso!'));
+      fecharModalFecharGrupos();
+      loadGroups();
+    } else {
+      alert('❌ Erro: ' + (data ? (data.error || data.mensagem) : 'Falha na requisição'));
+    }
+  } catch(e) {
+    alert('❌ Erro ao fechar grupos: ' + e.message);
+  }
+}
+
+async function reabrirTodosGrupos() {
+  if (!confirm('Deseja REABRIR TODOS OS GRUPOS no WhatsApp para que todos os membros voltem a enviar mensagens?')) return;
+  try {
+    showToast('⏳ A reabrir grupos no WhatsApp...');
+    const data = await fetchAPI('/api/admin/groups/open-all', {
+      method: 'POST'
+    });
+    if (data && data.success) {
+      alert('✅ ' + (data.mensagem || 'Grupos reabertos com sucesso!'));
+      loadGroups();
+    } else {
+      alert('❌ Erro: ' + (data ? (data.error || data.mensagem) : 'Falha na requisição'));
+    }
+  } catch(e) {
+    alert('❌ Erro ao reabrir grupos: ' + e.message);
+  }
+}
+
+function abrirModalComunicadoGrupos() {
+  document.getElementById('modalComunicadoGrupos').style.display = 'flex';
+}
+
+function fecharModalComunicadoGrupos() {
+  document.getElementById('modalComunicadoGrupos').style.display = 'none';
+}
+
+async function executarEnvioComunicado() {
+  const msgInput = document.getElementById('comunicadoGrupoInput');
+  const mensagem = msgInput ? msgInput.value.trim() : '';
+  if (!mensagem) {
+    alert('Por favor, escreva a mensagem do comunicado!');
+    return;
+  }
+  if (!confirm('Tem a certeza que deseja enviar este comunicado para TODOS os grupos?')) return;
+
+  try {
+    showToast('⏳ A enviar comunicado para os grupos...');
+    const data = await fetchAPI('/api/admin/groups/announce', {
+      method: 'POST',
+      body: JSON.stringify({ mensagem })
+    });
+    if (data && data.success) {
+      alert('✅ ' + (data.mensagem || 'Comunicado enviado com sucesso!'));
+      fecharModalComunicadoGrupos();
+    } else {
+      alert('❌ Erro: ' + (data ? (data.error || data.mensagem) : 'Falha na requisição'));
+    }
+  } catch(e) {
+    alert('❌ Erro ao enviar comunicado: ' + e.message);
+  }
+}
+
 
 async function loadPriceTables() {
   try {
@@ -1954,25 +2110,31 @@ async function loadPriceTables() {
 // 5. AUTO-REFRESH & INIT
 // -------------------------------------------------------------------
 async function reloadAll() {
-  document.getElementById('lastRefresh').textContent = 'A actualizar...';
-  const devices = await loadDevices();
-  await loadQueue();
-  await loadWAStatus();
-  
-  const online = devices.filter(d => d.online).length;
-  const dailyDevices = devices.filter(d => d.porta !== 8077 && d.porta !== 8777 && d.online);
-  const avail = dailyDevices.reduce((a, d) => a + (d.transfers_available || 0), 0);
-  const today = devices.reduce((a, d) => a + (d.total_envios || 0), 0);
-  
-  document.getElementById('mDevices').textContent = online + ' / ' + devices.length;
-  document.getElementById('mAvail').textContent = avail;
-  document.getElementById('mToday').textContent = today;
-  document.getElementById('lastRefresh').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+  try {
+    const refreshEl = document.getElementById('lastRefresh');
+    if (refreshEl) refreshEl.textContent = 'A actualizar...';
+    
+    const devices = (await loadDevices().catch(() => [])) || [];
+    await loadQueue().catch(e => console.error('Erro loadQueue:', e));
+    await loadWAStatus().catch(e => console.error('Erro loadWAStatus:', e));
+    
+    const online = devices.filter(d => d && d.online).length;
+    const dailyDevices = devices.filter(d => d && d.porta !== 8077 && d.porta !== 8777 && d.online);
+    const avail = dailyDevices.reduce((a, d) => a + (d && d.transfers_available || 0), 0);
+    const today = devices.reduce((a, d) => a + (d && d.total_envios || 0), 0);
+    
+    const mDev = document.getElementById('mDevices'); if (mDev) mDev.textContent = online + ' / ' + devices.length;
+    const mAv = document.getElementById('mAvail'); if (mAv) mAv.textContent = avail;
+    const mTod = document.getElementById('mToday'); if (mTod) mTod.textContent = today;
+    if (refreshEl) refreshEl.textContent = 'Actualizado: ' + new Date().toLocaleTimeString('pt-PT');
+  } catch(err) {
+    console.error('Erro no reloadAll:', err);
+  }
 }
 
-// Iniciar e manter atualizado a cada 8 segundos
+// Iniciar e manter atualizado a cada 30 segundos (modo poupança < 5GB/mês — era 8s)
 reloadAll();
-setInterval(reloadAll, 8000);
+setInterval(reloadAll, 30000);
 
 // Inicializar o painel de envio manual ao carregar
 onSendModoChange();

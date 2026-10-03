@@ -79,7 +79,7 @@ app.use((req, res, next) => {
 // ----------------------------------------------------
 app.get(['/health', '/', '/status'], (req, res) => {
   const now = Date.now();
-  const onlineCount = Object.values(inMemoryDevices).filter(d => (now - new Date(d.lastSeen || 0).getTime()) < 35000).length;
+  const onlineCount = Object.values(inMemoryDevices).filter(d => (now - new Date(d.lastSeen || 0).getTime()) < 90000).length;
   res.json({
     status: 'online',
     service: 'Ka-Net Cloud API (Render + Firebase)',
@@ -262,7 +262,7 @@ app.get('/api/devices', async (req, res) => {
     .filter(dev => dev && dev.porta && Number(dev.porta) > 0)
     .map(dev => {
       const lastSeen = new Date(dev.lastSeen || 0).getTime();
-      const online = (now - lastSeen) < 35000; // 35 segundos
+      const online = (now - lastSeen) < 90000; // 90 segundos (resiliente para doze mode Android)
       const apto = isDeviceApto(dev);
       return { ...dev, online, is_apto: apto };
     });
@@ -667,7 +667,7 @@ function isDeviceApto(dev) {
   if (dev.paused === true) return false; // Pausado manualmente pelo operador
   const now = Date.now();
   const lastSeen = new Date(dev.lastSeen || 0).getTime();
-  const isOnline = (now - lastSeen) < 35000;
+  const isOnline = (now - lastSeen) < 90000;
   if (!isOnline) return false;
   if (dev.pending_order) return false;
   if (dev.livre === false) return false;
@@ -769,7 +769,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           const targetDev = inMemoryDevices[order.targetPort];
           const nowMs = Date.now();
           const targetLastSeen = targetDev ? new Date(targetDev.lastSeen || 0).getTime() : 0;
-          const targetOnline = targetDev && (nowMs - targetLastSeen < 35000);
+          const targetOnline = targetDev && (nowMs - targetLastSeen < 90000);
           const targetApto = targetDev && isDeviceApto(targetDev);
           if (targetOnline && targetApto && !targetDev.isBusy) {
             // A porta alvo original está online, apta e livre -> dar prioridade à porta alvo
@@ -1053,7 +1053,8 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
   let pendingSms = null;
   if (smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
-    pendingSms = smsSalesEngine.getNextPendingSms(port);
+    const isSmsCapable = port === 8077 || port === 8090 || dev.tipo === 'sms_and_ussd' || dev.tipo === 'sms' || dev.tipo === 'sms_dedicated';
+    pendingSms = smsSalesEngine.getNextPendingSms(port, isSmsCapable);
   }
 
   return res.json({
@@ -4578,7 +4579,7 @@ app.post(['/api/sms/outgoing/confirm', '/api/sms/confirm'], (req, res) => {
 // ── 20.7.1.1 CONSULTA DE SMS PENDENTES PARA ENVIO PELO GATEWAY ──
 app.get('/api/sms/outgoing/pending', (req, res) => {
   if (smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
-    const item = smsSalesEngine.getNextPendingSms();
+    const item = smsSalesEngine.getNextPendingSms(null, true);
     return res.json({ success: true, pending_sms: item });
   }
   return res.json({ success: true, pending_sms: null });
