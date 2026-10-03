@@ -658,7 +658,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
 <div id="toast"></div>
 
 <script>
-const API = (window.location.hostname === 'kanet-cloud-api.onrender.com') ? '' : 'https://kanet-cloud-api-v0gg.onrender.com';
+const API = window.location.hostname.includes('onrender.com') ? '' : 'https://kanet-cloud-api-v0gg.onrender.com';
 let allOrders = [];
 let allSalesData = [];
 
