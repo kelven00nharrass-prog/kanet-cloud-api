@@ -58,9 +58,15 @@ const inMemoryOrders = new Map();
 // ----------------------------------------------------
 // 2. MIDDLEWARES
 // ----------------------------------------------------
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const compression = require('compression');
+app.use(compression()); // Compressão gzip — reduz respostas JSON/HTML em 60-80%
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
@@ -221,8 +227,11 @@ app.post('/api/send/manual', async (req, res) => {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB)
+    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB) ou Tudo Top (> 11GB)
     splitMensalOrderIfEligible(orderDoc);
+
+    // Aplicar detector e ativador de Planos Especiais (Renovável e Faseado)
+    handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(orderId, orderDoc);
     saveOrdersToCache();
@@ -246,13 +255,17 @@ app.post('/api/send/manual', async (req, res) => {
 
 // ----------------------------------------------------
 app.get('/api/devices', async (req, res) => {
+  delete inMemoryDevices[0];
+  delete inMemoryDevices['0'];
   const now = Date.now();
-  const devices = Object.values(inMemoryDevices).map(dev => {
-    const lastSeen = new Date(dev.lastSeen || 0).getTime();
-    const online = (now - lastSeen) < 35000; // 35 segundos (heartbeat a cada 3s)
-    const apto = isDeviceApto(dev);
-    return { ...dev, online, is_apto: apto };
-  });
+  const devices = Object.values(inMemoryDevices)
+    .filter(dev => dev && dev.porta && Number(dev.porta) > 0)
+    .map(dev => {
+      const lastSeen = new Date(dev.lastSeen || 0).getTime();
+      const online = (now - lastSeen) < 35000; // 35 segundos
+      const apto = isDeviceApto(dev);
+      return { ...dev, online, is_apto: apto };
+    });
   return res.json({ success: true, count: devices.length, devices });
 });
 
@@ -269,6 +282,8 @@ app.post('/api/devices/:port/reset', (req, res) => {
   dev.is_apto = true;
   dev.paused = false;
   dev.pending_order = null;
+  dev.currentOrder = null;
+  dev.isBusy = false;
   dev._lastBlockLogTime = 0;
   dev.manual_saldo_override = Date.now();
 
@@ -471,12 +486,19 @@ app.post('/api/devices/reset-all', (req, res) => {
     dev.is_apto = true;
     dev.paused = false;
     dev.pending_order = null;
+    dev.currentOrder = null;
+    dev.isBusy = false;
     dev._lastBlockLogTime = 0;
     count++;
   }
   console.log(`🔓 [MANUSEIO PAINEL] Todos os ${count} celulares foram libertados e desbloqueados.`);
   return res.json({ success: true, mensagem: `Todos os ${count} celulares foram libertados e estão prontos!`, count });
 });
+
+function isDailyPort(port) {
+  const p = Number(port);
+  return p !== 8077 && p !== 8777 && p !== 8090;
+}
 
 function isPortCompatibleWithModo(port, modo) {
   const p = Number(port);
@@ -485,7 +507,7 @@ function isPortCompatibleWithModo(port, modo) {
   if (m === 'saldo' || m === 'credito') {
     return p === 8777;
   }
-  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) {
+  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top')) {
     return p === 8077;
   }
   // Pacotes Diários: compatível com qualquer celular diário (8021 a 8028)
@@ -495,7 +517,7 @@ function isPortCompatibleWithModo(port, modo) {
 function getPortForModo(modo) {
   const m = String(modo || '').toLowerCase().trim();
   if (m === 'saldo' || m === 'credito') return 8777;
-  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) return 8077;
+  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top')) return 8077;
 
   // Para diários: selecionar dinamicamente a melhor porta diária online e apta
   const dailyDevs = Object.values(inMemoryDevices).filter(d => {
@@ -517,25 +539,27 @@ function getPortForModo(modo) {
   return 8025; // fallback padrão (Huawei)
 }
 
-// ── REGRA OFICIAL KA-NET: PACOTES MENSAIS (1ª Oferta Vodacom + Diferença Diária) ──
-// Vodacom *162# -> 5 -> 1 entrega 2.8GB (2867MB) por 95 MT.
-// Para pedidos mensais > 2867MB (ex: 5GB = 5120MB, 8GB = 8192MB, 10GB = 10240MB):
-// 1ª Parte: 2867MB via Porta 8077 (Modo Mensal, Opção 1).
-// 2ª Parte: (Total - 2867MB) via Portas Diárias (Modo Diário / 24hrs).
-const MENSAL_BASE_MB = 2867; // 2.8 GB
+// ── REGRA OFICIAL KA-NET: DIVISÃO INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) ──
+// 1. Mensal: Vodacom *162# -> 5 -> 1 entrega 2.8GB (2867MB) por 95 MT.
+//    Se pedido > 2867MB (ex: 5GB, 8GB, 10GB): Parte 1 (2867MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
+// 2. Tudo Top: Vodacom *111# -> 4 -> 3 -> 1 entrega 11GB (11264MB) + Minutos por 500 MT.
+//    Se pedido > 11264MB (ex: 15GB, 25GB): Parte 1 (11264MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
+const MENSAL_BASE_MB = 2867;     // 2.8 GB
+const TUDO_TOP_BASE_MB = 11264;  // 11 GB
 
-function splitMensalOrderIfEligible(orderDoc) {
-  if (!orderDoc) return false;
+function splitSpecialOrderIfEligible(orderDoc) {
+  if (!orderDoc || orderDoc.isSplit) return false;
   const modo = String(orderDoc.modo || '').toLowerCase().trim();
   const qty = Number(orderDoc.quantidade) || 0;
-  if (modo === 'mensal' && qty > MENSAL_BASE_MB && !orderDoc.isSplit) {
+
+  // 1. Split de Pacote Mensal
+  if (modo === 'mensal' && qty > MENSAL_BASE_MB) {
     const totalMb = qty;
     const parte1 = MENSAL_BASE_MB;
     const parte2 = totalMb - parte1;
     const parentId = orderDoc.id || orderDoc.orderId;
     const part2Id = `${parentId}-DIARIO`;
 
-    // Configurar Parte 1: Mensal (Porta 8077)
     orderDoc.isSplit = true;
     orderDoc.splitPart = 1;
     orderDoc.splitTotalParts = 2;
@@ -546,7 +570,6 @@ function splitMensalOrderIfEligible(orderDoc) {
     orderDoc.targetPort = 8077;
     orderDoc.input_val = '1'; // 1ª oferta mensal
 
-    // Criar Parte 2: Diário (Portas Diárias)
     const orderPart2 = {
       id: part2Id,
       orderId: part2Id,
@@ -579,7 +602,64 @@ function splitMensalOrderIfEligible(orderDoc) {
 
     return true;
   }
+
+  // 2. Split de Pacote Tudo Top / Ilimitado
+  const isTop = modo === 'ilimitado' || modo === 'ilimitados' || modo.includes('top');
+  if (isTop && qty > TUDO_TOP_BASE_MB) {
+    const totalMb = qty;
+    const parte1 = TUDO_TOP_BASE_MB;
+    const parte2 = totalMb - parte1;
+    const parentId = orderDoc.id || orderDoc.orderId;
+    const part2Id = `${parentId}-DIARIO`;
+
+    orderDoc.isSplit = true;
+    orderDoc.splitPart = 1;
+    orderDoc.splitTotalParts = 2;
+    orderDoc.splitTotalMb = totalMb;
+    orderDoc.splitOtherPartMb = parte2;
+    orderDoc.part2Id = part2Id;
+    orderDoc.quantidade = parte1;
+    orderDoc.targetPort = 8077;
+    orderDoc.input_val = '1'; // 1ª oferta Tudo Top (11GB)
+
+    const orderPart2 = {
+      id: part2Id,
+      orderId: part2Id,
+      parentOrderId: parentId,
+      numero: orderDoc.numero,
+      quantidade: parte2,
+      modo: 'diario',
+      input_val: '',
+      jid: orderDoc.jid || null,
+      remetente: orderDoc.remetente || 'Bot',
+      targetPort: null,
+      isSplit: true,
+      splitPart: 2,
+      splitTotalParts: 2,
+      splitTotalMb: totalMb,
+      splitOtherPartMb: parte1,
+      status: 'waiting_part1',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      notified: false,
+      groupNotified: false
+    };
+
+    inMemoryOrders.set(part2Id, orderPart2);
+    saveOrdersToCache();
+
+    console.log(`📦 [SPLIT TUDO TOP KA-NET] Pedido Tudo Top ${parentId} (${totalMb}MB) dividido automaticamente:`);
+    console.log(`   👉 Parte 1 (Tudo Top): ${parte1}MB -> Porta 8077 (1ª Oferta *111# 11GB + Minutos)`);
+    console.log(`   👉 Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
+
+    return true;
+  }
+
   return false;
+}
+
+function splitMensalOrderIfEligible(orderDoc) {
+  return splitSpecialOrderIfEligible(orderDoc);
 }
 
 function isDeviceApto(dev) {
@@ -684,7 +764,19 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
         splitMensalOrderIfEligible(order);
 
-        let isCompatible = order.targetPort ? (order.targetPort === port) : isPortCompatibleWithModo(port, order.modo);
+        let isCompatible = isPortCompatibleWithModo(port, order.modo);
+        if (order.targetPort && order.targetPort !== port) {
+          const targetDev = inMemoryDevices[order.targetPort];
+          const nowMs = Date.now();
+          const targetLastSeen = targetDev ? new Date(targetDev.lastSeen || 0).getTime() : 0;
+          const targetOnline = targetDev && (nowMs - targetLastSeen < 35000);
+          const targetApto = targetDev && isDeviceApto(targetDev);
+          if (targetOnline && targetApto && !targetDev.isBusy) {
+            // A porta alvo original está online, apta e livre -> dar prioridade à porta alvo
+            isCompatible = false;
+          }
+          // Caso contrário (porta alvo offline/ocupada/sem saldo), a porta atual apta assume o pedido imediatamente!
+        }
         // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA diários)
         if (port === 8077) {
           const m = String(order.modo || '').toLowerCase().trim();
@@ -960,8 +1052,8 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   dev.pending_commands = null; // consumido
 
   let pendingSms = null;
-  if ((port === 8077 || port === 8090 || dev.tipo === 'sms_dedicated' || dev.tipo === 'sms_and_ussd') && smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
-    pendingSms = smsSalesEngine.getNextPendingSms();
+  if (smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
+    pendingSms = smsSalesEngine.getNextPendingSms(port);
   }
 
   return res.json({
@@ -1010,6 +1102,19 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       bodyClean.is_apto = true;
       bodyClean.livre = true;
     }
+  }
+
+  // Auto-expirar currentOrder preso por mais de 10 min
+  if (currentDev.currentOrder && currentDev.currentOrder.timestamp) {
+    if (Date.now() - Number(currentDev.currentOrder.timestamp) > 10 * 60 * 1000) {
+      currentDev.currentOrder = null;
+      currentDev.isBusy = false;
+    }
+  }
+  if (req.body.last_result) {
+    currentDev.currentOrder = null;
+    currentDev.isBusy = false;
+    pendingOrder = null;
   }
 
   inMemoryDevices[port] = {
@@ -1091,18 +1196,37 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           );
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de CONCLUSÃO TOTAL (Parte 2) do pedido ${resId}`);
         } else {
+          const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
+          let headerText = 'PACOTE ATIVADO COM SUCESSO! 📶';
+          let modoBadge = '';
+          let duracaoText = 'A sua recarga já está pronta para uso!';
+
+          if (modoStr === 'semanal') {
+            headerText = 'PACOTE SEMANAL ATIVADO! 🗓️';
+            modoBadge = ' (Semanal - 7 Dias)';
+            duracaoText = 'O seu pacote Semanal de 7 Dias já está ativo e pronto para uso!';
+          } else if (modoStr === 'mensal') {
+            headerText = 'PACOTE MENSAL ATIVADO! 📅';
+            modoBadge = ' (Mensal - 30 Dias)';
+            duracaoText = 'O seu pacote Mensal de 30 Dias já está ativo e pronto para uso!';
+          } else if (modoStr === 'tudo_top' || modoStr === 'ilimitado') {
+            headerText = 'PACOTE TUDO TOP ATIVADO! 💎';
+            modoBadge = ' (Tudo Top / Ilimitado)';
+            duracaoText = 'O seu pacote Tudo Top já está ativo e pronto para uso!';
+          }
+
           baileysEngine.sendTextMessage(clientJid,
             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-            `  🎉 *PACOTE ATIVADO COM SUCESSO!* 📶\n` +
+            `  🎉 *${headerText}*\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
             `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Volume:* *${volStr}*\n` +
+            `📦 *Volume:* *${volStr}*${modoBadge}\n` +
             `🔖 *Ref:* \`${resId}\`\n\n` +
-            `⚡ *A sua recarga já está pronta para uso!*\n` +
+            `⚡ *${duracaoText}*\n` +
             `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
             `📞 *Suporte / Dúvidas:* Envie *Suporte*`
           );
-          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${resId}`);
+          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
         }
       } else {
         baileysEngine.sendTextMessage(clientJid,
@@ -1399,7 +1523,7 @@ const ORDERS_CACHE_FILE = path.resolve(__dirname, 'orders_cache.json');
 
 function saveOrdersToCache() {
   try {
-    const list = Array.from(inMemoryOrders.entries()).slice(-100);
+    const list = Array.from(inMemoryOrders.entries()).slice(-2000);
     fs.writeFileSync(ORDERS_CACHE_FILE, JSON.stringify(list), 'utf8');
   } catch(e) {}
 }
@@ -1410,13 +1534,89 @@ function loadOrdersFromCache() {
       const data = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
       if (Array.isArray(data)) {
         data.forEach(([k, v]) => inMemoryOrders.set(k, v));
-        console.log(`📦 [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histórico.`);
+        console.log(`📦 [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histórico local.`);
       }
     }
   } catch(e) {}
 }
 
+async function restoreAllDataFromFirestore() {
+  if (!db) return;
+  try {
+    const snapOrders = await db.collection('orders').orderBy('createdAt', 'desc').limit(2000).get();
+    if (!snapOrders.empty) {
+      let count = 0;
+      snapOrders.docs.forEach(doc => {
+        const orderData = doc.data();
+        const orderId = orderData.orderId || orderData.id || doc.id;
+        if (orderId) {
+          if (!inMemoryOrders.has(orderId)) {
+            inMemoryOrders.set(orderId, orderData);
+            count++;
+          }
+          // Marcar historico como ja notificado para nao disparar mensagens no WhatsApp
+          clientRemindersSent.add(`${orderId}_D3`);
+          clientRemindersSent.add(`${orderId}_D0`);
+        }
+      });
+      console.log(`📦 [FIRESTORE RESTORE] ${count} pedidos de vendas históricos restaurados do Firestore.`);
+      saveOrdersToCache();
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE RESTORE ERRO] Pedidos:', err.message);
+  }
+
+  try {
+    const snapPayments = await db.collection('sms_payments').orderBy('timestamp', 'desc').limit(2000).get();
+    if (!snapPayments.empty) {
+      let countP = 0;
+      snapPayments.docs.forEach(doc => {
+        const pData = doc.data();
+        const ref = pData.ref || pData.txn_id || pData.id || doc.id;
+        if (ref && !adminReceiptsHistory.some(p => (p.ref || p.id || p.txn_id) === ref)) {
+          adminReceiptsHistory.push({
+            id: ref,
+            ref,
+            operadora: pData.operadora || pData.metodo || 'M-Pesa',
+            metodo: pData.metodo || pData.operadora || 'M-Pesa',
+            valor: Number(pData.valor || 0),
+            numero: pData.numero || pData.remetente || '',
+            remetente: pData.remetente || pData.numero || '',
+            timestamp: pData.timestamp || pData.createdAt || new Date().toISOString(),
+            status: pData.status || 'ativado',
+            detalhes: pData.detalhes || ''
+          });
+          countP++;
+        }
+      });
+      console.log(`💳 [FIRESTORE RESTORE] ${countP} extratos de pagamentos históricos restaurados do Firestore.`);
+      savePaymentsToCache();
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE RESTORE ERRO] Pagamentos:', err.message);
+  }
+
+  try {
+    const snapPlans = await db.collection('scheduled_plans').where('status', '==', 'ativo').get();
+    if (!snapPlans.empty) {
+      let countPlans = 0;
+      snapPlans.docs.forEach(doc => {
+        const pData = doc.data();
+        if (pData && pData.planId) {
+          scheduledPlans.set(pData.planId, pData);
+          countPlans++;
+        }
+      });
+      console.log(`📋 [FIRESTORE RESTORE] ${countPlans} planos agendados (faseado/renovável) ativos restaurados.`);
+      saveScheduledPlans();
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE RESTORE ERRO] Planos agendados:', err.message);
+  }
+}
+
 loadOrdersFromCache();
+setTimeout(() => restoreAllDataFromFirestore(), 2000);
 
 // ── ENDPOINTS DE FILA PARA O PAINEL CLOUD ──
 app.get('/api/orders', (req, res) => {
@@ -2138,7 +2338,8 @@ app.get('/api/reports', async (req, res) => {
     let emolaCount = 0;
     payments.forEach(p => {
       const val = Number(p.valor) || 0;
-      if (String(p.metodo || '').toLowerCase().includes('emola')) {
+      const met = String(p.metodo || p.operadora || p.metodoNome || p.tipo || '').toLowerCase();
+      if (met.includes('emola') || met.includes('e-mola') || met.includes('movitel')) {
         emolaTotal += val;
         emolaCount++;
       } else {
@@ -2289,15 +2490,97 @@ app.get('/api/groups', async (req, res) => {
 // ── MANUTENÇÃO GLOBAL (fecha vendas em grupos + privado) ──
 app.post('/api/maintenance', (req, res) => {
   try {
-    const { ativo } = req.body;
-    if (typeof ativo !== 'boolean') {
-      return res.status(400).json({ success: false, error: 'Campo "ativo" (boolean) é obrigatório.' });
+    const rawVal = req.body.ativo !== undefined ? req.body.ativo : req.body.active;
+    if (rawVal === undefined || rawVal === null) {
+      return res.status(400).json({ success: false, error: 'Campo "ativo" ou "active" (boolean) é obrigatório.' });
     }
+    const ativo = (rawVal === true || rawVal === 'true');
     let estado = ativo;
     if (baileysEngine && typeof baileysEngine.setModoManutencao === 'function') {
       estado = baileysEngine.setModoManutencao(ativo);
     }
-    return res.json({ success: true, modoManutencao: estado, mensagem: estado ? '🛑 Sistema em manutenção — vendas bloqueadas.' : '🟢 Sistema online — vendas liberadas.' });
+    return res.json({
+      success: true,
+      modoManutencao: estado,
+      active: estado,
+      mensagem: estado ? '🛑 Sistema em manutenção — vendas bloqueadas.' : '🟢 Sistema online — vendas liberadas.'
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/maintenance', (req, res) => {
+  try {
+    const estado = (baileysEngine && typeof baileysEngine.getModoManutencao === 'function')
+      ? baileysEngine.getModoManutencao()
+      : false;
+    return res.json({ success: true, modoManutencao: estado, active: estado });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/system/status', (req, res) => {
+  try {
+    const manutencao = (baileysEngine && typeof baileysEngine.getModoManutencao === 'function')
+      ? baileysEngine.getModoManutencao()
+      : false;
+    const silenciado = (baileysEngine && typeof baileysEngine.getBotSilenciado === 'function')
+      ? baileysEngine.getBotSilenciado()
+      : false;
+    return res.json({
+      success: true,
+      online: !manutencao,
+      modoManutencao: manutencao,
+      botSilenciado: silenciado,
+      mensagem: manutencao ? '🛑 Servidores em manutenção temporária' : '🟢 Servidores online e operacionais'
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── VERSÃO & AUTO-UPDATE DO CLIENT HUB ──
+app.get('/api/app/hub/version', (req, res) => {
+  try {
+    return res.json({
+      success: true,
+      version: '2.2.0',
+      versionCode: 22,
+      pwaVersion: '2026.10.02-v2',
+      apkUrl: 'https://kanet-cloud-api.onrender.com/hub/KaNet-Client-Hub.apk',
+      changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
+      releasedAt: new Date().toISOString()
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── SILENCIAR / REATIVAR BOT ──
+app.post('/api/bot/silence', (req, res) => {
+  try {
+    const { silenciado } = req.body;
+    if (typeof silenciado !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'Campo "silenciado" (boolean) é obrigatório.' });
+    }
+    let estado = silenciado;
+    if (baileysEngine && typeof baileysEngine.setBotSilenciado === 'function') {
+      estado = baileysEngine.setBotSilenciado(silenciado);
+    }
+    return res.json({ success: true, silenciado: estado, mensagem: estado ? '🔇 Bot silenciado — sem respostas automáticas.' : '🔊 Bot activo — a responder normalmente.' });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/bot/silence/status', (req, res) => {
+  try {
+    const silenciado = baileysEngine && typeof baileysEngine.getBotSilenciado === 'function'
+      ? baileysEngine.getBotSilenciado()
+      : false;
+    return res.json({ success: true, silenciado });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -2315,6 +2598,66 @@ app.post('/api/groups/:jid/fechar', (req, res) => {
       fechado = baileysEngine.toggleGrupoFechado(jid);
     }
     return res.json({ success: true, jid, fechado, mensagem: fechado ? '🔒 Grupo fechado — bot não responde neste grupo.' : '🔓 Grupo aberto — bot volta a responder normalmente.' });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── FECHAR GRUPOS NO WHATSAPP COM MOTIVO / COMUNICADO ──
+app.post('/api/admin/groups/close-with-reason', async (req, res) => {
+  try {
+    const { motivo, targetJids } = req.body || {};
+    if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
+      return res.status(400).json({ success: false, error: 'O motivo / mensagem do fecho é obrigatório.' });
+    }
+    if (!baileysEngine || typeof baileysEngine.closeGroupsWithReason !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.closeGroupsWithReason(motivo.trim(), targetJids);
+    return res.json({
+      success: true,
+      mensagem: `${result.count} grupo(s) foram fechados no WhatsApp e o comunicado foi enviado!`,
+      details: result
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── REABRIR TODOS OS GRUPOS NO WHATSAPP ──
+app.post('/api/admin/groups/open-all', async (req, res) => {
+  try {
+    const { targetJids } = req.body || {};
+    if (!baileysEngine || typeof baileysEngine.openAllGroups !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.openAllGroups(targetJids);
+    return res.json({
+      success: true,
+      mensagem: `${result.count} grupo(s) foram reabertos no WhatsApp para todos os membros!`,
+      details: result
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── ENVIAR COMUNICADO / ANÚNCIO AOS GRUPOS NO WHATSAPP ──
+app.post('/api/admin/groups/announce', async (req, res) => {
+  try {
+    const { mensagem, targetJids } = req.body || {};
+    if (!mensagem || typeof mensagem !== 'string' || !mensagem.trim()) {
+      return res.status(400).json({ success: false, error: 'A mensagem do comunicado é obrigatória.' });
+    }
+    if (!baileysEngine || typeof baileysEngine.sendAnnouncementToGroups !== 'function') {
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+    }
+    const result = await baileysEngine.sendAnnouncementToGroups(mensagem.trim(), targetJids);
+    return res.json({
+      success: true,
+      mensagem: `Comunicado enviado com sucesso para ${result.count} grupo(s)!`,
+      details: result
+    });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -3863,8 +4206,13 @@ app.get('/api/client/orders/:phone', (req, res) => {
     })
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
     .slice(0, 30);
+  const clientPlans = [...scheduledPlans.values()].filter(p => {
+    const cp = String(p.clientPhone || '').replace(/\D/g, '');
+    const num = String(p.numero || '').replace(/\D/g, '');
+    return cp.includes(cleanPhone) || num.includes(cleanPhone);
+  });
 
-  return res.json({ success: true, count: orders.length, orders });
+  return res.json({ success: true, count: orders.length, orders, scheduledPlans: clientPlans });
 });
 
 // ── 20.6 Suporte Bidirecional (Cliente ↔ Admin) ──
@@ -3875,7 +4223,7 @@ app.get('/api/client/support/messages/:phone', (req, res) => {
 });
 
 app.post('/api/client/support/send', (req, res) => {
-  const { phone, name, text, sender } = req.body || {};
+  const { phone, name, text, sender, isDirectAdmin, hasPaymentProof, paymentDetails } = req.body || {};
   if (!phone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e mensagem são obrigatórios.' });
 
   const cleanPhone = String(phone).replace(/\D/g, '');
@@ -3883,16 +4231,136 @@ app.post('/api/client/support/send', (req, res) => {
     id: `MSG-${Date.now()}-${Math.floor(Math.random()*1000)}`,
     clientPhone: cleanPhone,
     clientName: name || `Cliente ${cleanPhone.slice(-4)}`,
-    sender: sender === 'admin' ? 'admin' : 'client',
+    sender: sender === 'admin' ? 'admin' : (sender === 'ai' ? 'ai' : 'client'),
     text: String(text).trim(),
     createdAt: new Date().toISOString(),
-    read: sender === 'admin'
+    read: sender === 'admin',
+    isDirectAdmin: !!isDirectAdmin,
+    hasPaymentProof: !!hasPaymentProof,
+    paymentDetails: paymentDetails || null
   };
 
   clientSupportMessages.push(msgObj);
   if (clientSupportMessages.length > 500) clientSupportMessages.shift();
 
+  if (isDirectAdmin || hasPaymentProof) {
+    console.log(`🚨 [SUPORTE CLIENTE] ${cleanPhone} ${hasPaymentProof ? '💳 [COMPROVATIVO]' : '👨‍💼 [DIRECTO COM ADM]'}: ${msgObj.text.slice(0, 80)}`);
+  }
+
   return res.json({ success: true, message: msgObj });
+});
+
+// ── 20.6.1 Processamento Inteligente de Comprovativo no Chat de Suporte ──
+app.post('/api/client/support/process-proof', async (req, res) => {
+  try {
+    const { phone, name, smsText } = req.body || {};
+    if (!smsText) return res.status(400).json({ success: false, mensagem: 'Texto do comprovativo é obrigatório.' });
+
+    const smsClean = String(smsText).trim();
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
+
+    // 1. Detectar se é realmente um SMS de pagamento
+    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transa[çc][ãa]o|Ref|PP2\d{5})/i.test(smsClean);
+    const temValor = /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(smsClean);
+
+    if (!temIndicador && !temValor) {
+      return res.json({
+        success: false,
+        recognized: false,
+        mensagem: 'Não foi possível reconhecer este texto como um comprovativo M-Pesa ou e-Mola.'
+      });
+    }
+
+    // 2. Extrair TxId
+    function extrairTxIdChat(texto) {
+      const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[çc][ãa]o|ID\s*Trans|TxId|Ref(?:er[êe]ncia)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
+      if (mExplicit && mExplicit[1] && mExplicit[1].length >= 6) return mExplicit[1].toUpperCase().replace(/\.$/, '');
+      const mPP = texto.match(/\b(PP[0-9]{6}\.[0-9]{4}\.[A-Z0-9]{4,8})\b/i);
+      if (mPP) return mPP[1].toUpperCase();
+      const mConf = texto.match(/Confirmado\s+([A-Z0-9]{8,15})\b/i);
+      if (mConf) { const c = mConf[1].toUpperCase(); if (!/^(258)?8[2-7]\d{7}$/.test(c)) return c; }
+      const mAlpha = texto.match(/\b([A-Z][A-Z0-9]{9,12})\b/);
+      if (mAlpha) {
+        const c = mAlpha[1].toUpperCase();
+        const ignorar = ['CONFIRMADO','TRANSFERISTE','RECEBESTE','NOTIFICACAO','COMPROVATIVO','AUTOMATICA'];
+        if (!ignorar.includes(c) && /[0-9]/.test(c)) return c;
+      }
+      return 'TXN-' + Date.now();
+    }
+
+    // 3. Extrair Valor
+    function extrairValorChat(texto) {
+      const mTransf = texto.match(/Transferiste\s+([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
+      if (mTransf) return parseFloat(mTransf[1].replace(',', '.'));
+      const mReceb  = texto.match(/(?:Recebeste|Recebeu|Creditado|Depositado)\s+([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
+      if (mReceb)  return parseFloat(mReceb[1].replace(',', '.'));
+      const mValor  = texto.match(/Valor\s*[:.]?\s*([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
+      if (mValor)  return parseFloat(mValor[1].replace(',', '.'));
+      const mGeral  = texto.match(/([\d.,]+)\s*(?:MT|MZN|Mts?)\b/i);
+      if (mGeral)  return parseFloat(mGeral[1].replace(',', '.'));
+      return null;
+    }
+
+    const txnId = extrairTxIdChat(smsClean);
+    const valor = extrairValorChat(smsClean) || 0;
+    const isEmola = /e-?mola|864882152/i.test(smsClean);
+    const metodo = isEmola ? 'e-Mola' : 'M-Pesa';
+
+    // 4. Verificar se a operadora já confirmou no gateway
+    let realPay = await findOperatorPayment(txnId);
+
+    const paymentDetails = {
+      txnId,
+      valor,
+      metodo,
+      operatorConfirmed: !!realPay,
+      rawSms: smsClean.slice(0, 180)
+    };
+
+    // Registar no chat do cliente como comprovativo reconhecido
+    const msgObj = {
+      id: `MSG-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+      clientPhone: cleanPhone || 'Visitante',
+      clientName: name || 'Cliente Hub',
+      sender: 'client',
+      text: `💳 [COMPROVATIVO ENVIADO]\nRef: ${txnId}\nValor: ${valor} MT (${metodo})\n\n"${smsClean.slice(0, 100)}..."`,
+      createdAt: new Date().toISOString(),
+      read: false,
+      isDirectAdmin: true,
+      hasPaymentProof: true,
+      paymentDetails
+    };
+    clientSupportMessages.push(msgObj);
+    if (clientSupportMessages.length > 500) clientSupportMessages.shift();
+
+    let respostaTexto = '';
+    if (realPay) {
+      respostaTexto = `✅ <b>Comprovativo M-Pesa/e-Mola Reconhecido e Validado!</b><br><br>` +
+        `• <b>Código/Ref:</b> <code class="text-cyan-400 font-bold">${txnId}</code><br>` +
+        `• <b>Valor Recebido:</b> <b>${realPay.valor || valor} MT</b> (${metodo})<br>` +
+        `• <b>Status:</b> Confirmado pelo nosso gateway de rede!<br><br>` +
+        `🚀 O seu pagamento já está aprovado no sistema! O Administrador Kelven foi notificado para despachar ou você pode ir na aba <b>Loja</b> e concluir a compra com esse comprovativo.`;
+    } else {
+      respostaTexto = `⏳ <b>Comprovativo de Pagamento Detectado!</b><br><br>` +
+        `• <b>Código/Ref:</b> <code class="text-amber-400 font-bold">${txnId}</code><br>` +
+        `• <b>Valor Identificado:</b> <b>${valor} MT</b> (${metodo})<br>` +
+        `• <b>Status:</b> Registado no sistema! A aguardar o SMS oficial da operadora entrar no telemóvel gateway.<br><br>` +
+        `📱 <b>Atenção:</b> O sistema e o Administrador Kelven já receberam a sua confirmação. Assim que a rede entregar o SMS (30 a 60 segundos), o envio é liberado!`;
+    }
+
+    return res.json({
+      success: true,
+      recognized: true,
+      operatorConfirmed: !!realPay,
+      txnId,
+      valor,
+      metodo,
+      respostaTexto,
+      paymentDetails
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // ── 20.7 CRM & Suporte no Ka-Net Admin Master ──
@@ -3965,13 +4433,23 @@ app.get('/api/admin/crm/support-tickets', (req, res) => {
         unreadCount: 0,
         lastMessage: m.text,
         lastTime: m.createdAt,
+        isDirectAdmin: false,
+        hasPaymentProof: false,
+        paymentDetails: null,
         messages: []
       };
     }
     grouped[m.clientPhone].messages.push(m);
+    if (m.isDirectAdmin) grouped[m.clientPhone].isDirectAdmin = true;
+    if (m.hasPaymentProof) {
+      grouped[m.clientPhone].hasPaymentProof = true;
+      grouped[m.clientPhone].paymentDetails = m.paymentDetails;
+    }
     if (m.sender === 'client' && !m.read) {
       grouped[m.clientPhone].unreadCount++;
     }
+    grouped[m.clientPhone].lastMessage = m.text;
+    grouped[m.clientPhone].lastTime = m.createdAt;
   });
 
   return res.json({ success: true, tickets: Object.values(grouped).sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime)) });
@@ -4108,7 +4586,7 @@ app.get('/api/sms/outgoing/pending', (req, res) => {
 
 // ── 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOMÁTICO) ──
 app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
-  const { sender, remetente, phone, body, text, mensagem } = req.body || {};
+  const { sender, remetente, phone, body, text, mensagem, port, sim_slot, simSlot } = req.body || {};
   const cleanSender = sender || remetente || phone;
   const cleanBody = body || text || mensagem;
 
@@ -4116,12 +4594,17 @@ app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
     return res.status(400).json({ success: false, mensagem: 'Remetente e mensagem são obrigatórios.' });
   }
 
-  console.log(`📩 [SMS WEBHOOK RECEBIDO] De: ${cleanSender} | Texto: ${cleanBody.substring(0, 60)}`);
+  const originPort = port ? Number(port) : null;
+  const originSlot = sim_slot !== undefined ? Number(sim_slot) : (simSlot !== undefined ? Number(simSlot) : 0);
+
+  console.log(`📩 [SMS WEBHOOK RECEBIDO] Porta: ${originPort || 'Auto'} (SIM ${originSlot + 1}) | De: ${cleanSender} | Texto: ${cleanBody.substring(0, 60)}`);
 
   if (smsSalesEngine) {
     smsSalesEngine.processIncomingCustomerSms({
       sender: cleanSender,
       body: cleanBody,
+      port: originPort,
+      simSlot: originSlot,
       inMemoryPayments
     }).catch(err => {
       console.error('❌ [SMS SALES ENGINE ERRO]:', err.message);
@@ -4184,8 +4667,8 @@ function processClientPackageReminders() {
       }
     }
 
-    // 2. Alerta no Próprio Dia de Expiração (D-0)
-    if (diasRestantes <= 0) {
+    // 2. Alerta no Próprio Dia de Expiração (D-0) — APENAS no próprio dia (não em pedidos antigos)
+    if (diasRestantes === 0 && (now - createdAtTime) <= (duracaoDias + 1) * ONE_DAY_MS) {
       const reminderKey = `${order.id || order.orderId}_D0`;
       if (!clientRemindersSent.has(reminderKey)) {
         clientRemindersSent.add(reminderKey);
@@ -4231,8 +4714,43 @@ setTimeout(processClientPackageReminders, 15000);
 //            Ex: 5GB Faseado (5×1024MB) | 10GB Faseado (10×1024MB)
 // ══════════════════════════════════════════════════════════════════════════════
 
-const PLANS_CACHE_FILE = path.join(__dirname, '..', 'cache_scheduled_plans.json');
+const PLANS_CACHE_FILE = path.join(__dirname, 'cache_scheduled_plans.json');
 const scheduledPlans   = new Map(); // planId → planDoc
+
+// ── Tabela Oficial de Planos Especiais com Fallback Permanente ───────────────
+const DEFAULT_PLANOS_ESPECIAIS = {
+  "76":  { nome: "♻️ 3GB+700 (Renovação)", tipo: "renovavel", total: 3772, inicial: 3072, diaria: 100 },
+  "120": { nome: "♻️ 5GB+700 (Renovação)", tipo: "renovavel", total: 5820, inicial: 5120, diaria: 100 },
+  "130": { nome: "📉 5GB Faseado (1GB/dia)", tipo: "faseado", total: 5120, inicial: 1024, diaria: 1024 },
+  "195": { nome: "♻️ 8GB+700 (Renovação)", tipo: "renovavel", total: 8892, inicial: 8192, diaria: 100 },
+  "240": { nome: "♻️ 10GB+700 (Renovação)", tipo: "renovavel", total: 10940, inicial: 10240, diaria: 100 },
+  "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado", total: 10240, inicial: 1024, diaria: 1024 },
+  "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado", total: 15360, inicial: 1024, diaria: 1024 },
+  "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado", total: 20480, inicial: 1024, diaria: 1024 }
+};
+
+function getPlanosEspeciaisConfig() {
+  let planos = {};
+  try {
+    const p1 = path.join(__dirname, 'bot_config.js');
+    if (fs.existsSync(p1)) {
+      delete require.cache[require.resolve(p1)];
+      const c1 = require(p1);
+      if (c1 && c1.PLANOS_ESPECIAIS) planos = { ...c1.PLANOS_ESPECIAIS };
+    }
+  } catch(e) {}
+  if (Object.keys(planos).length === 0) {
+    try {
+      const p2 = path.resolve(__dirname, '..', 'bot_config.js');
+      if (fs.existsSync(p2)) {
+        delete require.cache[require.resolve(p2)];
+        const c2 = require(p2);
+        if (c2 && c2.PLANOS_ESPECIAIS) planos = { ...c2.PLANOS_ESPECIAIS };
+      }
+    } catch(e) {}
+  }
+  return { ...DEFAULT_PLANOS_ESPECIAIS, ...planos };
+}
 
 // ── Persistência ──────────────────────────────────────────────────────────────
 function loadScheduledPlans() {
@@ -4242,15 +4760,22 @@ function loadScheduledPlans() {
       for (const [id, plan] of Object.entries(raw)) {
         if (plan.status === 'ativo') scheduledPlans.set(id, plan);
       }
-      console.log(`📋 [PLANOS] ${scheduledPlans.size} planos activos carregados do cache.`);
+      console.log(`📋 [PLANOS] ${scheduledPlans.size} planos activos carregados do cache local.`);
     }
-  } catch(e) { console.warn('⚠️ [PLANOS] Erro ao carregar cache:', e.message); }
+  } catch(e) { console.warn('⚠️ [PLANOS] Erro ao carregar cache local:', e.message); }
 }
 
 function saveScheduledPlans() {
   try {
     const obj = {};
-    for (const [id, plan] of scheduledPlans.entries()) obj[id] = plan;
+    for (const [id, plan] of scheduledPlans.entries()) {
+      obj[id] = plan;
+      if (db) {
+        db.collection('scheduled_plans').doc(id).set(plan).catch(e =>
+          console.warn('Firebase scheduled_plan save err:', e.message)
+        );
+      }
+    }
     fs.writeFileSync(PLANS_CACHE_FILE, JSON.stringify(obj, null, 2), 'utf8');
   } catch(e) { console.warn('⚠️ [PLANOS] Erro ao guardar cache:', e.message); }
 }
@@ -4262,14 +4787,14 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
   const planId   = `PLAN-${tipo.toUpperCase()}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const now      = new Date();
 
-  // Total de entregas diárias (após a inicial)
-  const entregas_diarias_total = Math.round((total_mb - (mb_inicial || mb_diaria)) / mb_diaria);
+  // Total de entregas diárias adicionais após a entrega inicial
+  const entregas_diarias_total = Math.max(1, Math.round((total_mb - (mb_inicial || mb_diaria)) / mb_diaria));
 
-  // Próxima entrega = amanhã, 1 hora antes da hora actual
+  // Próxima entrega = amanhã, 1 hora antes da hora da recarga de hoje (para renovar antes de expirar)
   const proxima = new Date(now);
   proxima.setDate(proxima.getDate() + 1);
   proxima.setHours(proxima.getHours() - 1);
-  // Ajustar minutos/segundos para coincidir com a hora exacta
+  if (proxima.getHours() < 7) proxima.setHours(7); // Não enviar de madrugada
   proxima.setSeconds(0);
   proxima.setMilliseconds(0);
 
@@ -4284,7 +4809,7 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
     entregas_diarias_total,
     entregas_feitas: 0,
     valor,
-    sms_ref,
+    sms_ref: sms_ref || '',
     hora_compra: now.toISOString(),
     proxima_entrega: proxima.toISOString(),
     historico: [],
@@ -4294,7 +4819,7 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
 
   scheduledPlans.set(planId, plan);
   saveScheduledPlans();
-  console.log(`✅ [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | ${total_mb}MB total | ${mb_diaria}MB/dia | Próxima: ${proxima.toISOString()}`);
+  console.log(`✅ [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | Total: ${total_mb}MB | Inicial: ${mb_inicial}MB | Diária: ${mb_diaria}MB/dia | Total dias: ${entregas_diarias_total} | Próxima: ${proxima.toISOString()}`);
   return plan;
 }
 
@@ -4302,51 +4827,108 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
 function handleSpecialPlanIfApplicable(orderDoc) {
   if (!orderDoc || orderDoc.isSpecialPlanHandled) return false;
   const val = Number(orderDoc.valor) || Number(orderDoc.valor_pago);
-  if (!val) return false;
+  const planos = getPlanosEspeciaisConfig();
+  const vKey = val ? String(Math.round(val)) : null;
 
-  let botCfg = {};
-  try {
-    const cfgPath = path.resolve(__dirname, '..', 'bot_config.js');
-    if (fs.existsSync(cfgPath)) {
-      botCfg = require(cfgPath);
+  let plano = vKey ? planos[vKey] : null;
+
+  // Fallback por nome do pacote ou modo se o valor exato divergir
+  if (!plano) {
+    const modoLower = String(orderDoc.modo || '').toLowerCase();
+    const pkgLower = String(orderDoc.package_name || '').toLowerCase();
+    if (modoLower === 'faseado' || pkgLower.includes('faseado')) {
+      const matchKey = Object.keys(planos).find(k => planos[k].tipo === 'faseado' && (orderDoc.quantidade >= planos[k].total * 0.8));
+      if (matchKey) plano = planos[matchKey];
+    } else if (modoLower.includes('renov') || pkgLower.includes('renov')) {
+      const matchKey = Object.keys(planos).find(k => (planos[k].tipo === 'renovacao' || planos[k].tipo === 'renovavel') && (orderDoc.quantidade >= planos[k].total * 0.8));
+      if (matchKey) plano = planos[matchKey];
     }
-  } catch(e) {}
-
-  const planos = (botCfg && botCfg.PLANOS_ESPECIAIS) || {};
-  const plano = planos[String(Math.round(val))];
+  }
 
   if (plano && (plano.tipo === 'renovacao' || plano.tipo === 'renovavel' || plano.tipo === 'faseado')) {
     orderDoc.isSpecialPlanHandled = true;
     const tipo = (plano.tipo === 'renovacao' || plano.tipo === 'renovavel') ? 'renovavel' : 'faseado';
-    const mbInicial = plano.inicial || plano.diaria || 1024;
-    const totalMb = plano.total || (mbInicial + ((plano.diaria || 1024) * 7));
+    const mbInicial = plano.inicial || (tipo === 'faseado' ? 1024 : 3072);
+    const mbDiaria = plano.diaria || (tipo === 'faseado' ? 1024 : 100);
+    const totalMb = plano.total || (mbInicial + (mbDiaria * (tipo === 'faseado' ? 4 : 7)));
 
-    // Ajustar a quantidade da ordem inicial (entrega imediata de hoje)
+    // ⚠️ CRÍTICO: Pacotes Renovável e Faseado são transferidos como pacotes DIÁRIOS normais (*162# -> 8 -> 2)
+    // pelas portas diárias disponíveis (8021, 8023, 8024, etc.)
     orderDoc.quantidade = mbInicial;
     orderDoc.origem = tipo;
+    orderDoc.modo = 'diario';
+    orderDoc.targetPort = null; // Qualquer celular diário online e apto assume de imediato
+    orderDoc.input_val = '';
     orderDoc.remetente = `Ka-Net ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`;
 
-    // Criar o plano agendado para as próximas entregas diárias (1 hora antes a cada dia)
+    // Criar o plano agendado para as próximas entregas diárias automáticas
     const plan = criarPlano({
       numero: orderDoc.numero,
       tipo,
       total_mb: totalMb,
       mb_inicial: mbInicial,
-      mb_diaria: plano.diaria || (tipo === 'renovavel' ? 100 : 1024),
-      valor: val,
+      mb_diaria: mbDiaria,
+      valor: val || plano.preco || 0,
       sms_ref: orderDoc.sms_ref || orderDoc.orderId,
       clientPhone: orderDoc.cliente_solicitante || orderDoc.numero
     });
 
-    console.log(`✨ [PLANO ESPECIAL DETECTADO] Ordem ${orderDoc.orderId} (${val}MT) configurada como ${tipo.toUpperCase()}!`);
-    console.log(`   📦 Entrega Inicial: ${mbInicial}MB (agora)`);
-    console.log(`   ⏰ Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias | Próxima: ${plan.proxima_entrega}`);
+    console.log(`✨ [PLANO ESPECIAL DETECTADO] Ordem ${orderDoc.orderId} (${val || 0}MT) configurada como ${tipo.toUpperCase()}!`);
+    console.log(`   📦 Entrega Inicial: ${mbInicial}MB (enviando agora via celular diário)`);
+    console.log(`   ⏰ Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias adicionais | Próxima: ${plan.proxima_entrega}`);
+
+    // Notificar cliente no WhatsApp com explicação detalhada, clara e tranquilizadora do plano
+    let clientJid = orderDoc.jid;
+    if (!clientJid && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
+      clientJid = baileysEngine.getJidForOrder(orderDoc.id || orderDoc.orderId);
+    }
+    if (!clientJid && (orderDoc.cliente_solicitante || orderDoc.numero)) {
+      const p = String(orderDoc.cliente_solicitante || orderDoc.numero).replace(/\D/g, '').slice(-9);
+      clientJid = `258${p}@s.whatsapp.net`;
+    }
+
+    if (clientJid && baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
+      const horaProx = new Date(plan.proxima_entrega).toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
+      const msgTexto = tipo === 'faseado'
+        ? `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  📉 *PLANO FASEADO ACTIVADO!* ⚡\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `1️⃣ *1ª Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
+          `📅 *Próximas Fases:* *${plan.entregas_diarias_total} entregas diárias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
+          `⏰ *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
+          `📲 *Destino:* *${orderDoc.numero}*\n` +
+          `✨ *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
+          `💡 *Como funciona o Plano Faseado?*\n` +
+          `• A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
+          `• O envio é feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
+          `• Você receberá uma notificação aqui no WhatsApp a cada fase entregue!\n\n` +
+          `📞 *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
+        : `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  ♻️ *PLANO RENOVÁVEL ACTIVADO!* ⚡\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `1️⃣ *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
+          `📅 *Renovações Diárias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
+          `⏰ *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
+          `📲 *Destino:* *${orderDoc.numero}*\n` +
+          `✨ *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
+          `💡 *Como funciona o Plano Renovável?*\n` +
+          `• Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
+          `• Durante os próximos 7 dias, o sistema transfere *${mbDiaria} MB diários* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
+          `• Assim, os seus dados duram a semana toda sem expirar!\n` +
+          `• Você receberá uma notificação aqui no WhatsApp a cada renovação diária.\n\n` +
+          `📞 *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`;
+
+      baileysEngine.enviarMensagemTexto(clientJid, msgTexto).catch(() => {});
+    }
+
     return true;
   }
   return false;
 }
 
-// ── Executar entrega diária ───────────────────────────────────────────────────
+// ── Executar entrega diária agendada ──────────────────────────────────────────
 async function executarEntregaPlano(planId) {
   const plan = scheduledPlans.get(planId);
   if (!plan || plan.status !== 'ativo') return;
@@ -4355,7 +4937,7 @@ async function executarEntregaPlano(planId) {
   const orderId  = `${planId}-D${entregaN}`;
   const timestamp = new Date().toISOString();
 
-  // Criar ordem normal na fila de processamento
+  // Criar ordem diária normal na fila de processamento
   const orderDoc = {
     orderId,
     id:       orderId,
@@ -4363,11 +4945,12 @@ async function executarEntregaPlano(planId) {
     quantidade: plan.mb_diaria,
     valor:    0, // já pago na compra inicial
     valor_pago: 0,
-    modo:     'diario',
+    modo:     'diario', // USSD diário padrão
+    targetPort: null,   // Qualquer porta diária apta pega na hora
     status:   'pending',
-    origem:   plan.tipo,          // 'renovavel' | 'faseado'
+    origem:   plan.tipo, // 'renovavel' | 'faseado'
     planId,
-    remetente: `Ka-Net Auto (${plan.tipo})`,
+    remetente: `Ka-Net Auto (${plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renovação ${entregaN}`})`,
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -4384,14 +4967,67 @@ async function executarEntregaPlano(planId) {
   plan.historico.push({ entrega: entregaN, orderId, timestamp, mb: plan.mb_diaria });
   plan.entregas_feitas = entregaN;
 
-  const label = plan.tipo === 'faseado' ? `Fase ${entregaN}/${plan.entregas_diarias_total + 1}` : `Renovação ${entregaN}/${plan.entregas_diarias_total}`;
+  const isFinal = plan.entregas_feitas >= plan.entregas_diarias_total;
+  const label = plan.tipo === 'faseado'
+    ? `Fase ${entregaN + 1}/${plan.entregas_diarias_total + 1}`
+    : `Renovação ${entregaN}/${plan.entregas_diarias_total}`;
   console.log(`📦 [PLANO ${plan.tipo.toUpperCase()}] ${label} → ${plan.mb_diaria}MB → ${plan.numero} | Ordem: ${orderId}`);
 
-  // Notificar cliente via WhatsApp
+  // Calcular próxima hora de envio
+  const proxima = new Date(plan.proxima_entrega);
+  proxima.setDate(proxima.getDate() + 1);
+  proxima.setHours(proxima.getHours() - 1);
+  if (proxima.getHours() < 7) proxima.setHours(7);
+  proxima.setSeconds(0);
+  proxima.setMilliseconds(0);
+  plan.proxima_entrega = proxima.toISOString();
+
+  const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
   const restantes = plan.entregas_diarias_total - plan.entregas_feitas;
-  const textoNotif = plan.tipo === 'faseado'
-    ? `📦 [Ka-Net] ${label}: ${(plan.mb_diaria/1024).toFixed(1)}GB activado agora! ${restantes > 0 ? `Restam ${restantes} fases.` : '✅ Plano concluído!'}`
-    : `♻️ [Ka-Net] Renovação automática: +${plan.mb_diaria}MB adicionados! ${restantes > 0 ? `${restantes} renovações restantes.` : '✅ Plano de renovação concluído!'}`;
+
+  let textoNotif = '';
+  if (plan.tipo === 'faseado') {
+    if (isFinal) {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  🎉 *PLANO FASEADO CONCLUÍDO!* 🏆\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de enviar a *Última Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*!\n\n` +
+                   `✨ *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
+                   `✅ Todas as fases foram concluídas com sucesso.\n\n` +
+                   `Muito obrigado pela confiança na *Ka-Net Internet*!`;
+    } else {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  📦 *${label.toUpperCase()} ENTREGUE!* 📶\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de transferir mais *${(plan.mb_diaria/1024).toFixed(1)} GB* para o seu número *${plan.numero}*.\n\n` +
+                   `📊 *Progresso do seu Plano Faseado:*\n` +
+                   `• *Fases Concluídas:* ${entregaN + 1} de ${plan.entregas_diarias_total + 1}\n` +
+                   `• *Fases Restantes:* ${restantes} fase(s)\n` +
+                   `• *Próximo Envio:* Amanhã às *${horaProx}* (1 hora antes de expirar a anterior)\n\n` +
+                   `⚡ _Os dados acumularam com o saldo anterior. Boa navegação!_`;
+    }
+  } else {
+    // Renovável
+    if (isFinal) {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  🎉 *PLANO RENOVÁVEL CONCLUÍDO!* 🏆\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de enviar a *Última Renovação (${label})* de *+${plan.mb_diaria} MB* para o número *${plan.numero}*!\n\n` +
+                   `✨ *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
+                   `✅ O ciclo de 7 dias de renovações automáticas foi concluído com sucesso.\n\n` +
+                   `Muito obrigado pela confiança na *Ka-Net Internet*!`;
+    } else {
+      textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                   `  ♻️ *${label.toUpperCase()} ENTREGUE!* 📶\n` +
+                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                   `Olá! Acabámos de transferir *+${plan.mb_diaria} MB* de renovação para o seu número *${plan.numero}*.\n\n` +
+                   `📊 *Progresso da sua Renovação:*\n` +
+                   `• *Renovações Concluídas:* ${entregaN} de ${plan.entregas_diarias_total}\n` +
+                   `• *Renovações Restantes:* ${restantes} dia(s)\n` +
+                   `• *Próxima Renovação:* Amanhã às *${horaProx}* (1 hora antes de expirar)\n\n` +
+                   `⚡ _A validade dos seus megas foi renovada com sucesso para não expirar!_`;
+    }
+  }
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(() => {});
@@ -4409,19 +5045,13 @@ async function executarEntregaPlano(planId) {
   });
 
   // Verificar se o plano terminou
-  if (plan.entregas_feitas >= plan.entregas_diarias_total) {
+  if (isFinal) {
     plan.status = 'concluido';
     plan.concluido_em = timestamp;
     console.log(`🏁 [PLANO ${plan.tipo.toUpperCase()}] ${planId} CONCLUÍDO! Total entregue: ${plan.total_mb}MB ao ${plan.numero}`);
     saveScheduledPlans();
     return;
   }
-
-  // Agendar próxima entrega: amanhã, 1 hora antes da entrega anterior
-  const proxima = new Date(plan.proxima_entrega);
-  proxima.setDate(proxima.getDate() + 1);
-  proxima.setHours(proxima.getHours() - 1);
-  plan.proxima_entrega = proxima.toISOString();
 
   saveScheduledPlans();
   console.log(`⏰ [PLANO] Próxima entrega agendada: ${plan.proxima_entrega}`);
@@ -4443,6 +5073,12 @@ function checkScheduledPlans() {
 
 setInterval(checkScheduledPlans, 60 * 1000); // Verificar a cada 1 minuto
 setTimeout(checkScheduledPlans, 5000);        // Primeira checagem 5s após boot
+
+// ── ENDPOINT: Listar Planos Agendados Activos ────────────────────────────────
+app.get('/api/plans/scheduled', (req, res) => {
+  const plans = Array.from(scheduledPlans.values());
+  res.json({ success: true, count: plans.length, plans });
+});
 
 // ── API: Criar plano renovável / faseado ─────────────────────────────────────
 app.post('/api/subscribe/plan', async (req, res) => {
@@ -4554,6 +5190,20 @@ app.delete('/api/admin/plans/:planId', (req, res) => {
   saveScheduledPlans();
   console.log(`🚫 [PLANO] Cancelado pelo admin: ${planId}`);
   return res.json({ success: true, mensagem: `Plano ${planId} cancelado.` });
+});
+
+// ── API: Disparar Próxima Entrega Manualmente (Admin) ─────────────────────────
+app.post('/api/admin/plans/:planId/trigger', async (req, res) => {
+  const { planId } = req.params;
+  const plan = scheduledPlans.get(planId);
+  if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
+  if (plan.status !== 'ativo') return res.status(400).json({ success: false, error: 'Plano não está activo.' });
+  try {
+    await executarEntregaPlano(planId);
+    return res.json({ success: true, mensagem: `Entrega disparada com sucesso para o plano ${planId}!` });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

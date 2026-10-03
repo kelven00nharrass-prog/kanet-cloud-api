@@ -495,6 +495,11 @@ app.post('/api/devices/reset-all', (req, res) => {
   return res.json({ success: true, mensagem: `Todos os ${count} celulares foram libertados e estão prontos!`, count });
 });
 
+function isDailyPort(port) {
+  const p = Number(port);
+  return p !== 8077 && p !== 8777 && p !== 8090;
+}
+
 function isPortCompatibleWithModo(port, modo) {
   const p = Number(port);
   if (p === 8090) return false; // 🚫 Porta 8090 é exclusiva para SMS e Leitura M-Pesa/e-Mola
@@ -502,7 +507,7 @@ function isPortCompatibleWithModo(port, modo) {
   if (m === 'saldo' || m === 'credito') {
     return p === 8777;
   }
-  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) {
+  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top')) {
     return p === 8077;
   }
   // Pacotes Diários: compatível com qualquer celular diário (8021 a 8028)
@@ -512,7 +517,7 @@ function isPortCompatibleWithModo(port, modo) {
 function getPortForModo(modo) {
   const m = String(modo || '').toLowerCase().trim();
   if (m === 'saldo' || m === 'credito') return 8777;
-  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens')) return 8077;
+  if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top')) return 8077;
 
   // Para diários: selecionar dinamicamente a melhor porta diária online e apta
   const dailyDevs = Object.values(inMemoryDevices).filter(d => {
@@ -1047,8 +1052,8 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   dev.pending_commands = null; // consumido
 
   let pendingSms = null;
-  if ((port === 8077 || port === 8090 || dev.tipo === 'sms_dedicated' || dev.tipo === 'sms_and_ussd') && smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
-    pendingSms = smsSalesEngine.getNextPendingSms();
+  if (smsSalesEngine && typeof smsSalesEngine.getNextPendingSms === 'function') {
+    pendingSms = smsSalesEngine.getNextPendingSms(port);
   }
 
   return res.json({
@@ -2485,15 +2490,97 @@ app.get('/api/groups', async (req, res) => {
 // ── MANUTENÇÃO GLOBAL (fecha vendas em grupos + privado) ──
 app.post('/api/maintenance', (req, res) => {
   try {
-    const { ativo } = req.body;
-    if (typeof ativo !== 'boolean') {
-      return res.status(400).json({ success: false, error: 'Campo "ativo" (boolean) é obrigatório.' });
+    const rawVal = req.body.ativo !== undefined ? req.body.ativo : req.body.active;
+    if (rawVal === undefined || rawVal === null) {
+      return res.status(400).json({ success: false, error: 'Campo "ativo" ou "active" (boolean) é obrigatório.' });
     }
+    const ativo = (rawVal === true || rawVal === 'true');
     let estado = ativo;
     if (baileysEngine && typeof baileysEngine.setModoManutencao === 'function') {
       estado = baileysEngine.setModoManutencao(ativo);
     }
-    return res.json({ success: true, modoManutencao: estado, mensagem: estado ? '🛑 Sistema em manutenção — vendas bloqueadas.' : '🟢 Sistema online — vendas liberadas.' });
+    return res.json({
+      success: true,
+      modoManutencao: estado,
+      active: estado,
+      mensagem: estado ? '🛑 Sistema em manutenção — vendas bloqueadas.' : '🟢 Sistema online — vendas liberadas.'
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/maintenance', (req, res) => {
+  try {
+    const estado = (baileysEngine && typeof baileysEngine.getModoManutencao === 'function')
+      ? baileysEngine.getModoManutencao()
+      : false;
+    return res.json({ success: true, modoManutencao: estado, active: estado });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/system/status', (req, res) => {
+  try {
+    const manutencao = (baileysEngine && typeof baileysEngine.getModoManutencao === 'function')
+      ? baileysEngine.getModoManutencao()
+      : false;
+    const silenciado = (baileysEngine && typeof baileysEngine.getBotSilenciado === 'function')
+      ? baileysEngine.getBotSilenciado()
+      : false;
+    return res.json({
+      success: true,
+      online: !manutencao,
+      modoManutencao: manutencao,
+      botSilenciado: silenciado,
+      mensagem: manutencao ? '🛑 Servidores em manutenção temporária' : '🟢 Servidores online e operacionais'
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── VERSÃO & AUTO-UPDATE DO CLIENT HUB ──
+app.get('/api/app/hub/version', (req, res) => {
+  try {
+    return res.json({
+      success: true,
+      version: '2.2.0',
+      versionCode: 22,
+      pwaVersion: '2026.10.02-v2',
+      apkUrl: 'https://kanet-cloud-api.onrender.com/hub/KaNet-Client-Hub.apk',
+      changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
+      releasedAt: new Date().toISOString()
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── SILENCIAR / REATIVAR BOT ──
+app.post('/api/bot/silence', (req, res) => {
+  try {
+    const { silenciado } = req.body;
+    if (typeof silenciado !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'Campo "silenciado" (boolean) é obrigatório.' });
+    }
+    let estado = silenciado;
+    if (baileysEngine && typeof baileysEngine.setBotSilenciado === 'function') {
+      estado = baileysEngine.setBotSilenciado(silenciado);
+    }
+    return res.json({ success: true, silenciado: estado, mensagem: estado ? '🔇 Bot silenciado — sem respostas automáticas.' : '🔊 Bot activo — a responder normalmente.' });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/bot/silence/status', (req, res) => {
+  try {
+    const silenciado = baileysEngine && typeof baileysEngine.getBotSilenciado === 'function'
+      ? baileysEngine.getBotSilenciado()
+      : false;
+    return res.json({ success: true, silenciado });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -4136,7 +4223,7 @@ app.get('/api/client/support/messages/:phone', (req, res) => {
 });
 
 app.post('/api/client/support/send', (req, res) => {
-  const { phone, name, text, sender } = req.body || {};
+  const { phone, name, text, sender, isDirectAdmin, hasPaymentProof, paymentDetails } = req.body || {};
   if (!phone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e mensagem são obrigatórios.' });
 
   const cleanPhone = String(phone).replace(/\D/g, '');
@@ -4144,16 +4231,136 @@ app.post('/api/client/support/send', (req, res) => {
     id: `MSG-${Date.now()}-${Math.floor(Math.random()*1000)}`,
     clientPhone: cleanPhone,
     clientName: name || `Cliente ${cleanPhone.slice(-4)}`,
-    sender: sender === 'admin' ? 'admin' : 'client',
+    sender: sender === 'admin' ? 'admin' : (sender === 'ai' ? 'ai' : 'client'),
     text: String(text).trim(),
     createdAt: new Date().toISOString(),
-    read: sender === 'admin'
+    read: sender === 'admin',
+    isDirectAdmin: !!isDirectAdmin,
+    hasPaymentProof: !!hasPaymentProof,
+    paymentDetails: paymentDetails || null
   };
 
   clientSupportMessages.push(msgObj);
   if (clientSupportMessages.length > 500) clientSupportMessages.shift();
 
+  if (isDirectAdmin || hasPaymentProof) {
+    console.log(`🚨 [SUPORTE CLIENTE] ${cleanPhone} ${hasPaymentProof ? '💳 [COMPROVATIVO]' : '👨‍💼 [DIRECTO COM ADM]'}: ${msgObj.text.slice(0, 80)}`);
+  }
+
   return res.json({ success: true, message: msgObj });
+});
+
+// ── 20.6.1 Processamento Inteligente de Comprovativo no Chat de Suporte ──
+app.post('/api/client/support/process-proof', async (req, res) => {
+  try {
+    const { phone, name, smsText } = req.body || {};
+    if (!smsText) return res.status(400).json({ success: false, mensagem: 'Texto do comprovativo é obrigatório.' });
+
+    const smsClean = String(smsText).trim();
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
+
+    // 1. Detectar se é realmente um SMS de pagamento
+    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transa[çc][ãa]o|Ref|PP2\d{5})/i.test(smsClean);
+    const temValor = /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(smsClean);
+
+    if (!temIndicador && !temValor) {
+      return res.json({
+        success: false,
+        recognized: false,
+        mensagem: 'Não foi possível reconhecer este texto como um comprovativo M-Pesa ou e-Mola.'
+      });
+    }
+
+    // 2. Extrair TxId
+    function extrairTxIdChat(texto) {
+      const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[çc][ãa]o|ID\s*Trans|TxId|Ref(?:er[êe]ncia)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
+      if (mExplicit && mExplicit[1] && mExplicit[1].length >= 6) return mExplicit[1].toUpperCase().replace(/\.$/, '');
+      const mPP = texto.match(/\b(PP[0-9]{6}\.[0-9]{4}\.[A-Z0-9]{4,8})\b/i);
+      if (mPP) return mPP[1].toUpperCase();
+      const mConf = texto.match(/Confirmado\s+([A-Z0-9]{8,15})\b/i);
+      if (mConf) { const c = mConf[1].toUpperCase(); if (!/^(258)?8[2-7]\d{7}$/.test(c)) return c; }
+      const mAlpha = texto.match(/\b([A-Z][A-Z0-9]{9,12})\b/);
+      if (mAlpha) {
+        const c = mAlpha[1].toUpperCase();
+        const ignorar = ['CONFIRMADO','TRANSFERISTE','RECEBESTE','NOTIFICACAO','COMPROVATIVO','AUTOMATICA'];
+        if (!ignorar.includes(c) && /[0-9]/.test(c)) return c;
+      }
+      return 'TXN-' + Date.now();
+    }
+
+    // 3. Extrair Valor
+    function extrairValorChat(texto) {
+      const mTransf = texto.match(/Transferiste\s+([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
+      if (mTransf) return parseFloat(mTransf[1].replace(',', '.'));
+      const mReceb  = texto.match(/(?:Recebeste|Recebeu|Creditado|Depositado)\s+([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
+      if (mReceb)  return parseFloat(mReceb[1].replace(',', '.'));
+      const mValor  = texto.match(/Valor\s*[:.]?\s*([\d.,]+)\s*(?:MT|MZN|Mts?)/i);
+      if (mValor)  return parseFloat(mValor[1].replace(',', '.'));
+      const mGeral  = texto.match(/([\d.,]+)\s*(?:MT|MZN|Mts?)\b/i);
+      if (mGeral)  return parseFloat(mGeral[1].replace(',', '.'));
+      return null;
+    }
+
+    const txnId = extrairTxIdChat(smsClean);
+    const valor = extrairValorChat(smsClean) || 0;
+    const isEmola = /e-?mola|864882152/i.test(smsClean);
+    const metodo = isEmola ? 'e-Mola' : 'M-Pesa';
+
+    // 4. Verificar se a operadora já confirmou no gateway
+    let realPay = await findOperatorPayment(txnId);
+
+    const paymentDetails = {
+      txnId,
+      valor,
+      metodo,
+      operatorConfirmed: !!realPay,
+      rawSms: smsClean.slice(0, 180)
+    };
+
+    // Registar no chat do cliente como comprovativo reconhecido
+    const msgObj = {
+      id: `MSG-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+      clientPhone: cleanPhone || 'Visitante',
+      clientName: name || 'Cliente Hub',
+      sender: 'client',
+      text: `💳 [COMPROVATIVO ENVIADO]\nRef: ${txnId}\nValor: ${valor} MT (${metodo})\n\n"${smsClean.slice(0, 100)}..."`,
+      createdAt: new Date().toISOString(),
+      read: false,
+      isDirectAdmin: true,
+      hasPaymentProof: true,
+      paymentDetails
+    };
+    clientSupportMessages.push(msgObj);
+    if (clientSupportMessages.length > 500) clientSupportMessages.shift();
+
+    let respostaTexto = '';
+    if (realPay) {
+      respostaTexto = `✅ <b>Comprovativo M-Pesa/e-Mola Reconhecido e Validado!</b><br><br>` +
+        `• <b>Código/Ref:</b> <code class="text-cyan-400 font-bold">${txnId}</code><br>` +
+        `• <b>Valor Recebido:</b> <b>${realPay.valor || valor} MT</b> (${metodo})<br>` +
+        `• <b>Status:</b> Confirmado pelo nosso gateway de rede!<br><br>` +
+        `🚀 O seu pagamento já está aprovado no sistema! O Administrador Kelven foi notificado para despachar ou você pode ir na aba <b>Loja</b> e concluir a compra com esse comprovativo.`;
+    } else {
+      respostaTexto = `⏳ <b>Comprovativo de Pagamento Detectado!</b><br><br>` +
+        `• <b>Código/Ref:</b> <code class="text-amber-400 font-bold">${txnId}</code><br>` +
+        `• <b>Valor Identificado:</b> <b>${valor} MT</b> (${metodo})<br>` +
+        `• <b>Status:</b> Registado no sistema! A aguardar o SMS oficial da operadora entrar no telemóvel gateway.<br><br>` +
+        `📱 <b>Atenção:</b> O sistema e o Administrador Kelven já receberam a sua confirmação. Assim que a rede entregar o SMS (30 a 60 segundos), o envio é liberado!`;
+    }
+
+    return res.json({
+      success: true,
+      recognized: true,
+      operatorConfirmed: !!realPay,
+      txnId,
+      valor,
+      metodo,
+      respostaTexto,
+      paymentDetails
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // ── 20.7 CRM & Suporte no Ka-Net Admin Master ──
@@ -4226,13 +4433,23 @@ app.get('/api/admin/crm/support-tickets', (req, res) => {
         unreadCount: 0,
         lastMessage: m.text,
         lastTime: m.createdAt,
+        isDirectAdmin: false,
+        hasPaymentProof: false,
+        paymentDetails: null,
         messages: []
       };
     }
     grouped[m.clientPhone].messages.push(m);
+    if (m.isDirectAdmin) grouped[m.clientPhone].isDirectAdmin = true;
+    if (m.hasPaymentProof) {
+      grouped[m.clientPhone].hasPaymentProof = true;
+      grouped[m.clientPhone].paymentDetails = m.paymentDetails;
+    }
     if (m.sender === 'client' && !m.read) {
       grouped[m.clientPhone].unreadCount++;
     }
+    grouped[m.clientPhone].lastMessage = m.text;
+    grouped[m.clientPhone].lastTime = m.createdAt;
   });
 
   return res.json({ success: true, tickets: Object.values(grouped).sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime)) });
@@ -4369,7 +4586,7 @@ app.get('/api/sms/outgoing/pending', (req, res) => {
 
 // ── 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOMÁTICO) ──
 app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
-  const { sender, remetente, phone, body, text, mensagem } = req.body || {};
+  const { sender, remetente, phone, body, text, mensagem, port, sim_slot, simSlot } = req.body || {};
   const cleanSender = sender || remetente || phone;
   const cleanBody = body || text || mensagem;
 
@@ -4377,12 +4594,17 @@ app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
     return res.status(400).json({ success: false, mensagem: 'Remetente e mensagem são obrigatórios.' });
   }
 
-  console.log(`📩 [SMS WEBHOOK RECEBIDO] De: ${cleanSender} | Texto: ${cleanBody.substring(0, 60)}`);
+  const originPort = port ? Number(port) : null;
+  const originSlot = sim_slot !== undefined ? Number(sim_slot) : (simSlot !== undefined ? Number(simSlot) : 0);
+
+  console.log(`📩 [SMS WEBHOOK RECEBIDO] Porta: ${originPort || 'Auto'} (SIM ${originSlot + 1}) | De: ${cleanSender} | Texto: ${cleanBody.substring(0, 60)}`);
 
   if (smsSalesEngine) {
     smsSalesEngine.processIncomingCustomerSms({
       sender: cleanSender,
       body: cleanBody,
+      port: originPort,
+      simSlot: originSlot,
       inMemoryPayments
     }).catch(err => {
       console.error('❌ [SMS SALES ENGINE ERRO]:', err.message);

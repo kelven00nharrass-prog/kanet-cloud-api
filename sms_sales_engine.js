@@ -60,8 +60,10 @@ function getPaymentDetails() {
 
 function getSuporteDetails() {
     carregarConfigs();
-    let supportNum = '856116039';
-    if (LOCAL_CFG.master_number) {
+    let supportNum = '850401416';
+    if (LOCAL_CFG.support_number) {
+        supportNum = String(LOCAL_CFG.support_number).split(',')[0].trim();
+    } else if (LOCAL_CFG.master_number) {
         supportNum = String(LOCAL_CFG.master_number).split(',')[0].trim();
     }
     const sysName = LOCAL_CFG.nome_sistema || 'Ka-Net';
@@ -72,10 +74,10 @@ function getSuporteDetails() {
 const pendingOutgoingSms = [];
 
 /**
- * Retorna o próximo SMS pendente para envio pelo Gateway Android (Porta 8090/8077)
- * Remove a mensagem da fila imediatamente para evitar reenvios em loop!
+ * Retorna o próximo SMS pendente para envio pelo Gateway Android
+ * Dá prioridade a mensagens destinadas à porta que solicitou (forPort)
  */
-function getNextPendingSms() {
+function getNextPendingSms(forPort = null) {
     const now = Date.now();
     // Limpar mensagens com mais de 10 minutos
     for (let i = pendingOutgoingSms.length - 1; i >= 0; i--) {
@@ -84,15 +86,30 @@ function getNextPendingSms() {
         }
     }
     
-    if (pendingOutgoingSms.length > 0) {
-        // Pop o primeiro SMS pendente
-        const item = pendingOutgoingSms.shift();
-        console.log(`📤 [SMS ENGINE DISPATCHED] SMS ${item.id} entregue ao celular para ${item.numero}`);
+    if (pendingOutgoingSms.length === 0) return null;
+
+    const p = forPort ? Number(forPort) : null;
+    let idx = -1;
+
+    if (p) {
+        // Procurar por SMS especificamente destinado a esta porta
+        idx = pendingOutgoingSms.findIndex(item => item.targetPort && Number(item.targetPort) === p);
+        // Se não houver específico, pegar um genérico
+        if (idx === -1) {
+            idx = pendingOutgoingSms.findIndex(item => !item.targetPort);
+        }
+    } else {
+        idx = 0;
+    }
+
+    if (idx !== -1) {
+        const item = pendingOutgoingSms.splice(idx, 1)[0];
+        console.log(`📤 [SMS ENGINE DISPATCHED] SMS ${item.id} entregue ao celular Porta ${p || 'qualquer'} para ${item.numero}`);
         return {
             id: item.id,
             numero: item.numero,
             mensagem: item.mensagem,
-            sim_slot: item.sim_slot || 0
+            sim_slot: item.sim_slot !== undefined ? item.sim_slot : 0
         };
     }
     return null;
@@ -108,8 +125,9 @@ function confirmSmsSent(smsId, success = true, error = null) {
 
 /**
  * Envia SMS para o cliente usando a Porta do Gateway Android
+ * Tenta disparo direto via HTTP local se a porta for informada
  */
-async function sendSms(destinatario, mensagem, simSlot = 0) {
+async function sendSms(destinatario, mensagem, simSlot = 0, targetPort = null) {
     const cleanNum = String(destinatario).trim();
     const cleanMsg = String(mensagem).trim();
     const smsId = 'SMS-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
@@ -118,120 +136,121 @@ async function sendSms(destinatario, mensagem, simSlot = 0) {
         id: smsId,
         numero: cleanNum,
         mensagem: cleanMsg,
-        sim_slot: simSlot,
+        sim_slot: simSlot !== undefined ? Number(simSlot) : 0,
+        targetPort: targetPort ? Number(targetPort) : null,
         createdAt: Date.now()
     };
 
-    // 1. Tentar envio direto se o Gateway estiver rodando em IP configurado
-    const gatewayPort = process.env.SMS_GATEWAY_PORT || 8077;
-    const gatewayHost = process.env.SMS_GATEWAY_HOST;
-    if (gatewayHost && gatewayHost !== '127.0.0.1') {
+    // 1. Tentar envio direto HTTP se a porta estiver disponível localmente
+    const directPort = targetPort || process.env.SMS_GATEWAY_PORT;
+    const directHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
+    if (directPort) {
         try {
-            const response = await axios.post(`http://${gatewayHost}:${gatewayPort}/sms/send`, {
+            const response = await axios.post(`http://${directHost}:${directPort}/sms/send`, {
                 numero: cleanNum,
                 mensagem: cleanMsg,
-                sim_slot: simSlot
-            }, { timeout: 4000 });
-            console.log(`📱 [SMS ENGINE ENVIADO DIRETO] Porta ${gatewayPort} -> ${cleanNum}`);
+                sim_slot: smsItem.sim_slot
+            }, { timeout: 3500 });
+            console.log(`📱 [SMS ENGINE ENVIADO DIRETO] Porta ${directPort} -> ${cleanNum}`);
             return response.data;
         } catch (err) {
-            console.log(`ℹ️ [SMS ENGINE] Envio direto HTTP falhou (${err.message}). Adicionando à fila para coleta pelo celular.`);
+            console.log(`ℹ️ [SMS ENGINE] Envio direto HTTP falhou na porta ${directPort} (${err.message}). Adicionando à fila para coleta pelo celular.`);
         }
     }
 
     // 2. Colocar na fila em Nuvem para o Gateway Android coletar via /api/devices/:port/health
     pendingOutgoingSms.push(smsItem);
-    console.log(`📥 [SMS ENGINE FILA] SMS ${smsId} enfileirado para ${cleanNum} (${pendingOutgoingSms.length} na fila da Nuvem)`);
+    console.log(`📥 [SMS ENGINE FILA] SMS ${smsId} enfileirado para ${cleanNum} (Porta Alvo: ${targetPort || 'Qualquer'}, ${pendingOutgoingSms.length} na fila)`);
     return { success: true, queued: true, id: smsId };
 }
 
 /**
- * Gera Tabela formatada especificamente para envio via SMS
+ * Gera Tabela formatada em texto puro GSM para SMS (Sem emojis para evitar UCS-2 e falhas na rede)
  */
 function gerarTabelaCompactaSms() {
     carregarConfigs();
     const tabelas = DYN_CFG.TABELAS || {};
-    let msg = "Ka-Net • TABELA DE PACOTES\n\n";
+    let msg = "Ka-Net - TABELA DE PACOTES:\n\n";
 
     // DIÁRIOS
     if (tabelas['24hrs'] && Object.keys(tabelas['24hrs']).length > 0) {
-        msg += "⚡ DIÁRIOS (24H):\n";
+        msg += "DIARIOS (24H):\n";
         const entries = Object.entries(tabelas['24hrs']).sort((a, b) => Number(a[0]) - Number(b[0]));
         for (const [preco, item] of entries) {
             const nome = item.nome ? item.nome.replace('24h', '').trim() : `${item.quantidade_mb || item.quantidade}MB`;
-            msg += `• ${nome}: ${preco} MT\n`;
+            msg += `- ${nome}: ${preco} MT\n`;
         }
         msg += "\n";
     }
 
     // SEMANAIS
     if (tabelas['semanal'] && Object.keys(tabelas['semanal']).length > 0) {
-        msg += "📅 SEMANAIS (7 Dias):\n";
+        msg += "SEMANAIS (7 Dias):\n";
         const entries = Object.entries(tabelas['semanal']).sort((a, b) => Number(a[0]) - Number(b[0]));
         for (const [preco, item] of entries) {
             const nome = item.nome ? item.nome.replace('7 Dias', '').trim() : `${item.quantidade_mb || item.quantidade}MB`;
-            msg += `• ${nome}: ${preco} MT\n`;
+            msg += `- ${nome}: ${preco} MT\n`;
         }
         msg += "\n";
     }
 
     // MENSAIS
     if (tabelas['mensal'] && Object.keys(tabelas['mensal']).length > 0) {
-        msg += "🗓️ MENSAIS (30 Dias):\n";
+        msg += "MENSAIS (30 Dias):\n";
         const entries = Object.entries(tabelas['mensal']).sort((a, b) => Number(a[0]) - Number(b[0]));
         for (const [preco, item] of entries) {
             const nome = item.nome ? item.nome.replace('Mensal', '').trim() : `${item.quantidade_mb || item.quantidade}MB`;
-            msg += `• ${nome}: ${preco} MT\n`;
+            msg += `- ${nome}: ${preco} MT\n`;
         }
         msg += "\n";
     }
 
-    msg += "Pague via M-Pesa ou e-Mola e reenvie aqui o comprovativo com o seu número Vodacom para ativar!";
+    msg += "Pague via M-Pesa ou e-Mola e reenvie aqui o comprovativo com o seu numero Vodacom para ativar!";
     return msg;
 }
 
 /**
- * Gera Mensagem de Formas de Pagamento para SMS
+ * Gera Mensagem de Formas de Pagamento em texto puro GSM
  */
 function gerarPagamentoCompactaSms() {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
-    return `Ka-Net • FORMAS DE PAGAMENTO:
+    return `Ka-Net - FORMAS DE PAGAMENTO:
 
-▫️ M-PESA: ${mpesa_num} (${mpesa_name})
-▫️ E-MOLA: ${emola_num} (${emola_name})
+- M-PESA: ${mpesa_num} (${mpesa_name})
+- E-MOLA: ${emola_num} (${emola_name})
 
 Como comprar:
-1. Faça a transferência do valor do pacote escolhido.
-2. Encaminhe o SMS do comprovativo para este número.
-3. Se o número que vai receber os megas for diferente, escreva o número na mensagem.
-Ativação imediata 24h!`;
+1. Envie o valor do pacote para uma das contas acima.
+2. Encaminhe o SMS do comprovativo para este numero.
+3. Se o numero for diferente, escreva o numero no SMS.
+Ativacao imediata 24h!`;
 }
 
 /**
- * Gera Mensagem de Suporte para SMS
+ * Gera Mensagem de Suporte para SMS em texto puro GSM
  */
 function gerarSuporteCompactaSms() {
     const { supportNum, sysName } = getSuporteDetails();
-    return `${sysName} • SUPORTE E ATENDIMENTO:
+    return `${sysName} - SUPORTE E ATENDIMENTO:
 
-Para assistência ou dúvidas sobre recargas, ligue ou envie WhatsApp para:
-📞 ${supportNum}
-Horário de atendimento: 24h / 7 dias por semana.`;
+Para assistencia ou duvidas sobre recargas, ligue ou envie WhatsApp para:
+Tel: ${supportNum}
+Atendimento: 24h / 7 dias por semana.`;
 }
 
 /**
- * Gera Mensagem de Boas-Vindas
+ * Gera Mensagem de Boas-Vindas em texto puro GSM (compatível com todos celulares)
  */
 function gerarBoasVindasSms() {
     const { sysName } = getSuporteDetails();
-    return `Olá! Bem-vindo ao atendimento automático da ${sysName} 🇲🇿
+    return `Ola! Bem-vindo ao atendimento automatico da ${sysName}.
 
-Responda com uma opção:
+Responda com uma opcao:
 1 - Formas de Pagamento
-2 - Tabela de Preços e Pacotes
+2 - Tabela de Precos e Pacotes
 3 - Suporte
 
-⚡ Se já pagou, basta reenviar o comprovativo da operadora para ativar os seus megas!`;
+Se ja pagou, reenvie o comprovativo da operadora para ativar!`;
 }
 
 /**
@@ -360,7 +379,7 @@ function extrairValor(body) {
  * PROCESSADOR PRINCIPAL DE MENSAGENS RECEBIDAS POR SMS
  * Chamado pelo webhook quando qualquer cliente envia um SMS para o celular Gateway
  */
-async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
+async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port = null, simSlot = 0 }) {
     if (!sender || !body) return;
     const cleanSender = String(sender).replace(/\D/g, '').slice(-9);
     
@@ -382,7 +401,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
     }
     recentIncomingSmsCache.set(dedupKey, now);
 
-    console.log(`📩 [SMS BOT] Mensagem de ${cleanSender}: "${text.slice(0, 80)}"`);
+    console.log(`📩 [SMS BOT] Mensagem de ${cleanSender} (Porta ${port || 'Auto'}, SIM ${simSlot + 1}): "${text.slice(0, 80)}"`);
 
     // ── 1. DETECTAR SE É UM COMPROVATIVO ENCAMINHADO PELO CLIENTE (PRIMEIRA PRIORIDADE!) ──
     const isComprovativo = (
@@ -405,7 +424,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
         const numDestino = extrairNumeroDestino(text, cleanSender);
 
         if (!txnId || !valor) {
-            await sendSms(cleanSender, "Ka-Net: Não conseguimos ler o código da transação ou o valor do comprovativo. Por favor, reenvie o SMS original completo da operadora.");
+            await sendSms(cleanSender, "Ka-Net: Nao conseguimos ler o codigo da transacao ou o valor do comprovativo. Por favor, reenvie o SMS original completo da operadora.", simSlot, port);
             return;
         }
 
@@ -413,7 +432,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
 
         // Anti-duplicação
         if (smsTransacoesProcessadas.has(txnId)) {
-            await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} já foi utilizado anteriormente no sistema.`);
+            await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} ja foi utilizado anteriormente no sistema.`, simSlot, port);
             return;
         }
 
@@ -421,7 +440,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
 
         // Se o número de destino não for Vodacom (84/85) e não conseguimos extrair no texto:
         if (!numDestino) {
-            await sendSms(cleanSender, `Ka-Net: Identificamos o seu comprovativo ${txnId} (${valor} MT - ${pacote.nome})! Por favor, responda com o seu número Vodacom (84 ou 85) que receberá os megas.`);
+            await sendSms(cleanSender, `Ka-Net: Identificamos o seu comprovativo ${txnId} (${valor} MT - ${pacote.nome})! Por favor, responda com o seu numero Vodacom (84 ou 85) que recebera os megas.`, simSlot, port);
             // Salva na fila aguardando número
             smsAguardandoOperadora.set(txnId, {
                 txn_id: txnId,
@@ -457,12 +476,12 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
                 if (smsAguardandoOperadora.has(txnId)) {
                     smsAguardandoOperadora.delete(txnId);
                     const { supportNum } = getSuporteDetails();
-                    await sendSms(cleanSender, `⚠️ Ka-Net: O comprovativo ${txnId} (${valor} MT) ainda não foi confirmado pela operadora após 2 minutos. Se o valor já saiu da conta, envie o extrato ao suporte: ${supportNum}.`);
+                    await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} (${valor} MT) ainda nao foi confirmado pela operadora apos 2 minutos. Se o valor ja saiu da conta, envie o extrato ao suporte: ${supportNum}.`, simSlot, port);
                 }
             }, 120000);
 
             // Avisar o cliente que estamos aguardando a rede
-            await sendSms(cleanSender, `⏳ Ka-Net: Comprovativo ${txnId} (${valor} MT) recebido! A verificar com a rede para ativar ${pacote.nome} no número ${numDestino}.`);
+            await sendSms(cleanSender, `Ka-Net: Comprovativo ${txnId} (${valor} MT) recebido! A verificar com a rede para ativar ${pacote.nome} no numero ${numDestino}.`, simSlot, port);
         }
         return;
     }
@@ -474,8 +493,8 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
     ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('pagamento') || cleanText.includes('como pagar') || cleanText.includes('formas de pagamento'));
 
     if (ehPagamento) {
-        console.log(`💳 [SMS BOT] Enviando formas de pagamento para ${cleanSender}`);
-        await sendSms(cleanSender, gerarPagamentoCompactaSms());
+        console.log(`💳 [SMS BOT] Enviando formas de pagamento para ${cleanSender} via Porta ${port || 'Auto'}`);
+        await sendSms(cleanSender, gerarPagamentoCompactaSms(), simSlot, port);
         return;
     }
 
@@ -486,8 +505,8 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
     ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('manda tabela') || cleanText.includes('quero megas') || cleanText.includes('ver tabela')) && !cleanText.includes('pagam');
 
     if (ehTabela) {
-        console.log(`📋 [SMS BOT] Enviando tabela para ${cleanSender}`);
-        await sendSms(cleanSender, gerarTabelaCompactaSms());
+        console.log(`📋 [SMS BOT] Enviando tabela para ${cleanSender} via Porta ${port || 'Auto'}`);
+        await sendSms(cleanSender, gerarTabelaCompactaSms(), simSlot, port);
         return;
     }
 
@@ -497,8 +516,8 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
     ].some(w => cleanText === w || cleanText.startsWith(w + ' ') || cleanText.includes('falar com'));
 
     if (ehSuporte) {
-        console.log(`📞 [SMS BOT] Enviando suporte para ${cleanSender}`);
-        await sendSms(cleanSender, gerarSuporteCompactaSms());
+        console.log(`📞 [SMS BOT] Enviando suporte para ${cleanSender} via Porta ${port || 'Auto'}`);
+        await sendSms(cleanSender, gerarSuporteCompactaSms(), simSlot, port);
         return;
     }
 
@@ -509,7 +528,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
             if (numDetectado) {
                 item.numDestino = numDetectado;
                 console.log(`📲 [SMS BOT] Número ${numDetectado} vinculado ao comprovativo ${txnId}`);
-                await sendSms(cleanSender, `Ka-Net: Número ${numDetectado} registado! Assim que a operadora confirmar os ${item.valor} MT, o pacote ${item.pacote.nome} será ativado.`);
+                await sendSms(cleanSender, `Ka-Net: Numero ${numDetectado} registado! Assim que a operadora confirmar os ${item.valor} MT, o pacote ${item.pacote.nome} sera ativado.`, simSlot, port);
                 
                 // Se a operadora já tiver confirmado enquanto aguardava número
                 if (inMemoryPayments && inMemoryPayments.has(txnId)) {
@@ -528,8 +547,8 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments }) {
     }
 
     // ── 6. MENSAGEM PADRÃO / SAUDAÇÃO ──
-    console.log(`👋 [SMS BOT] Enviando boas-vindas padrão para ${cleanSender}`);
-    await sendSms(cleanSender, gerarBoasVindasSms());
+    console.log(`👋 [SMS BOT] Enviando boas-vindas padrão para ${cleanSender} via Porta ${port || 'Auto'}`);
+    await sendSms(cleanSender, gerarBoasVindasSms(), simSlot, port);
 }
 
 /**
