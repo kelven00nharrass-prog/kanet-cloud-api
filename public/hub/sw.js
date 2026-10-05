@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kanet-hub-v1';
+const CACHE_NAME = 'kanet-hub-v2.2';
 const ASSETS = [
   '/hub/',
   '/hub/index.html',
@@ -20,9 +20,16 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING' || (event.data && event.data.type === 'SKIP_WAITING')) {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
   );
 });
+

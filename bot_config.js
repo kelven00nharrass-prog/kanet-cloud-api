@@ -567,9 +567,10 @@ module.exports = {
         }
     },
     "NOME_SISTEMA": "Ka-Net System",
+    "SUPPORT_NUMBER": "850401416",
     "MASTER_NUMBERS": [
-        "856116039",
-        "850401416"
+        "850401416",
+        "856116039"
     ],
     "MPESA_NUMBER": "856268811",
     "MPESA_NAME": "Kelven Junior Anabela Nharrava",
