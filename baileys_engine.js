@@ -1393,7 +1393,84 @@ async function startWhatsApp(orderCallback, db = null) {
                         await sock.sendMessage(jid, { text: resposta });
                     };
 
+                    // ── 🎯 COMANDOS DO FASEADO MENSAL INTERATIVO ─────────────────────────────
+                    // SIM / NÃO / sacar Xgb / meu saldo — processados antes de tudo
+                    const textLimpo = cleanText.trim();
+                    const isSim = ['sim', 's', 'yes'].includes(textLimpo);
+                    const isNao = ['nao', 'não', 'n', 'no'].includes(textLimpo);
+                    const isSaque = /^sacar\s+(\d+(?:[.,]\d+)?)\s*(gb|mb|g|m)?$/i.test(textLimpo);
+                    const isMeuSaldo = ['meu saldo', 'saldo', 'meu plano', 'plano'].includes(textLimpo);
+
+                    if (isSim || isNao) {
+                        // Verificar se tem plano faseado_mensal aguardando confirmação
+                        const apiBase = `http://localhost:${process.env.PORT || 3000}`;
+                        try {
+                            const axios = require('axios');
+                            const endpoint = isSim ? '/api/plans/confirmar' : '/api/plans/pular';
+                            const resp = await axios.post(`${apiBase}${endpoint}`, { numero: senderNumber }, { timeout: 8000 });
+                            if (resp.data && resp.data.success) {
+                                await reply(resp.data.mensagem);
+                                addLog(`✅ [PLANO MENSAL] ${senderNumber} → ${isSim ? 'SIM' : 'NÃO'} | ${resp.data.acao}`);
+                                continue;
+                            }
+                            // Se não houver plano pendente, deixar cair para processamento normal
+                        } catch (e) { /* continuar processamento normal se erro */ }
+                    }
+
+                    if (isSaque) {
+                        try {
+                            const axios = require('axios');
+                            const matchSaque = textLimpo.match(/^sacar\s+(\d+(?:[.,]\d+)?)\s*(gb|mb|g|m)?$/i);
+                            const qtd = parseFloat(matchSaque[1].replace(',', '.'));
+                            const unidade = (matchSaque[2] || 'mb').toLowerCase();
+                            const mbSolicitado = (unidade === 'gb' || unidade === 'g') ? Math.round(qtd * 1024) : Math.round(qtd);
+                            const apiBase = `http://localhost:${process.env.PORT || 3000}`;
+                            const resp = await axios.post(`${apiBase}/api/plans/saque`, { numero: senderNumber, mb: mbSolicitado }, { timeout: 8000 });
+                            if (resp.data && resp.data.success) {
+                                await reply(resp.data.mensagem);
+                                addLog(`💸 [SAQUE] ${senderNumber} → ${mbSolicitado}MB | Saldo: ${resp.data.saldo_restante}MB`);
+                            } else {
+                                await reply(`❌ ${resp.data?.error || 'Não foi possível processar o saque. Verifique o seu saldo com *meu saldo*.'}`);
+                            }
+                            continue;
+                        } catch (e) {
+                            await reply(`❌ Erro ao processar saque: ${e.response?.data?.error || e.message}`);
+                            continue;
+                        }
+                    }
+
+                    if (isMeuSaldo) {
+                        try {
+                            const axios = require('axios');
+                            const apiBase = `http://localhost:${process.env.PORT || 3000}`;
+                            const resp = await axios.get(`${apiBase}/api/plans/meu-saldo/${senderNumber}`, { timeout: 5000 });
+                            if (resp.data && resp.data.success && resp.data.planos.length > 0) {
+                                const p = resp.data.planos[0];
+                                const tipoLabel = p.tipo === 'faseado_mensal' ? 'Faseado Mensal' : p.tipo === 'faseado' ? 'Faseado' : 'Renovável';
+                                const proxData = p.proxima_entrega ? new Date(p.proxima_entrega).toLocaleString('pt-PT', { timeZone: 'Africa/Maputo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                                const mbDiarF = p.mb_diaria >= 1024 ? `${(p.mb_diaria/1024).toFixed(1)}GB` : `${p.mb_diaria}MB`;
+                                const confMsg = p.aguardando_confirmacao ? `\n\n❓ *Entrega pendente de confirmação!* Responda *SIM* para receber ou *NÃO* para adiar.` : '';
+                                await reply(
+                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                    `  📊 *MEU PLANO KA-NET* 📊\n` +
+                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `📦 *Tipo:* ${tipoLabel}\n` +
+                                    `💾 *Saldo Restante:* *${p.saldo_formatado}*\n` +
+                                    `📅 *Entrega diária:* ${mbDiarF}\n` +
+                                    `⏰ *Próxima entrega:* ${proxData}\n` +
+                                    `✅ *Entregas feitas:* ${p.entregas_feitas}` +
+                                    confMsg +
+                                    `\n\n💡 Use *sacar Xgb* para sacar a qualquer hora.`
+                                );
+                                addLog(`📊 [MEU SALDO] ${senderNumber} consultou saldo: ${p.saldo_formatado}`);
+                                continue;
+                            }
+                        } catch (e) { /* sem plano — resposta normal abaixo */ }
+                    }
+                    // ── FIM DOS COMANDOS DO FASEADO MENSAL ───────────────────────────────────
+
                     // ── 1. AGUARDANDO NÚMERO DE DESTINO APÓS COMPROVATIVO ──
+
                     // Caso o cliente esteja aguardando validação da operadora e tenha enviado o número agora:
                     const itemAguardandoOp = [...aguardandoOperadora.values()].find(it => it.senderNumber === senderNumber && !it.numDestino);
                     if (itemAguardandoOp) {
