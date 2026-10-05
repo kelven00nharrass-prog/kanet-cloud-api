@@ -4917,23 +4917,26 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     }
   }
 
-  if (plano && (plano.tipo === 'renovacao' || plano.tipo === 'renovavel' || plano.tipo === 'faseado')) {
+  if (plano && (plano.tipo === 'renovacao' || plano.tipo === 'renovavel' || plano.tipo === 'faseado' || plano.tipo === 'faseado_mensal')) {
     orderDoc.isSpecialPlanHandled = true;
-    const tipo = (plano.tipo === 'renovacao' || plano.tipo === 'renovavel') ? 'renovavel' : 'faseado';
-    const mbInicial = plano.inicial || (tipo === 'faseado' ? 1024 : 3072);
-    const mbDiaria = plano.diaria || (tipo === 'faseado' ? 1024 : 100);
-    const totalMb = plano.total || (mbInicial + (mbDiaria * (tipo === 'faseado' ? 4 : 7)));
+    const tipo = (plano.tipo === 'renovacao' || plano.tipo === 'renovavel') ? 'renovavel'
+               : plano.tipo === 'faseado_mensal' ? 'faseado_mensal'
+               : 'faseado';
+    const mbInicial = plano.inicial || 1024;
+    const mbDiaria  = plano.diaria  || 1024;
+    const totalMb   = plano.total   || (mbInicial + (mbDiaria * (tipo === 'renovavel' ? 7 : 4)));
+    const labelTipo = tipo === 'faseado_mensal' ? 'Faseado Mensal' : tipo === 'faseado' ? 'Faseado' : 'Renovável';
 
-    // ⚠️ CRÍTICO: Pacotes Renovável e Faseado são transferidos como pacotes DIÁRIOS normais (*162# -> 8 -> 2)
-    // pelas portas diárias disponíveis (8021, 8023, 8024, etc.)
+    // ⚠️ CRÍTICO: Todos os planos especiais enviam a Fase 1 como pacote DIÁRIO normal
+    // pelas portas diárias disponíveis (8023, 8025, etc.)
     orderDoc.quantidade = mbInicial;
     orderDoc.origem = tipo;
     orderDoc.modo = 'diario';
-    orderDoc.targetPort = null; // Qualquer celular diário online e apto assume de imediato
+    orderDoc.targetPort = null;
     orderDoc.input_val = '';
-    orderDoc.remetente = `Ka-Net ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`;
+    orderDoc.remetente = `Ka-Net ${labelTipo} (Fase 1)`;
 
-    // Criar o plano agendado para as próximas entregas diárias automáticas
+    // Criar o plano agendado para as próximas entregas
     const plan = criarPlano({
       numero: orderDoc.numero,
       tipo,
@@ -4947,7 +4950,8 @@ function handleSpecialPlanIfApplicable(orderDoc) {
 
     console.log(`✨ [PLANO ESPECIAL DETECTADO] Ordem ${orderDoc.orderId} (${val || 0}MT) configurada como ${tipo.toUpperCase()}!`);
     console.log(`   📦 Entrega Inicial: ${mbInicial}MB (enviando agora via celular diário)`);
-    console.log(`   ⏰ Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias adicionais | Próxima: ${plan.proxima_entrega}`);
+    console.log(`   ⏰ Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias | Próxima: ${plan.proxima_entrega}`);
+
 
     // Notificar cliente no WhatsApp com explicação detalhada, clara e tranquilizadora do plano
     let clientJid = orderDoc.jid;

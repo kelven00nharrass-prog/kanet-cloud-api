@@ -355,14 +355,17 @@ function gerarMenuOriginal(jid = null) {
     // Se a mensagem veio de um grupo e esse grupo tiver uma tabela customizada, exibi-la
     let _tabelas = DYN_CFG.TABELAS || {};
     const DEFAULT_PLANOS_ESPECIAIS = {
-        "76":  { nome: "♻️ 3GB+700 (Renovação)", tipo: "renovavel", total: 3772, inicial: 3072, diaria: 100 },
-        "120": { nome: "♻️ 5GB+700 (Renovação)", tipo: "renovavel", total: 5820, inicial: 5120, diaria: 100 },
-        "130": { nome: "📉 5GB Faseado (1GB/dia)", tipo: "faseado", total: 5120, inicial: 1024, diaria: 1024 },
-        "195": { nome: "♻️ 8GB+700 (Renovação)", tipo: "renovavel", total: 8892, inicial: 8192, diaria: 100 },
-        "240": { nome: "♻️ 10GB+700 (Renovação)", tipo: "renovavel", total: 10940, inicial: 10240, diaria: 100 },
-        "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado", total: 10240, inicial: 1024, diaria: 1024 },
-        "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado", total: 15360, inicial: 1024, diaria: 1024 },
-        "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado", total: 20480, inicial: 1024, diaria: 1024 }
+        "76":  { nome: "♻️ 3GB+700 (Renovação)",   tipo: "renovavel",      total: 3772,  inicial: 3072, diaria: 100  },
+        "120": { nome: "♻️ 5GB+700 (Renovação)",   tipo: "renovavel",      total: 5820,  inicial: 5120, diaria: 100  },
+        "130": { nome: "📉 5GB Faseado (1GB/dia)",  tipo: "faseado",        total: 5120,  inicial: 1024, diaria: 1024 },
+        "195": { nome: "♻️ 8GB+700 (Renovação)",   tipo: "renovavel",      total: 8892,  inicial: 8192, diaria: 100  },
+        "240": { nome: "♻️ 10GB+700 (Renovação)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100 },
+        "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado",        total: 10240, inicial: 1024, diaria: 1024 },
+        "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024, diaria: 1024 },
+        "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado",        total: 20480, inicial: 1024, diaria: 1024 },
+        "232": { nome: "📆 10GB Faseado Mensal",    tipo: "faseado_mensal", total: 10240, inicial: 1024, diaria: 1024 },
+        "461": { nome: "📆 20GB Faseado Mensal",    tipo: "faseado_mensal", total: 20480, inicial: 1024, diaria: 1024 },
+        "700": { nome: "📆 30GB Faseado Mensal",    tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
     };
     let _especiais = (DYN_CFG.PLANOS_ESPECIAIS && Object.keys(DYN_CFG.PLANOS_ESPECIAIS).length > 0)
         ? { ...DEFAULT_PLANOS_ESPECIAIS, ...DYN_CFG.PLANOS_ESPECIAIS }
@@ -441,14 +444,33 @@ function gerarMenuOriginal(jid = null) {
         out += `╰─────────────────────────────╯\n\n`;
     }
 
-    // PLANOS ESPECIAIS
-    if (Object.keys(_especiais).length > 0) {
+    // PLANOS ESPECIAIS — separar renovavel/faseado de faseado_mensal
+    const especiaisVip    = Object.entries(_especiais).filter(([, v]) => v.tipo !== 'faseado_mensal');
+    const especiaisMensal = Object.entries(_especiais).filter(([, v]) => v.tipo === 'faseado_mensal');
+
+    if (especiaisVip.length > 0) {
         out += `🚀 *PLANOS ESPECIAIS VIP*\n`;
         out += `╭─────────────────────────────╮\n`;
-        const sortedEsp = Object.entries(_especiais).sort((a, b) => Number(a[0]) - Number(b[0]));
-        for (const [preco, info] of sortedEsp) {
+        especiaisVip.sort((a, b) => Number(a[0]) - Number(b[0]));
+        for (const [preco, info] of especiaisVip) {
             out += `│ 💎 *${info.nome}* ➔ *${preco} MT*\n`;
         }
+        out += `╰─────────────────────────────╯\n\n`;
+    }
+
+    if (especiaisMensal.length > 0) {
+        out += `📆 *FASEADO MENSAL INTERATIVO*\n`;
+        out += `╭─────────────────────────────╮\n`;
+        especiaisMensal.sort((a, b) => Number(a[0]) - Number(b[0]));
+        for (const [preco, info] of especiaisMensal) {
+            const gbTotal = Math.round(info.total / 1024);
+            out += `│ 🗓️ *${gbTotal}GB* ➔ *${preco} MT*\n`;
+        }
+        out += `│\n`;
+        out += `│ ✅ Você define quantos GB\n`;
+        out += `│    quer receber por dia.\n`;
+        out += `│ 📲 Confirme por WhatsApp,\n`;
+        out += `│    SMS ou Ka-Net Hub.\n`;
         out += `╰─────────────────────────────╯\n\n`;
     }
 
