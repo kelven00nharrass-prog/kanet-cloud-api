@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-MZ" class="dark">
 <head>
   <meta charset="UTF-8">
@@ -504,6 +504,135 @@
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════ -->
+    <!-- SECÇÃO: MEU PLANO FASEADO MENSAL        -->
+    <!-- ═══════════════════════════════════════ -->
+    <section id="view-plan" class="section-view px-4 pt-4">
+
+      <!-- Card de Saldo Principal -->
+      <div id="plan-card" class="hidden mb-4">
+        <div class="relative overflow-hidden rounded-3xl p-5 bg-gradient-to-br from-[#0d2137] via-[#0a1a2e] to-[#061220] border border-cyan-500/20 shadow-2xl shadow-cyan-500/10">
+          <div class="absolute top-0 right-0 w-40 h-40 bg-cyan-500/5 rounded-full -translate-y-10 translate-x-10 blur-2xl pointer-events-none"></div>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <span class="text-[10px] font-bold text-cyan-400/70 uppercase tracking-widest">Faseado Mensal</span>
+              <p class="text-xs text-slate-400 mt-0.5" id="plan-tipo-label">A carregar...</p>
+            </div>
+            <span id="plan-status-badge" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">ACTIVO</span>
+          </div>
+          <div class="mb-5">
+            <p class="text-[11px] text-slate-500 mb-1">Saldo Disponível</p>
+            <div class="flex items-end gap-2">
+              <span id="plan-saldo-valor" class="text-4xl font-black text-white neon-text">--</span>
+              <span id="plan-saldo-unit" class="text-lg font-bold text-cyan-400 mb-1">GB</span>
+            </div>
+            <div class="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div id="plan-saldo-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-700" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between mt-1">
+              <span class="text-[10px] text-slate-500" id="plan-saldo-mb-label">0 MB restantes</span>
+              <span class="text-[10px] text-slate-500" id="plan-total-label">/ 0 GB total</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+              <p class="text-slate-500 text-[10px] mb-0.5">Entrega diária</p>
+              <p class="font-bold text-white" id="plan-diaria">--</p>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+              <p class="text-slate-500 text-[10px] mb-0.5">Próxima entrega</p>
+              <p class="font-bold text-white" id="plan-proxima">--</p>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+              <p class="text-slate-500 text-[10px] mb-0.5">Entregas feitas</p>
+              <p class="font-bold text-white" id="plan-feitas">--</p>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+              <p class="text-slate-500 text-[10px] mb-0.5">Hora preferida</p>
+              <p class="font-bold text-cyan-400" id="plan-hora">--</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card de Confirmação (aparece quando aguardando) -->
+      <div id="plan-confirm-card" class="hidden mb-4 p-4 rounded-2xl border-2 border-amber-400/40 bg-amber-500/5 shadow-lg shadow-amber-500/10">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xl animate-bounce">❓</span>
+          <div>
+            <p class="text-sm font-bold text-amber-300">Entrega de hoje pendente!</p>
+            <p class="text-[11px] text-slate-400" id="plan-confirm-msg">O sistema está à espera da sua confirmação para enviar os dados.</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="responderConfirmacao('sim')" class="py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+            <span>✅</span> SIM, Quero!
+          </button>
+          <button onclick="responderConfirmacao('nao')" class="py-3 rounded-2xl bg-slate-800 border border-slate-700 text-slate-300 font-bold text-sm active:scale-95 transition-all flex items-center justify-center gap-2">
+            <span>⏭️</span> Hoje Não
+          </button>
+        </div>
+      </div>
+
+      <!-- Card de Saque -->
+      <div id="plan-saque-card" class="hidden mb-4 p-4 rounded-2xl glass-card border border-slate-700">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-bold text-white flex items-center gap-2">💸 Sacar Dados</h4>
+          <span class="text-[10px] text-slate-400">Saldo: <span id="saque-saldo-disp" class="text-cyan-400 font-bold">--</span></span>
+        </div>
+        <div class="mb-3">
+          <label class="text-[11px] text-slate-400 mb-1 block">Quanto quer sacar agora?</label>
+          <div class="flex gap-2">
+            <input type="number" id="saque-input" placeholder="Ex: 2" min="0.1" step="0.5" class="flex-1 bg-[#070b14] border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-cyan-400 transition-colors">
+            <select id="saque-unit" class="bg-[#070b14] border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400">
+              <option value="gb">GB</option>
+              <option value="mb">MB</option>
+            </select>
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button onclick="setSaquePreset(1)" class="flex-1 py-1.5 rounded-xl bg-slate-800 text-xs font-bold text-slate-300 hover:text-white border border-slate-700 active:scale-95">1 GB</button>
+            <button onclick="setSaquePreset(2)" class="flex-1 py-1.5 rounded-xl bg-slate-800 text-xs font-bold text-slate-300 hover:text-white border border-slate-700 active:scale-95">2 GB</button>
+            <button onclick="setSaquePreset(3)" class="flex-1 py-1.5 rounded-xl bg-slate-800 text-xs font-bold text-slate-300 hover:text-white border border-slate-700 active:scale-95">3 GB</button>
+            <button onclick="setSaquePresetAll()" class="flex-1 py-1.5 rounded-xl bg-cyan-900/40 text-xs font-bold text-cyan-400 border border-cyan-800 active:scale-95">Tudo</button>
+          </div>
+        </div>
+        <button onclick="executarSaque()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-cyan-500/25 active:scale-95 transition-all">
+          💸 Sacar Agora
+        </button>
+      </div>
+
+      <!-- Card de Configurações do Plano -->
+      <div id="plan-settings-card" class="hidden mb-4 p-4 rounded-2xl glass-card border border-slate-700">
+        <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">⚙️ Configurações do Plano</h4>
+        <div class="space-y-3">
+          <div>
+            <label class="text-[11px] text-slate-400 mb-1 block">Hora preferida de entrega (06:00–22:00)</label>
+            <div class="flex gap-2">
+              <input type="time" id="hora-preferida-input" min="06:00" max="22:00" value="08:00" class="flex-1 bg-[#070b14] border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400">
+              <button onclick="salvarHoraPreferida()" class="px-4 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 active:scale-95 transition-all">Guardar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estado Vazio (sem plano activo) -->
+      <div id="plan-empty" class="text-center py-12 px-4">
+        <div class="text-5xl mb-3">📆</div>
+        <h3 class="text-base font-bold text-slate-300 mb-1">Sem plano activo</h3>
+        <p class="text-xs text-slate-500 mb-5">Adquira um Faseado Mensal na loja e o seu saldo aparecerá aqui automaticamente.</p>
+        <button onclick="switchView('store')" class="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 active:scale-95 transition-all">
+          Ver Pacotes
+        </button>
+      </div>
+
+      <!-- Loader -->
+      <div id="plan-loader" class="flex flex-col items-center py-12 gap-3">
+        <div class="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin"></div>
+        <p class="text-xs text-slate-500">A carregar plano...</p>
+      </div>
+
+    </section>
+
   </main>
 
   <!-- BANNER FLUTUANTE DE NOVA ACTUALIZAÇÃO (AUTO-UPDATE) -->
@@ -658,6 +787,11 @@
       <button onclick="switchView('orders')" id="tab-nav-orders" class="flex flex-col items-center gap-1 py-1.5 px-3 text-slate-400 font-bold transition-all">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         <span class="text-[10px]">Compras</span>
+      </button>
+      <button onclick="switchView('plan')" id="tab-nav-plan" class="flex flex-col items-center gap-1 py-1.5 px-3 text-slate-400 font-bold transition-all relative">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span class="text-[10px]">Meu Plano</span>
+        <span id="plan-tab-badge" class="hidden absolute top-0.5 right-2 w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
       </button>
       <button onclick="switchView('support')" id="tab-nav-support" class="flex flex-col items-center gap-1 py-1.5 px-3 text-slate-400 font-bold transition-all">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -1990,16 +2124,19 @@ Se tiver dúvidas específicas, utilize os <b>atalhos rápidos acima</b> ou toqu
     }
 
     // ── NAVEGAÇÃO ENTRE ABAS PRINCIPAIS ──
+    let planPollingInterval = null;
+    let activePlanData = null;
+
     function switchView(view) {
-      ['store', 'orders', 'support', 'profile'].forEach(v => {
+      ['store', 'orders', 'support', 'profile', 'plan'].forEach(v => {
         const sec = document.getElementById(`view-${v}`);
         if (sec) sec.classList.toggle('active', v === view);
         const navBtn = document.getElementById(`tab-nav-${v}`);
         if (navBtn) {
           if (v === view) {
-            navBtn.className = 'flex flex-col items-center gap-1 py-1.5 px-3 text-cyan-400 font-bold transition-all';
+            navBtn.className = 'flex flex-col items-center gap-1 py-1.5 px-3 text-cyan-400 font-bold transition-all relative';
           } else {
-            navBtn.className = 'flex flex-col items-center gap-1 py-1.5 px-3 text-slate-400 font-bold transition-all';
+            navBtn.className = 'flex flex-col items-center gap-1 py-1.5 px-3 text-slate-400 font-bold transition-all relative';
           }
         }
       });
@@ -2007,18 +2144,208 @@ Se tiver dúvidas específicas, utilize os <b>atalhos rápidos acima</b> ou toqu
       // Limpar intervalos de polling anteriores
       if (ordersPollingInterval) { clearInterval(ordersPollingInterval); ordersPollingInterval = null; }
       if (supportPollingInterval) { clearInterval(supportPollingInterval); supportPollingInterval = null; }
+      if (planPollingInterval)   { clearInterval(planPollingInterval);   planPollingInterval   = null; }
 
       if (view === 'orders') {
         loadClientOrders();
-        // Polling a cada 4 segundos enquanto estiver na aba de pedidos
         ordersPollingInterval = setInterval(() => loadClientOrders(true), 4000);
       }
       if (view === 'support') {
         loadSupportMessages();
-        // Polling a cada 3 segundos enquanto estiver na aba de suporte
         supportPollingInterval = setInterval(loadSupportMessages, 3000);
       }
+      if (view === 'plan') {
+        // Esconder badge ao entrar
+        const badge = document.getElementById('plan-tab-badge');
+        if (badge) badge.classList.add('hidden');
+        loadMeuPlano();
+        planPollingInterval = setInterval(loadMeuPlano, 30000);
+      }
     }
+
+    // ── FUNÇÕES DO MEU PLANO ─────────────────────────────────────────────────
+
+    async function loadMeuPlano(silent = false) {
+      if (!currentUser || !currentUser.phone) {
+        document.getElementById('plan-loader').classList.add('hidden');
+        document.getElementById('plan-empty').classList.remove('hidden');
+        document.getElementById('plan-card').classList.add('hidden');
+        document.getElementById('plan-confirm-card').classList.add('hidden');
+        document.getElementById('plan-saque-card').classList.add('hidden');
+        document.getElementById('plan-settings-card').classList.add('hidden');
+        return;
+      }
+      if (!silent) {
+        document.getElementById('plan-loader').classList.remove('hidden');
+        document.getElementById('plan-empty').classList.add('hidden');
+        document.getElementById('plan-card').classList.add('hidden');
+        document.getElementById('plan-confirm-card').classList.add('hidden');
+        document.getElementById('plan-saque-card').classList.add('hidden');
+        document.getElementById('plan-settings-card').classList.add('hidden');
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/plans/meu-saldo/${currentUser.phone}`);
+        if (!res.ok) throw new Error('sem_plano');
+        const data = await res.json();
+        if (!data.success || !data.planos || data.planos.length === 0) throw new Error('sem_plano');
+
+        const plan = data.planos[0];
+        activePlanData = plan;
+
+        // Preencher card de saldo
+        const saldoMb   = plan.saldo_mb || 0;
+        const totalMb   = plan.total_mb || 1;
+        const pct       = Math.min(100, Math.round((saldoMb / totalMb) * 100));
+        const saldoGb   = (saldoMb / 1024);
+        const totalGb   = Math.round(totalMb / 1024);
+        const diariaFmt = plan.mb_diaria >= 1024 ? `${(plan.mb_diaria/1024).toFixed(1)} GB` : `${plan.mb_diaria} MB`;
+        const proxDate  = plan.proxima_entrega ? new Date(plan.proxima_entrega) : null;
+        const proxFmt   = proxDate ? proxDate.toLocaleString('pt-PT', { timeZone: 'Africa/Maputo', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '--';
+        const tipoLabel = plan.tipo === 'faseado_mensal' ? 'Faseado Mensal Interativo' : plan.tipo === 'faseado' ? 'Faseado Automático' : 'Renovável';
+
+        document.getElementById('plan-tipo-label').textContent = tipoLabel;
+        document.getElementById('plan-status-badge').textContent = plan.status === 'ativo' ? 'ACTIVO' : plan.status.toUpperCase();
+        document.getElementById('plan-saldo-valor').textContent = saldoGb >= 1 ? saldoGb.toFixed(1) : saldoMb;
+        document.getElementById('plan-saldo-unit').textContent  = saldoGb >= 1 ? 'GB' : 'MB';
+        document.getElementById('plan-saldo-bar').style.width   = pct + '%';
+        document.getElementById('plan-saldo-mb-label').textContent = `${saldoMb} MB restantes`;
+        document.getElementById('plan-total-label').textContent = `/ ${totalGb} GB total`;
+        document.getElementById('plan-diaria').textContent      = diariaFmt;
+        document.getElementById('plan-proxima').textContent     = proxFmt;
+        document.getElementById('plan-feitas').textContent      = plan.entregas_feitas ?? '--';
+        document.getElementById('plan-hora').textContent        = plan.hora_preferida || 'Automático';
+        if (plan.hora_preferida) document.getElementById('hora-preferida-input').value = plan.hora_preferida;
+
+        // Saque — actualizar saldo disponível
+        const saldoFmt = saldoGb >= 1 ? `${saldoGb.toFixed(1)} GB` : `${saldoMb} MB`;
+        document.getElementById('saque-saldo-disp').textContent = saldoFmt;
+
+        document.getElementById('plan-loader').classList.add('hidden');
+        document.getElementById('plan-empty').classList.add('hidden');
+        document.getElementById('plan-card').classList.remove('hidden');
+        document.getElementById('plan-saque-card').classList.remove('hidden');
+        document.getElementById('plan-settings-card').classList.remove('hidden');
+
+        // Card de confirmação — só para faseado_mensal aguardando resposta
+        const aguardando = plan.aguardando_confirmacao && plan.tipo === 'faseado_mensal';
+        document.getElementById('plan-confirm-card').classList.toggle('hidden', !aguardando);
+        if (aguardando) {
+          const exp = plan.confirmacao_expira_em ? new Date(plan.confirmacao_expira_em) : null;
+          const expFmt = exp ? exp.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour:'2-digit', minute:'2-digit' }) : '--';
+          document.getElementById('plan-confirm-msg').textContent = `Confirme até às ${expFmt} ou a entrega de hoje será adiada.`;
+          // Badge na tab
+          const badge = document.getElementById('plan-tab-badge');
+          if (badge) badge.classList.remove('hidden');
+        }
+
+      } catch (e) {
+        document.getElementById('plan-loader').classList.add('hidden');
+        if (!silent) {
+          document.getElementById('plan-empty').classList.remove('hidden');
+        }
+      }
+    }
+
+    async function responderConfirmacao(resposta) {
+      if (!currentUser?.phone) return showToast('Precisa de iniciar sessão.', 'error');
+      const endpoint = resposta === 'sim' ? '/api/plans/confirmar' : '/api/plans/pular';
+      try {
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numero: currentUser.phone })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.mensagem || (resposta === 'sim' ? '✅ Entrega confirmada!' : '⏭️ Dia adiado!'), resposta === 'sim' ? 'success' : 'info');
+          setTimeout(() => loadMeuPlano(true), 1500);
+        } else {
+          showToast(data.error || 'Erro ao processar confirmação.', 'error');
+        }
+      } catch(e) {
+        showToast('Erro de rede. Tente novamente.', 'error');
+      }
+    }
+
+    async function executarSaque() {
+      if (!currentUser?.phone) return showToast('Precisa de iniciar sessão.', 'error');
+      const qtd = parseFloat(document.getElementById('saque-input').value);
+      const unit = document.getElementById('saque-unit').value;
+      if (!qtd || qtd <= 0) return showToast('Insira uma quantidade válida.', 'error');
+      const body = unit === 'gb'
+        ? { numero: currentUser.phone, gb: qtd }
+        : { numero: currentUser.phone, mb: qtd };
+      try {
+        const res = await fetch(`${API_BASE}/api/plans/saque`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.mensagem || '💸 Saque iniciado!', 'success');
+          document.getElementById('saque-input').value = '';
+          setTimeout(() => loadMeuPlano(true), 1500);
+        } else {
+          showToast(data.error || 'Erro ao processar saque.', 'error');
+        }
+      } catch(e) {
+        showToast('Erro de rede. Tente novamente.', 'error');
+      }
+    }
+
+    async function salvarHoraPreferida() {
+      if (!currentUser?.phone) return showToast('Precisa de iniciar sessão.', 'error');
+      const hora = document.getElementById('hora-preferida-input').value;
+      if (!hora) return showToast('Selecione uma hora válida.', 'error');
+      try {
+        const res = await fetch(`${API_BASE}/api/plans/hora-preferida`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numero: currentUser.phone, hora })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✅ Hora definida para ${hora}`, 'success');
+          document.getElementById('plan-hora').textContent = hora;
+        } else {
+          showToast(data.error || 'Erro ao guardar hora.', 'error');
+        }
+      } catch(e) {
+        showToast('Erro de rede. Tente novamente.', 'error');
+      }
+    }
+
+    function setSaquePreset(gb) {
+      document.getElementById('saque-input').value = gb;
+      document.getElementById('saque-unit').value = 'gb';
+    }
+
+    function setSaquePresetAll() {
+      if (!activePlanData) return;
+      const saldoGb = (activePlanData.saldo_mb / 1024).toFixed(2);
+      document.getElementById('saque-input').value = saldoGb;
+      document.getElementById('saque-unit').value = 'gb';
+    }
+
+    // Verificar plano pendente no fundo (a cada 2 min) e mostrar badge na tab
+    setInterval(async () => {
+      if (!currentUser?.phone) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/plans/meu-saldo/${currentUser.phone}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && data.planos?.length > 0) {
+          const plan = data.planos[0];
+          const badge = document.getElementById('plan-tab-badge');
+          if (badge && plan.aguardando_confirmacao) {
+            badge.classList.remove('hidden');
+          }
+        }
+      } catch(e) {}
+    }, 2 * 60 * 1000);
+
+
 
     // Inicialização periódica do status do sistema
     setInterval(checkSystemStatus, 12000);
