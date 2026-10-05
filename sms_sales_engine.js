@@ -297,29 +297,46 @@ const SYSTEM_PAYMENT_NUMBERS = new Set([
 ]);
 
 /**
- * Extrai número de destino Vodacom (84/85) do texto do cliente ou comprovativo
+/**
+ * Extrai número de destino Vodacom (84/85) do texto do cliente.
+ * ⚠️ NÃO extrai números do miolo do comprovativo M-Pesa/e-Mola (como "de 25884...")
+ * ⚠️ NÃO faz fallback automático para o remetente, forçando o bot a perguntar o número ao cliente.
  */
 function extrairNumeroDestino(texto, remetenteOrigem) {
-    const cleanRemetente = String(remetenteOrigem || '').replace(/\D/g, '').slice(-9);
+    if (!texto) return null;
+    const cleanText = String(texto).trim();
 
-    if (texto) {
-        const cleanText = String(texto).replace(/[\r\n]+/g, ' ');
-
-        // 1. Verificar se há um comando explícito: "para 84...", "numero 84...", "destinatario 84..."
-        const explicitMatch = cleanText.match(/(?:para|numero|número|destinatario|destinatário|enviar\s+para|recarga\s+para)\s*[:.]?\s*(?:258)?(8[45]\s*\d[\d\s-]{6,8}\d)/i);
-        if (explicitMatch && explicitMatch[1]) {
-            const candidate = explicitMatch[1].replace(/\D/g, '');
-            if (candidate.length === 9 && (candidate.startsWith('84') || candidate.startsWith('85')) && !SYSTEM_PAYMENT_NUMBERS.has(candidate)) {
-                return candidate;
-            }
+    // 1. Se a mensagem for exatamente um número de telefone Vodacom
+    const digitsOnly = cleanText.replace(/\D/g, '');
+    if (/^(?:258)?(8[45]\d{7})$/.test(digitsOnly)) {
+        const candidate = digitsOnly.slice(-9);
+        if (!SYSTEM_PAYMENT_NUMBERS.has(candidate)) {
+            return candidate;
         }
+        return null;
+    }
 
-        // 2. Buscar qualquer número 84 ou 85 de 9 dígitos no texto (desconsiderando espaços/traços)
-        const allNumbers = cleanText.match(/(?:258)?(8[45]\s*\d[\d\s-]{6,8}\d)/g) || [];
-        for (const numStr of allNumbers) {
-            const candidate = numStr.replace(/\D/g, '').slice(-9);
-            if (candidate.length === 9 && (candidate.startsWith('84') || candidate.startsWith('85'))) {
-                // Se for um número de pagamento do sistema (ex: M-Pesa 856268811), IGNORED!
+    // 2. Verificar se há um comando explícito: "para 84...", "numero: 84...", "recarga para 84..."
+    const explicitMatch = cleanText.match(/(?:para|numero|número|destinatario|destinatário|enviar\s+para|recarga\s+para|destino)\s*[:.]?\s*(?:258)?(8[45]\s*\d[\d\s-]{6,8}\d)/i);
+    if (explicitMatch && explicitMatch[1]) {
+        const candidate = explicitMatch[1].replace(/\D/g, '').slice(-9);
+        if (candidate.length === 9 && (candidate.startsWith('84') || candidate.startsWith('85')) && !SYSTEM_PAYMENT_NUMBERS.has(candidate)) {
+            return candidate;
+        }
+    }
+
+    // 3. Se for mensagem com comprovativo, procurar por linha separada com o número
+    const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length >= 2) {
+        for (let i = lines.length - 1; i >= 1; i--) {
+            const l = lines[i];
+            // Ignorar linhas típicas de recibo
+            if (/(?:confirmado|transferiste|recebeste|recebeu|transferiu|saldo|taxa foi|liga 100|m-pesa|e-mola|vodacom|movitel|em caso de duvida)/i.test(l)) {
+                continue;
+            }
+            const lDigits = l.replace(/\D/g, '');
+            if (/^(?:258)?(8[45]\d{7})$/.test(lDigits)) {
+                const candidate = lDigits.slice(-9);
                 if (!SYSTEM_PAYMENT_NUMBERS.has(candidate)) {
                     return candidate;
                 }
@@ -327,13 +344,10 @@ function extrairNumeroDestino(texto, remetenteOrigem) {
         }
     }
 
-    // 3. Se não houver número explícito no texto, usar o próprio remetente se for Vodacom (84/85)
-    if (/^8[45]\d{7}$/.test(cleanRemetente)) {
-        return cleanRemetente;
-    }
-
+    // 4. NUNCA assumir o remetente automaticamente — retornar null para forçar o bot a pedir o número
     return null;
 }
+
 
 /**
  * Extrai ID de transação (TXN) do comprovativo
