@@ -4772,10 +4772,11 @@ const DEFAULT_PLANOS_ESPECIAIS = {
   "255":  { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado",        total: 10240, inicial: 1024,  diaria: 1024 },
   "381":  { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024,  diaria: 1024 },
   "510":  { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado",        total: 20480, inicial: 1024,  diaria: 1024 },
-  // ── Faseado Mensal Interativo (cliente confirma diariamente) ──────────────
-  "232": { nome: "📆 10GB Faseado Mensal (2GB/dia)", tipo: "faseado_mensal", total: 10240, inicial: 2048, diaria: 2048 },
-  "461": { nome: "📆 20GB Faseado Mensal (2GB/dia)", tipo: "faseado_mensal", total: 20480, inicial: 2048, diaria: 2048 },
-  "700": { nome: "📆 30GB Faseado Mensal (3GB/dia)", tipo: "faseado_mensal", total: 30720, inicial: 3072, diaria: 3072 }
+  // ── Faseado Mensal Interativo (cliente define quanto quer por dia) ──────────
+  // Base: 1GB/dia — cliente pode definir outra quantidade ao subscrever
+  "232": { nome: "📆 10GB Faseado Mensal", tipo: "faseado_mensal", total: 10240, inicial: 1024, diaria: 1024 },
+  "461": { nome: "📆 20GB Faseado Mensal", tipo: "faseado_mensal", total: 20480, inicial: 1024, diaria: 1024 },
+  "700": { nome: "📆 30GB Faseado Mensal", tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
 };
 
 function getPlanosEspeciaisConfig() {
@@ -5402,8 +5403,6 @@ app.post('/api/subscribe/plan', async (req, res) => {
 
     const tipo         = plano.tipo; // 'renovavel' | 'faseado' | 'faseado_mensal'
     const total_mb     = plano.total || 0;
-    const mb_inicial   = plano.inicial || plano.diaria || 1024;
-    const mb_diaria    = plano.diaria  || 1024;
     const hora_preferida = req.body.hora_preferida || plano.hora_preferida || null;
     const valor        = Number(planoKey);
     const destino      = String(recipientPhone || numero).replace(/\D/g, '').slice(-9);
@@ -5411,6 +5410,21 @@ app.post('/api/subscribe/plan', async (req, res) => {
     if (tipo !== 'renovavel' && tipo !== 'renovacao' && tipo !== 'faseado' && tipo !== 'faseado_mensal') {
       return res.status(400).json({ success: false, error: 'Tipo de plano inválido. Use renovavel, faseado ou faseado_mensal.' });
     }
+
+    // ── Para faseado_mensal: cliente pode definir mb_diaria personalizado ──────
+    // O cliente envia mb_diaria (em MB) ou gb_diaria (em GB) no body
+    // Se não enviar, usa o padrão do plano (1GB)
+    let mb_diaria = plano.diaria || 1024;
+    if (tipo === 'faseado_mensal') {
+      const clientMbDiaria = req.body.mb_diaria ? Number(req.body.mb_diaria)
+        : req.body.gb_diaria ? Math.round(Number(req.body.gb_diaria) * 1024)
+        : 0;
+      if (clientMbDiaria >= 100 && clientMbDiaria <= total_mb) {
+        mb_diaria = clientMbDiaria;
+      }
+      // Se não especificou, mantém default (1GB)
+    }
+    const mb_inicial = mb_diaria; // Primeira fase = mesma quantidade que as seguintes
 
 
     // Prevenção de SMS duplicado

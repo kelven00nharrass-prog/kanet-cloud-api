@@ -590,22 +590,22 @@ module.exports = {
             "nome": "📆 10GB Faseado Mensal",
             "tipo": "faseado_mensal",
             "total": 10240,
-            "inicial": 2048,
-            "diaria": 2048
+            "inicial": 1024,
+            "diaria": 1024
         },
         "461": {
             "nome": "📆 20GB Faseado Mensal",
             "tipo": "faseado_mensal",
             "total": 20480,
-            "inicial": 2048,
-            "diaria": 2048
+            "inicial": 1024,
+            "diaria": 1024
         },
         "700": {
             "nome": "📆 30GB Faseado Mensal",
             "tipo": "faseado_mensal",
             "total": 30720,
-            "inicial": 3072,
-            "diaria": 3072
+            "inicial": 1024,
+            "diaria": 1024
         }
     },
     "NOME_SISTEMA": "Ka-Net System",
