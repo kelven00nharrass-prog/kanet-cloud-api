@@ -4773,10 +4773,9 @@ const DEFAULT_PLANOS_ESPECIAIS = {
   "381":  { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024,  diaria: 1024 },
   "510":  { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado",        total: 20480, inicial: 1024,  diaria: 1024 },
   // ── Faseado Mensal Interativo (cliente confirma diariamente) ──────────────
-  "200fm": { nome: "📆 10GB Faseado Mensal (2GB/dia)", tipo: "faseado_mensal", total: 10240, inicial: 2048, diaria: 2048 },
-  "310fm": { nome: "📆 15GB Faseado Mensal (3GB/dia)", tipo: "faseado_mensal", total: 15360, inicial: 3072, diaria: 3072 },
-  "400fm": { nome: "📆 20GB Faseado Mensal (2GB/dia)", tipo: "faseado_mensal", total: 20480, inicial: 2048, diaria: 2048 },
-  "600fm": { nome: "📆 30GB Faseado Mensal (3GB/dia)", tipo: "faseado_mensal", total: 30720, inicial: 3072, diaria: 3072 }
+  "232": { nome: "📆 10GB Faseado Mensal (2GB/dia)", tipo: "faseado_mensal", total: 10240, inicial: 2048, diaria: 2048 },
+  "461": { nome: "📆 20GB Faseado Mensal (2GB/dia)", tipo: "faseado_mensal", total: 20480, inicial: 2048, diaria: 2048 },
+  "700": { nome: "📆 30GB Faseado Mensal (3GB/dia)", tipo: "faseado_mensal", total: 30720, inicial: 3072, diaria: 3072 }
 };
 
 function getPlanosEspeciaisConfig() {

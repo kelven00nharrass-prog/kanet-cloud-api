@@ -408,6 +408,27 @@ module.exports = {
                 "periodo": "ilimitado",
                 "tipo": "ilimitado"
             },
+            "232": {
+                "quantidade": 10240,
+                "nome": "📆 10GB Faseado Mensal",
+                "quantidade_mb": 10240,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "461": {
+                "quantidade": 20480,
+                "nome": "📆 20GB Faseado Mensal",
+                "quantidade_mb": 20480,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
+            "700": {
+                "quantidade": 30720,
+                "nome": "📆 30GB Faseado Mensal",
+                "quantidade_mb": 30720,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado"
+            },
             "570": {
                 "quantidade": 15360,
                 "nome": "Vodacom 15GB + Minutos",
@@ -564,6 +585,27 @@ module.exports = {
             "total": 20480,
             "inicial": 1024,
             "diaria": 1024
+        },
+        "232": {
+            "nome": "📆 10GB Faseado Mensal",
+            "tipo": "faseado_mensal",
+            "total": 10240,
+            "inicial": 2048,
+            "diaria": 2048
+        },
+        "461": {
+            "nome": "📆 20GB Faseado Mensal",
+            "tipo": "faseado_mensal",
+            "total": 20480,
+            "inicial": 2048,
+            "diaria": 2048
+        },
+        "700": {
+            "nome": "📆 30GB Faseado Mensal",
+            "tipo": "faseado_mensal",
+            "total": 30720,
+            "inicial": 3072,
+            "diaria": 3072
         }
     },
     "NOME_SISTEMA": "Ka-Net System",
