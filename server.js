@@ -1935,10 +1935,19 @@ app.post(['/api/orders/:orderId/cancel', '/api/orders/:orderId/cancelar'], (req,
 // Marcar pedido manualmente como Concluído (quando a operadora concluiu no chip mas deu timeout na tela)
 app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (req, res) => {
   const { orderId } = req.params;
-  const order = inMemoryOrders.get(orderId);
+  let order = inMemoryOrders.get(orderId);
 
   if (!order) {
-    return res.status(404).json({ success: false, mensagem: 'Pedido não encontrado na fila.' });
+    order = {
+      id: orderId,
+      orderId: orderId,
+      numero: (req.body && req.body.numero) || '',
+      quantidade: Number((req.body && req.body.quantidade) || 0),
+      modo: (req.body && req.body.modo) || 'diario',
+      status: 'completed',
+      createdAt: new Date().toISOString()
+    };
+    inMemoryOrders.set(orderId, order);
   }
 
   order.status = 'completed';
