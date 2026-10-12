@@ -1932,6 +1932,54 @@ app.post(['/api/orders/:orderId/cancel', '/api/orders/:orderId/cancelar'], (req,
   return res.json({ success: true, mensagem: `Pedido ${orderId} cancelado.` });
 });
 
+// Marcar pedido manualmente como Concluído (quando a operadora concluiu no chip mas deu timeout na tela)
+app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (req, res) => {
+  const { orderId } = req.params;
+  const order = inMemoryOrders.get(orderId);
+
+  if (!order) {
+    return res.status(404).json({ success: false, mensagem: 'Pedido não encontrado na fila.' });
+  }
+
+  order.status = 'completed';
+  order.completedAt = new Date().toISOString();
+  order.lastError = null;
+  order.updatedAt = new Date().toISOString();
+
+  // Desocupar qualquer celular que estivesse com este pedido
+  for (const dev of Object.values(inMemoryDevices)) {
+    if (dev.pending_order && (dev.pending_order.id === orderId || dev.pending_order.orderId === orderId)) {
+      dev.pending_order = null;
+    }
+  }
+
+  // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
+  if (order.isSplit && order.splitPart === 1 && order.part2Id) {
+    const part2Order = inMemoryOrders.get(order.part2Id);
+    if (part2Order && part2Order.status === 'waiting_part1') {
+      part2Order.status = 'pending';
+      part2Order.updatedAt = new Date().toISOString();
+      console.log(`🚀 [PARTE 2 LIBERADA] Parte 2 (${part2Order.id} - ${part2Order.quantidade}MB) liberada para envio imediato!`);
+    }
+  }
+
+  saveOrdersToCache();
+
+  if (db) {
+    const orderIdToSave = order.orderId || order.id || orderId;
+    db.collection('orders').doc(orderIdToSave).set({
+      ...order,
+      status: 'completed',
+      completedAt: order.completedAt,
+      lastError: null,
+      updatedAt: new Date().toISOString()
+    }, { merge: true }).catch(() => {});
+  }
+
+  console.log(`✅ [PAINEL] Pedido ${orderId} marcado manualmente como CONCLUÍDO pelo operador.`);
+  return res.json({ success: true, mensagem: `Pedido ${orderId} marcado com sucesso como CONCLUÍDO!`, order });
+});
+
 app.post('/api/orders/clear', (req, res) => {
   const type = (req.body && req.body.type) || req.query.type || 'finalized';
   let cleared = 0;
