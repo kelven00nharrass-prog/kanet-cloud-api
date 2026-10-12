@@ -889,15 +889,28 @@ function getDeviceAvailableMb(dev) {
   if (port === 8077 || port === 8777) return 102400; // Planos ilimitados/semanais/mensais/saldo
   if (dev.sem_saldo === true || dev.limite_atingido === true) return 0;
 
+  const s1 = (dev.sim1_saldo_mb !== undefined && dev.sim1_saldo_mb !== null) ? Math.max(0, Number(dev.sim1_saldo_mb)) : 0;
+  const s2 = (dev.sim2_saldo_mb !== undefined && dev.sim2_saldo_mb !== null) ? Math.max(0, Number(dev.sim2_saldo_mb)) : 0;
+  const smb = (dev.saldo_mb !== undefined && dev.saldo_mb !== null) ? Math.max(0, Number(dev.saldo_mb)) : 0;
+
   const slot = dev.active_sim_slot || 1;
-  const slotSaldo = slot === 2 ? dev.sim2_saldo_mb : dev.sim1_saldo_mb;
-  if (slotSaldo !== undefined && slotSaldo !== null) {
-    return Math.max(0, Number(slotSaldo));
+  const slotSaldo = slot === 2 ? s2 : s1;
+
+  // 1. Se o slot ativo tem saldo suficiente (>= 100MB), usar o saldo do slot ativo
+  if (slotSaldo >= MIN_TRANSFER_MB) {
+    return slotSaldo;
   }
-  if (dev.saldo_mb !== undefined && dev.saldo_mb !== null) {
-    return Math.max(0, Number(dev.saldo_mb));
+
+  // 2. Se o slot ativo tem < 100MB mas o outro slot tem saldo >= 100MB:
+  // O aplicativo Android (SimCardManager.getOptimalSimSlot) alterna automaticamente para o chip com saldo!
+  const otherSlotSaldo = slot === 2 ? s1 : s2;
+  if (otherSlotSaldo >= MIN_TRANSFER_MB) {
+    return otherSlotSaldo;
   }
-  return 0;
+
+  // 3. Caso geral: maior saldo reportado pelo dispositivo
+  const maxSaldo = Math.max(s1, s2, smb);
+  return maxSaldo;
 }
 
 app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
@@ -1886,6 +1899,7 @@ app.post('/api/orders/:orderId/retry', (req, res) => {
   order.processingAt = null;
   order.completedAt = null;
   order.lastError = null;
+  order.createdAt = new Date().toISOString(); // Resetar TTL para não expirar imediatamente após retry
   if (targetPort) {
     order.targetPort = targetPort;
   }
