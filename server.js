@@ -167,8 +167,9 @@ async function handleTransfer(req, res) {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
+    // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
     splitMensalOrderIfEligible(orderDoc);
+    splitDailyOrderIfEligible(orderDoc);
 
     inMemoryOrders.set(orderId, orderDoc);
     saveOrdersToCache();
@@ -227,8 +228,9 @@ app.post('/api/send/manual', async (req, res) => {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB) ou Tudo Top (> 11GB)
+    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB), Tudo Top (> 11GB) ou Diário
     splitMensalOrderIfEligible(orderDoc);
+    splitDailyOrderIfEligible(orderDoc);
 
     // Aplicar detector e ativador de Planos Especiais (Renovável e Faseado)
     handleSpecialPlanIfApplicable(orderDoc);
@@ -571,10 +573,12 @@ function isPortCompatibleWithModo(port, modo) {
   return p !== 8077 && p !== 8777 && p !== 8090;
 }
 
-function getPortForModo(modo) {
+function getPortForModo(modo, requiredMb = 0) {
   const m = String(modo || '').toLowerCase().trim();
   if (m === 'saldo' || m === 'credito') return 8777;
   if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top')) return 8077;
+
+  const reqMb = Number(requiredMb) || 0;
 
   // Para diários: selecionar dinamicamente a melhor porta diária online e apta
   const dailyDevs = Object.values(inMemoryDevices).filter(d => {
@@ -582,8 +586,25 @@ function getPortForModo(modo) {
     return port !== 8077 && port !== 8777 && port !== 8090 && isDeviceApto(d);
   });
   if (dailyDevs.length > 0) {
-    // Escolher a porta com maior saldo ou mais transferências disponíveis
-    dailyDevs.sort((a, b) => (b.transfers_available || 0) - (a.transfers_available || 0));
+    // 1. Se foi especificada uma quantidade de MB necessária, priorizar dispositivos que cobrem 100% da quantidade
+    if (reqMb > 0) {
+      const capableDevs = dailyDevs.filter(d => getDeviceAvailableMb(d) >= reqMb);
+      if (capableDevs.length > 0) {
+        capableDevs.sort((a, b) => {
+          const balDiff = getDeviceAvailableMb(b) - getDeviceAvailableMb(a);
+          if (balDiff !== 0) return balDiff;
+          return (b.transfers_available || 0) - (a.transfers_available || 0);
+        });
+        return Number(capableDevs[0].porta);
+      }
+    }
+
+    // 2. Se nenhuma cobre 100%, escolher a que tem MAIOR saldo disponível (e mais transferências livres)
+    dailyDevs.sort((a, b) => {
+      const balDiff = getDeviceAvailableMb(b) - getDeviceAvailableMb(a);
+      if (balDiff !== 0) return balDiff;
+      return (b.transfers_available || 0) - (a.transfers_available || 0);
+    });
     return Number(dailyDevs[0].porta);
   }
   // Se nenhuma porta diária estiver apta no momento, verificar qualquer porta diária registrada online
@@ -719,6 +740,104 @@ function splitMensalOrderIfEligible(orderDoc) {
   return splitSpecialOrderIfEligible(orderDoc);
 }
 
+// ── REGRA OFICIAL KA-NET: DIVISÃO INTELIGENTE DE PACOTES DIÁRIOS (SPLIT DIÁRIO) ──
+// 1. Limite USSD da Vodacom: O valor máximo permitido por transferência é 10.240MB (10GB).
+//    Se pedido > 10240MB (ex: 15GB, 20GB): Parte 1 (máx 10240MB) + Parte 2 (Resto).
+// 2. Proteção de Saldo: Se nenhum celular diário tem saldo suficiente para cobrir o pedido inteiro,
+//    mas o melhor celular tem saldo >= 100MB e a sobra também é >= 100MB:
+//    Parte 1 (saldo disponível do melhor celular) + Parte 2 (Resto na fila aguardando).
+function splitDailyOrderIfEligible(orderDoc) {
+  if (!orderDoc || orderDoc.isSplit) return false;
+  const modo = String(orderDoc.modo || 'diario').toLowerCase().trim();
+  const isDiario = modo === 'diario' || modo === '24hrs' || modo === '24h';
+  if (!isDiario) return false;
+
+  const qty = Number(orderDoc.quantidade) || 0;
+  if (qty < 200) return false; // Para dividir com mínimo de 100MB por parte, precisa de pelo menos 200MB
+
+  // Buscar celulares diários online e aptos
+  const dailyDevs = Object.values(inMemoryDevices).filter(d => {
+    const port = Number(d.porta);
+    return port !== 8077 && port !== 8777 && port !== 8090 && isDeviceApto(d);
+  });
+  if (dailyDevs.length === 0) return false;
+
+  dailyDevs.sort((a, b) => getDeviceAvailableMb(b) - getDeviceAvailableMb(a));
+  const bestDev = dailyDevs[0];
+  const bestBalance = getDeviceAvailableMb(bestDev);
+
+  let shouldSplit = false;
+  let parte1 = 0;
+  let parte2 = 0;
+
+  // Caso 1: Pedido maior que o teto máximo permitido por envio USSD da Vodacom (10.240MB = 10GB)
+  if (qty > 10240) {
+    const maxParte1 = 10240;
+    parte1 = bestBalance >= 100 ? Math.min(maxParte1, Math.floor(bestBalance)) : maxParte1;
+    if (parte1 >= qty) parte1 = 10240;
+    parte2 = qty - parte1;
+    if (parte1 >= 100 && parte2 >= 100) {
+      shouldSplit = true;
+    }
+  }
+  // Caso 2: Nenhum celular diário tem saldo suficiente para cobrir o pedido inteiro,
+  // mas o melhor celular tem saldo >= 100MB e a sobra também é >= 100MB
+  else if (bestBalance < qty && bestBalance >= 100 && (qty - bestBalance) >= 100) {
+    shouldSplit = true;
+    parte1 = Math.floor(bestBalance);
+    parte2 = qty - parte1;
+  }
+
+  if (shouldSplit && parte1 >= 100 && parte2 >= 100) {
+    const parentId = orderDoc.id || orderDoc.orderId;
+    const part2Id = `${parentId}-P2`;
+    const totalMb = qty;
+
+    orderDoc.isSplit = true;
+    orderDoc.splitPart = 1;
+    orderDoc.splitTotalParts = 2;
+    orderDoc.splitTotalMb = totalMb;
+    orderDoc.splitOtherPartMb = parte2;
+    orderDoc.part2Id = part2Id;
+    orderDoc.quantidade = parte1;
+    orderDoc.targetPort = Number(bestDev.porta);
+
+    const orderPart2 = {
+      id: part2Id,
+      orderId: part2Id,
+      parentOrderId: parentId,
+      numero: orderDoc.numero,
+      quantidade: parte2,
+      modo: 'diario',
+      input_val: '',
+      jid: orderDoc.jid || null,
+      remetente: orderDoc.remetente || 'Bot',
+      targetPort: null,
+      isSplit: true,
+      splitPart: 2,
+      splitTotalParts: 2,
+      splitTotalMb: totalMb,
+      splitOtherPartMb: parte1,
+      status: 'waiting_part1',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      notified: false,
+      groupNotified: false
+    };
+
+    inMemoryOrders.set(part2Id, orderPart2);
+    saveOrdersToCache();
+
+    console.log(`🔀 [SPLIT DIÁRIO INTELIGENTE] Pedido Diário ${parentId} (${totalMb}MB) dividido automaticamente:`);
+    console.log(`   👉 Parte 1: ${parte1}MB -> Porta ${bestDev.porta} (Saldo disponível: ${bestBalance}MB)`);
+    console.log(`   👉 Parte 2: ${parte2}MB -> Fila de espera (Aguardando conclusão da Parte 1)`);
+
+    return true;
+  }
+
+  return false;
+}
+
 function isDeviceApto(dev) {
   if (!dev) return false;
   if (dev.paused === true) return false; // Pausado manualmente pelo operador
@@ -746,12 +865,19 @@ function isDeviceApto(dev) {
 
   // ── PORTAS DIÁRIAS (todas as demais portas) ──
   if (dev.limite_atingido === true) return false;
+  if (dev.sem_saldo === true) return false;
   if (dev.transfers_available !== undefined && dev.transfers_available <= 0) return false;
-  const s1 = dev.sim1_saldo_mb !== undefined && dev.sim1_saldo_mb !== null ? dev.sim1_saldo_mb : 10240;
-  const s2 = dev.sim2_saldo_mb !== undefined && dev.sim2_saldo_mb !== null ? dev.sim2_saldo_mb : 10240;
-  // Só considera sem saldo se AMBOS os cartões estiverem zerados (<100MB) ou marcados sem saldo
-  if (s1 < 100 && s2 < 100) return false;
-  if (dev.sem_saldo === true && s1 < 100 && s2 < 100) return false;
+
+  const s1 = (dev.sim1_saldo_mb !== undefined && dev.sim1_saldo_mb !== null) ? Number(dev.sim1_saldo_mb) : null;
+  const s2 = (dev.sim2_saldo_mb !== undefined && dev.sim2_saldo_mb !== null) ? Number(dev.sim2_saldo_mb) : null;
+  const smb = (dev.saldo_mb !== undefined && dev.saldo_mb !== null) ? Number(dev.saldo_mb) : null;
+
+  const knownSaldos = [s1, s2, smb].filter(s => s !== null);
+  if (knownSaldos.length > 0) {
+    const maxSaldo = Math.max(...knownSaldos);
+    if (maxSaldo < 100) return false; // Sem saldo suficiente para transferência mínima de 100MB
+  }
+
   return true;
 }
 
@@ -761,16 +887,17 @@ function getDeviceAvailableMb(dev) {
   if (!dev) return 0;
   const port = Number(dev.porta);
   if (port === 8077 || port === 8777) return 102400; // Planos ilimitados/semanais/mensais/saldo
+  if (dev.sem_saldo === true || dev.limite_atingido === true) return 0;
 
   const slot = dev.active_sim_slot || 1;
   const slotSaldo = slot === 2 ? dev.sim2_saldo_mb : dev.sim1_saldo_mb;
-  if (slotSaldo !== undefined && Number(slotSaldo) > 0) {
-    return Number(slotSaldo);
+  if (slotSaldo !== undefined && slotSaldo !== null) {
+    return Math.max(0, Number(slotSaldo));
   }
-  if (dev.saldo_mb !== undefined && Number(dev.saldo_mb) > 0) {
-    return Number(dev.saldo_mb);
+  if (dev.saldo_mb !== undefined && dev.saldo_mb !== null) {
+    return Math.max(0, Number(dev.saldo_mb));
   }
-  return 10240;
+  return 0;
 }
 
 app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
@@ -818,8 +945,9 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
         }
 
-        // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
+        // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
         splitMensalOrderIfEligible(order);
+        splitDailyOrderIfEligible(order);
 
         let isCompatible = isPortCompatibleWithModo(port, order.modo);
         if (order.targetPort && order.targetPort !== port) {
@@ -845,27 +973,16 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         if (isCompatible) {
           const orderMb = Number(order.quantidade) || 0;
           const availableMb = getDeviceAvailableMb(dev);
-          const isDataMode = (order.modo || 'diario').toLowerCase().trim() !== 'saldo' && (order.modo || 'diario').toLowerCase().trim() !== 'credito';
+          const isDiarioMode = (order.modo || 'diario').toLowerCase().trim() === 'diario' || (order.modo || 'diario').toLowerCase().trim() === '24hrs';
 
-          // ── DIVISÃO INTELIGENTE DE PACOTE (SPLIT-TRANSFER ENTRE PORTAS) ──
-          // Se a porta tem menos que o pedido, mas >= 50MB, e o restante também é >= 50MB,
-          // e há outra porta compatível online para assumir a segunda parte:
-          const canSplit = !order.isSplit &&
-                           isDataMode &&
-                           orderMb > availableMb &&
-                           availableMb >= MIN_TRANSFER_MB &&
-                           (orderMb - availableMb) >= MIN_TRANSFER_MB;
+          // Se for modo diário e o celular atual NÃO tiver saldo suficiente para cobrir o pedido inteiro:
+          if (isDiarioMode && orderMb > availableMb) {
+            // Tentar divisão inteligente se este celular tiver pelo menos MIN_TRANSFER_MB (100MB) e sobra >= 100MB:
+            const canSplit = !order.isSplit &&
+                             availableMb >= MIN_TRANSFER_MB &&
+                             (orderMb - availableMb) >= MIN_TRANSFER_MB;
 
-          if (canSplit) {
-            const otherCandidateOnline = Object.values(inMemoryDevices).some(d => {
-              if (Number(d.porta) === port) return false;
-              const now = Date.now();
-              const lastSeen = new Date(d.lastSeen || 0).getTime();
-              const isOnline = (now - lastSeen) < 180000;
-              return isOnline && !d.sem_saldo && !d.limite_atingido && isPortCompatibleWithModo(Number(d.porta), order.modo);
-            });
-
-            if (otherCandidateOnline) {
+            if (canSplit) {
               const totalMb = orderMb;
               const parte1 = Math.floor(availableMb);
               const parte2 = totalMb - parte1;
@@ -923,14 +1040,18 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
               };
 
               console.log(`🔀 [ENVIO INTELIGENTE DIVIDIDO] Pedido ${parentId} de ${totalMb}MB dividido em 2 partes:`);
-              console.log(`   👉 Parte 1: ${parte1}MB atribuído à Porta ${port}`);
+              console.log(`   👉 Parte 1: ${parte1}MB atribuído à Porta ${port} (Saldo disponível: ${availableMb}MB)`);
               console.log(`   👉 Parte 2: ${parte2}MB aguardando conclusão da Parte 1 para despacho por outra porta.`);
 
               break;
+            } else {
+              // 🛡️ Celular não tem saldo para o pedido completo e não é elegível para split:
+              // NUNCA atribuir este pedido a esta porta! Pular para o próximo pedido da fila.
+              continue;
             }
           }
 
-          // Atribuição padrão (sem divisão)
+          // Atribuição padrão (celular tem saldo suficiente para cobrir o pedido)
           order.status = 'assigned';
           order.targetPort = port;
           order.assignedToPort = port;
@@ -947,7 +1068,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             jid: order.jid || null,
             timestamp: Date.now()
           };
-          console.log(`📦 [FILA NUVEM] Atribuindo pedido ${orderId} (${order.quantidade}MB [${order.modo || 'diario'}] -> ${order.numero}) ao Celular Apto Porta ${port}`);
+          console.log(`📦 [FILA NUVEM] Atribuindo pedido ${orderId} (${order.quantidade}MB [${order.modo || 'diario'}] -> ${order.numero}) ao Celular Apto Porta ${port} (Saldo: ${availableMb}MB)`);
           break;
         }
       }
@@ -962,7 +1083,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
     for (const [orderId, order] of inMemoryOrders.entries()) {
       if (order.status === 'pending') {
-        const designatedPort = order.targetPort || getPortForModo(order.modo);
+        const designatedPort = order.targetPort || getPortForModo(order.modo, order.quantidade);
         if (designatedPort !== port) continue; // não é desta porta, ignorar
 
         // Procurar outra porta disponível que suporte o mesmo modo
@@ -976,7 +1097,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           if (!isDeviceApto(candidateDev)) continue; // deve estar apto
 
           // Verificar se a porta candidata é compatível com o modo do pedido
-          const candidateDesignated = getPortForModo(modoOrder);
+          const candidateDesignated = getPortForModo(modoOrder, order.quantidade);
           // Aceitar apenas se o candidato for a porta correta para esse modo
           // Exceção: se a porta original for 8077 e não houver outra 8077, mas houver 8023 disponível e ambos forem vodacom
           // → Para pacotes diários (8023) → fallback: outra porta vodacom disponível  
@@ -1009,7 +1130,10 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
         }
 
-        if (fallbackDev && fallbackPort) {
+        const isOrderDaily = modoOrder === 'diario' || modoOrder === '24hrs' || modoOrder === '24h';
+        const fallbackHasBalance = fallbackDev ? (isOrderDaily ? getDeviceAvailableMb(fallbackDev) >= (order.quantidade || 0) : true) : false;
+
+        if (fallbackDev && fallbackPort && fallbackHasBalance) {
           // Redirecionar pedido para a porta de fallback
           const rawQty = order.quantidade || 0;
           const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(1)} GB`;
@@ -1201,8 +1325,8 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const order = inMemoryOrders.get(resId);
     const success = !!req.body.last_result.success;
     const targetNum = (order && order.numero) || req.body.last_result.numero || 'N/A';
-    const rawQty = (order && order.quantidade) || req.body.last_result.quantidade || 1024;
-    const volStr = rawQty < 1024 ? `${rawQty} MB` : `${rawQty / 1024} GB`;
+    const rawQty = (order && (order.splitTotalMb || order.quantidade)) || req.body.last_result.quantidade || 1024;
+    const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
     const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
 
     // Resolver JID do cliente com máxima resiliência (do pedido em cache, do body ou do histórico Baileys)
@@ -2956,8 +3080,9 @@ try {
       createdAt: new Date().toISOString()
     };
 
-    // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
+    // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
     splitMensalOrderIfEligible(orderDoc);
+    splitDailyOrderIfEligible(orderDoc);
     // Aplicar ativação de Planos Especiais (Renovável & Faseado)
     handleSpecialPlanIfApplicable(orderDoc);
 
@@ -2970,15 +3095,17 @@ try {
       });
     }
 
-    // Roteamento Estrito de Portas:
-    // - Portas Diárias (8025, 8023, 8024): Diários (24hrs)
+    // Roteamento Estrito e Inteligente de Portas baseado em Saldo Real:
+    // - Portas Diárias (8025, 8023, 8026): Diários (24hrs) selecionando a porta com saldo >= quantidade
     // - 8077: Semanais, Mensais e Ilimitados
     // - 8777: Saldo
-    const targetPort = getPortForModo(orderDoc.modo);
+    const targetPort = getPortForModo(orderDoc.modo, orderDoc.quantidade);
     const isDiario = (orderDoc.modo || 'diario').toLowerCase().trim() === 'diario' || (orderDoc.modo || 'diario').toLowerCase().trim() === '24hrs';
-    // Se for diário, NÃO travar targetPort em uma porta fixa se ela estiver offline, para que qualquer porta diária que acordar pegue
     const dev = inMemoryDevices[targetPort];
-    if (isDeviceApto(dev)) {
+    const devAvailable = dev ? getDeviceAvailableMb(dev) : 0;
+    const canDeviceHandle = isDeviceApto(dev) && (isDiario ? devAvailable >= orderDoc.quantidade : true);
+
+    if (canDeviceHandle) {
       orderDoc.targetPort = targetPort;
       orderDoc.status = 'assigned';
       orderDoc.assignedToPort = targetPort;
@@ -2992,11 +3119,11 @@ try {
         jid: orderDoc.jid,
         timestamp: Date.now()
       };
-      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue ao Celular Apto ${targetPort} (Modo: ${orderDoc.modo || 'diario'})`);
+      console.log(`🚀 [WHATSAPP NUVEM] Ordem entregue ao Celular Apto ${targetPort} (Modo: ${orderDoc.modo || 'diario'}, Qtd: ${orderDoc.quantidade}MB, Saldo: ${devAvailable}MB)`);
     } else {
       orderDoc.targetPort = isDiario ? null : targetPort;
       orderDoc.status = 'pending';
-      console.log(`⏳ [WHATSAPP NUVEM] Celulares para modo ${orderDoc.modo || 'diario'} ocupados ou offline. Ordem mantida como PENDENTE na fila geral para atendimento assim que uma porta ficar online.`);
+      console.log(`⏳ [WHATSAPP NUVEM] Celulares para modo ${orderDoc.modo || 'diario'} (${orderDoc.quantidade}MB) sem saldo suficiente livre no momento. Ordem mantida como PENDENTE na fila geral.`);
     }
   }, db);
 } catch(e) {
@@ -3022,6 +3149,7 @@ try {
     };
 
     splitMensalOrderIfEligible(orderDoc);
+    splitDailyOrderIfEligible(orderDoc);
     handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(order.orderId, orderDoc);
@@ -3033,11 +3161,16 @@ try {
       });
     }
 
-    const targetPort = getPortForModo(orderDoc.modo);
+    const targetPort = getPortForModo(orderDoc.modo, orderDoc.quantidade);
     const isDiario = (orderDoc.modo || 'diario').toLowerCase().trim() === 'diario' || (orderDoc.modo || 'diario').toLowerCase().trim() === '24hrs';
     const dev = inMemoryDevices[targetPort];
-    if (isDeviceApto(dev)) {
+    const devAvailable = dev ? getDeviceAvailableMb(dev) : 0;
+    const canDeviceHandle = isDeviceApto(dev) && (isDiario ? devAvailable >= orderDoc.quantidade : true);
+
+    if (canDeviceHandle) {
       orderDoc.targetPort = targetPort;
+      orderDoc.status = 'assigned';
+      orderDoc.assignedToPort = targetPort;
       dev.isBusy = true;
       dev.currentOrder = {
         id: orderDoc.id,
@@ -3047,11 +3180,21 @@ try {
         input_val: orderDoc.input_val || '',
         timestamp: Date.now()
       };
-      console.log(`🚀 [SMS NUVEM] Ordem entregue ao Celular Apto ${targetPort} (Modo: ${orderDoc.modo || 'diario'})`);
+      dev.pending_order = {
+        id: orderDoc.id || orderDoc.orderId,
+        orderId: orderDoc.id || orderDoc.orderId,
+        numero: orderDoc.numero,
+        quantidade: orderDoc.quantidade,
+        modo: orderDoc.modo || 'diario',
+        input_val: orderDoc.input_val || '',
+        jid: null,
+        timestamp: Date.now()
+      };
+      console.log(`🚀 [SMS NUVEM] Ordem entregue ao Celular Apto ${targetPort} (Modo: ${orderDoc.modo || 'diario'}, Qtd: ${orderDoc.quantidade}MB, Saldo: ${devAvailable}MB)`);
     } else {
       orderDoc.targetPort = isDiario ? null : targetPort;
       orderDoc.status = 'pending';
-      console.log(`⏳ [SMS NUVEM] Celulares para modo ${orderDoc.modo || 'diario'} ocupados ou offline. Ordem mantida como PENDENTE na fila geral.`);
+      console.log(`⏳ [SMS NUVEM] Celulares para modo ${orderDoc.modo || 'diario'} (${orderDoc.quantidade}MB) sem saldo suficiente livre no momento. Ordem mantida como PENDENTE na fila geral.`);
     }
   });
   console.log('✅ [SMS ENGINE] Motor de vendas e atendimento por SMS inicializado com sucesso!');
@@ -4128,6 +4271,7 @@ app.post('/api/client/purchase', async (req, res) => {
       };
 
       splitMensalOrderIfEligible(orderDoc);
+      splitDailyOrderIfEligible(orderDoc);
       handleSpecialPlanIfApplicable(orderDoc);
 
       inMemoryOrders.set(orderId, orderDoc);
@@ -4192,6 +4336,7 @@ app.post('/api/client/purchase', async (req, res) => {
     };
 
     splitMensalOrderIfEligible(orderDoc);
+    splitDailyOrderIfEligible(orderDoc);
     handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(orderId, orderDoc);
