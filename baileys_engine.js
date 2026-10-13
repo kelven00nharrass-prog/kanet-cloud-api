@@ -235,7 +235,7 @@ function limparDuplicatasTabelas() {
 }
 
 function getMasterNumbers() {
-    const list = new Set(['850401416', '856116039', '856268811', '841636072']);
+    const list = new Set(['850401416', '856116039', '856268811']);
     if (LOCAL_CFG.master_number) {
         String(LOCAL_CFG.master_number).split(/[,;]/).forEach(n => list.add(n.trim().replace(/\D/g, '')));
     }
@@ -250,14 +250,14 @@ function isMaster(numero) {
     const clean = String(numero).replace(/\D/g, '');
     const clean9 = (clean.startsWith('258') && clean.length >= 11) ? clean.substring(3) : clean;
 
-    // Números do Criador / Kelven e LIDs conhecidos em grupos (Sempre Master em todas as situações)
-    if (clean.includes('850401416') || clean.includes('856116039') || clean.includes('856268811') || clean.includes('841636072') ||
-        clean9.includes('850401416') || clean9.includes('856116039') || clean9.includes('856268811') || clean9.includes('841636072') ||
-        clean.includes('216054655656152')) { // LID do WhatsApp do Kelven em Grupos
+    // Números estritos do Criador / Kelven e LID autorizado do WhatsApp
+    if (clean.includes('850401416') || clean.includes('856116039') || clean.includes('856268811') ||
+        clean9.includes('850401416') || clean9.includes('856116039') || clean9.includes('856268811') ||
+        clean.includes('216054655656152')) { // LID verificado do Kelven
         return true;
     }
 
-    // Verificar lista dinâmica de LIDs salvos de masters
+    // Verificar lista dinâmica de LIDs autorizados
     if (DYN_CFG.MASTER_LIDS && Array.isArray(DYN_CFG.MASTER_LIDS)) {
         if (DYN_CFG.MASTER_LIDS.some(l => clean.includes(String(l).replace(/\D/g, '')))) return true;
     }
@@ -1343,21 +1343,8 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     let senderIsMaster = candidateSenders.some(s => isMaster(s));
 
-                    // Se a mensagem veio de um grupo e ainda não detectou como master, verificar se é Admin do Grupo
-                    if (!senderIsMaster && jid.endsWith('@g.us')) {
-                        try {
-                            const meta = await getCachedGroupMetadata(jid);
-                            if (meta && meta.participants) {
-                                const p = meta.participants.find(x => {
-                                    const xClean = String(x.id).replace(/\D/g, '');
-                                    return candidateSenders.some(cand => String(cand).replace(/\D/g, '') === xClean || x.id === cand);
-                                });
-                                if (p && (p.admin === 'admin' || p.admin === 'superadmin')) {
-                                    senderIsMaster = true;
-                                }
-                            }
-                        } catch(e) {}
-                    }
+                    // 🛡️ SEGURANÇA: Administradores de Grupo de WhatsApp NÃO são Master do Sistema.
+                    // Apenas os números estritamente cadastrados em getMasterNumbers() possuem poderes de envio manual e controle.
 
                     // Se o remetente for master e tiver LID, salvar dinamicamente esse LID para sempre reconhecer
                     if (senderIsMaster) {
@@ -1792,10 +1779,12 @@ async function startWhatsApp(orderCallback, db = null) {
 
                             if (numDest && megas > 0) {
                                 const orderId = 'MANUAL-' + Date.now();
+                                addLog(`👑 [COMANDO MANUAL EXECUTADO] Autor: ${senderNumber} | Destino: ${numDest} | Megas: ${megas}MB | Ref: ${orderId}`);
                                 await reply(
                                     `⚡ *ENVIO MANUAL DISPACHADO!*\n━━━━━━━━━━━━━━━━━━━\n` +
                                     `📱 Destino: *${numDest}*\n` +
                                     `📦 Quantidade: *${megas} MB*\n` +
+                                    `👤 Autor: *${senderNumber}*\n` +
                                     `🆔 Ordem: \`${orderId}\`\n\n` +
                                     `⏳ A enviar ordem ao celular ativo...`
                                 );
