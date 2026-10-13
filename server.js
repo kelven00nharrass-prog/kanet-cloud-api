@@ -1660,21 +1660,17 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
         order.targetPort = null;
         order.lastError = mensagem || 'Sem saldo / Limite atingido';
         console.log(`🔄 [APP RESULT RETRY] Pedido ${orderId} falhou por saldo no Celular ${port}. Repassando para outro cartão (Tentativa #${order.retryCount})`);
-      } else if (isHighValueMode && !isSaldoError) {
-        // Tudo Top / Mensal / Semanal com erro de timeout ou USSD: NÃO tentar de novo!
-        // A Vodacom pode já ter activado. Reenvio apenas manual pelo operador.
+      } else if (!isSaldoError) {
+        // 🛡️ PROTEÇÃO ANTI-DUPLA ACTIVAÇÃO UNIVERSAL:
+        // Se o celular JÁ DISCOU o USSD e deu timeout/falha, a Vodacom pode já ter processado.
+        // NUNCA reenviar automaticamente — risco de enviar megas em dobro ao cliente.
+        // Aplica-se a TODOS os modos (diario, semanal, mensal, tudo_top).
+        // Reenvio apenas manual pelo operador no painel.
         order.status = 'failed';
         order.resultMessage = mensagem || '';
         order.completedAt = new Date().toISOString();
         order.lastError = mensagem || 'Falha USSD / Timeout';
         console.warn(`🛑 [ANTI-DUPLA ACTIVAÇÃO] Pedido ${orderId} (${modoOrder}) falhou com erro não-saldo: "${mensagem}". Marcado como FALHADO sem retry automático para evitar dupla activação. Reenvio apenas manual no painel.`);
-      } else if (order.retryCount < 5) {
-        order.status = 'pending';
-        order.assignedToPort = null;
-        order.processingAt = null;
-        order.targetPort = null;
-        order.lastError = mensagem || 'Falha USSD / Timeout';
-        console.log(`🔄 [APP RESULT RETRY] Pedido ${orderId} falhou no Celular ${port} (${order.lastError}). Devolvido à fila como PENDENTE para outro cartão/porta (Tentativa #${order.retryCount})`);
       } else {
         order.status = 'failed';
         order.resultMessage = mensagem || '';
