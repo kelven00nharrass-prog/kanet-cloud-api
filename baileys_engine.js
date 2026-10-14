@@ -698,27 +698,40 @@ function calcularPacoteProporcional(valor, jid = null) {
     const vNum = Math.round(parseFloat(String(valor).replace(',', '.')));
     if (isNaN(vNum) || vNum < 5) return null; // valor mínimo de segurança
 
-    // 1. Obter tabela de referência (preferência pelo grupo ou diários padrão)
-    let refTable = null;
+    // 1. Obter pontos da tabela de referência (preferência absoluta pela tabela exclusiva do Grupo!)
+    const pontos = [];
+    let origemPersonalizada = false;
+
     if (jid && String(jid).endsWith('@g.us') && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
         const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
         const grpTabs = grpCfg.TABELAS || grpCfg;
-        if (grpTabs['24hrs'] && Object.keys(grpTabs['24hrs']).length > 0) {
-            refTable = grpTabs['24hrs'];
+        // Percorrer todas as categorias configuradas neste grupo (24hrs, semanal, mensal, estudantes, revenda, etc.)
+        for (const [catName, catObj] of Object.entries(grpTabs)) {
+            if (catObj && typeof catObj === 'object') {
+                for (const [pStr, pObj] of Object.entries(catObj)) {
+                    const p = parseFloat(pStr);
+                    const mb = Number(pObj.quantidade_mb || pObj.quantidade || 0);
+                    if (!isNaN(p) && p > 0 && mb > 0) {
+                        pontos.push({ preco: p, mb, cat: catName });
+                    }
+                }
+            }
         }
-    }
-    if (!refTable && DYN_CFG.TABELAS && DYN_CFG.TABELAS['24hrs']) {
-        refTable = DYN_CFG.TABELAS['24hrs'];
+        if (pontos.length > 0) origemPersonalizada = true;
     }
 
-    // 2. Extrair pontos [preço, mb] conhecidos
-    const pontos = [];
-    if (refTable) {
-        for (const [pStr, pObj] of Object.entries(refTable)) {
-            const p = parseFloat(pStr);
-            const mb = Number(pObj.quantidade_mb || pObj.quantidade || 0);
-            if (!isNaN(p) && p > 0 && mb > 0) {
-                pontos.push({ preco: p, mb });
+    // Se não encontrou pontos na tabela do grupo (ou mensagem privada), usar a Tabela Geral
+    if (pontos.length === 0 && DYN_CFG.TABELAS) {
+        for (const catName of ['24hrs', 'semanal', 'mensal']) {
+            const catObj = DYN_CFG.TABELAS[catName];
+            if (catObj && typeof catObj === 'object') {
+                for (const [pStr, pObj] of Object.entries(catObj)) {
+                    const p = parseFloat(pStr);
+                    const mb = Number(pObj.quantidade_mb || pObj.quantidade || 0);
+                    if (!isNaN(p) && p > 0 && mb > 0) {
+                        pontos.push({ preco: p, mb, cat: catName });
+                    }
+                }
             }
         }
     }
@@ -776,7 +789,8 @@ function calcularPacoteProporcional(valor, jid = null) {
         tipo: '24hrs',
         preco: vNum,
         calculado: true,
-        origem: 'calculador_proporcional'
+        origem: origemPersonalizada ? 'calculador_grupo_exclusivo' : 'calculador_proporcional',
+        origemPersonalizada
     };
 }
 
