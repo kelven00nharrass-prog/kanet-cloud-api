@@ -2340,6 +2340,16 @@ app.get('/api/admin/reports', async (req, res) => {
     const totalVolumeMB = completed.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
     const totalVolumeGB = (totalVolumeMB / 1024).toFixed(1);
 
+    let custoGb = 20;
+    try {
+      const cfg = require('./bot_config.js');
+      if (cfg && cfg.CUSTO_GB_MT) custoGb = Number(cfg.CUSTO_GB_MT);
+    } catch (_) {}
+
+    const custoTotalMT = (totalVolumeMB / 1024) * custoGb;
+    const lucroLiquidoMT = totalFaturadoMT - custoTotalMT;
+    const margemLucroPct = totalFaturadoMT > 0 ? ((lucroLiquidoMT / totalFaturadoMT) * 100).toFixed(1) : '0.0';
+
     // Agrupamento por pacote mais vendido
     const pacotesMap = {};
     completed.forEach(o => {
@@ -2379,7 +2389,11 @@ app.get('/api/admin/reports', async (req, res) => {
         pedidos_pendentes: pending.length,
         taxa_sucesso_pct: filteredOrders.length > 0 ? Math.round((completed.length / filteredOrders.length) * 100) : 100,
         total_volume_mb: totalVolumeMB,
-        total_volume_gb: totalVolumeGB
+        total_volume_gb: totalVolumeGB,
+        custo_gb_mt: custoGb,
+        custo_total_mt: Math.round(custoTotalMT * 100) / 100,
+        lucro_liquido_mt: Math.round(lucroLiquidoMT * 100) / 100,
+        margem_lucro_pct: parseFloat(margemLucroPct)
       },
       pacotes_mais_vendidos: pacotesMaisVendidos,
       ultimas_vendas: completed.slice(-15).reverse(),
@@ -2785,17 +2799,36 @@ app.get('/api/reports', async (req, res) => {
       }
     });
 
+    let custoGb = 20;
+    try {
+      const cfg = require('./bot_config.js');
+      if (cfg && cfg.CUSTO_GB_MT) custoGb = Number(cfg.CUSTO_GB_MT);
+    } catch (_) {}
+
+    const todayCusto = (todayTotalMb / 1024) * custoGb;
+    const todayLucro = todayTotalMt - todayCusto;
+    const monthCusto = (monthTotalMb / 1024) * custoGb;
+    const monthLucro = monthTotalMt - monthCusto;
+
     return res.json({
       success: true,
       today: {
         valor_mt: todayTotalMt,
         megas: todayTotalMb,
-        total_vendas: todaySales.length
+        total_vendas: todaySales.length,
+        custo_gb: custoGb,
+        custo_total_mt: Math.round(todayCusto * 100) / 100,
+        lucro_liquido_mt: Math.round(todayLucro * 100) / 100,
+        margem_pct: todayTotalMt > 0 ? Math.round((todayLucro / todayTotalMt) * 1000) / 10 : 0
       },
       month: {
         valor_mt: monthTotalMt,
         megas: monthTotalMb,
-        total_vendas: monthSales.length
+        total_vendas: monthSales.length,
+        custo_gb: custoGb,
+        custo_total_mt: Math.round(monthCusto * 100) / 100,
+        lucro_liquido_mt: Math.round(monthLucro * 100) / 100,
+        margem_pct: monthTotalMt > 0 ? Math.round((monthLucro / monthTotalMt) * 1000) / 10 : 0
       },
       recebidos: {
         mpesa_mt: mpesaTotal,
@@ -2810,6 +2843,40 @@ app.get('/api/reports', async (req, res) => {
       recentPayments: payments.slice(0, 50)
     });
   } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── CONFIGURAÇÃO DE CUSTO DE COMPRA DO GB (PARA CÁLCULO DE LUCRO LÍQUIDO) ──
+app.get('/api/admin/config/custo-gb', (req, res) => {
+  let custo = 20;
+  try {
+    const cfg = require('./bot_config.js');
+    if (cfg && cfg.CUSTO_GB_MT) custo = Number(cfg.CUSTO_GB_MT);
+  } catch (_) {}
+  return res.json({ success: true, custo_gb_mt: custo });
+});
+
+app.post('/api/admin/config/custo-gb', async (req, res) => {
+  try {
+    const novoCusto = parseFloat(req.body?.custo_gb || req.body?.preco_gb);
+    if (isNaN(novoCusto) || novoCusto <= 0) {
+      return res.status(400).json({ success: false, mensagem: 'Valor de custo do GB inválido.' });
+    }
+    const cfgPath = path.resolve(__dirname, 'bot_config.js');
+    let cfg = {};
+    try {
+      delete require.cache[require.resolve(cfgPath)];
+      cfg = require(cfgPath);
+    } catch (_) {}
+    cfg.CUSTO_GB_MT = novoCusto;
+    fs.writeFileSync(cfgPath, '// GERADO PELO SISTEMA KA-NET CLOUD\nmodule.exports = ' + JSON.stringify(cfg, null, 4) + ';\n', 'utf8');
+
+    if (db) {
+      db.collection('bot_settings').doc('pricing_tables').set({ CUSTO_GB_MT: novoCusto }, { merge: true }).catch(() => {});
+    }
+    return res.json({ success: true, mensagem: `Custo do GB atualizado para ${novoCusto} MT/GB com sucesso!`, custo_gb_mt: novoCusto });
+  } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
 });

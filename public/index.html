@@ -480,6 +480,16 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
         <div class="stat-val yellow" id="repEmolaVal">0 MT</div>
         <div class="stat-sub"><span id="repEmolaCount">0</span> SMS confirmados</div>
       </div>
+      <div class="card stat-card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), transparent);">
+        <div class="stat-label" style="color:var(--green)"><i class="fa-solid fa-chart-line"></i> Lucro Líquido Real (Hoje)</div>
+        <div class="stat-val green" id="repTodayLucroVal">0 MT</div>
+        <div class="stat-sub">Margem: <b id="repTodayMargem">0%</b> • Custo: <span id="repTodayCusto">0 MT</span></div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label"><i class="fa-solid fa-tags"></i> Custo de Compra (GB)</div>
+        <div class="stat-val" style="color:#a855f7" id="repCustoGbVal">20 MT</div>
+        <div class="stat-sub"><a href="javascript:void(0)" onclick="alterarCustoGB()" style="color:var(--cyan);text-decoration:underline">Ajustar Preço de Custo</a></div>
+      </div>
     </div>
 
     <!-- SALES HISTORY & SMS TRANSACTIONS -->
@@ -1854,6 +1864,17 @@ async function loadReports() {
     const eCountEl = document.getElementById('repEmolaCount');
     if (eCountEl) eCountEl.textContent = d.recebidos.emola_count || 0;
 
+    // Métricas financeiras e Lucro Líquido
+    const lucroHoje = d.today.lucro_liquido_mt !== undefined ? d.today.lucro_liquido_mt : (d.today.valor_mt || 0);
+    const lucroEl = document.getElementById('repTodayLucroVal');
+    if (lucroEl) lucroEl.textContent = (lucroHoje >= 0 ? '+' : '') + lucroHoje + ' MT';
+    const margemEl = document.getElementById('repTodayMargem');
+    if (margemEl) margemEl.textContent = (d.today.margem_pct || 0) + '%';
+    const custoEl = document.getElementById('repTodayCusto');
+    if (custoEl) custoEl.textContent = (d.today.custo_total_mt || 0) + ' MT';
+    const custoGbEl = document.getElementById('repCustoGbVal');
+    if (custoGbEl) custoGbEl.textContent = (d.today.custo_gb || 20) + ' MT';
+
     // Tabela de vendas
     allSalesData = d.allSales || d.recentSales || [];
     const tb = document.getElementById('salesTableBody');
@@ -1934,6 +1955,29 @@ function exportSalesCSV() {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+async function alterarCustoGB() {
+  const atual = document.getElementById('repCustoGbVal').textContent.replace(/[^\d.]/g, '') || '20';
+  const novo = prompt('Informe o seu preço de compra de 1 GB (em Meticais):', atual);
+  if (!novo) return;
+  const num = parseFloat(novo.replace(',', '.'));
+  if (isNaN(num) || num <= 0) return alert('Valor inválido!');
+  try {
+    const res = await fetchAPI('/api/admin/config/custo-gb', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custo_gb: num })
+    });
+    if (res.success) {
+      alert(`Preço de compra do GB atualizado para ${num} MT/GB!`);
+      loadReports();
+    } else {
+      alert('Erro: ' + (res.mensagem || res.error));
+    }
+  } catch(e) {
+    alert('Erro ao salvar custo: ' + e.message);
+  }
 }
 
 // -------------------------------------------------------------------

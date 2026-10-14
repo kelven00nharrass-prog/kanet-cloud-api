@@ -162,6 +162,7 @@ function carregarConfigs() {
     if (!DYN_CFG.PLANOS_ESPECIAIS) DYN_CFG.PLANOS_ESPECIAIS = {};
     if (!DYN_CFG.GRUPOS_FECHADOS) DYN_CFG.GRUPOS_FECHADOS = [];
     if (!DYN_CFG.TABELAS_GRUPO) DYN_CFG.TABELAS_GRUPO = {};
+    if (DYN_CFG.CUSTO_GB_MT === undefined || DYN_CFG.CUSTO_GB_MT === null) DYN_CFG.CUSTO_GB_MT = 20;
     // Restaurar modo manutenção persistido
     if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
     
@@ -690,6 +691,96 @@ function gerarPainelAjudaCompleto() {
 }
 
 // ══════════════════════════════════════════════════
+// CALCULADOR PROPORCIONAL INTELIGENTE (VALORES FORA DA TABELA)
+// Converte qualquer valor em megas justos protegendo o lucro
+// ══════════════════════════════════════════════════
+function calcularPacoteProporcional(valor, jid = null) {
+    const vNum = Math.round(parseFloat(String(valor).replace(',', '.')));
+    if (isNaN(vNum) || vNum < 5) return null; // valor mínimo de segurança
+
+    // 1. Obter tabela de referência (preferência pelo grupo ou diários padrão)
+    let refTable = null;
+    if (jid && String(jid).endsWith('@g.us') && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
+        const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
+        const grpTabs = grpCfg.TABELAS || grpCfg;
+        if (grpTabs['24hrs'] && Object.keys(grpTabs['24hrs']).length > 0) {
+            refTable = grpTabs['24hrs'];
+        }
+    }
+    if (!refTable && DYN_CFG.TABELAS && DYN_CFG.TABELAS['24hrs']) {
+        refTable = DYN_CFG.TABELAS['24hrs'];
+    }
+
+    // 2. Extrair pontos [preço, mb] conhecidos
+    const pontos = [];
+    if (refTable) {
+        for (const [pStr, pObj] of Object.entries(refTable)) {
+            const p = parseFloat(pStr);
+            const mb = Number(pObj.quantidade_mb || pObj.quantidade || 0);
+            if (!isNaN(p) && p > 0 && mb > 0) {
+                pontos.push({ preco: p, mb });
+            }
+        }
+    }
+
+    pontos.sort((a, b) => a.preco - b.preco);
+
+    let mbEstimado = 0;
+    if (pontos.length === 0) {
+        mbEstimado = Math.round(vNum * 39); // Fallback: ~39 MB/MT
+    } else if (vNum <= pontos[0].preco) {
+        const taxa = pontos[0].mb / pontos[0].preco;
+        mbEstimado = Math.round(vNum * taxa);
+    } else if (vNum >= pontos[pontos.length - 1].preco) {
+        const taxa = pontos[pontos.length - 1].mb / pontos[pontos.length - 1].preco;
+        mbEstimado = Math.round(vNum * taxa);
+    } else {
+        // Interpolação linear entre os dois pontos mais próximos
+        let pInf = pontos[0];
+        let pSup = pontos[pontos.length - 1];
+        for (let i = 0; i < pontos.length - 1; i++) {
+            if (vNum >= pontos[i].preco && vNum <= pontos[i + 1].preco) {
+                pInf = pontos[i];
+                pSup = pontos[i + 1];
+                break;
+            }
+        }
+        const deltaPreco = pSup.preco - pInf.preco;
+        const fator = deltaPreco > 0 ? (vNum - pInf.preco) / deltaPreco : 0;
+        mbEstimado = Math.round(pInf.mb + fator * (pSup.mb - pInf.mb));
+    }
+
+    // 3. PROTEÇÃO ANTI-PREJUÍZO (Garante margem mínima calculada com o CUSTO_GB_MT)
+    const custoGb = Number(DYN_CFG.CUSTO_GB_MT) || 20;
+    const custoPorMb = custoGb / 1024;
+    // O cliente nunca recebe mais do que o valor pago com 15% de margem líquida garantida
+    const tetoMbPermitido = Math.floor((vNum * 0.85) / custoPorMb);
+    if (tetoMbPermitido > 0 && mbEstimado > tetoMbPermitido) {
+        mbEstimado = tetoMbPermitido;
+    }
+
+    // Arredondamento comercial amigável (múltiplos de 50 MB para pacotes grandes, ou 10 MB para pequenos)
+    if (mbEstimado >= 1000) {
+        mbEstimado = Math.round(mbEstimado / 50) * 50;
+    } else {
+        mbEstimado = Math.round(mbEstimado / 10) * 10;
+    }
+
+    if (mbEstimado < 100) mbEstimado = 100;
+
+    const nomeFormatado = mbEstimado >= 1024 ? `${(mbEstimado / 1024).toFixed(1)} GB` : `${mbEstimado} MB`;
+
+    return {
+        nome: `${nomeFormatado} 24h`,
+        mb: mbEstimado,
+        tipo: '24hrs',
+        preco: vNum,
+        calculado: true,
+        origem: 'calculador_proporcional'
+    };
+}
+
+// ══════════════════════════════════════════════════
 // BUSCA DE PACOTE PELO VALOR (COM SUPORTE A TABELAS POR GRUPO)
 // ══════════════════════════════════════════════════
 function buscarPacotePorValor(valor, jid = null) {
@@ -774,6 +865,14 @@ function buscarPacotePorValor(valor, jid = null) {
             return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: 'semanal', preco: vNum + delta };
         }
     }
+
+    // 5. ⚡ CALCULADOR AUTOMÁTICO INTELIGENTE (valores fora da tabela)
+    const pacoteCalculado = calcularPacoteProporcional(vNum, jid);
+    if (pacoteCalculado) {
+        console.log(`🧮 [CALCULADOR PROPORCIONAL] Valor ${vNum} MT fora da tabela convertido em ${pacoteCalculado.mb} MB!`);
+        return pacoteCalculado;
+    }
+
     return null;
 }
 
@@ -2000,6 +2099,140 @@ async function startWhatsApp(orderCallback, db = null) {
                             `💡 *Como alterar:*\n` +
                             `• Entre no grupo e envie *.setnotificacoes*\n` +
                             `• Entre no grupo e envie *.seterros*`
+                        );
+                        continue;
+                    }
+
+                    // ── CONTROLE FINANCEIRO: PREÇO DE COMPRA DO GB (ADMIN MASTER) ──
+                    if ((cleanText === '.custogb' || cleanText.startsWith('.custogb ')) && senderIsMaster) {
+                        const partes = cleanText.split(/\s+/);
+                        if (partes.length > 1) {
+                            const novoCusto = parseFloat(partes[1].replace(',', '.'));
+                            if (!isNaN(novoCusto) && novoCusto > 0) {
+                                DYN_CFG.CUSTO_GB_MT = novoCusto;
+                                salvarBotConfig();
+                                await reply(
+                                    `🏷️ *PREÇO DE COMPRA DO GB ATUALIZADO!*\n` +
+                                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                    `💰 *Novo Custo de Compra:* *${novoCusto.toFixed(2)} MT / GB*\n` +
+                                    `📉 *Custo por MB:* *${(novoCusto / 1024).toFixed(4)} MT / MB*\n\n` +
+                                    `✅ Salvo na nuvem e ativo no Calculador Inteligente e no Relatório de Lucro!`
+                                );
+                            } else {
+                                await reply(`⚠️ Valor inválido. Exemplo de uso: *.custogb 20*`);
+                            }
+                        } else {
+                            const atual = Number(DYN_CFG.CUSTO_GB_MT) || 20;
+                            await reply(
+                                `🏷️ *CUSTO DE COMPRA ATUAL DO GB:*\n` +
+                                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                `💰 *${atual.toFixed(2)} MT / GB* (${(atual / 1024).toFixed(4)} MT / MB)\n\n` +
+                                `💡 Para alterar, envie: *.custogb [valor]* (ex: *.custogb 22*)`
+                            );
+                        }
+                        continue;
+                    }
+
+                    // ── RELATÓRIO DE LUCRO LÍQUIDO REAL POR PERÍODO (ADMIN MASTER) ──
+                    if ((cleanText === '.lucro' || cleanText.startsWith('.lucro ')) && senderIsMaster) {
+                        const param = cleanText.replace('.lucro', '').trim().toLowerCase() || 'hoje';
+                        const now = new Date();
+                        let startDate = new Date();
+                        let tituloPeriodo = 'HOJE';
+
+                        if (param === 'hoje' || param === 'today' || param === 'diario') {
+                            const todayStr = now.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' });
+                            startDate = new Date(todayStr + 'T00:00:00+02:00');
+                            tituloPeriodo = `HOJE (${now.toLocaleDateString('pt-PT', { timeZone: 'Africa/Maputo' })})`;
+                        } else if (param === 'semana' || param === 'week' || param === 'semanal') {
+                            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            tituloPeriodo = 'ÚLTIMOS 7 DIAS';
+                        } else if (param === 'mes' || param === 'month' || param === 'mensal') {
+                            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                            tituloPeriodo = 'ÚLTIMOS 30 DIAS';
+                        } else {
+                            startDate = new Date(0);
+                            tituloPeriodo = 'HISTÓRICO COMPLETO';
+                        }
+
+                        const startMs = startDate.getTime();
+                        const custoGb = Number(DYN_CFG.CUSTO_GB_MT) || 20;
+
+                        const mapOrders = new Map();
+
+                        // 1. Vendas locais
+                        historicoVendas.forEach(v => {
+                            const ts = v.timestamp ? new Date(v.timestamp).getTime() : 0;
+                            if (ts >= startMs) {
+                                mapOrders.set(v.orderId || `${v.timestamp}-${v.numero}`, {
+                                    valor: Number(v.valor) || 0,
+                                    mb: Number(v.mb) || 0
+                                });
+                            }
+                        });
+
+                        // 2. Vendas do Firestore se disponível
+                        if (firestoreDbInstance) {
+                            try {
+                                const snap = await firestoreDbInstance.collection('orders').orderBy('createdAt', 'desc').limit(300).get();
+                                snap.docs.forEach(doc => {
+                                    const d = doc.data();
+                                    const id = d.orderId || d.id || doc.id;
+                                    const t = d.completedAt || d.createdAt ? new Date(d.completedAt || d.createdAt).getTime() : 0;
+                                    if (t >= startMs && (d.status === 'completed' || d.success === true)) {
+                                        mapOrders.set(id, {
+                                            valor: Number(d.valor || d.valor_pago || 0),
+                                            mb: Number(d.quantidade || 0)
+                                        });
+                                    }
+                                });
+                            } catch (_) {}
+                        }
+
+                        let faturamentoBruto = 0;
+                        let totalMegas = 0;
+                        mapOrders.forEach(o => {
+                            faturamentoBruto += o.valor;
+                            totalMegas += o.mb;
+                        });
+
+                        // Breakdown de confirmações operadora
+                        let mpesaTotal = 0;
+                        let emolaTotal = 0;
+                        smsPaymentsMap.forEach(p => {
+                            const ts = p.processedAt || p.timestamp ? new Date(p.processedAt || p.timestamp).getTime() : 0;
+                            if (ts >= startMs) {
+                                const val = Number(p.valor) || 0;
+                                const isEmola = (p.metodo === 'emola' || /^(ID|PP26)/i.test(p.txn_id || ''));
+                                if (isEmola) emolaTotal += val;
+                                else mpesaTotal += val;
+                            }
+                        });
+
+                        const volumeGb = totalMegas / 1024;
+                        const custoTotalDados = volumeGb * custoGb;
+                        const lucroLiquido = faturamentoBruto - custoTotalDados;
+                        const margemPct = faturamentoBruto > 0 ? (lucroLiquido / faturamentoBruto) * 100 : 0;
+
+                        await reply(
+                            `📊 *RELATÓRIO FINANCEIRO & LUCRO REAL*\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                            `📅 *Período:* ${tituloPeriodo}\n\n` +
+                            `💰 *Faturamento Bruto:* *${faturamentoBruto.toFixed(2)} MT*\n` +
+                            `📦 *Volume Vendido:* *${volumeGb.toFixed(2)} GB* (${totalMegas.toLocaleString()} MB)\n` +
+                            `🔢 *Pedidos Concluídos:* *${mapOrders.size}*\n\n` +
+                            `🏷️ *Custo de Compra:* *${custoGb.toFixed(2)} MT / GB*\n` +
+                            `📉 *Custo dos Dados:* *${custoTotalDados.toFixed(2)} MT*\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                            `📈 *LUCRO LÍQUIDO:* *${lucroLiquido >= 0 ? '+' : ''}${lucroLiquido.toFixed(2)} MT*\n` +
+                            `📊 *Margem de Lucro:* *${margemPct.toFixed(1)}%*\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                            `💳 *Recebido por Operadora:*\n` +
+                            `• 🟥 M-Pesa: *${mpesaTotal.toFixed(2)} MT*\n` +
+                            `• 🟨 e-Mola: *${emolaTotal.toFixed(2)} MT*\n\n` +
+                            `💡 *Comandos disponíveis:*\n` +
+                            `• *.lucro hoje* | *.lucro semana* | *.lucro mes*\n` +
+                            `• *.custogb [valor]* (para atualizar o preço do GB)`
                         );
                         continue;
                     }
