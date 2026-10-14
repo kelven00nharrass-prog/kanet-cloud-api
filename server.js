@@ -4558,7 +4558,10 @@ app.post('/api/client/support/process-proof', async (req, res) => {
 
     const txnId = extrairTxIdChat(smsClean);
     const valor = extrairValorChat(smsClean) || 0;
-    const isEmola = /e-?mola|864882152/i.test(smsClean);
+    // Detecção fiável por prefixo: e-Mola começa com "ID da transacao", M-Pesa com "Confirmado DJDXXXXX"
+    const isEmolaPrefix = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(smsClean.trim());
+    const isMpesaPrefix = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(smsClean.trim());
+    const isEmola = isEmolaPrefix ? true : isMpesaPrefix ? false : /e-?mola|864882152/i.test(smsClean);
     const metodo = isEmola ? 'e-Mola' : 'M-Pesa';
 
     // 4. Verificar se a operadora já confirmou no gateway

@@ -1973,7 +1973,15 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (isComprovativo(text)) {
                         const valor = extrairValorMT(text);
                         const txn_id = extrairTxId(text);
-                        const metodo = /e-mola|emola|movitel|864882152|catia|TX[A-Z0-9]/i.test(text) ? 'emola' : 'mpesa';
+                        // Detecção fiável: e-Mola começa com "ID da transacao" / "Transaction ID"
+                        // M-Pesa começa com "Confirmado DJDXXXXXX" ou tem código "PP26..."
+                        const isEmolaPattern = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(text.trim());
+                        const isMpesaPattern = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(text.trim());
+                        const metodo = isEmolaPattern
+                            ? 'emola'
+                            : isMpesaPattern
+                                ? 'mpesa'
+                                : /e-?mola|emola|movitel|864882152|catia/i.test(text) ? 'emola' : 'mpesa';
                         const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
                         // ── REGRA 1: SEGURANÇA MÁXIMA ANTI-DUPLICAÇÃO E LOCK EXCLUSIVO ──
