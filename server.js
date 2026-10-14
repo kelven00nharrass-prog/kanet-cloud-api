@@ -2133,47 +2133,120 @@ app.get('/api/admin/recebimentos', async (req, res) => {
   }
 });
 
-// 1. Extrato de Pagamentos Recebidos (M-Pesa / e-Mola)
-app.get('/api/admin/payments', (req, res) => {
+// 1. Extrato de Pagamentos Recebidos (M-Pesa / e-Mola) para KaNet Admin Master
+app.get('/api/admin/payments', async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) || 100;
+    const map = new Map();
 
-  const limit = Number(req.query.limit) || 50;
-  // Derivar também pagamentos a partir dos pedidos concluídos/processados
-  const fromOrders = Array.from(inMemoryOrders.values())
-    .filter(o => o.valor || o.valor_pago)
-    .map(o => ({
-      id: o.orderId || o.id,
-      ref: o.orderId || o.id,
-      operadora: (o.modo === 'saldo' || (o.numero && o.numero.startsWith('86') || o.numero && o.numero.startsWith('87'))) ? 'e-Mola' : 'M-Pesa',
-      valor: Number(o.valor || o.valor_pago || 0),
-      numero: o.numero || '',
-      remetente: o.remetente || '',
-      timestamp: o.createdAt || new Date().toISOString(),
-      orderId: o.orderId || o.id,
-      status: o.status === 'completed' ? 'ativado' : (o.status === 'failed' ? 'falhou' : 'processando'),
-      detalhes: `${o.quantidade}MB [${o.modo || 'diario'}]`
-    }));
+    // 1. Incluir pagamentos registrados manualmente / cache
+    adminReceiptsHistory.forEach(p => {
+      const ref = p.ref || p.id || p.txn_id;
+      if (ref) map.set(ref, p);
+    });
 
-  // Unir e ordenar do mais recente ao mais antigo
-  const combined = [...adminReceiptsHistory, ...fromOrders];
-  const uniqueMap = new Map();
-  combined.forEach(p => {
-    if (p.ref && !uniqueMap.has(p.ref)) {
-      uniqueMap.set(p.ref, p);
+    // 2. Incluir pagamentos de SMS em memória
+    inMemoryPayments.forEach((p, k) => {
+      const ref = p.txn_id || p.id || k;
+      if (ref) {
+        const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
+        map.set(ref, {
+          id: ref,
+          ref,
+          operadora: isEmola ? 'e-Mola' : 'M-Pesa',
+          valor: Number(p.valor || 0),
+          numero: p.numero || p.remetente || '',
+          remetente: p.remetente || '',
+          timestamp: p.processedAt || p.timestamp || new Date().toISOString(),
+          status: p.usado ? 'ativado' : 'recebido',
+          detalhes: p.usadoPor ? `Ativado para ${p.usadoPor}` : (isEmola ? 'e-Mola Transfer' : 'M-Pesa Transfer')
+        });
+      }
+    });
+
+    // 3. Incluir pagamentos de SMS do Baileys (WhatsApp)
+    if (baileysEngine && baileysEngine.smsPaymentsMap) {
+      for (const [k, p] of baileysEngine.smsPaymentsMap.entries()) {
+        const ref = p.txn_id || p.id || k;
+        if (ref && !map.has(ref)) {
+          const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
+          map.set(ref, {
+            id: ref,
+            ref,
+            operadora: isEmola ? 'e-Mola' : 'M-Pesa',
+            valor: Number(p.valor || 0),
+            numero: p.numero || p.remetente || '',
+            remetente: p.remetente || '',
+            timestamp: p.processedAt || p.timestamp || new Date().toISOString(),
+            status: p.usado ? 'ativado' : 'recebido',
+            detalhes: p.usadoPor ? `Ativado para ${p.usadoPor}` : (isEmola ? 'e-Mola WhatsApp' : 'M-Pesa WhatsApp')
+          });
+        }
+      }
     }
-  });
 
-  const sorted = Array.from(uniqueMap.values())
-    .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
-    .slice(0, limit);
+    // 4. Buscar do Firestore sms_payments se disponível (persistência na nuvem)
+    if (db) {
+      try {
+        const snap = await db.collection('sms_payments').orderBy('processedAt', 'desc').limit(150).get();
+        snap.docs.forEach(d => {
+          const p = d.data();
+          const ref = p.txn_id || p.id || d.id;
+          if (ref && !map.has(ref)) {
+            const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
+            map.set(ref, {
+              id: ref,
+              ref,
+              operadora: isEmola ? 'e-Mola' : 'M-Pesa',
+              valor: Number(p.valor || 0),
+              numero: p.numero || p.remetente || '',
+              remetente: p.remetente || '',
+              timestamp: p.processedAt || p.timestamp || new Date().toISOString(),
+              status: p.usado ? 'ativado' : 'recebido',
+              detalhes: p.usadoPor ? `Ativado para ${p.usadoPor}` : (isEmola ? 'e-Mola Cloud' : 'M-Pesa Cloud')
+            });
+          }
+        });
+      } catch (err) {}
+    }
 
-  const totalValor = sorted.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+    // 5. Incluir também vendas concluídas que tenham valor
+    const ordersList = Array.from(inMemoryOrders.values()).filter(o => o.valor || o.valor_pago);
+    ordersList.forEach(o => {
+      const ref = o.orderId || o.id;
+      if (ref && !map.has(ref)) {
+        const met = String(o.metodo || o.operadora || '').toLowerCase();
+        const isEmola = met.includes('emola') || met.includes('e-mola') || /PP2\d{5}\.\d{4}/i.test(ref);
+        map.set(ref, {
+          id: ref,
+          ref,
+          operadora: isEmola ? 'e-Mola' : 'M-Pesa',
+          valor: Number(o.valor || o.valor_pago || 0),
+          numero: o.numero || '',
+          remetente: o.remetente || '',
+          timestamp: o.completedAt || o.createdAt || new Date().toISOString(),
+          orderId: ref,
+          status: o.status === 'completed' ? 'ativado' : (o.status === 'failed' ? 'falhou' : 'processando'),
+          detalhes: `${o.quantidade}MB [${o.modo || 'diario'}]`
+        });
+      }
+    });
 
-  return res.json({
-    success: true,
-    total_registos: sorted.length,
-    total_faturado_lista: totalValor,
-    payments: sorted
-  });
+    const sorted = Array.from(map.values())
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      .slice(0, limit);
+
+    const totalValor = sorted.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+
+    return res.json({
+      success: true,
+      total_registos: sorted.length,
+      total_faturado_lista: totalValor,
+      payments: sorted
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // Endpoint para registrar recebimento de SMS M-Pesa / e-Mola via Bot ou Celular
@@ -2206,74 +2279,115 @@ app.post('/api/admin/payments/register', (req, res) => {
   return res.json({ success: true, payment: paymentDoc });
 });
 
-// 2. Relatórios de Vendas (Diário, Semanal, Mensal, Trimestral, Semestral, Anual)
-app.get('/api/admin/reports', (req, res) => {
-  const period = (req.query.period || 'today').toLowerCase(); // today, week, month, quarter, semester, year
-  const now = new Date();
-  
-  let startTime = new Date();
-  if (period === 'today' || period === 'diario') {
-    startTime.setHours(0, 0, 0, 0);
-  } else if (period === 'week' || period === 'semanal') {
-    startTime.setDate(now.getDate() - 7);
-  } else if (period === 'month' || period === 'mensal') {
-    startTime.setDate(now.getDate() - 30);
-  } else if (period === 'quarter' || period === 'trimestral') {
-    startTime.setDate(now.getDate() - 90);
-  } else if (period === 'semester' || period === 'semestral') {
-    startTime.setDate(now.getDate() - 180);
-  } else if (period === 'year' || period === 'anual') {
-    startTime.setDate(now.getDate() - 365);
-  } else {
-    startTime.setHours(0, 0, 0, 0);
+// 2. Relatórios de Vendas (Diário, Semanal, Mensal, Trimestral, Semestral, Anual) para KaNet Admin Master
+app.get('/api/admin/reports', async (req, res) => {
+  try {
+    const period = (req.query.period || 'today').toLowerCase(); // today, week, month, quarter, semester, year
+    const now = new Date();
+    
+    let startTime = new Date();
+    if (period === 'today' || period === 'diario') {
+      // Começar às 00:00 no fuso de Moçambique
+      const todayDateStr = now.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' });
+      startTime = new Date(todayDateStr + 'T00:00:00+02:00');
+    } else if (period === 'week' || period === 'semanal') {
+      startTime.setDate(now.getDate() - 7);
+    } else if (period === 'month' || period === 'mensal') {
+      startTime.setDate(now.getDate() - 30);
+    } else if (period === 'quarter' || period === 'trimestral') {
+      startTime.setDate(now.getDate() - 90);
+    } else if (period === 'semester' || period === 'semestral') {
+      startTime.setDate(now.getDate() - 180);
+    } else if (period === 'year' || period === 'anual') {
+      startTime.setDate(now.getDate() - 365);
+    } else {
+      const todayDateStr = now.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' });
+      startTime = new Date(todayDateStr + 'T00:00:00+02:00');
+    }
+
+    const startMs = startTime.getTime();
+    const orderMap = new Map();
+
+    // Ler ordens em memória
+    inMemoryOrders.forEach((v, k) => orderMap.set(k, v));
+
+    // Se Firestore estiver ativo, enriquecer com histórico persistente
+    if (db) {
+      try {
+        const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(200).get();
+        snap.docs.forEach(doc => {
+          const d = doc.data();
+          const id = d.orderId || d.id || doc.id;
+          if (id && !orderMap.has(id)) {
+            orderMap.set(id, d);
+          }
+        });
+      } catch (_) {}
+    }
+
+    const allOrders = Array.from(orderMap.values());
+
+    const filteredOrders = allOrders.filter(o => {
+      const t = o.createdAt ? new Date(o.createdAt).getTime() : (o.timestamp || 0);
+      return t >= startMs;
+    });
+
+    const completed = filteredOrders.filter(o => o.status === 'completed' || o.success === true);
+    const failed = filteredOrders.filter(o => o.status === 'failed');
+    const pending = filteredOrders.filter(o => o.status === 'pending' || o.status === 'assigned');
+
+    const totalFaturadoMT = completed.reduce((acc, o) => acc + (Number(o.valor || o.valor_pago) || 0), 0);
+    const totalVolumeMB = completed.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
+    const totalVolumeGB = (totalVolumeMB / 1024).toFixed(1);
+
+    // Agrupamento por pacote mais vendido
+    const pacotesMap = {};
+    completed.forEach(o => {
+      const key = `${o.quantidade}MB [${o.modo || 'diario'}]`;
+      pacotesMap[key] = (pacotesMap[key] || 0) + 1;
+    });
+
+    const pacotesMaisVendidos = Object.entries(pacotesMap)
+      .map(([pacote, total]) => ({ pacote, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+
+    // Formato compatível com KaNet-Admin-Master (MainActivity.kt)
+    const historicoFormatado = completed.slice(-30).reverse().map(o => {
+      const qty = Number(o.quantidade) || 0;
+      return {
+        id: o.orderId || o.id || '',
+        numero: o.numero || '',
+        volume: qty >= 1024 ? `${(qty / 1024).toFixed(1)} GB` : `${qty} MB`,
+        valor: Number(o.valor || o.valor_pago || 0),
+        status: o.status || 'completed',
+        timestamp: new Date(o.completedAt || o.createdAt || 0).getTime(),
+        port: Number(o.assignedToPort || o.targetPort || 0)
+      };
+    });
+
+    return res.json({
+      success: true,
+      periodo: period,
+      data_inicio: startTime.toISOString(),
+      data_fim: now.toISOString(),
+      metricas: {
+        total_faturado_mt: totalFaturadoMT,
+        total_pedidos: filteredOrders.length,
+        pedidos_concluidos: completed.length,
+        pedidos_falhados: failed.length,
+        pedidos_pendentes: pending.length,
+        taxa_sucesso_pct: filteredOrders.length > 0 ? Math.round((completed.length / filteredOrders.length) * 100) : 100,
+        total_volume_mb: totalVolumeMB,
+        total_volume_gb: totalVolumeGB
+      },
+      pacotes_mais_vendidos: pacotesMaisVendidos,
+      ultimas_vendas: completed.slice(-15).reverse(),
+      historico: historicoFormatado
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
-
-  const startMs = startTime.getTime();
-  const allOrders = Array.from(inMemoryOrders.values());
-
-  const filteredOrders = allOrders.filter(o => {
-    const t = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-    return t >= startMs;
-  });
-
-  const completed = filteredOrders.filter(o => o.status === 'completed');
-  const failed = filteredOrders.filter(o => o.status === 'failed');
-  const pending = filteredOrders.filter(o => o.status === 'pending' || o.status === 'assigned');
-
-  const totalFaturadoMT = completed.reduce((acc, o) => acc + (Number(o.valor || o.valor_pago) || 0), 0);
-  const totalVolumeMB = completed.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
-  const totalVolumeGB = (totalVolumeMB / 1024).toFixed(1);
-
-  // Agrupamento por pacote mais vendido
-  const pacotesMap = {};
-  completed.forEach(o => {
-    const key = `${o.quantidade}MB [${o.modo || 'diario'}]`;
-    pacotesMap[key] = (pacotesMap[key] || 0) + 1;
-  });
-
-  const pacotesMaisVendidos = Object.entries(pacotesMap)
-    .map(([pacote, total]) => ({ pacote, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
-
-  return res.json({
-    success: true,
-    periodo: period,
-    data_inicio: startTime.toISOString(),
-    data_fim: now.toISOString(),
-    metricas: {
-      total_faturado_mt: totalFaturadoMT,
-      total_pedidos: filteredOrders.length,
-      pedidos_concluidos: completed.length,
-      pedidos_falhados: failed.length,
-      pedidos_pendentes: pending.length,
-      taxa_sucesso_pct: filteredOrders.length > 0 ? Math.round((completed.length / filteredOrders.length) * 100) : 100,
-      total_volume_mb: totalVolumeMB,
-      total_volume_gb: totalVolumeGB
-    },
-    pacotes_mais_vendidos: pacotesMaisVendidos,
-    ultimas_vendas: completed.slice(-15).reverse()
-  });
 });
 
 const ADB_DEVICE_MAP = {
