@@ -90,6 +90,15 @@ function salvarTransacoes() {
     } catch (e) {
         console.error('❌ Erro ao salvar transacoes_db.json:', e.message);
     }
+    // ── Backup Firebase: só guarda a última transação (chamada após cada nova transação) ──
+    if (firestoreDbInstance) {
+        const ultima = Array.from(transacoesProcessadasMap.entries()).pop();
+        if (ultima) {
+            const [txnId, dados] = ultima;
+            firestoreDbInstance.collection('transacoes_processadas').doc(txnId).set(dados)
+                .catch(e => console.warn('⚠️ [FIREBASE] Erro ao salvar transacao:', e.message));
+        }
+    }
 }
 
 function carregarSmsPayments() {
@@ -120,6 +129,18 @@ function salvarSmsPayments() {
         fs.writeFileSync(SMS_PAYMENTS_DB_PATH, JSON.stringify(obj, null, 2), 'utf8');
     } catch (e) {
         console.error('❌ Erro ao salvar sms_payments_db.json:', e.message);
+    }
+    // ── Backup Firebase: guarda o último SMS de pagamento recebido ──
+    if (firestoreDbInstance) {
+        const ultima = Array.from(smsPaymentsMap.entries()).pop();
+        if (ultima) {
+            const [txnId, dados] = ultima;
+            firestoreDbInstance.collection('sms_payments').doc(txnId).set({
+                ...dados,
+                txn_id: txnId,
+                processedAt: dados.processedAt || new Date().toISOString()
+            }).catch(e => console.warn('⚠️ [FIREBASE] Erro ao salvar sms_payment:', e.message));
+        }
     }
 }
 
@@ -1149,6 +1170,45 @@ async function startWhatsApp(orderCallback, db = null) {
         if (firestoreDbInstance) {
             await restoreAuthFromFirestore(firestoreDbInstance);
             await restoreConfigsFromFirestore(firestoreDbInstance);
+
+            // ── Restaurar SMS de pagamento do Firebase (sobrevive a restarts) ──
+            try {
+                const snapSms = await firestoreDbInstance.collection('sms_payments').orderBy('processedAt', 'desc').limit(1000).get();
+                if (!snapSms.empty) {
+                    let countSms = 0;
+                    snapSms.docs.forEach(doc => {
+                        const d = doc.data();
+                        const tid = d.txn_id || doc.id;
+                        if (tid && !smsPaymentsMap.has(tid)) {
+                            smsPaymentsMap.set(tid, d);
+                            countSms++;
+                        }
+                    });
+                    if (countSms > 0) console.log(`📥 [FIREBASE] ${countSms} confirmações de pagamento restauradas do Firestore.`);
+                }
+            } catch (e) {
+                console.warn('⚠️ [FIREBASE] Erro ao restaurar sms_payments:', e.message);
+            }
+
+            // ── Restaurar transações anti-fraude do Firebase ──
+            try {
+                const snapTxn = await firestoreDbInstance.collection('transacoes_processadas').orderBy('timestamp', 'desc').limit(2000).get();
+                if (!snapTxn.empty) {
+                    let countTxn = 0;
+                    snapTxn.docs.forEach(doc => {
+                        const d = doc.data();
+                        const tid = doc.id;
+                        if (tid && !transacoesProcessadasMap.has(tid)) {
+                            transacoesProcessadasMap.set(tid, d);
+                            transacoesProcessadas.add(tid);
+                            countTxn++;
+                        }
+                    });
+                    if (countTxn > 0) console.log(`🔒 [FIREBASE] ${countTxn} transações anti-fraude restauradas do Firestore.`);
+                }
+            } catch (e) {
+                console.warn('⚠️ [FIREBASE] Erro ao restaurar transacoes_processadas:', e.message);
+            }
         }
 
         // Limpeza prévia de socket anterior se existir
