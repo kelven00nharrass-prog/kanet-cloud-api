@@ -2,7 +2,7 @@
 module.exports = {
     "BOT_EXPIRACAO_DIAS": 10000000,
     "SMS_GATEWAY_SEND_URL": "http://192.168.43.1:8080/send",
-    "CUSTO_GB_MT": 20,
+    "CUSTO_GB_MT": 17.7,
     "TABELAS_FORNECIMENTO": {
         "183": {
             "quantidade": 100,
