@@ -2045,8 +2045,97 @@ function loadPaymentsFromCache() {
 }
 loadPaymentsFromCache();
 
+// ── ENDPOINT DEDICADO: RECEBIMENTOS POR OPERADORA (M-Pesa vs e-Mola) ──
+app.get('/api/admin/recebimentos', async (req, res) => {
+  try {
+    const periodo = (req.query.periodo || 'hoje').toLowerCase();
+    const now = new Date();
+    let startDate = new Date();
+    if (periodo === 'hoje' || periodo === 'today') {
+      startDate = new Date(now.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' }) + 'T00:00:00+02:00');
+    } else if (periodo === 'semana' || periodo === 'week') {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (periodo === 'mes' || periodo === 'month') {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      startDate = new Date(now.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' }) + 'T00:00:00+02:00');
+    }
+
+    // Ler do Firebase (fonte principal persistente)
+    let docs = [];
+    if (db) {
+      try {
+        const snap = await db.collection('sms_payments').orderBy('processedAt', 'desc').limit(500).get();
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch(e) {
+        console.warn('[recebimentos] Erro Firebase:', e.message);
+      }
+    }
+
+    // Complementar com dados em memória
+    const mapAll = new Map();
+    docs.forEach(p => mapAll.set(p.txn_id || p.id, p));
+    inMemoryPayments.forEach((v, k) => { if (!mapAll.has(k)) mapAll.set(k, v); });
+    if (baileysEngine && baileysEngine.smsPaymentsMap) {
+      baileysEngine.smsPaymentsMap.forEach((v, k) => { if (!mapAll.has(k)) mapAll.set(k, v); });
+    }
+
+    const todos = Array.from(mapAll.values());
+    const startMs = startDate.getTime();
+
+    const filtrados = todos.filter(p => {
+      const t = new Date(p.processedAt || p.timestamp || 0).getTime();
+      return t >= startMs;
+    });
+
+    let mpesaTotal = 0, emolaTotal = 0, mpesaCount = 0, emolaCount = 0;
+    const lista = [];
+
+    filtrados.forEach(p => {
+      const val = Number(p.valor) || 0;
+      const met = String(p.metodo || p.operadora || '').toLowerCase();
+      const txn = p.txn_id || p.id || '';
+      // Detecção por campo metodo (fiável após fix) + fallback por prefixo txn_id
+      const isEmola = met.includes('emola') || met.includes('e-mola')
+        || /^(ID|PP26)/i.test(txn) && !met.includes('mpesa');
+
+      if (isEmola) { emolaTotal += val; emolaCount++; }
+      else          { mpesaTotal += val; mpesaCount++; }
+
+      lista.push({
+        txn_id: txn,
+        valor: val,
+        operadora: isEmola ? 'e-Mola' : 'M-Pesa',
+        metodo: p.metodo || (isEmola ? 'emola' : 'mpesa'),
+        remetente: p.remetente || '',
+        processedAt: p.processedAt || p.timestamp || '',
+        usado: p.usado || false,
+        usadoPor: p.usadoPor || null
+      });
+    });
+
+    lista.sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt));
+
+    return res.json({
+      success: true,
+      periodo,
+      inicio: startDate.toISOString(),
+      resumo: {
+        mpesa: { total_mt: mpesaTotal, quantidade: mpesaCount },
+        emola: { total_mt: emolaTotal, quantidade: emolaCount },
+        total_mt: mpesaTotal + emolaTotal,
+        total_confirmacoes: filtrados.length
+      },
+      lista
+    });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // 1. Extrato de Pagamentos Recebidos (M-Pesa / e-Mola)
 app.get('/api/admin/payments', (req, res) => {
+
   const limit = Number(req.query.limit) || 50;
   // Derivar também pagamentos a partir dos pedidos concluídos/processados
   const fromOrders = Array.from(inMemoryOrders.values())
