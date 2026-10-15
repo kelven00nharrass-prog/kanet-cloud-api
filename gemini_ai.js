@@ -13,11 +13,14 @@ const axios = require('axios');
 function getApiKey() {
     return (process.env.GEMINI_API_KEY || '').trim();
 }
-
+ 
 const GEMINI_BASE    = 'https://generativelanguage.googleapis.com/v1beta';
-const VISION_MODEL   = 'gemini-flash-latest';
-const AUDIO_MODEL    = 'gemini-flash-latest';
-const CHAT_MODEL     = 'gemini-flash-latest';
+const DEFAULT_MODEL  = 'gemini-3.1-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+
+const VISION_MODEL   = DEFAULT_MODEL;
+const AUDIO_MODEL    = DEFAULT_MODEL;
+const CHAT_MODEL     = DEFAULT_MODEL;
 
 // ── Cache de conversas por número (Cérebro Gemini) ──────────────
 const conversationHistory = new Map(); // numero → [{role, parts}]
@@ -30,17 +33,49 @@ function isConfigured() {
     return getApiKey().length > 15;
 }
 
+function sanitizeMimeType(mime, defaultType = 'audio/ogg') {
+    if (!mime) return defaultType;
+    const clean = String(mime).split(';')[0].trim().toLowerCase();
+    if (clean === 'audio/ogg' || clean === 'audio/opus') return 'audio/ogg';
+    if (clean.includes('mp4') || clean.includes('m4a')) return 'audio/mp4';
+    if (clean.includes('mpeg') || clean.includes('mp3')) return 'audio/mp3';
+    if (clean.includes('wav')) return 'audio/wav';
+    if (clean.includes('jpeg') || clean.includes('jpg')) return 'image/jpeg';
+    if (clean.includes('png')) return 'image/png';
+    if (clean.includes('webp')) return 'image/webp';
+    return clean || defaultType;
+}
+
 async function callGemini(model, payload, timeout = 30000) {
     const key = getApiKey();
     if (!key) {
         throw new Error('GEMINI_API_KEY não configurada');
     }
-    const url = `${GEMINI_BASE}/models/${model}:generateContent?key=${key}`;
-    const res = await axios.post(url, payload, {
-        timeout,
-        headers: { 'Content-Type': 'application/json' }
-    });
-    return res.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    const candidateModels = [model, ...FALLBACK_MODELS.filter(m => m !== model)];
+    let lastErr = null;
+
+    for (const m of candidateModels) {
+        try {
+            const url = `${GEMINI_BASE}/models/${m}:generateContent?key=${key}`;
+            const res = await axios.post(url, payload, {
+                timeout,
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
+        } catch (err) {
+            lastErr = err;
+            const status = err.response?.status;
+            // Se for 404 (modelo não existe) ou 503 (sobrecarregado) ou 429, tenta o próximo modelo
+            if (status === 404 || status === 503 || status === 429) {
+                console.warn(`⚠️ [GEMINI] Modelo ${m} retornou ${status}. Tentando modelo alternativo...`);
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw lastErr || new Error('Nenhum modelo Gemini respondeu');
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -75,12 +110,14 @@ Extrai os seguintes dados SE existirem (responde APENAS com JSON válido, sem ma
 
 Se não for uma imagem de pagamento, retorna: {"valido": false, "motivo": "não é comprovativo de pagamento"}`;
 
+    const cleanMime = sanitizeMimeType(mimeType, 'image/jpeg');
+
     try {
         const payload = {
             contents: [{
                 role: 'user',
                 parts: [
-                    { inlineData: { mimeType, data: base64 } },
+                    { inlineData: { mimeType: cleanMime, data: base64 } },
                     { text: prompt }
                 ]
             }],
@@ -117,6 +154,7 @@ async function transcreverAudio(audioBuffer, mimeType = 'audio/ogg; codecs=opus'
     if (!isConfigured()) return null;
 
     const base64 = audioBuffer.toString('base64');
+    const cleanMime = sanitizeMimeType(mimeType, 'audio/ogg');
 
     const prompt = `Transcreve esta mensagem de voz em português moçambicano.
 
@@ -141,7 +179,7 @@ Responde APENAS em JSON (sem markdown):
             contents: [{
                 role: 'user',
                 parts: [
-                    { inlineData: { mimeType, data: base64 } },
+                    { inlineData: { mimeType: cleanMime, data: base64 } },
                     { text: prompt }
                 ]
             }],
@@ -183,11 +221,12 @@ CONHECIMENTO:
 - Horário de atendimento: 24h/7 dias
 
 REGRAS:
-- Quando o cliente quiser comprar: explica que deve transferir o valor por M-Pesa/e-Mola e enviar o comprovativo aqui
+- Quando o cliente quiser comprar, recarregar ou pedir megas (seja por voz ou texto): explica o processo e pede SEMPRE que transfira para o M-Pesa/e-Mola e envie a mensagem de confirmação (SMS ou print comprovativo) aqui para ativar.
+- Lembra com simpatia: "O robô ativa no mesmo segundo assim que enviares a confirmação da operadora!"
 - Nunca inventas preços — só mencionas preços se conheceres a tabela atual
 - Se não souberes a resposta, dizes honestamente
-- Máximo 3 linhas por resposta, a não ser que seja necessário mais detalhe
-- NÃO usas listas com bullet points — falas de forma natural`;
+- Máximo 3 a 4 linhas por resposta, de forma calorosa e natural
+- NÃO usas listas longas — falas de forma direta e moçambicana`;
 
 /**
  * Gera uma resposta inteligente do Cérebro Gemini para o cliente.

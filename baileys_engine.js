@@ -376,24 +376,25 @@ function _fmtSize(mb) {
     return mb + 'MB';
 }
 
+const DEFAULT_PLANOS_ESPECIAIS = {
+    "76":  { nome: "♻️ 3GB+700 (Renovação)",   tipo: "renovavel",      total: 3772,  inicial: 3072, diaria: 100  },
+    "120": { nome: "♻️ 5GB+700 (Renovação)",   tipo: "renovavel",      total: 5820,  inicial: 5120, diaria: 100  },
+    "130": { nome: "📉 5GB Faseado (1GB/dia)",  tipo: "faseado",        total: 5120,  inicial: 1024, diaria: 1024 },
+    "195": { nome: "♻️ 8GB+700 (Renovação)",   tipo: "renovavel",      total: 8892,  inicial: 8192, diaria: 100  },
+    "240": { nome: "♻️ 10GB+700 (Renovação)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100 },
+    "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado",        total: 10240, inicial: 1024, diaria: 1024 },
+    "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024, diaria: 1024 },
+    "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado",        total: 20480, inicial: 1024, diaria: 1024 },
+    "232": { nome: "📆 10GB Faseado Mensal",    tipo: "faseado_mensal", total: 10240, inicial: 1024, diaria: 1024 },
+    "461": { nome: "📆 20GB Faseado Mensal",    tipo: "faseado_mensal", total: 20480, inicial: 1024, diaria: 1024 },
+    "700": { nome: "📆 30GB Faseado Mensal",    tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
+};
+
 function gerarMenuOriginal(jid = null) {
     const { supportNum, sysName } = getSuporteDetails();
     
     // Se a mensagem veio de um grupo e esse grupo tiver uma tabela customizada, exibi-la
     let _tabelas = DYN_CFG.TABELAS || {};
-    const DEFAULT_PLANOS_ESPECIAIS = {
-        "76":  { nome: "♻️ 3GB+700 (Renovação)",   tipo: "renovavel",      total: 3772,  inicial: 3072, diaria: 100  },
-        "120": { nome: "♻️ 5GB+700 (Renovação)",   tipo: "renovavel",      total: 5820,  inicial: 5120, diaria: 100  },
-        "130": { nome: "📉 5GB Faseado (1GB/dia)",  tipo: "faseado",        total: 5120,  inicial: 1024, diaria: 1024 },
-        "195": { nome: "♻️ 8GB+700 (Renovação)",   tipo: "renovavel",      total: 8892,  inicial: 8192, diaria: 100  },
-        "240": { nome: "♻️ 10GB+700 (Renovação)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100 },
-        "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado",        total: 10240, inicial: 1024, diaria: 1024 },
-        "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024, diaria: 1024 },
-        "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado",        total: 20480, inicial: 1024, diaria: 1024 },
-        "232": { nome: "📆 10GB Faseado Mensal",    tipo: "faseado_mensal", total: 10240, inicial: 1024, diaria: 1024 },
-        "461": { nome: "📆 20GB Faseado Mensal",    tipo: "faseado_mensal", total: 20480, inicial: 1024, diaria: 1024 },
-        "700": { nome: "📆 30GB Faseado Mensal",    tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
-    };
     let _especiais = (DYN_CFG.PLANOS_ESPECIAIS && Object.keys(DYN_CFG.PLANOS_ESPECIAIS).length > 0)
         ? { ...DEFAULT_PLANOS_ESPECIAIS, ...DYN_CFG.PLANOS_ESPECIAIS }
         : DEFAULT_PLANOS_ESPECIAIS;
@@ -2500,7 +2501,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     `  🎉 *COMPROVATIVO VALIDADO COM SUCESSO!* ⚡\n` +
                                     `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                                     `A sua transação foi confirmada pela operadora (*${metodoNome}*)!\n\n` +
-                                    `📦 *Pacote:* *${pacote.nome}*\n` +
+                                    `📦 *Pacote:* *${pacote.nome}*${pacote.calculado ? ' ⚡ _(Calculado Proporcionalmente)_' : ''}\n` +
                                     `📲 *Destino:* *${numDestinoInline}*\n` +
                                     `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
                                     `🔖 *Ref:* \`${txn_id}\`\n\n` +
@@ -2590,7 +2591,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                                     `🔖 *Transação:* \`${txn_id}\`\n` +
                                     `💰 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                    `📦 *Pacote:* *${pacote.nome}* (${pacote.mb} MB)\n\n` +
+                                    `📦 *Pacote:* *${pacote.nome}* (${pacote.mb} MB)${pacote.calculado ? ' ⚡ _(Cálculo Proporcional)_' : ''}\n\n` +
                                     `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?*\n` +
                                     `Por favor, responda agora com o seu *número Vodacom*:\n` +
                                     `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
@@ -2660,7 +2661,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                 `Identificamos o seu comprovativo:\n` +
                                 `🔖 *Ref:* \`${txn_id}\`\n` +
                                 `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                `📦 *Pacote:* *${pacote.nome}*\n` +
+                                `📦 *Pacote:* *${pacote.nome}*${pacote.calculado ? ' ⚡ _(Calculado Proporcionalmente)_' : ''}\n` +
                                 (numDestinoInline ? `📲 *Destino:* *${numDestinoInline}*\n\n` : `\n`) +
                                 `📡 *Aguardando confirmação oficial da operadora (${metodoNome})...*\n` +
                                 `O sistema está a verificar o recebimento do valor na nossa conta. Isso costuma levar entre *30 segundos a 2 minutos*.\n\n` +
@@ -2697,6 +2698,69 @@ async function startWhatsApp(orderCallback, db = null) {
                             `3. Pronto! O bónus cai automaticamente.`
                         );
                         continue;
+                    }
+
+                    // ── 11B. CALCULADOR PROPORCIONAL INTERATIVO (VALORES EM METICAIS) ──
+                    const ehConsultaCalcAjuda = ['calc', 'calcular', 'calculador', 'calculadora', '!calc', '.calc', '/calc'].includes(cleanCmd);
+                    if (ehConsultaCalcAjuda) {
+                        await reply(
+                            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                            `  🧮 *CALCULADOR DE MEGAS KA-NET* ⚡\n` +
+                            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                            `Calculamos megas exatos para *qualquer valor* em Meticais que transferir!\n\n` +
+                            `💡 *Como consultar:*\n` +
+                            `• Digite: *.calc 35* ou *.calc 80*\n` +
+                            `• Ou pergunte: *quanto dá 35 mt?*\n` +
+                            `• Ou envie apenas o valor: *35 mt*\n\n` +
+                            `⚡ _Aceitamos qualquer valor a partir de 5 MT com ativação automática 24h!_`
+                        );
+                        continue;
+                    }
+
+                    // Detetar consultas: .calc 35, quanto dá 35 mt, 35 mt dá quantos megas, 35 mt
+                    let valorConsultaCalc = null;
+                    const mCalcCmd = cleanText.match(/^[.!/#]?(?:calc|calcular|calcula)\s+(\d+)\s*(?:mt|mzn|meticais)?$/i);
+                    const mQuantoDa = cleanText.match(/^quanto\s+(?:d[aá]|é|e|fica|custa)\s+(\d+)\s*(?:mt|mzn|meticais)?\??$/i);
+                    const mInvertido = cleanText.match(/^(\d+)\s*(?:mt|mzn|meticais)\s+(?:d[aá]|s[aã]o|rende)\s+(?:quanto|quantos)/i);
+                    const mValorPuro = cleanText.match(/^(\d+)\s*(?:mt|mzn|meticais)$/i);
+
+                    if (mCalcCmd) valorConsultaCalc = parseInt(mCalcCmd[1]);
+                    else if (mQuantoDa) valorConsultaCalc = parseInt(mQuantoDa[1]);
+                    else if (mInvertido) valorConsultaCalc = parseInt(mInvertido[1]);
+                    else if (mValorPuro) {
+                        const vp = parseInt(mValorPuro[1]);
+                        if (vp >= 5 && vp <= 5000) valorConsultaCalc = vp;
+                    }
+
+                    if (valorConsultaCalc && valorConsultaCalc >= 5) {
+                        const pkg = buscarPacotePorValor(valorConsultaCalc, jid);
+                        if (pkg && pkg.mb > 0) {
+                            const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
+                            const volFormatado = pkg.mb >= 1024 ? `${(pkg.mb / 1024).toFixed(1)} GB` : `${pkg.mb} MB`;
+                            const taxaMbMt = (pkg.mb / valorConsultaCalc).toFixed(1);
+                            const catNome = pkg.calculado ? 'Cálculo Proporcional Automático ⚡' : (pkg.tipo === '24hrs' ? 'Pacote Diário (24h)' : (pkg.tipo === 'semanal' ? 'Pacote Semanal (7 dias)' : 'Pacote Mensal'));
+
+                            await reply(
+                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                `  🧮 *CÁLCULO DE MEGAS KA-NET* ⚡\n` +
+                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                `Para o valor de *${valorConsultaCalc} MT*, você recebe:\n\n` +
+                                `╭─────────────────────────────╮\n` +
+                                `│ 💰 *Valor Pago:* *${valorConsultaCalc} MT*\n` +
+                                `│ 📦 *Recebe:* *${volFormatado}* (${pkg.mb} MB)\n` +
+                                `│ ⏱️ *Validade:* 24 Horas\n` +
+                                `│ 📈 *Rendimento:* ~${taxaMbMt} MB por MT\n` +
+                                `│ 🏷️ *Categoria:* ${catNome}\n` +
+                                `╰─────────────────────────────╯\n\n` +
+                                `⚡ *COMO ATIVAR AGORA:*\n` +
+                                `1️⃣ Transfira *${valorConsultaCalc} MT* para uma das contas:\n` +
+                                `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+                                `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+                                `2️⃣ Envie a confirmação (SMS ou print) aqui com o seu número Vodacom na última linha.\n` +
+                                `3️⃣ O robô ativa os teus megas no mesmo segundo! 🚀`
+                            );
+                            continue;
+                        }
                     }
 
                     // ── 12. TABELA DE ESTUDANTES ────────────────────────────
@@ -3294,6 +3358,8 @@ module.exports = {
     aguardandoOperadora,
     limparDuplicatasTabelas,
     salvarBotConfig,
+    calcularPacoteProporcional,
+    buscarPacotePorValor,
     get DYN_CFG() { return DYN_CFG; },
     getRecentLogs: () => recentLogs
 };

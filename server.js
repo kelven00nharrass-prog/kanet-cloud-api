@@ -1413,37 +1413,34 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           const senderWith258 = cleanSender.startsWith('258') ? cleanSender : (cleanSender.length === 9 ? '258' + cleanSender : cleanSender);
           const mentionTag = senderWith258 ? `@${senderWith258}` : (senderNome || 'Cliente');
 
-          let saudacaoComprador = '';
+          let saudacao = '';
           if (isGroup && senderWith258) {
-            saudacaoComprador = `👋 Olá, ${mentionTag}!\nMuito obrigado pela tua compra e pela confiança na *Ka-Net Internet*! 🙏✨\n\n`;
+            saudacao = `👋 Olá, ${mentionTag}! O seu pacote foi ativado com sucesso.`;
           } else if (senderNome && senderNome !== 'Cliente') {
-            saudacaoComprador = `👋 Olá, *${senderNome}*!\nMuito obrigado pela tua compra e pela preferência na *Ka-Net Internet*! 🙏✨\n\n`;
+            saudacao = `👋 Olá, *${senderNome}*! O seu pacote foi ativado com sucesso.`;
           } else {
-            saudacaoComprador = `👋 Olá! Muito obrigado pela tua compra e pela preferência na *Ka-Net Internet*! 🙏✨\n\n`;
+            saudacao = `👋 Olá! O seu pacote foi ativado com sucesso.`;
           }
 
-          let linhaComprador = '';
-          if (isGroup && senderWith258) {
-            linhaComprador = `👤 *Comprador:* ${mentionTag}\n`;
-          }
-
-          const valorLinha = valorPago ? `💳 *Valor:* *${valorPago} MT*\n` : '';
+          const valorLinha = valorPago ? `│ 💰 *Valor Pago:* *${valorPago} MT*\n` : '';
 
           baileysEngine.sendTextMessage(clientJid,
             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
             `  🎉 *${headerText}*\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-            saudacaoComprador +
-            linhaComprador +
-            `📲 *Linha Ativada:* *${targetNum}*\n` +
-            `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
+            `${saudacao}\n\n` +
+            `╭─────────────────────────────╮\n` +
+            `│ 📲 *Destino:* *${targetNum}*\n` +
+            `│ 📦 *Pacote:* *${volStr}*${modoBadge}\n` +
             valorLinha +
-            `🔖 *Ref:* \`${resId}\`\n` +
-            `🕒 *Data/Hora:* ${horaAgora}\n\n` +
+            `│ 🔖 *Ref:* \`${resId}\`\n` +
+            `│ 🕒 *Data/Hora:* ${horaAgora}\n` +
+            `╰─────────────────────────────╯\n\n` +
             `⚡ *${duracaoText}*\n` +
-            `🚀 _Agradecemos de coração pela sua preferência. Volte sempre e boas navegações!_\n\n` +
+            `📶 *Consultar Saldo:* Digite *\\*100\\*03#* no seu telemóvel\n\n` +
+            `🙏 _Muito obrigado pela preferência e confiança na Ka-Net! Volte sempre e boas navegações!_ 🌐✨\n\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `📞 *Suporte / Dúvidas:* Envie *Suporte*`
+            `📞 *Suporte ou Dúvidas:* Envie *Suporte*`
           );
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
         }
@@ -3789,7 +3786,7 @@ function getMbFromValor(valor) {
   const v = parseFloat(String(valor).replace(',', '.'));
   if (isNaN(v) || v <= 0) return null;
 
-  // 1. Tentar ler do bot_config.js
+  // 1. Tentar ler do bot_config.js (todas as categorias)
   try {
     const cfg = require('./bot_config.js');
     const tabelas = cfg.TABELAS || {};
@@ -3807,12 +3804,66 @@ function getMbFromValor(valor) {
     if (tabelas['ilimitado'] && tabelas['ilimitado'][vStr]) {
       return tabelas['ilimitado'][vStr].quantidade_mb || tabelas['ilimitado'][vStr].quantidade;
     }
+    if (tabelas['estudantes'] && tabelas['estudantes'][vStr]) {
+      return tabelas['estudantes'][vStr].quantidade_mb || tabelas['estudantes'][vStr].quantidade;
+    }
     if (cfg.PLANOS_ESPECIAIS && cfg.PLANOS_ESPECIAIS[vStr]) {
       return cfg.PLANOS_ESPECIAIS[vStr].quantidade_mb || cfg.PLANOS_ESPECIAIS[vStr].quantidade || 1024;
     }
   } catch (e) { console.warn('⚠️ [CONFIG] Falha ao ler tabelas de preços em getMbFromValor:', e.message); }
 
-  // 2. Fallback pela PRICE_TABLE
+  // 2. Chamar o calculador proporcional do baileys_engine se disponível
+  if (baileysEngine && typeof baileysEngine.calcularPacoteProporcional === 'function') {
+    try {
+      const calc = baileysEngine.calcularPacoteProporcional(v);
+      if (calc && calc.mb) {
+        console.log(`🧮 [PROPORCIONAL SERVER] ${v} MT calculado via Baileys Engine ➔ ${calc.mb} MB`);
+        return calc.mb;
+      }
+    } catch (err) {
+      console.warn('⚠️ [PROPORCIONAL] Erro ao chamar calcularPacoteProporcional:', err.message);
+    }
+  }
+
+  // 3. Fallback de cálculo proporcional interno direto (para qualquer valor >= 5 MT)
+  const vNum = Math.round(v);
+  if (vNum >= 5) {
+    const pontos = [
+      { preco: 10, mb: 250 },
+      { preco: 15, mb: 400 },
+      { preco: 20, mb: 600 },
+      { preco: 25, mb: 800 },
+      { preco: 30, mb: 1024 },
+      { preco: 40, mb: 1500 },
+      { preco: 50, mb: 2048 },
+      { preco: 100, mb: 5120 },
+      { preco: 200, mb: 10240 }
+    ];
+    let mbEst = 0;
+    if (vNum <= pontos[0].preco) {
+      mbEst = Math.round(vNum * (pontos[0].mb / pontos[0].preco));
+    } else if (vNum >= pontos[pontos.length - 1].preco) {
+      mbEst = Math.round(vNum * (pontos[pontos.length - 1].mb / pontos[pontos.length - 1].preco));
+    } else {
+      let pInf = pontos[0], pSup = pontos[pontos.length - 1];
+      for (let i = 0; i < pontos.length - 1; i++) {
+        if (vNum >= pontos[i].preco && vNum <= pontos[i + 1].preco) {
+          pInf = pontos[i];
+          pSup = pontos[i + 1];
+          break;
+        }
+      }
+      const deltaP = pSup.preco - pInf.preco;
+      const frac = deltaP > 0 ? (vNum - pInf.preco) / deltaP : 0;
+      mbEst = Math.round(pInf.mb + frac * (pSup.mb - pInf.mb));
+    }
+    // Arredondamento comercial
+    if (mbEst >= 1000) mbEst = Math.round(mbEst / 50) * 50;
+    else mbEst = Math.round(mbEst / 10) * 10;
+    return mbEst > 0 ? mbEst : 100;
+  }
+
+  // 4. Último fallback pela PRICE_TABLE
   const exact = PRICE_TABLE.find(p => p.valor === v);
   if (exact) return exact.mb;
   const match = [...PRICE_TABLE].reverse().find(p => p.valor <= v);
