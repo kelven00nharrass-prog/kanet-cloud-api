@@ -1379,15 +1379,45 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             duracaoText = 'O seu pacote Tudo Top já está ativo e pronto para uso!';
           }
 
+          const senderNum = (order && (order.sender || order.senderNumber)) || (req.body.last_result && req.body.last_result.sender) || null;
+          const senderNome = (order && (order.senderName || order.nomeCliente)) || (req.body.last_result && req.body.last_result.senderName) || null;
+          const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && req.body.last_result.valor) || null;
+
+          const isGroup = clientJid && clientJid.endsWith('@g.us');
+          const cleanSender = senderNum ? String(senderNum).replace(/\D/g, '') : '';
+          const senderWith258 = cleanSender.startsWith('258') ? cleanSender : (cleanSender.length === 9 ? '258' + cleanSender : cleanSender);
+          const mentionTag = senderWith258 ? `@${senderWith258}` : (senderNome || 'Cliente');
+
+          let saudacaoComprador = '';
+          if (isGroup && senderWith258) {
+            saudacaoComprador = `👋 Olá, ${mentionTag}!\nMuito obrigado pela tua compra e pela confiança na *Ka-Net Internet*! 🙏✨\n\n`;
+          } else if (senderNome && senderNome !== 'Cliente') {
+            saudacaoComprador = `👋 Olá, *${senderNome}*!\nMuito obrigado pela tua compra e pela preferência na *Ka-Net Internet*! 🙏✨\n\n`;
+          } else {
+            saudacaoComprador = `👋 Olá! Muito obrigado pela tua compra e pela preferência na *Ka-Net Internet*! 🙏✨\n\n`;
+          }
+
+          let linhaComprador = '';
+          if (isGroup && senderWith258) {
+            linhaComprador = `👤 *Comprador:* ${mentionTag}\n`;
+          }
+
+          const valorLinha = valorPago ? `💳 *Valor:* *${valorPago} MT*\n` : '';
+
           baileysEngine.sendTextMessage(clientJid,
             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
             `  🎉 *${headerText}*\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-            `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Volume:* *${volStr}*${modoBadge}\n` +
-            `🔖 *Ref:* \`${resId}\`\n\n` +
+            saudacaoComprador +
+            linhaComprador +
+            `📲 *Linha Ativada:* *${targetNum}*\n` +
+            `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
+            valorLinha +
+            `🔖 *Ref:* \`${resId}\`\n` +
+            `🕒 *Data/Hora:* ${horaAgora}\n\n` +
             `⚡ *${duracaoText}*\n` +
-            `_Obrigado pela preferência e confiança no nosso serviço!_ 🙏\n\n` +
+            `🚀 _Agradecemos de coração pela sua preferência. Volte sempre e boas navegações!_\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `📞 *Suporte / Dúvidas:* Envie *Suporte*`
           );
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);

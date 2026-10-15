@@ -1821,7 +1821,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                         quantidade: pacote ? pacote.mb : 1024,
                                         modo: pacote ? pacote.tipo : 'diario',
                                         jid,
-                                        sender: senderNumber,
+                                        sender: pay.senderNumber || senderNumber,
+                                        senderName: pay.senderName || nomeCliente,
                                         txn_id: pay.txn_id,
                                         valor: pay.valor
                                     });
@@ -2518,6 +2519,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                         modo: pacote.tipo,
                                         jid,
                                         sender: senderNumber,
+                                        senderName: nomeCliente,
                                         txn_id,
                                         valor
                                     });
@@ -2542,6 +2544,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                     txn_id,
                                     valor,
                                     metodo,
+                                    senderName: nomeCliente,
+                                    senderNumber,
                                     aguardando_numero: true
                                 });
 
@@ -2823,9 +2827,18 @@ function getStatus() {
     };
 }
 
-async function sendTextMessage(jid, text) {
+async function sendTextMessage(jid, text, options = {}) {
     if (sock && connectionStatus === 'connected') {
-        return await sock.sendMessage(jid, { text });
+        const payload = typeof text === 'string' ? { text } : { ...text };
+        if (options && options.mentions) {
+            payload.mentions = options.mentions;
+        } else if (typeof payload.text === 'string') {
+            const matches = payload.text.match(/@(\d{9,15})/g);
+            if (matches) {
+                payload.mentions = matches.map(m => `${m.replace('@', '')}@s.whatsapp.net`);
+            }
+        }
+        return await sock.sendMessage(jid, payload);
     }
     return false;
 }
@@ -2982,6 +2995,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                     modo: item.pacote.tipo,
                     jid: item.jid,
                     sender: item.senderNumber,
+                    senderName: item.nomeCliente,
                     txn_id: item.txn_id,
                     valor: valorPago
                 });
@@ -2992,6 +3006,8 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 txn_id: item.txn_id,
                 valor: valorPago,
                 metodo: item.metodo,
+                senderName: item.nomeCliente,
+                senderNumber: item.senderNumber,
                 aguardando_numero: true
             });
 
