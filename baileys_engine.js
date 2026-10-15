@@ -150,14 +150,18 @@ function carregarConfigs() {
         if (fs.existsSync(LOCAL_CONFIG_PATH)) {
             LOCAL_CFG = JSON.parse(fs.readFileSync(LOCAL_CONFIG_PATH, 'utf8'));
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('⚠️ [CONFIG] Erro ao carregar LOCAL_CONFIG:', e.message);
+    }
 
     try {
         if (fs.existsSync(BOT_CONFIG_PATH)) {
             delete require.cache[require.resolve(BOT_CONFIG_PATH)];
             DYN_CFG = require(BOT_CONFIG_PATH);
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('⚠️ [CONFIG] Erro ao carregar BOT_CONFIG:', e.message);
+    }
 
     if (!DYN_CFG.TABELAS) DYN_CFG.TABELAS = { '24hrs': {}, 'semanal': {}, 'mensal': {}, 'ilimitado': {}, 'saldo': {} };
     if (!DYN_CFG.PLANOS_ESPECIAIS) DYN_CFG.PLANOS_ESPECIAIS = {};
@@ -1001,7 +1005,9 @@ function getNumerosDeposito() {
             const c = String(pay.emola_num).replace(/\D/g, '').slice(-9);
             if (c.length === 9) list.add(c);
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('⚠️ [PAGAMENTO] Erro ao obter números de depósito:', e.message);
+    }
     list.add('856268811');
     list.add('864882152');
     return list;
@@ -1240,7 +1246,9 @@ async function restoreConfigsFromFirestore(db) {
                     try {
                         const content = '// GERADO PELO SISTEMA KA-NET CLOUD (CACHE FIRESTORE)\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
                         fs.writeFileSync(BOT_CONFIG_PATH, content, 'utf8');
-                    } catch (_) {}
+                    } catch (_) {
+                        console.warn('⚠️ [CACHE] Erro ao salvar BOT_CONFIG local:', _.message);
+                    }
                 }
             }
         } else {
@@ -1256,7 +1264,9 @@ async function restoreConfigsFromFirestore(db) {
                 console.log('📥 [FIRESTORE CONFIG] Configurações locais restauradas do Firestore!');
                 try {
                     fs.writeFileSync(LOCAL_CONFIG_PATH, JSON.stringify(LOCAL_CFG, null, 2), 'utf8');
-                } catch (_) {}
+                } catch (_) {
+                    console.warn('⚠️ [CACHE] Erro ao salvar LOCAL_CONFIG local:', _.message);
+                }
             }
         }
     } catch (err) {
@@ -1331,7 +1341,9 @@ async function startWhatsApp(orderCallback, db = null) {
                 sock.ev.removeAllListeners();
                 sock.ws?.close();
                 sock.end?.(undefined);
-            } catch (e) {}
+            } catch (e) {
+                console.warn('⚠️ [BAILEYS] Erro ao fechar socket anterior:', e.message);
+            }
             sock = null;
         }
 
@@ -1368,7 +1380,9 @@ async function startWhatsApp(orderCallback, db = null) {
                 try {
                     currentQrBase64 = await QRCode.toDataURL(qr);
                     console.log('📱 [BAILEYS] Novo QR Code gerado em /qr');
-                } catch (e) {}
+                } catch (e) {
+                    console.warn('⚠️ [BAILEYS] Erro ao converter QR Code para base64:', e.message);
+                }
             }
 
             if (connection === 'close') {
@@ -1383,7 +1397,9 @@ async function startWhatsApp(orderCallback, db = null) {
                 
                 try {
                     sock.ws?.close();
-                } catch (e) {}
+                } catch (e) {
+                    console.warn('⚠️ [BAILEYS] Erro ao fechar WebSocket na desconexão:', e.message);
+                }
 
                 if (shouldReconnect) {
                     const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
@@ -1407,7 +1423,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             const b = firestoreDbInstance.batch();
                             snap.docs.forEach(doc => b.delete(doc.ref));
                             return b.commit();
-                        }).catch(() => {});
+                        }).catch(e => console.warn('⚠️ [FIRESTORE] Erro ao limpar whatsapp_cloud_auth:', e.message));
                     }
                     console.log('🔄 [BAILEYS] A reiniciar para gerar novo QR Code limpo...');
                     setTimeout(() => startWhatsApp(orderDispatchCallback, firestoreDbInstance), 3000);
@@ -1461,7 +1477,9 @@ async function startWhatsApp(orderCallback, db = null) {
                     try {
                         const meta = await getCachedGroupMetadata(id);
                         if (meta && meta.subject) groupName = meta.subject;
-                    } catch (_) {}
+                    } catch (_) {
+                        console.warn('⚠️ [GRUPO] Erro ao obter metadados para boas-vindas:', _.message);
+                    }
 
                     const welcomeObj = gerarMensagemBoasVindasGrupo(groupName, participants);
                     await sock.sendMessage(id, {
@@ -2293,7 +2311,9 @@ async function startWhatsApp(orderCallback, db = null) {
                                         });
                                     }
                                 });
-                            } catch (_) {}
+                            } catch (_) {
+                                console.warn('⚠️ [FIRESTORE] Erro ao buscar vendas do dia para relatório:', _.message);
+                            }
                         }
 
                         let faturamentoBruto = 0;
@@ -3085,7 +3105,9 @@ async function resetSession(db) {
                 sock.ev.removeAllListeners();
                 sock.ws?.close();
                 sock.end?.(undefined);
-            } catch(e) {}
+            } catch(e) {
+                console.warn('⚠️ [BAILEYS] Erro ao fechar socket no resetSession:', e.message);
+            }
             sock = null;
         }
         if (fs.existsSync(AUTH_DIR)) {
@@ -3098,7 +3120,9 @@ async function resetSession(db) {
                 const b = db.batch();
                 snap.docs.forEach(d => b.delete(d.ref));
                 await b.commit();
-            } catch(e) {}
+            } catch(e) {
+                console.warn('⚠️ [FIRESTORE] Erro ao deletar whatsapp_cloud_auth no resetSession:', e.message);
+            }
         }
         connectionStatus = 'connecting';
         currentQrBase64 = null;

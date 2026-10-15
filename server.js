@@ -67,7 +67,7 @@ try {
     db = admin.firestore();
     try {
       rtdb = admin.database();
-    } catch (_) {}
+    } catch (_) { console.warn('⚠️ [FIREBASE] RTDB não disponível:', _.message || _); }
     console.log('🔥 [FIREBASE] Firestore Conectado:', serviceAccount.project_id || 'ka-net-math');
   } else {
     console.log('⚠️ [FIREBASE] Sem credenciais no momento. Operando em modo Cloud Gateway.');
@@ -177,7 +177,7 @@ async function handleTransfer(req, res) {
             mensagem: `Este pedido com a referência ${orderId} já foi atendido e concluído anteriormente!`
           });
         }
-      } catch(e) {}
+      } catch(e) { console.warn('⚠️ [DEDUPLICAÇÃO] Falha ao ler cache de pedidos:', e.message); }
     }
 
     const orderDoc = {
@@ -1761,7 +1761,7 @@ function saveOrdersToCache() {
   try {
     const list = Array.from(inMemoryOrders.entries()).slice(-2000);
     fs.writeFileSync(ORDERS_CACHE_FILE, JSON.stringify(list), 'utf8');
-  } catch(e) {}
+  } catch(e) { console.error('❌ [CACHE] Falha ao gravar orders_cache.json:', e.message); }
 }
 
 function loadOrdersFromCache() {
@@ -1773,7 +1773,7 @@ function loadOrdersFromCache() {
         console.log(`📦 [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histórico local.`);
       }
     }
-  } catch(e) {}
+  } catch(e) { console.error('❌ [CACHE] Falha ao carregar orders_cache.json:', e.message); }
 }
 
 async function restoreAllDataFromFirestore() {
@@ -1848,6 +1848,28 @@ async function restoreAllDataFromFirestore() {
     }
   } catch (err) {
     console.warn('⚠️ [FIRESTORE RESTORE ERRO] Planos agendados:', err.message);
+  }
+
+  // ── Restaurar contas de clientes do Client Hub ──
+  try {
+    const snapClients = await db.collection('client_users').get();
+    if (!snapClients.empty) {
+      let countC = 0;
+      snapClients.docs.forEach(doc => {
+        const userData = doc.data();
+        const phone = userData.phone || doc.id;
+        if (phone && !clientUsers.has(phone)) {
+          clientUsers.set(phone, userData);
+          countC++;
+        }
+      });
+      if (countC > 0) {
+        try { fs.writeFileSync(path.resolve(__dirname, 'clients_store.json'), JSON.stringify([...clientUsers.values()], null, 2), 'utf8'); } catch(_) {}
+        console.log(`👤 [FIRESTORE RESTORE] ${countC} contas de clientes restauradas do Firestore.`);
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE RESTORE ERRO] Clientes:', err.message);
   }
 }
 
@@ -2090,7 +2112,7 @@ function savePaymentsToCache() {
   try {
     const keep = adminReceiptsHistory.slice(-200);
     fs.writeFileSync(PAYMENTS_CACHE_FILE, JSON.stringify(keep), 'utf8');
-  } catch(e) {}
+  } catch(e) { console.error('❌ [CACHE] Falha ao salvar payments_cache.json:', e.message); }
 }
 
 function loadPaymentsFromCache() {
@@ -2101,7 +2123,7 @@ function loadPaymentsFromCache() {
         adminReceiptsHistory.push(...data);
       }
     }
-  } catch(e) {}
+  } catch(e) { console.error('❌ [CACHE] Falha ao carregar payments_cache.json:', e.message); }
 }
 loadPaymentsFromCache();
 
@@ -2267,7 +2289,7 @@ app.get('/api/admin/payments', async (req, res) => {
             });
           }
         });
-      } catch (err) {}
+      } catch (err) { console.warn('⚠️ [FIREBASE] Falha ao consultar sms_payments em /admin/payments:', err.message); }
     }
 
     // 5. Incluir também vendas concluídas que tenham valor
@@ -2382,7 +2404,7 @@ app.get('/api/admin/reports', async (req, res) => {
             orderMap.set(id, d);
           }
         });
-      } catch (_) {}
+      } catch (_) { console.warn('⚠️ [FIREBASE] Falha ao consultar ordens para relatório admin:', _.message); }
     }
 
     const allOrders = Array.from(orderMap.values());
@@ -2404,7 +2426,7 @@ app.get('/api/admin/reports', async (req, res) => {
     try {
       const cfg = require('./bot_config.js');
       if (cfg && cfg.CUSTO_GB_MT) custoGb = Number(cfg.CUSTO_GB_MT);
-    } catch (_) {}
+    } catch (_) { console.warn('⚠️ [CONFIG] Falha ao ler CUSTO_GB_MT em /admin/reports:', _.message); }
 
     const custoTotalMT = (totalVolumeMB / 1024) * custoGb;
     const lucroLiquidoMT = totalFaturadoMT - custoTotalMT;
@@ -2731,7 +2753,7 @@ app.get(['/api/price-tables', '/api/prices', '/api/groups/prices'], (req, res) =
   } else {
     try {
       cfg = require('./bot_config.js');
-    } catch (_) {}
+    } catch (_) { console.warn('⚠️ [CONFIG] Falha ao carregar bot_config.js para /api/price-tables:', _.message); }
   }
   return res.json({
     success: true,
@@ -2837,7 +2859,7 @@ app.get('/api/reports', async (req, res) => {
           const tid = p.txn_id || p.id;
           if (tid) mapP.set(tid, { ...(mapP.get(tid) || {}), ...p });
         });
-      } catch(err) {}
+      } catch(err) { console.warn('⚠️ [FIREBASE] Falha ao consultar sms_payments em /api/reports:', err.message); }
     }
 
     const payments = Array.from(mapP.values());
@@ -2863,7 +2885,7 @@ app.get('/api/reports', async (req, res) => {
     try {
       const cfg = require('./bot_config.js');
       if (cfg && cfg.CUSTO_GB_MT) custoGb = Number(cfg.CUSTO_GB_MT);
-    } catch (_) {}
+    } catch (_) { console.warn('⚠️ [CONFIG] Falha ao ler CUSTO_GB_MT em /api/reports:', _.message); }
 
     const todayCusto = (todayTotalMb / 1024) * custoGb;
     const todayLucro = todayTotalMt - todayCusto;
@@ -2913,7 +2935,7 @@ app.get('/api/admin/config/custo-gb', (req, res) => {
   try {
     const cfg = require('./bot_config.js');
     if (cfg && cfg.CUSTO_GB_MT) custo = Number(cfg.CUSTO_GB_MT);
-  } catch (_) {}
+  } catch (_) { console.warn('⚠️ [CONFIG] Falha ao obter CUSTO_GB_MT de bot_config.js:', _.message); }
   return res.json({ success: true, custo_gb_mt: custo });
 });
 
@@ -2928,7 +2950,7 @@ app.post('/api/admin/config/custo-gb', authenticateAdmin, async (req, res) => {
     try {
       delete require.cache[require.resolve(cfgPath)];
       cfg = require(cfgPath);
-    } catch (_) {}
+    } catch (_) { console.warn('⚠️ [CONFIG] Falha ao recarregar bot_config.js para atualizar custo GB:', _.message); }
     cfg.CUSTO_GB_MT = novoCusto;
     fs.writeFileSync(cfgPath, '// GERADO PELO SISTEMA KA-NET CLOUD\nmodule.exports = ' + JSON.stringify(cfg, null, 4) + ';\n', 'utf8');
 
@@ -2998,7 +3020,7 @@ app.get('/api/groups', async (req, res) => {
         delete require.cache[require.resolve(cfgPath)];
         botCfg = require(cfgPath);
       }
-    } catch(e) {}
+    } catch(e) { console.warn('⚠️ [CONFIG] Falha ao carregar bot_config.js em /api/groups:', e.message); }
 
     const groupTables = botCfg.TABELAS_GRUPO || {};
     const jidNotif  = (botCfg.GRUPO_NOTIFICACOES || '120363409903708446@g.us').trim();
@@ -3696,7 +3718,7 @@ app.get('/qr', (req, res) => {
           statusBox.className = 'status status-waiting';
           statusBox.innerHTML = '⏳ A gerar novo QR Code...';
         }
-      } catch(e) {}
+      } catch(e) { console.error('Erro ao atualizar QR Code:', e.message); }
     }
 
     updateQR();
@@ -3747,7 +3769,7 @@ async function findOperatorPayment(cleanTxnId) {
     try {
       const snap = await db.collection('sms_payments').doc(tid).get();
       if (snap.exists) return snap.data();
-    } catch (_) {}
+    } catch (_) { console.warn(`⚠️ [FIREBASE] Falha ao buscar pagamento ${tid} no Firestore:`, _.message); }
   }
 
   // 4. Busca flexível (prefixos ou sufixos comuns do código)
@@ -3788,7 +3810,7 @@ function getMbFromValor(valor) {
     if (cfg.PLANOS_ESPECIAIS && cfg.PLANOS_ESPECIAIS[vStr]) {
       return cfg.PLANOS_ESPECIAIS[vStr].quantidade_mb || cfg.PLANOS_ESPECIAIS[vStr].quantidade || 1024;
     }
-  } catch (e) {}
+  } catch (e) { console.warn('⚠️ [CONFIG] Falha ao ler tabelas de preços em getMbFromValor:', e.message); }
 
   // 2. Fallback pela PRICE_TABLE
   const exact = PRICE_TABLE.find(p => p.valor === v);
@@ -3827,7 +3849,7 @@ function getValorFromMb(mb, modo = 'diario') {
       }
       if (closestVal > 0 && closestDiff <= numMb * 0.45) return closestVal;
     }
-  } catch (e) {}
+  } catch (e) { console.warn('⚠️ [CONFIG] Falha ao ler tabelas de preços em getValorFromMb:', e.message); }
 
   const exact = PRICE_TABLE.find(p => p.mb === numMb);
   if (exact) return exact.valor;
@@ -4047,7 +4069,7 @@ app.get('/api/sms/payments/:txn_id', async (req, res) => {
       try {
         const snap = await db.collection('sms_payments').doc(txnId).get();
         if (snap.exists) payment = snap.data();
-      } catch (_) {}
+      } catch (_) { console.warn(`⚠️ [FIREBASE] Falha ao buscar transação SMS ${txnId} no Firestore:`, _.message); }
     }
 
     // 3. Pesquisa parcial (contém) nos pagamentos em memória
@@ -4323,6 +4345,25 @@ function loadDynamicPackages() {
 }
 loadDynamicPackages();
 
+// Restaurar pacotes do RTDB se arquivo local não existir (após restart do Render)
+async function restoreDynamicPackagesFromRTDB() {
+  if (!rtdb) return;
+  try {
+    const snap = await rtdb.ref('system_packages').once('value');
+    const data = snap.val();
+    if (data && typeof data === 'object' && (data.diario || data.semanal || data.mensal)) {
+      currentDynamicPackages = { ...DEFAULT_SERVER_PACKAGES, ...data };
+      saveDynamicPackages();
+      console.log('📦 [RTDB RESTORE] Pacotes dinâmicos restaurados do Firebase RTDB.');
+    }
+  } catch (e) {
+    console.warn('⚠️ [RTDB RESTORE] Erro ao restaurar pacotes:', e.message);
+  }
+}
+if (!fs.existsSync(PACKAGES_CACHE_FILE)) {
+  setTimeout(() => restoreDynamicPackagesFromRTDB(), 3000);
+}
+
 function saveDynamicPackages() {
   try {
     fs.writeFileSync(PACKAGES_CACHE_FILE, JSON.stringify(currentDynamicPackages, null, 2), 'utf8');
@@ -4366,7 +4407,7 @@ app.post('/api/admin/packages/save', (req, res) => {
     saveDynamicPackages();
 
     if (rtdb) {
-      rtdb.ref('system_packages').set(currentDynamicPackages).catch(() => {});
+      rtdb.ref('system_packages').set(currentDynamicPackages).catch(e => console.warn('⚠️ [RTDB] Erro ao salvar system_packages:', e.message));
     }
 
     console.log('✅ [ADMIN] Tabelas de pacotes atualizadas dinamicamente pelo Admin! Versão:', currentDynamicPackages.version);
@@ -4409,6 +4450,25 @@ function loadAnnouncement() {
   }
 }
 loadAnnouncement();
+
+// Restaurar anúncio do RTDB se arquivo local não existir (após restart do Render)
+async function restoreAnnouncementFromRTDB() {
+  if (!rtdb) return;
+  try {
+    const snap = await rtdb.ref('system_announcement').once('value');
+    const data = snap.val();
+    if (data && typeof data === 'object' && data.id) {
+      currentAnnouncement = { ...currentAnnouncement, ...data };
+      saveAnnouncement();
+      console.log('📢 [RTDB RESTORE] Anúncio restaurado do Firebase RTDB.');
+    }
+  } catch (e) {
+    console.warn('⚠️ [RTDB RESTORE] Erro ao restaurar anúncio:', e.message);
+  }
+}
+if (!fs.existsSync(ANNOUNCEMENT_CACHE_FILE)) {
+  setTimeout(() => restoreAnnouncementFromRTDB(), 3500);
+}
 
 function saveAnnouncement() {
   try {
@@ -4453,7 +4513,7 @@ app.post('/api/admin/announcement', (req, res) => {
     saveAnnouncement();
 
     if (rtdb) {
-      rtdb.ref('system_announcement').set(currentAnnouncement).catch(() => {});
+      rtdb.ref('system_announcement').set(currentAnnouncement).catch(e => console.warn('⚠️ [RTDB] Erro ao salvar system_announcement:', e.message));
     }
 
     console.log(`📢 [ADMIN] Anúncio publicado para os clientes! Ativo: ${currentAnnouncement.active} | Título: ${currentAnnouncement.title}`);
@@ -5308,7 +5368,7 @@ function getPlanosEspeciaisConfig() {
       const c1 = require(p1);
       if (c1 && c1.PLANOS_ESPECIAIS) planos = { ...c1.PLANOS_ESPECIAIS };
     }
-  } catch(e) {}
+  } catch(e) { console.warn('⚠️ [CONFIG] Falha ao carregar PLANOS_ESPECIAIS de ./bot_config.js:', e.message); }
   if (Object.keys(planos).length === 0) {
     try {
       const p2 = path.resolve(__dirname, '..', 'bot_config.js');
@@ -5317,7 +5377,7 @@ function getPlanosEspeciaisConfig() {
         const c2 = require(p2);
         if (c2 && c2.PLANOS_ESPECIAIS) planos = { ...c2.PLANOS_ESPECIAIS };
       }
-    } catch(e) {}
+    } catch(e) { console.warn('⚠️ [CONFIG] Falha ao carregar PLANOS_ESPECIAIS de ../bot_config.js:', e.message); }
   }
   return { ...DEFAULT_PLANOS_ESPECIAIS, ...planos };
 }
@@ -5669,7 +5729,7 @@ async function executarEntregaPlano(planId) {
   }
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
-    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(() => {});
+    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(e => console.warn('⚠️ [WHATSAPP] Erro ao notificar renovação:', e.message));
   }
 
   // Guardar mensagem no suporte do app
@@ -5722,7 +5782,7 @@ async function enviarPedidoConfirmacao(planId) {
 
   // Enviar via WhatsApp
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
-    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msg).catch(() => {});
+    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msg).catch(e => console.warn('⚠️ [WHATSAPP] Erro ao notificar plano:', e.message));
   }
 
   // Guardar notificação para o Hub (clientSupportMessages)
@@ -5818,7 +5878,7 @@ async function executarSaquePlano(numero, mbSolicitado) {
 
   inMemoryOrders.set(orderId, orderDoc);
   saveOrdersToCache();
-  if (db) db.collection('orders').doc(orderId).set(orderDoc).catch(() => {});
+  if (db) db.collection('orders').doc(orderId).set(orderDoc).catch(e => console.warn('⚠️ [FIRESTORE] Erro ao salvar pedido plano:', e.message));
 
   // Descontar saldo e actualizar histórico
   plan.saldo_mb = Math.max(0, plan.saldo_mb - mbReal);
@@ -5839,7 +5899,7 @@ async function executarSaquePlano(numero, mbSolicitado) {
     `Use *sacar Xgb* para sacar mais, ou aguarde a próxima entrega diária.`;
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
-    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgCliente).catch(() => {});
+    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgCliente).catch(e => console.warn('⚠️ [WHATSAPP] Erro ao notificar cliente:', e.message));
   }
 
   console.log(`💸 [SAQUE] Plano ${planId}: ${mbReal}MB → ${plan.numero} | Saldo: ${plan.saldo_mb}MB`);
@@ -5866,7 +5926,7 @@ function checkScheduledPlans() {
         const sldF = (plan.saldo_mb || 0) >= 1024 ? `${((plan.saldo_mb||0)/1024).toFixed(1)}GB` : `${plan.saldo_mb||0}MB`;
         const msgAdiado = `⏭️ A entrega de hoje foi adiada por falta de resposta. Saldo: *${sldF}*. Voltaremos amanhã às *${horaProx}*. Use *sacar Xgb* quando quiser.`;
         if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
-          baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgAdiado).catch(() => {});
+          baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgAdiado).catch(e => console.warn('⚠️ [WHATSAPP] Erro ao notificar adiamento:', e.message));
         }
         console.log(`⏭️ [PLANO MENSAL] ${planId}: confirmação expirou → adiado para ${plan.proxima_entrega}`);
       }
@@ -5974,7 +6034,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
     };
     inMemoryOrders.set(orderId0, orderInit);
     saveOrdersToCache();
-    if (db) db.collection('orders').doc(orderId0).set(orderInit).catch(() => {});
+    if (db) db.collection('orders').doc(orderId0).set(orderInit).catch(e => console.warn('⚠️ [FIRESTORE] Erro ao salvar pedido inicial:', e.message));
 
     // ── Criar plano agendado (para as entregas dos dias seguintes) ──
     const plan = criarPlano({
