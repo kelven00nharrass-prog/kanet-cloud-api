@@ -901,6 +901,7 @@ function buscarPacotePorValor(valor, jid = null) {
 // Igual ao bot original - identifica qualquer formato M-Pesa/e-Mola
 // ══════════════════════════════════════════════════
 const pendingPayments = new Map(); // chave: jid + ":" + senderNumber
+const lidToPhoneMap = new Map(); // chave: cleanLid -> cleanPhone
 
 function extrairValorMT(texto) {
     if (!texto) return null;
@@ -1606,10 +1607,32 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // Candidatos a identificador do remetente (suporte a LID e números alternativos)
                     let realSender = msg.key.participant || msg.participant || msg.key.remoteJidAlt || jid;
-                    if (String(realSender).endsWith('@lid') && msg.key.remoteJidAlt) {
-                        realSender = msg.key.remoteJidAlt;
+                    if (String(realSender).endsWith('@lid')) {
+                        if (msg.key.remoteJidAlt && !String(msg.key.remoteJidAlt).endsWith('@lid')) {
+                            realSender = msg.key.remoteJidAlt;
+                        } else if (msg.key.participantPn && !String(msg.key.participantPn).endsWith('@lid')) {
+                            realSender = msg.key.participantPn;
+                        } else if (msg.participantPn && !String(msg.participantPn).endsWith('@lid')) {
+                            realSender = msg.participantPn;
+                        }
                     }
-                    const senderClean = String(realSender).split('@')[0].split(':')[0].replace(/\D/g, '');
+
+                    const rawLidClean = (msg.key.participant && String(msg.key.participant).endsWith('@lid'))
+                        ? String(msg.key.participant).replace(/\D/g, '')
+                        : (String(realSender).endsWith('@lid') ? String(realSender).replace(/\D/g, '') : null);
+
+                    let senderClean = String(realSender).split('@')[0].split(':')[0].replace(/\D/g, '');
+
+                    // Se senderClean parece número real de Moçambique, registrar no mapa se houver LID
+                    const isSenderPhone = (senderClean.length === 12 && senderClean.startsWith('258') && /^2588[2-7]\d{7}$/.test(senderClean)) ||
+                                          (senderClean.length === 9 && /^8[2-7]\d{7}$/.test(senderClean));
+                    if (isSenderPhone && rawLidClean) {
+                        lidToPhoneMap.set(rawLidClean, senderClean.startsWith('258') ? senderClean : '258' + senderClean);
+                    } else if (!isSenderPhone && rawLidClean && lidToPhoneMap.has(rawLidClean)) {
+                        // Se o senderClean é um LID, resgatar o telefone real previamente associado
+                        senderClean = lidToPhoneMap.get(rawLidClean);
+                    }
+
                     const senderNumber = senderClean; // Alias utilizado em toda a lógica abaixo
                     // Remove menções (@258... ou @nome) e cria comando limpo sem prefixos (. ! / #)
                     const textSemMencoes = text.replace(/@\d+/g, '').replace(/@[\w.-]+/g, '').trim();
@@ -2548,6 +2571,9 @@ async function startWhatsApp(orderCallback, db = null) {
                                 );
 
                                 if (orderDispatchCallback) {
+                                    if (rawLidClean && numDestinoInline) {
+                                        lidToPhoneMap.set(rawLidClean, numDestinoInline.startsWith('258') ? numDestinoInline : '258' + numDestinoInline);
+                                    }
                                     orderDispatchCallback({
                                         orderId,
                                         numero: numDestinoInline,
@@ -2555,6 +2581,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                         modo: pacote.tipo,
                                         jid,
                                         sender: senderNumber,
+                                        senderJid: msg.key.participant || msg.participant || realSender || jid,
+                                        senderPhone: isSenderPhone ? senderNumber : (numDestinoInline || null),
                                         senderName: nomeCliente,
                                         txn_id,
                                         valor
@@ -2933,12 +2961,15 @@ function getStatus() {
 async function sendTextMessage(jid, text, options = {}) {
     if (sock && connectionStatus === 'connected') {
         const payload = typeof text === 'string' ? { text } : { ...text };
-        if (options && options.mentions) {
+        if (options && options.mentions && Array.isArray(options.mentions)) {
             payload.mentions = options.mentions;
         } else if (typeof payload.text === 'string') {
             const matches = payload.text.match(/@(\d{9,15})/g);
             if (matches) {
-                payload.mentions = matches.map(m => `${m.replace('@', '')}@s.whatsapp.net`);
+                payload.mentions = matches
+                    .map(m => m.replace('@', ''))
+                    .filter(num => (num.length === 12 && num.startsWith('258')) || num.length === 9)
+                    .map(num => (num.startsWith('258') ? num : '258' + num) + '@s.whatsapp.net');
             }
         }
         return await sock.sendMessage(jid, payload);

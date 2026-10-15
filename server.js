@@ -1404,22 +1404,55 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             duracaoText = 'O seu pacote Tudo Top já está ativo e pronto para uso!';
           }
 
-          const senderNum = (order && (order.sender || order.senderNumber)) || (req.body.last_result && req.body.last_result.sender) || null;
-          const senderNome = (order && (order.senderName || order.nomeCliente)) || (req.body.last_result && req.body.last_result.senderName) || null;
-          const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && req.body.last_result.valor) || null;
+          const rawSender = (order && (order.senderPhone || order.sender || order.senderNumber)) || (req.body.last_result && req.body.last_result.sender) || '';
+          const senderNome = (order && (order.senderName || order.nomeCliente)) || (req.body.last_result && req.body.last_result.senderName) || '';
+          const senderJid = (order && (order.senderJid || order.participant)) || null;
 
           const isGroup = clientJid && clientJid.endsWith('@g.us');
-          const cleanSender = senderNum ? String(senderNum).replace(/\D/g, '') : '';
-          const senderWith258 = cleanSender.startsWith('258') ? cleanSender : (cleanSender.length === 9 ? '258' + cleanSender : cleanSender);
-          const mentionTag = senderWith258 ? `@${senderWith258}` : (senderNome || 'Cliente');
+          
+          // Validação rigorosa: NUNCA usar LID como menção de número
+          let realPhone = null;
+          const cleanSenderDigits = String(rawSender).replace(/\D/g, '');
+          if (cleanSenderDigits.length === 12 && cleanSenderDigits.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanSenderDigits)) {
+            realPhone = cleanSenderDigits;
+          } else if (cleanSenderDigits.length === 9 && /^8[2-7]\d{7}$/.test(cleanSenderDigits)) {
+            realPhone = '258' + cleanSenderDigits;
+          }
 
+          // Se o remetente for LID (sem telefone limpo direto), usar o número ativado (targetNum) para mencionar o comprador
+          if (!realPhone && targetNum) {
+            const cleanTarget = String(targetNum).replace(/\D/g, '');
+            if (cleanTarget.length === 9 && /^8[2-7]\d{7}$/.test(cleanTarget)) {
+              realPhone = '258' + cleanTarget;
+            } else if (cleanTarget.length === 12 && cleanTarget.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanTarget)) {
+              realPhone = cleanTarget;
+            }
+          }
+
+          // Montar saudação e menções reais (sem qualquer exibição de LID)
           let saudacao = '';
-          if (isGroup && senderWith258) {
-            saudacao = `Olá ${mentionTag}, a sua recarga foi entregue com sucesso! 🎉\n\n`;
-          } else if (senderNome && senderNome !== 'Cliente') {
-            saudacao = `Olá *${senderNome}*, a sua recarga foi entregue com sucesso! 🎉\n\n`;
+          const mentionsList = [];
+
+          if (isGroup) {
+            if (realPhone) {
+              saudacao = `Olá @${realPhone}, a sua recarga foi entregue com sucesso! 🎉\n\n`;
+              mentionsList.push(realPhone + '@s.whatsapp.net');
+              if (senderJid && String(senderJid).endsWith('@lid')) {
+                mentionsList.push(senderJid);
+              }
+            } else if (senderNome && senderNome !== 'Cliente') {
+              saudacao = `Olá @${senderNome}, a sua recarga foi entregue com sucesso! 🎉\n\n`;
+              if (senderJid) mentionsList.push(senderJid);
+            } else {
+              saudacao = `A sua recarga foi entregue com sucesso! 🎉\n\n`;
+              if (senderJid) mentionsList.push(senderJid);
+            }
           } else {
-            saudacao = `A sua recarga foi entregue com sucesso! 🎉\n\n`;
+            if (senderNome && senderNome !== 'Cliente') {
+              saudacao = `Olá *${senderNome}*, a sua recarga foi entregue com sucesso! 🎉\n\n`;
+            } else {
+              saudacao = `A sua recarga foi entregue com sucesso! 🎉\n\n`;
+            }
           }
 
           const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
@@ -1436,7 +1469,8 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
             `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `📞 *Dúvidas ou Suporte:* Digite *Suporte*`
+            `📞 *Dúvidas ou Suporte:* Digite *Suporte*`,
+            { mentions: mentionsList }
           );
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
         }
