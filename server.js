@@ -7,6 +7,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
 const { exec, spawn } = require('child_process');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,30 @@ const MASTER_TOKENS = new Set([
   process.env.MASTER_TOKEN || 'KaNetKelven2026Secure',
   'GitoAquinoMasterToken2025'
 ]);
+
+function authenticateAdmin(req, res, next) {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim() ||
+                req.headers['x-master-token'] ||
+                req.query.token ||
+                req.body?.token;
+  if (!token || !MASTER_TOKENS.has(token)) {
+    return res.status(403).json({ success: false, error: 'Acesso não autorizado. Token Master inválido.' });
+  }
+  next();
+}
+
+function hashPassword(password, salt = 'KaNetSalt2026') {
+  return crypto.createHash('sha256').update(String(password) + salt).digest('hex');
+}
+
+function verifyPassword(inputPassword, storedPassword, salt = 'KaNetSalt2026') {
+  if (!storedPassword || !inputPassword) return false;
+  if (storedPassword.length === 64 && /^[0-9a-f]+$/i.test(storedPassword)) {
+    return hashPassword(inputPassword, salt) === storedPassword;
+  }
+  return storedPassword === String(inputPassword);
+}
 
 // ----------------------------------------------------
 // 1. FIREBASE INITIALIZATION
@@ -2892,7 +2917,7 @@ app.get('/api/admin/config/custo-gb', (req, res) => {
   return res.json({ success: true, custo_gb_mt: custo });
 });
 
-app.post('/api/admin/config/custo-gb', async (req, res) => {
+app.post('/api/admin/config/custo-gb', authenticateAdmin, async (req, res) => {
   try {
     const novoCusto = parseFloat(req.body?.custo_gb || req.body?.preco_gb);
     if (isNaN(novoCusto) || novoCusto <= 0) {
@@ -2917,7 +2942,7 @@ app.post('/api/admin/config/custo-gb', async (req, res) => {
 });
 
 // Endpoint para reiniciar o bot a partir do painel
-app.post('/api/admin/restart-bot', (req, res) => {
+app.post('/api/admin/restart-bot', authenticateAdmin, (req, res) => {
   try {
     if (baileysEngine && typeof baileysEngine.startWhatsApp === 'function') {
       console.log('🔄 [ADMIN] Reinicialização manual do Bot WhatsApp solicitada pelo Painel');
@@ -4118,8 +4143,8 @@ app.post('/api/client/auth/register', (req, res) => {
     const user = {
       phone: cleanPhone,
       name: name ? String(name).trim() : `Cliente ${cleanPhone.slice(-4)}`,
-      password: String(password),
-      pin: pin ? String(pin) : '1234',
+      password: hashPassword(password),
+      pin: hashPassword(pin ? String(pin) : '1234'),
       biometricEnabled: false,
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString()
@@ -4151,8 +4176,13 @@ app.post('/api/client/auth/login', (req, res) => {
       return res.status(404).json({ success: false, mensagem: 'Cliente não encontrado. Por favor registe-se.' });
     }
 
-    if (!isBiometric && user.password !== String(password)) {
+    if (!isBiometric && !verifyPassword(password, user.password)) {
       return res.status(401).json({ success: false, mensagem: 'Senha incorreta.' });
+    }
+
+    // Se a senha estava em formato antigo de texto puro, atualizar para hash seguro
+    if (!isBiometric && user.password === String(password)) {
+      user.password = hashPassword(password);
     }
 
     user.lastLogin = new Date().toISOString();

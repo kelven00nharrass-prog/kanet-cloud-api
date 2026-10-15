@@ -1386,9 +1386,10 @@ async function startWhatsApp(orderCallback, db = null) {
                 } catch (e) {}
 
                 if (shouldReconnect) {
-                    reconnectAttempts++;
-                    const delay = Math.min(5000 * Math.pow(2, Math.min(reconnectAttempts - 1, 4)), 60000);
-                    console.log(`⏳ [BAILEYS] Aguardando ${delay / 1000}s antes de reconectar (tentativa #${reconnectAttempts})...`);
+                    const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
+                    const delay = isRestartRequired ? 1000 : Math.min(3000 * Math.pow(2, Math.min(reconnectAttempts, 4)), 30000);
+                    if (!isRestartRequired) reconnectAttempts++;
+                    console.log(`⏳ [BAILEYS] ${isRestartRequired ? 'Stream reset (515) - Reconexão imediata em 1s...' : `Aguardando ${delay / 1000}s antes de reconectar (tentativa #${reconnectAttempts})...`}`);
                     setTimeout(() => startWhatsApp(orderDispatchCallback, firestoreDbInstance), delay);
                 } else {
                     console.warn('🚪 [BAILEYS] Sessão encerrada (loggedOut). A limpar credenciais antigas e gerar novo QR Code...');
