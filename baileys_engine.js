@@ -1483,6 +1483,16 @@ async function startWhatsApp(orderCallback, db = null) {
                     const jid = msg.key.remoteJid;
                     if (!jid) continue;
 
+                    // 🛡️ FILTRO ANTI-BACKLOG: Ignora mensagens recebidas com mais de 5 minutos de atraso (evita que o bot responda mensagens antigas acumuladas)
+                    const msgTimestampSec = Number(msg.messageTimestamp) || 0;
+                    if (msgTimestampSec > 0) {
+                        const msgAgeMs = Date.now() - (msgTimestampSec * 1000);
+                        if (msgAgeMs > 5 * 60 * 1000) { // > 5 minutos
+                            addLog(`⏳ [MSG ANTIGA IGNORADA] Mensagem acumulada de ${jid} (${Math.round(msgAgeMs / 1000)}s atrás). Descartada.`);
+                            continue;
+                        }
+                    }
+
                     const isImage = !!msg.message?.imageMessage;
                     const isAudio = !!(msg.message?.audioMessage || msg.message?.pttMessage);
                     let text = msg.message?.conversation ||
