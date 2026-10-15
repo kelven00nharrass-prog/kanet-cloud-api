@@ -2825,19 +2825,23 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (APENAS PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
+                    // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
                     const isGroupMsg = jid.endsWith('@g.us');
-                    const saudacoesList = [
-                        'oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite',
-                        'iniciar', 'start', 'começar', 'comecar', 'bot', 'ka-net', 'kanet',
-                        'opa', 'salve', 'tudo bem', 'td bem', 'alô', 'alo', 'hello', 'hi',
-                        'boa', 'eae', 'eai', 'preciso de megas', 'quero megas', 'comprar'
-                    ];
-                    const ehSaudacaoExplicita = saudacoesList.some(w => 
-                        cleanCmd === w || cleanCmd.startsWith(w + ' ') || cleanText === w || cleanText.startsWith(w + ' ')
-                    );
+                    const textNorm = (cleanText || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^\w\s]/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    const regexSaudacao = /^(?:ola|oi+|bom dia|boa tarde|boa noite|tudo bem|td bem|tudo bom|opa|salve|alo|hello|hi|eae|eai|start|iniciar|comecar|bot|ka net)(?:\s|$)/i;
+                    const ehSaudacaoExplicita = regexSaudacao.test(textNorm) ||
+                        /^(?:ola|oi+|opa|salve)\s+(?:tudo bem|como esta|amigo|mano|irmao|boa|bom)/i.test(textNorm) ||
+                        /^(?:como esta|tudo bem|td bem)\??$/i.test(textNorm) ||
+                        ['preciso de megas', 'quero megas', 'comprar'].some(w => textNorm.startsWith(w));
 
                     if (ehSaudacaoExplicita) {
+                        addLog(`👋 [SAUDAÇÃO] Mensagem padrão de boas-vindas enviada para ${jid}`);
                         await reply(gerarMensagemBoasVindas(nomeCliente));
                         continue;
                     }

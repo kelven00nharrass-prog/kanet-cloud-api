@@ -1415,32 +1415,28 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
           let saudacao = '';
           if (isGroup && senderWith258) {
-            saudacao = `👋 Olá, ${mentionTag}! O seu pacote foi ativado com sucesso.`;
+            saudacao = `Olá ${mentionTag}, a sua recarga foi entregue com sucesso! 🎉\n\n`;
           } else if (senderNome && senderNome !== 'Cliente') {
-            saudacao = `👋 Olá, *${senderNome}*! O seu pacote foi ativado com sucesso.`;
+            saudacao = `Olá *${senderNome}*, a sua recarga foi entregue com sucesso! 🎉\n\n`;
           } else {
-            saudacao = `👋 Olá! O seu pacote foi ativado com sucesso.`;
+            saudacao = `A sua recarga foi entregue com sucesso! 🎉\n\n`;
           }
 
-          const valorLinha = valorPago ? `│ 💰 *Valor Pago:* *${valorPago} MT*\n` : '';
+          const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
 
           baileysEngine.sendTextMessage(clientJid,
-            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-            `  🎉 *${headerText}*\n` +
-            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-            `${saudacao}\n\n` +
-            `╭─────────────────────────────╮\n` +
-            `│ 📲 *Destino:* *${targetNum}*\n` +
-            `│ 📦 *Pacote:* *${volStr}*${modoBadge}\n` +
+            `✅ *RECARGA CONCLUÍDA* ⚡\n` +
+            `━━━━━━━━━━━━━━━━━━\n\n` +
+            saudacao +
+            `📲 *Destino:* *${targetNum}*\n` +
+            `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
             valorLinha +
-            `│ 🔖 *Ref:* \`${resId}\`\n` +
-            `│ 🕒 *Data/Hora:* ${horaAgora}\n` +
-            `╰─────────────────────────────╯\n\n` +
-            `⚡ *${duracaoText}*\n` +
-            `📶 *Consultar Saldo:* Digite *\\*100\\*03#* no seu telemóvel\n\n` +
-            `🙏 _Muito obrigado pela preferência e confiança na Ka-Net! Volte sempre e boas navegações!_ 🌐✨\n\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `📞 *Suporte ou Dúvidas:* Envie *Suporte*`
+            `🔖 *Ref:* \`${resId}\`\n` +
+            `🕒 *Data:* ${horaAgora}\n\n` +
+            `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
+            `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `📞 *Dúvidas ou Suporte:* Digite *Suporte*`
           );
           console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
         }
