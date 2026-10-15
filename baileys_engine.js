@@ -1566,19 +1566,23 @@ async function startWhatsApp(orderCallback, db = null) {
                                 // Se identificou número e valor = cliente quer comprar
                                 if (transcricao.intencao === 'compra' && transcricao.numero_destino && transcricao.valor_pedido) {
                                     text = `${transcricao.numero_destino} ${transcricao.valor_pedido}`;
+                                    const payDetails = getPaymentDetails();
                                     await sock.sendMessage(jid, {
-                                        text: `🎙️ *Ouvi a tua mensagem de voz!*\n\n` +
+                                        text: `🎙️ *Ouvi o teu áudio com clareza!*\n\n` +
                                               `_"${transcricao.transcricao}"_\n\n` +
-                                              `📱 Número: *${transcricao.numero_destino}*\n` +
-                                              `💵 Valor: *${transcricao.valor_pedido} MT*\n\n` +
-                                              `⏳ A processar...`
+                                              `📱 *Número a Ativar:* ${transcricao.numero_destino}\n` +
+                                              `💵 *Valor do Pacote:* ${transcricao.valor_pedido} MT\n` +
+                                              `━━━━━━━━━━━━━━━━━━\n` +
+                                              `⚠️ *ATENÇÃO:* Para a ativação ser concluída com sucesso, *envie aqui o SMS de confirmação (comprovativo)* do M-Pesa ou e-Mola!\n\n` +
+                                              `📌 *Contas de Pagamento:*\n` +
+                                              `🔴 *M-Pesa:* \`${payDetails.mpesa_num}\` (${payDetails.mpesa_name})\n` +
+                                              `🟡 *e-Mola:* \`${payDetails.emola_num}\` (${payDetails.emola_name})\n\n` +
+                                              `Assim que colares o texto do comprovativo ou enviares o print, os teus megas caem no mesmo segundo!`
                                     });
+                                    continue;
                                 } else {
-                                    // Usar transcrição como texto para o Cérebro
+                                    // Usar transcrição como texto para o Cérebro com orientação de envio de comprovativo
                                     text = transcricao.transcricao;
-                                    await sock.sendMessage(jid, {
-                                        text: `🎙️ _Ouvi: "${transcricao.transcricao}"_`
-                                    });
                                 }
                             } else {
                                 await sock.sendMessage(jid, {
