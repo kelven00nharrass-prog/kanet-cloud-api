@@ -15,11 +15,12 @@
  *   • Comprovativos M-Pesa e e-Mola automáticos
  */
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
+const geminiAI = require('./gemini_ai');
 
 let sock = null;
 let currentQrBase64 = null;
@@ -1482,9 +1483,88 @@ async function startWhatsApp(orderCallback, db = null) {
                     const jid = msg.key.remoteJid;
                     if (!jid) continue;
 
-                    const text = msg.message?.conversation ||
+                    const isImage = !!msg.message?.imageMessage;
+                    const isAudio = !!(msg.message?.audioMessage || msg.message?.pttMessage);
+                    let text = msg.message?.conversation ||
                                  msg.message?.extendedTextMessage?.text ||
                                  msg.message?.imageMessage?.caption || '';
+
+                    // ── 📸 GEMINI VISION: Analisa print de M-Pesa/e-Mola ──────────────────────
+                    if (isImage && !isComprovativo(text) && geminiAI.isConfigured()) {
+                        try {
+                            const imgBuffer = await downloadMediaMessage(msg, 'buffer', {});
+                            const mimeType = msg.message?.imageMessage?.mimetype || 'image/jpeg';
+                            addLog(`🖼️ [GEMINI VISION] Analisando imagem de ${jid}`);
+                            const analise = await geminiAI.analisarPrintPagamento(imgBuffer, mimeType);
+
+                            if (analise && analise.valido && analise.txnId) {
+                                const rawOuSintetico = analise.raw_text || `Confirmado ${analise.txnId}. Transferiste ${analise.valor || 0}.00MT para KaNet`;
+                                const legenda = text.trim();
+                                text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
+                                addLog(`🖼️ [GEMINI VISION] Print válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
+                                await sock.sendMessage(jid, {
+                                    text: `📸 *Comprovativo detetado pela IA!*\n\n` +
+                                          `🏦 Serviço: *${analise.servico || 'M-Pesa/e-Mola'}*\n` +
+                                          `💰 Valor: *${analise.valor} MT*\n` +
+                                          `🔑 Referência: *${analise.txnId}*\n\n` +
+                                          `⏳ A validar com a operadora...`
+                                });
+                            } else if (analise && !analise.valido) {
+                                // Não é comprovativo — acionar aviso visual amigável
+                                text = '__gemini_visual_query__';
+                            } else if (!analise) {
+                                addLog(`🖼️ [GEMINI VISION] Falha ao analisar imagem`);
+                                continue;
+                            }
+                        } catch (imgErr) {
+                            addLog(`🖼️ [GEMINI VISION] Erro ao processar imagem: ${imgErr.message}`);
+                            continue;
+                        }
+                    }
+
+                    // ── 🎙️ GEMINI AUDIO: Transcreve mensagem de voz ───────────────────────────
+                    if (isAudio && geminiAI.isConfigured()) {
+                        try {
+                            const audioBuffer = await downloadMediaMessage(msg, 'buffer', {});
+                            const audioMsg = msg.message?.audioMessage || msg.message?.pttMessage;
+                            const mimeType = audioMsg?.mimetype || 'audio/ogg; codecs=opus';
+                            addLog(`🎙️ [GEMINI AUDIO] Transcrevendo áudio de ${jid}`);
+                            const transcricao = await geminiAI.transcreverAudio(audioBuffer, mimeType);
+
+                            if (transcricao && transcricao.transcricao) {
+                                addLog(`🎙️ [GEMINI AUDIO] Transcrição: "${transcricao.transcricao}" | Intenção: ${transcricao.intencao}`);
+
+                                // Se identificou número e valor = cliente quer comprar
+                                if (transcricao.intencao === 'compra' && transcricao.numero_destino && transcricao.valor_pedido) {
+                                    text = `${transcricao.numero_destino} ${transcricao.valor_pedido}`;
+                                    await sock.sendMessage(jid, {
+                                        text: `🎙️ *Ouvi a tua mensagem de voz!*\n\n` +
+                                              `_"${transcricao.transcricao}"_\n\n` +
+                                              `📱 Número: *${transcricao.numero_destino}*\n` +
+                                              `💵 Valor: *${transcricao.valor_pedido} MT*\n\n` +
+                                              `⏳ A processar...`
+                                    });
+                                } else {
+                                    // Usar transcrição como texto para o Cérebro
+                                    text = transcricao.transcricao;
+                                    await sock.sendMessage(jid, {
+                                        text: `🎙️ _Ouvi: "${transcricao.transcricao}"_`
+                                    });
+                                }
+                            } else {
+                                await sock.sendMessage(jid, {
+                                    text: `🎙️ Não consegui ouvir bem. Podes enviar mensagem escrita?`
+                                });
+                                continue;
+                            }
+                        } catch (audioErr) {
+                            addLog(`🎙️ [GEMINI AUDIO] Erro ao processar áudio: ${audioErr.message}`);
+                            await sock.sendMessage(jid, {
+                                text: `🎙️ Não consegui ouvir o áudio. Podes enviar mensagem escrita?`
+                            });
+                            continue;
+                        }
+                    }
 
                     if (!text.trim()) continue;
 
@@ -1746,6 +1826,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                         valor: pay.valor
                                     });
                                 }
+                                if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
                                 continue;
                             } else {
                                 if (isNumeroDeposito(text)) {
@@ -2441,6 +2522,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                         valor
                                     });
                                 }
+                                if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
                                 continue;
                             } else {
                                 if (txn_id) {
@@ -2668,6 +2750,17 @@ async function startWhatsApp(orderCallback, db = null) {
                                                cleanText === 'bot';
 
                         if (isBotMentioned) {
+                            if (geminiAI.isConfigured() && geminiAI.isMensagemConversacional(cleanCmd)) {
+                                addLog(`🧠 [GEMINI BRAIN GRUPO] Respondendo para ${senderNumber}`);
+                                const respostaIa = await geminiAI.cerebroGemini(senderNumber, cleanCmd, {
+                                    nomeCliente,
+                                    modoManutencao
+                                });
+                                if (respostaIa) {
+                                    await reply(respostaIa);
+                                    continue;
+                                }
+                            }
                             addLog(`📢 [BOT MENCIONADO EM GRUPO] Enviando menu para ${jid}`);
                             await reply(gerarMenuOriginal(jid));
                             continue;
@@ -2676,6 +2769,31 @@ async function startWhatsApp(orderCallback, db = null) {
                         // Se for mensagem de grupo comum e não bateu nenhum comando/comprovativo/menu, ignorar para não poluir
                         addLog(`ℹ️ [GRUPO DESCARTADO] Sem comando reconhecido: "${cleanCmd}" em ${jid}`);
                         continue;
+                    }
+
+                    // Se for __gemini_visual_query__ (imagem que não era comprovativo de pagamento):
+                    if (text === '__gemini_visual_query__') {
+                        if (geminiAI.isConfigured()) {
+                            await reply(
+                                `📸 *Imagem recebida!*\n\n` +
+                                `Não consegui identificar um comprovativo válido de *M-Pesa* ou *e-Mola* nesta imagem.\n\n` +
+                                `💡 *Dica:* Envie o print nítido do SMS onde apareça o valor (MT) e o código da transação.`
+                            );
+                        }
+                        continue;
+                    }
+
+                    // Se for mensagem privada e for conversacional, acionar Cérebro Gemini!
+                    if (geminiAI.isConfigured() && geminiAI.isMensagemConversacional(cleanCmd)) {
+                        addLog(`🧠 [GEMINI BRAIN PRIVADO] Conversando com ${senderNumber} (${nomeCliente}): "${cleanCmd}"`);
+                        const respostaIa = await geminiAI.cerebroGemini(senderNumber, cleanCmd, {
+                            nomeCliente,
+                            modoManutencao
+                        });
+                        if (respostaIa) {
+                            await reply(respostaIa);
+                            continue;
+                        }
                     }
 
                     // No privado, se o cliente mandar algo desconhecido, enviar as boas-vindas de suporte
