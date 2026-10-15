@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
+const { exec, spawn } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,7 @@ const MASTER_TOKENS = new Set([
 // 1. FIREBASE INITIALIZATION
 // ----------------------------------------------------
 let db = null;
+let rtdb = null;
 try {
   let serviceAccount = null;
   if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
@@ -38,6 +40,9 @@ try {
       databaseURL: process.env.FIREBASE_DATABASE_URL || `https://${serviceAccount.project_id || 'ka-net-math'}.firebaseio.com`
     });
     db = admin.firestore();
+    try {
+      rtdb = admin.database();
+    } catch (_) {}
     console.log('🔥 [FIREBASE] Firestore Conectado:', serviceAccount.project_id || 'ka-net-math');
   } else {
     console.log('⚠️ [FIREBASE] Sem credenciais no momento. Operando em modo Cloud Gateway.');
@@ -3167,45 +3172,6 @@ app.post('/api/admin/groups/announce', async (req, res) => {
   }
 });
 
-// ── TABELAS DE PREÇOS DO SISTEMA ──
-app.get('/api/price-tables', (req, res) => {
-  try {
-    let botCfg = {};
-    try {
-      if (fs.existsSync(path.resolve(__dirname, 'bot_config.js'))) {
-        delete require.cache[require.resolve(path.resolve(__dirname, 'bot_config.js'))];
-        botCfg = require(path.resolve(__dirname, 'bot_config.js'));
-      }
-    } catch(e) {}
-
-    return res.json({
-      success: true,
-      tabelas: botCfg.TABELAS || {
-        '24hrs': {
-          '10': { nome: '350MB 24h', quantidade_mb: 350, valor: 10 },
-          '14': { nome: '550MB 24h', quantidade_mb: 550, valor: 14 },
-          '17': { nome: '696MB 24h', quantidade_mb: 696, valor: 17 },
-          '22': { nome: '1GB 24h', quantidade_mb: 1024, valor: 22 },
-          '44': { nome: '2GB 24h', quantidade_mb: 2048, valor: 44 }
-        },
-        'semanal': {
-          '47': { nome: '1.7GB 7d', quantidade_mb: 1740, valor: 47 },
-          '80': { nome: '2.9GB 7d', quantidade_mb: 2970, valor: 80 },
-          '140': { nome: '5.3GB 7d', quantidade_mb: 5427, valor: 140 }
-        },
-        'mensal': {
-          '95': { nome: '2.8GB 30d', quantidade_mb: 2867, valor: 95 },
-          '170': { nome: '5GB 30d', quantidade_mb: 5120, valor: 170 },
-          '250': { nome: '8GB 30d', quantidade_mb: 8192, valor: 250 }
-        }
-      },
-      planos_especiais: botCfg.PLANOS_ESPECIAIS || {},
-      tabelas_grupo: botCfg.TABELAS_GRUPO || {}
-    });
-  } catch(e) {
-    return res.status(500).json({ success: false, error: e.message });
-  }
-});
 
 // ----------------------------------------------------
 // 6. PAYMOZ / M-PESA WEBHOOK
@@ -4941,9 +4907,17 @@ app.get('/api/admin/crm/stats', (req, res) => {
     };
   });
 
+  const totalOrders = allOrders.length;
+  const totalRevenue = allOrders.reduce((acc, o) => acc + (Number(o.valor) || 0), 0);
+  const openTickets = clientSupportMessages.filter(m => !m.read && m.sender === 'client').length;
+
   return res.json({
     success: true,
     totalCadastrados,
+    totalClients: totalCadastrados,
+    totalOrders,
+    totalRevenue: Math.round(totalRevenue),
+    openTickets,
     ativosRegulares,
     inativosMais7Dias,
     clientes: clientesDetalhados.sort((a, b) => b.totalGasto - a.totalGasto)
@@ -4984,7 +4958,8 @@ app.get('/api/admin/crm/support-tickets', (req, res) => {
 });
 
 app.post('/api/admin/crm/support-reply', (req, res) => {
-  const { clientPhone, text } = req.body || {};
+  const clientPhone = req.body?.clientPhone || req.body?.phone;
+  const text = req.body?.text || req.body?.reply || req.body?.message;
   if (!clientPhone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e resposta obrigatórios.' });
 
   const cleanPhone = String(clientPhone).replace(/\D/g, '');
@@ -5040,7 +5015,7 @@ app.get(['/api/sms/status', '/api/sms/gateway/status'], async (req, res) => {
   }
 });
 
-app.get(['/api/sms/payments', '/api/sms/gateway/payments'], async (req, res) => {
+app.get('/api/sms/gateway/payments', async (req, res) => {
   const gatewayPort = req.query.port || process.env.SMS_GATEWAY_PORT || 8077;
   const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
   try {

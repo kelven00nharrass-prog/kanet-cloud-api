@@ -3097,8 +3097,10 @@ async function sendAnnouncementToGroups(mensagem, targetJids = null) {
 module.exports = { 
     startWhatsApp, 
     getStatus, 
+    getConnectionStatus: getStatus,
     resetSession,
     sendTextMessage, 
+    enviarMensagemTexto: sendTextMessage,
     enviarNotificacaoGrupo, 
     enviarErroGrupo, 
     getGrupoNotificacoes, 
@@ -3114,10 +3116,12 @@ module.exports = {
     sendAnnouncementToGroups,
     getJidForOrder,
     registrarSmsPayment,
+    salvarSmsPayments,
     smsPaymentsMap,
     aguardandoOperadora,
     limparDuplicatasTabelas,
     salvarBotConfig,
+    get DYN_CFG() { return DYN_CFG; },
     getRecentLogs: () => recentLogs
 };
 

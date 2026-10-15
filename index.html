@@ -689,6 +689,7 @@ function toast(msg, type='ok') {
   document.getElementById('toast').appendChild(el);
   setTimeout(() => el.remove(), 4000);
 }
+window.showToast = function(msg, type='ok') { return toast(msg, type); };
 
 // -------------------------------------------------------------------
 // CONTROLE REMOTO WEBADB & ESPELHAMENTO DE ECRÃ
@@ -1008,7 +1009,11 @@ async function openSmsAppRemote() {
 }
 
 async function fetchAPI(path, opts={}) {
-  const reqHeaders = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const reqHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer KaNetKelven2026Secure',
+    ...(opts.headers || {})
+  };
   const r = await fetch(API + path, { ...opts, headers: reqHeaders });
   if (!r.ok) {
     const errText = await r.text().catch(() => '');
@@ -2272,7 +2277,7 @@ function openCRMReply(phone, ticketId) {
   if (!msg) return;
   fetchAPI('/api/admin/crm/support-reply', {
     method: 'POST',
-    body: JSON.stringify({ phone, ticketId, reply: msg })
+    body: JSON.stringify({ clientPhone: phone, phone, ticketId, text: msg, reply: msg })
   }).then(d => {
     if (d.success) {
       toast('✅ Resposta enviada ao cliente!', 'ok');
