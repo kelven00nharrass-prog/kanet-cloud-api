@@ -2917,14 +2917,20 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // Detetar consultas: .calc 35, quanto dá 35 mt, 35 mt dá quantos megas, 35 mt
+                    // Detetar consultas: .calc 19, quantos megas terá com 19mt, quanto dá 19 mt, 19 mt dá quantos megas, 19 mt
                     let valorConsultaCalc = null;
-                    const mCalcCmd = cleanText.match(/^[.!/#]?(?:calc|calcular|calcula)\s+(\d+)\s*(?:mt|mzn|meticais)?$/i);
-                    const mQuantoDa = cleanText.match(/^quanto\s+(?:d[aá]|é|e|fica|custa)\s+(\d+)\s*(?:mt|mzn|meticais)?\??$/i);
-                    const mInvertido = cleanText.match(/^(\d+)\s*(?:mt|mzn|meticais)\s+(?:d[aá]|s[aã]o|rende)\s+(?:quanto|quantos)/i);
-                    const mValorPuro = cleanText.match(/^(\d+)\s*(?:mt|mzn|meticais)$/i);
+                    const cleanSemAcento = cleanText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+                    const mCalcCmd = cleanSemAcento.match(/^[.!/#]?(?:calc|calcular|calcula)\s+(\d+)\s*(?:mt|mzn|meticais)?$/i);
+                    const mQuantosMegas = cleanSemAcento.match(/quantos?\s+(?:megas?|mb|mbs|gigas?|gb|gbs)?.*?(?:com|para|de|por|\s)\s*(\d+)\s*(?:mt|mzn|meticais|\b)/i);
+                    const mSePagar = cleanSemAcento.match(/(?:se\s+)?(?:pagar|mandar|enviar|transferir|depositar)\s+(\d+)\s*(?:mt|mzn|meticais)?.*?(?:megas?|mb|gigas?|gb|quanto)/i);
+                    const mQuantoDa = cleanSemAcento.match(/^quanto\s+(?:da|e|fica|custa|rende|vale)\s+(\d+)\s*(?:mt|mzn|meticais)?\??$/i);
+                    const mInvertido = cleanSemAcento.match(/^(\d+)\s*(?:mt|mzn|meticais)\s+(?:da|sao|rende|vale|equivale|tem|recebo)/i);
+                    const mValorPuro = cleanSemAcento.match(/^(\d+)\s*(?:mt|mzn|meticais)$/i);
 
                     if (mCalcCmd) valorConsultaCalc = parseInt(mCalcCmd[1]);
+                    else if (mQuantosMegas && mQuantosMegas[1]) valorConsultaCalc = parseInt(mQuantosMegas[1]);
+                    else if (mSePagar && mSePagar[1]) valorConsultaCalc = parseInt(mSePagar[1]);
                     else if (mQuantoDa) valorConsultaCalc = parseInt(mQuantoDa[1]);
                     else if (mInvertido) valorConsultaCalc = parseInt(mInvertido[1]);
                     else if (mValorPuro) {
