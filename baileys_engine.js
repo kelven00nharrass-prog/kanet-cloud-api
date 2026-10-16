@@ -2603,7 +2603,16 @@ async function startWhatsApp(orderCallback, db = null) {
 
                         // ── REGRA 1: SEGURANÇA MÁXIMA ANTI-DUPLICAÇÃO E LOCK EXCLUSIVO ──
                         if (txn_id) {
-                            const registoExistente = transacoesProcessadasMap.get(txn_id);
+                            let registoExistente = transacoesProcessadasMap.get(txn_id);
+                            if (!registoExistente) {
+                                for (const [k, v] of transacoesProcessadasMap.entries()) {
+                                    if (matchTxnId(k, txn_id)) {
+                                        registoExistente = v;
+                                        break;
+                                    }
+                                }
+                            }
+
                             if (registoExistente) {
                                 if (registoExistente.status === 'completed') {
                                     await reply(
@@ -2627,13 +2636,24 @@ async function startWhatsApp(orderCallback, db = null) {
                                     );
                                     continue;
                                 }
-                            } else if (transacoesProcessadas.has(txn_id)) {
-                                await reply(
-                                    `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
-                                    `❌ Esta transação (\`${txn_id}\`) já foi processada anteriormente no sistema.\n\n` +
-                                    `⏳ Cada comprovativo só é válido para uma única ativação de pacote.`
-                                );
-                                continue;
+                            } else {
+                                let jaProcessada = transacoesProcessadas.has(txn_id);
+                                if (!jaProcessada) {
+                                    for (const item of transacoesProcessadas) {
+                                        if (matchTxnId(item, txn_id)) {
+                                            jaProcessada = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (jaProcessada) {
+                                    await reply(
+                                        `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
+                                        `❌ Esta transação (\`${txn_id}\`) já foi processada anteriormente no sistema.\n\n` +
+                                        `⏳ Cada comprovativo só é válido para uma única ativação de pacote.`
+                                    );
+                                    continue;
+                                }
                             }
                         }
 
