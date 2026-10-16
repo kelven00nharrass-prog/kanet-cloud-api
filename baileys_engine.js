@@ -42,6 +42,7 @@ const BOT_CONFIG_PATH = path.join(__dirname, 'bot_config.js');
 const LOCAL_CONFIG_PATH = path.join(__dirname, 'local_config.json');
 const TRANSACOES_DB_PATH = path.join(__dirname, 'transacoes_db.json');
 const SMS_PAYMENTS_DB_PATH = path.join(__dirname, 'sms_payments_db.json');
+const AGUARDANDO_OPERADORA_DB_PATH = path.join(__dirname, 'aguardando_operadora_db.json');
 
 let DYN_CFG = {};
 let LOCAL_CFG = {};
@@ -173,6 +174,7 @@ function carregarConfigs() {
     
     carregarTransacoes();
     carregarSmsPayments();
+    carregarAguardandoOperadora();
     limparDuplicatasTabelas();
 }
 
@@ -363,6 +365,165 @@ async function enviarErroGrupo(texto) {
         console.warn(`⚠️ [GRUPO ERROS ERRO]: ${e.message}`);
     }
     return false;
+}
+
+// ══════════════════════════════════════════════════
+// MOTOR DE CONCILIAÇÃO INTELIGENTE (RECONCILIATION ENGINE)
+// ══════════════════════════════════════════════════
+function cleanTx(s) {
+    return String(s || '').trim().toUpperCase();
+}
+
+function normalizeTx(s) {
+    return cleanTx(s).replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * Compara dois IDs de transação de forma robusta e inteligente (suporta com/sem pontos, prefixos e sufixos)
+ */
+function matchTxnId(a, b) {
+    if (!a || !b) return false;
+    const ca = cleanTx(a);
+    const cb = cleanTx(b);
+    if (ca === cb) return true;
+
+    const na = normalizeTx(ca);
+    const nb = normalizeTx(cb);
+    if (na === nb) return true;
+
+    // Se ambos são códigos padrão PP (M-Pesa / e-Mola)
+    if (na.startsWith('PP') && nb.startsWith('PP')) {
+        // Se ambos têm pelo menos 12 caracteres e um contém o outro
+        if (Math.min(na.length, nb.length) >= 12 && (na.includes(nb) || nb.includes(na))) {
+            return true;
+        }
+        // Se ambos têm a mesma data (primeiro bloco) e o mesmo sufixo final único (ex: B03818)
+        const partsA = ca.split('.');
+        const partsB = cb.split('.');
+        if (partsA.length === 3 && partsB.length === 3) {
+            if (partsA[0] === partsB[0] && partsA[2] === partsB[2]) return true;
+        }
+    } else {
+        // Códigos alfanuméricos padrão (ex: DHJ4L92EBZW)
+        const minL = Math.min(na.length, nb.length);
+        if (minL >= 8 && (na.includes(nb) || nb.includes(na))) return true;
+    }
+    return false;
+}
+
+let externalPaymentFinder = null;
+function setPaymentFinder(finder) {
+    externalPaymentFinder = finder;
+}
+
+function findSmsPayment(txnId) {
+    if (!txnId) return null;
+    const cleanId = cleanTx(txnId);
+    if (smsPaymentsMap.has(cleanId)) {
+        return smsPaymentsMap.get(cleanId);
+    }
+    for (const [k, p] of smsPaymentsMap.entries()) {
+        if (matchTxnId(k, cleanId) || matchTxnId(p.txn_id, cleanId)) {
+            return p;
+        }
+    }
+    return null;
+}
+
+function findItemAguardandoOperadora(incomingTxnId) {
+    if (!incomingTxnId) return null;
+    const cleanId = cleanTx(incomingTxnId);
+    if (aguardandoOperadora.has(cleanId)) {
+        return { key: cleanId, item: aguardandoOperadora.get(cleanId) };
+    }
+    for (const [k, item] of aguardandoOperadora.entries()) {
+        if (matchTxnId(k, cleanId) || matchTxnId(item.txn_id, cleanId)) {
+            return { key: k, item };
+        }
+    }
+    return null;
+}
+
+function findPendingPayment(jid, senderNumber, rawLidClean) {
+    const directKey = `${jid}:${senderNumber}`;
+    if (pendingPayments.has(directKey)) {
+        return { key: directKey, pay: pendingPayments.get(directKey) };
+    }
+    if (pendingPayments.has(jid)) {
+        return { key: jid, pay: pendingPayments.get(jid) };
+    }
+    for (const [key, pay] of pendingPayments.entries()) {
+        if (pay.jid === jid) {
+            if (pay.senderNumber === senderNumber || (rawLidClean && pay.rawLidClean === rawLidClean)) {
+                return { key, pay };
+            }
+        }
+    }
+    return null;
+}
+
+function salvarAguardandoOperadora() {
+    try {
+        const obj = {};
+        const now = Date.now();
+        for (const [id, val] of aguardandoOperadora.entries()) {
+            const { timer, ...rest } = val;
+            if (now - (val.timestamp || 0) < 600_000) {
+                obj[id] = rest;
+            }
+        }
+        fs.writeFileSync(AGUARDANDO_OPERADORA_DB_PATH, JSON.stringify(obj, null, 2), 'utf8');
+    } catch (e) {
+        console.warn('⚠️ [CACHE] Erro ao salvar aguardando_operadora_db.json:', e.message);
+    }
+}
+
+function expirarItemAguardandoOperadora(txn_id) {
+    try {
+        if (aguardandoOperadora.has(txn_id)) {
+            const item = aguardandoOperadora.get(txn_id);
+            aguardandoOperadora.delete(txn_id);
+            salvarAguardandoOperadora();
+            console.log(`⏱️ [TIMER 10 MIN] Transação ${txn_id} não confirmada pela operadora em 10min. Notificando grupo.`);
+            const origemMsg = (item.jid && item.jid.endsWith('@g.us')) ? 'Grupo WhatsApp' : 'Privado';
+            enviarNotificacaoGrupo(
+                `⏰ *COMPROVATIVO NÃO RECEBIDO DA OPERADORA (10 MIN)*\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `🔖 *Ref:* \`${txn_id}\`\n` +
+                `💳 *Valor:* *${item.valor} MT* (${item.metodoNome || 'M-Pesa/e-Mola'})\n` +
+                `👤 *Cliente:* *${item.nomeCliente || 'Cliente'}* (${item.senderNumber || 'N/D'})\n` +
+                `🏢 *Origem:* *${origemMsg}*\n` +
+                `⏳ *Status:* Tempo limite de 10 min atingido sem confirmação por SMS da operadora.`
+            );
+        }
+    } catch (err) {
+        console.error('❌ Erro no timer de 10 minutos do comprovativo:', err);
+    }
+}
+
+function carregarAguardandoOperadora() {
+    try {
+        if (fs.existsSync(AGUARDANDO_OPERADORA_DB_PATH)) {
+            const data = JSON.parse(fs.readFileSync(AGUARDANDO_OPERADORA_DB_PATH, 'utf8'));
+            const now = Date.now();
+            for (const [id, val] of Object.entries(data)) {
+                const elapsed = now - (val.timestamp || now);
+                if (elapsed < 600_000) {
+                    const remaining = 600_000 - elapsed;
+                    const item = { ...val, timer: null };
+                    item.timer = setTimeout(() => {
+                        expirarItemAguardandoOperadora(id);
+                    }, remaining);
+                    aguardandoOperadora.set(id, item);
+                }
+            }
+            if (aguardandoOperadora.size > 0) {
+                console.log(`⏳ [CACHE] ${aguardandoOperadora.size} comprovativos aguardando operadora restaurados com sucesso.`);
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ [CACHE] Erro ao carregar aguardando_operadora_db.json:', e.message);
+    }
 }
 
 // ══════════════════════════════════════════════════
@@ -932,18 +1093,19 @@ function extrairTxId(texto) {
 
     // 2. Padrão específico e-Mola / Vodacom PP: PP + 6 dígitos data + 4 dígitos hora + código alfanumérico
     // Ex: PP260818.1138.924955, PP251205.2043.k61611, PP260819.0642.B03818
-    const mPP = texto.match(/\b(PP[0-9]{6}\.[0-9]{4}\.[A-Z0-9]{4,8})\b/i);
+    const mPP = texto.match(/\b((?:PP|N|T)[0-9]{6,}(?:\.[A-Z0-9]{2,15}){1,4})\b/i) || texto.match(/\b(PP[0-9]{6}\.[0-9]{4}\.[A-Z0-9]{4,8})\b/i);
     if (mPP && mPP[1]) {
         let cand = mPP[1].toUpperCase().trim();
         if (cand.endsWith('.')) cand = cand.slice(0, -1);
         return cand;
     }
 
-    // 3. Padrão específico M-Pesa com 'Confirmado [CODE]' (ex: Confirmado DHJ4L92EBZW, Confirmado DHI4L8VY3SO)
-    const mConf = texto.match(/Confirmado\s+([A-Z0-9]{8,15})\b/i);
+    // 3. Padrão específico M-Pesa com 'Confirmado [CODE]' (permite pontos para casos PP e outros)
+    const mConf = texto.match(/Confirmado\s+([A-Z0-9]+(?:\.[A-Z0-9]+)*)\b/i);
     if (mConf && mConf[1]) {
-        const c = mConf[1].toUpperCase().trim();
-        if (!/^(258)?8[2-7]\d{7}$/.test(c)) return c;
+        let c = mConf[1].toUpperCase().trim();
+        if (c.endsWith('.')) c = c.slice(0, -1);
+        if (!/^(258)?8[2-7]\d{7}$/.test(c) && c.length >= 6) return c;
     }
 
     // 4. Padrão alfanumérico padrão M-Pesa (10 a 12 caracteres com letras e números misturados)
@@ -1529,7 +1691,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             const analise = await geminiAI.analisarPrintPagamento(imgBuffer, mimeType);
 
                             if (analise && analise.valido && analise.txnId) {
-                                const rawOuSintetico = analise.raw_text || `Confirmado ${analise.txnId}. Transferiste ${analise.valor || 0}.00MT para KaNet`;
+                                const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de KaNet\n` + (analise.raw_text || '');
                                 const legenda = text.trim();
                                 text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
                                 addLog(`🖼️ [GEMINI VISION] Print válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
@@ -1791,11 +1953,17 @@ async function startWhatsApp(orderCallback, db = null) {
                     // ── 1. AGUARDANDO NÚMERO DE DESTINO APÓS COMPROVATIVO ──
 
                     // Caso o cliente esteja aguardando validação da operadora e tenha enviado o número agora:
-                    const itemAguardandoOp = [...aguardandoOperadora.values()].find(it => it.senderNumber === senderNumber && !it.numDestino);
+                    const itemAguardandoOp = [...aguardandoOperadora.values()].find(it => 
+                        (it.senderNumber === senderNumber || (rawLidClean && it.rawLidClean === rawLidClean) || it.jid === jid) && !it.numDestino
+                    );
                     if (itemAguardandoOp) {
                         const numDestino = extrairNumeroDestino(text);
                         if (numDestino) {
                             itemAguardandoOp.numDestino = numDestino;
+                            salvarAguardandoOperadora();
+                            if (rawLidClean) {
+                                lidToPhoneMap.set(rawLidClean, numDestino.startsWith('258') ? numDestino : '258' + numDestino);
+                            }
                             await reply(
                                 `📲 *NÚMERO DE DESTINO REGISTADO:* *${numDestino}*\n\n` +
                                 `⏳ O seu comprovativo (\`${itemAguardandoOp.txn_id}\`) continua no status *Aguardando Confirmação da Operadora*.\n` +
@@ -1805,16 +1973,17 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
-                    const pendingKey = `${jid}:${senderNumber}`;
-                    const hasPending = pendingPayments.has(pendingKey) || pendingPayments.has(jid);
-                    if (hasPending) {
-                        const targetKey = pendingPayments.has(pendingKey) ? pendingKey : jid;
-                        const pay = pendingPayments.get(targetKey);
+                    const pendingMatch = findPendingPayment(jid, senderNumber, rawLidClean);
+                    if (pendingMatch) {
+                        const { key: targetKey, pay } = pendingMatch;
                         if (pay.aguardando_numero) {
                             const numDestino = extrairNumeroDestino(text);
                             if (numDestino) {
                                 pendingPayments.delete(targetKey);
-                                const pacote = buscarPacotePorValor(pay.valor, jid);
+                                if (rawLidClean) {
+                                    lidToPhoneMap.set(rawLidClean, numDestino.startsWith('258') ? numDestino : '258' + numDestino);
+                                }
+                                const pacote = pay.pacote || buscarPacotePorValor(pay.valor, jid);
                                 const orderId = 'WA-' + pay.txn_id + '-' + Date.now();
 
                                 const { supportNum } = getSuporteDetails();
@@ -2506,7 +2675,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         const { supportNum } = getSuporteDetails();
                         const numDestinoInline = extrairNumeroDestinoAbaixoDoComprovativo(text);
                         // ── VALIDAÇÃO REAL CONTRA CONFIRMAÇÃO DA OPERADORA (M-PESA / E-MOLA) ──
-                        const smsOperadora = smsPaymentsMap.get(txn_id);
+                        const smsOperadora = findSmsPayment(txn_id);
                         const jaConfirmadoPelaOperadora = smsOperadora && !smsOperadora.usado;
 
                         if (jaConfirmadoPelaOperadora) {
@@ -2628,17 +2797,18 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
                         } else {
                             // ⏳ A CONFIRMAÇÃO DA OPERADORA AINDA NÃO CHEGOU AO SISTEMA!
-                            // Colocar em status "Aguardando Comprovativo da Operadora" por até 2 minutos
-                            if (aguardandoOperadora.has(txn_id)) {
+                            // Colocar em status "Aguardando Confirmação da Operadora" por até 10 minutos
+                            const itemExistente = findItemAguardandoOperadora(txn_id);
+                            if (itemExistente) {
                                 await reply(
                                     `⏳ *COMPROVATIVO JÁ EM VERIFICAÇÃO* ⏳\n━━━━━━━━━━━━━━━━━━\n` +
-                                    `A transação \`${txn_id}\` já está no status *Aguardando Comprovativo da Operadora*.\n\n` +
+                                    `A transação \`${txn_id}\` já está no status *Aguardando Confirmação da Operadora*.\n\n` +
                                     `Assim que a rede ${metodoNome} confirmar o recebimento do valor (*${valor} MT*), o seu pedido será processado automaticamente!`
                                 );
                                 continue;
                             }
 
-                            console.log(`⏳ [AGUARDANDO OPERADORA] Ref ${txn_id} (${valor} MT) - Cliente: ${senderNumber}. Iniciando timer de 2 minutos.`);
+                            console.log(`⏳ [AGUARDANDO OPERADORA] Ref ${txn_id} (${valor} MT) - Cliente: ${senderNumber}. Iniciando timer de 10 minutos.`);
 
                             const itemAguardando = {
                                 txn_id,
@@ -2647,6 +2817,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                 metodoNome,
                                 jid,
                                 senderNumber,
+                                rawLidClean,
+                                realSender,
                                 nomeCliente,
                                 numDestino: numDestinoInline || null,
                                 pacote,
@@ -2654,32 +2826,12 @@ async function startWhatsApp(orderCallback, db = null) {
                                 timer: null
                             };
 
-                            itemAguardando.timer = setTimeout(async () => {
-                                try {
-                                    if (aguardandoOperadora.has(txn_id)) {
-                                        aguardandoOperadora.delete(txn_id);
-                                        // 🛑 NUNCA enviar mensagem alarmista ao cliente no WhatsApp!
-                                        // O SMS da operadora pode levar mais tempo por lentidão na rede. Se notificar o cliente,
-                                        // ele exige reembolso ao admin e depois a recarga cai automaticamente, gerando prejuízo.
-                                        console.log(`⏱️ [TIMER 2 MIN] Transação ${txn_id} não confirmada pela operadora em 2min. Notificando apenas o grupo do admin.`);
-
-                                        const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
-                                        enviarNotificacaoGrupo(
-                                            `⏰ *COMPROVATIVO NÃO RECEBIDO DA OPERADORA (2 MIN)*\n` +
-                                            `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                                            `🔖 *Ref:* \`${txn_id}\`\n` +
-                                            `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                            `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
-                                            `🏢 *Origem:* *${origemMsg}*\n` +
-                                            `⏳ *Status:* Tempo limite de 2 min atingido sem confirmação por SMS da operadora.`
-                                        );
-                                    }
-                                } catch (err) {
-                                    console.error('❌ Erro no timer de 2 minutos do comprovativo:', err);
-                                }
-                            }, 120_000);
+                            itemAguardando.timer = setTimeout(() => {
+                                expirarItemAguardandoOperadora(txn_id);
+                            }, 600_000); // 10 minutos
 
                             aguardandoOperadora.set(txn_id, itemAguardando);
+                            salvarAguardandoOperadora();
 
                             // Responder imediatamente ao cliente
                             await reply(
@@ -2692,7 +2844,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                 `📦 *Pacote:* *${pacote.nome}*${pacote.calculado ? ' ⚡ _(Calculado Proporcionalmente)_' : ''}\n` +
                                 (numDestinoInline ? `📲 *Destino:* *${numDestinoInline}*\n\n` : `\n`) +
                                 `📡 *Aguardando confirmação oficial da operadora (${metodoNome})...*\n` +
-                                `O sistema está a verificar o recebimento do valor na nossa conta. Isso costuma levar entre *30 segundos a 2 minutos*.\n\n` +
+                                `O sistema está a verificar o recebimento do valor na nossa conta. Isso costuma levar entre *30 segundos a 3 minutos*.\n\n` +
                                 `⚡ *Assim que a confirmação chegar, o seu pacote será ativado imediatamente!*`
                             );
 
@@ -3055,7 +3207,7 @@ function getJidForOrder(orderId) {
  */
 async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
     try {
-        const smsRec = smsPaymentsMap.get(item.txn_id);
+        const smsRec = findSmsPayment(item.txn_id);
         if (smsRec) {
             smsRec.usado = true;
             smsRec.usadoPor = item.senderNumber;
@@ -3122,6 +3274,9 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             );
 
             if (orderDispatchCallback) {
+                if (item.rawLidClean && item.numDestino) {
+                    lidToPhoneMap.set(item.rawLidClean, item.numDestino.startsWith('258') ? item.numDestino : '258' + item.numDestino);
+                }
                 orderDispatchCallback({
                     orderId,
                     numero: item.numDestino,
@@ -3129,6 +3284,8 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                     modo: item.pacote.tipo,
                     jid: item.jid,
                     sender: item.senderNumber,
+                    senderJid: item.realSender || item.jid,
+                    senderPhone: item.numDestino,
                     senderName: item.nomeCliente,
                     txn_id: item.txn_id,
                     valor: valorPago
@@ -3142,8 +3299,21 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 metodo: item.metodo,
                 senderName: item.nomeCliente,
                 senderNumber: item.senderNumber,
+                rawLidClean: item.rawLidClean,
+                realSender: item.realSender,
+                pacote: item.pacote,
                 aguardando_numero: true
             });
+
+            transacoesProcessadas.add(item.txn_id);
+            transacoesProcessadasMap.set(item.txn_id, {
+                sender: item.senderNumber,
+                jid: item.jid,
+                valor: valorPago,
+                status: 'locked',
+                timestamp: Date.now()
+            });
+            salvarTransacoes();
 
             if (sock) {
                 await sock.sendMessage(item.jid, {
@@ -3172,9 +3342,9 @@ function registrarSmsPayment({ txn_id, valor, remetente, metodo, raw_sms }) {
     const vNum = parseFloat(valor);
     console.log(`💰 [SMS OPERADORA REGISTADO] Ref: ${cleanTxnId} | Valor: ${vNum} MT | Remetente: ${remetente} (${metodo})`);
 
-    const existing = smsPaymentsMap.get(cleanTxnId);
+    let existing = findSmsPayment(cleanTxnId);
     if (!existing) {
-        smsPaymentsMap.set(cleanTxnId, {
+        existing = {
             txn_id: cleanTxnId,
             valor: vNum,
             remetente: remetente || '',
@@ -3182,20 +3352,23 @@ function registrarSmsPayment({ txn_id, valor, remetente, metodo, raw_sms }) {
             raw_sms: raw_sms || '',
             timestamp: Date.now(),
             usado: false
-        });
+        };
+        smsPaymentsMap.set(cleanTxnId, existing);
         salvarSmsPayments();
     }
 
-    // Se houver algum cliente aguardando no status "Aguardando Comprovativo da Operadora":
-    if (aguardandoOperadora.has(cleanTxnId)) {
-        const item = aguardandoOperadora.get(cleanTxnId);
-        aguardandoOperadora.delete(cleanTxnId);
+    // Se houver algum cliente aguardando no status "Aguardando Confirmação da Operadora":
+    const matchAguardando = findItemAguardandoOperadora(cleanTxnId);
+    if (matchAguardando) {
+        const { key, item } = matchAguardando;
+        aguardandoOperadora.delete(key);
+        salvarAguardandoOperadora();
         if (item.timer) {
             clearTimeout(item.timer);
             item.timer = null;
         }
 
-        console.log(`🎉 [OPERADORA VALIDOU] Cliente ${item.senderNumber} estava aguardando ref ${cleanTxnId}. Processando imediatamente!`);
+        console.log(`🎉 [OPERADORA VALIDOU] Cliente ${item.senderNumber} estava aguardando ref ${item.txn_id || key} (SMS ref: ${cleanTxnId}). Processando imediatamente!`);
         processarPedidoAguardandoConfirmado(item, vNum, metodo || item.metodo);
     }
 }
@@ -3391,6 +3564,10 @@ module.exports = {
     salvarSmsPayments,
     smsPaymentsMap,
     aguardandoOperadora,
+    setPaymentFinder,
+    findSmsPayment,
+    findItemAguardandoOperadora,
+    salvarAguardandoOperadora,
     limparDuplicatasTabelas,
     salvarBotConfig,
     calcularPacoteProporcional,

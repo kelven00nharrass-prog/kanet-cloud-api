@@ -3533,6 +3533,9 @@ try {
       console.log(`⏳ [WHATSAPP NUVEM] Celulares para modo ${orderDoc.modo || 'diario'} (${orderDoc.quantidade}MB) sem saldo suficiente livre no momento. Ordem mantida como PENDENTE na fila geral.`);
     }
   }, db);
+  if (typeof baileysEngine.setPaymentFinder === 'function') {
+    baileysEngine.setPaymentFinder((txnId) => findOperatorPayment(txnId));
+  }
 } catch(e) {
   console.warn('⚠️ [BAILEYS] Inicializando em modo standard:', e.message);
 }
@@ -3971,7 +3974,11 @@ app.post('/api/sms/payment', (req, res) => {
 
     // Anti-fraude: verificar duplicação
     if (inMemoryPayments.has(cleanTxnId)) {
-      console.warn(`⚠️ [SMS PAYMENT] Transação duplicada ignorada: ${cleanTxnId}`);
+      console.warn(`⚠️ [SMS PAYMENT] Transação duplicada ignorada no cache geral: ${cleanTxnId}`);
+      // Notificar Baileys caso haja algum cliente aguardando confirmação desta transação
+      if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
+        baileysEngine.registrarSmsPayment({ txn_id: cleanTxnId, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
+      }
       return res.json({
         success: false,
         duplicado: true,
@@ -4004,7 +4011,7 @@ app.post('/api/sms/payment', (req, res) => {
       });
     }
 
-    // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Comprovativo da Operadora" (WhatsApp)
+    // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Confirmação da Operadora" (WhatsApp)
     if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
       baileysEngine.registrarSmsPayment({ txn_id: cleanTxnId, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
     }
@@ -4015,9 +4022,26 @@ app.post('/api/sms/payment', (req, res) => {
     }
 
     // Validar pedidos do Aplicativo Client Hub que estejam aguardando esta confirmação da operadora
+    let hubMatch = null;
+    let hubKey = null;
     if (hubAguardandoOperadora.has(cleanTxnId)) {
-      const item = hubAguardandoOperadora.get(cleanTxnId);
-      hubAguardandoOperadora.delete(cleanTxnId);
+      hubMatch = hubAguardandoOperadora.get(cleanTxnId);
+      hubKey = cleanTxnId;
+    } else {
+      for (const [k, item] of hubAguardandoOperadora.entries()) {
+        const kClean = String(k).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const txnClean = String(cleanTxnId).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (kClean === txnClean || (Math.min(kClean.length, txnClean.length) >= 8 && (kClean.includes(txnClean) || txnClean.includes(kClean)))) {
+          hubMatch = item;
+          hubKey = k;
+          break;
+        }
+      }
+    }
+
+    if (hubMatch) {
+      const item = hubMatch;
+      hubAguardandoOperadora.delete(hubKey);
       if (item.timer) clearTimeout(item.timer);
 
       const vNum = Number(valor);
@@ -4035,6 +4059,30 @@ app.post('/api/sms/payment', (req, res) => {
 
         if (db) {
           db.collection('orders').doc(item.orderId).set(item.orderDoc).catch(() => {});
+        }
+
+        // Tentar despacho imediato para celular apto
+        const targetPort = getPortForModo(item.orderDoc.modo, item.orderDoc.quantidade);
+        const isDiario = (item.orderDoc.modo || 'diario').toLowerCase().trim() === 'diario' || (item.orderDoc.modo || 'diario').toLowerCase().trim() === '24hrs';
+        const dev = inMemoryDevices[targetPort];
+        const devAvailable = dev ? getDeviceAvailableMb(dev) : 0;
+        const canDeviceHandle = isDeviceApto(dev) && (isDiario ? devAvailable >= item.orderDoc.quantidade : true);
+
+        if (canDeviceHandle) {
+          item.orderDoc.targetPort = targetPort;
+          item.orderDoc.status = 'assigned';
+          item.orderDoc.assignedToPort = targetPort;
+          dev.pending_order = {
+            id: item.orderDoc.id || item.orderDoc.orderId,
+            orderId: item.orderDoc.id || item.orderDoc.orderId,
+            numero: item.orderDoc.numero,
+            quantidade: item.orderDoc.quantidade,
+            modo: item.orderDoc.modo || 'diario',
+            input_val: item.orderDoc.input_val || '',
+            jid: item.orderDoc.jid || null,
+            timestamp: Date.now()
+          };
+          console.log(`🚀 [CLIENT HUB NUVEM] Pedido ${item.orderId} entregue diretamente à Porta ${targetPort}!`);
         }
 
         clientSupportMessages.push({
@@ -4854,13 +4902,13 @@ app.post('/api/client/purchase', async (req, res) => {
       if (hubAguardandoOperadora.has(txnId)) {
         hubAguardandoOperadora.delete(txnId);
         orderDoc.status = 'failed';
-        orderDoc.motivo = 'Confirmação por SMS da operadora não foi recebida no tempo limite (3 min).';
+        orderDoc.motivo = 'Confirmação por SMS da operadora não foi recebida no tempo limite (10 min).';
         orderDoc.updatedAt = new Date().toISOString();
         inMemoryOrders.set(orderId, orderDoc);
         saveOrdersToCache();
-        console.warn(`⏰ [HUB TIMEOUT] Pedido ${orderId} cancelado: SMS da operadora não entrou em 3 minutos.`);
+        console.warn(`⏰ [HUB TIMEOUT] Pedido ${orderId} cancelado: SMS da operadora não entrou em 10 minutos.`);
       }
-    }, 3 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     hubAguardandoOperadora.set(txnId, {
       orderId,
