@@ -1377,6 +1377,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     if (!clientJid && resId && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
       clientJid = baileysEngine.getJidForOrder(resId);
     }
+    if (!clientJid && order && (order.sender || order.senderPhone || order.senderNumber || order.cliente_solicitante || order.numero)) {
+      const p = String(order.sender || order.senderPhone || order.senderNumber || order.cliente_solicitante || order.numero).replace(/\D/g, '');
+      if (p.length === 9) clientJid = `258${p}@s.whatsapp.net`;
+      else if (p.length === 12 && p.startsWith('258')) clientJid = `${p}@s.whatsapp.net`;
+    }
 
     if (clientJid && (!order || !order.notified) && baileysEngine) {
       if (success) {
@@ -1384,7 +1389,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           order.notified = true;
           console.log(`ℹ️ [SILENT SPLIT] Parte 1 do pedido ${resId} entregue com sucesso. Notificação ao cliente aguarda conclusão da Parte 2.`);
         } else {
-          order.notified = true;
+          if (order) order.notified = true;
           const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
           let headerText = 'PACOTE ATIVADO COM SUCESSO! 📶';
           let modoBadge = '';
@@ -1455,24 +1460,31 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             }
           }
 
+          const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && (req.body.last_result.valor || req.body.last_result.valor_pago)) || null;
           const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
 
-          baileysEngine.sendTextMessage(clientJid,
-            `✅ *RECARGA CONCLUÍDA* ⚡\n` +
-            `━━━━━━━━━━━━━━━━━━\n\n` +
-            saudacao +
-            `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
-            valorLinha +
-            `🔖 *Ref:* \`${resId}\`\n` +
-            `🕒 *Data:* ${horaAgora}\n\n` +
-            `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
-            `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
-            `━━━━━━━━━━━━━━━━━━\n` +
-            `📞 *Dúvidas ou Suporte:* Digite *Suporte*`,
-            { mentions: mentionsList }
-          );
-          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
+          try {
+            baileysEngine.sendTextMessage(clientJid,
+              `✅ *RECARGA CONCLUÍDA* ⚡\n` +
+              `━━━━━━━━━━━━━━━━━━\n\n` +
+              saudacao +
+              `📲 *Destino:* *${targetNum}*\n` +
+              `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
+              valorLinha +
+              `🔖 *Ref:* \`${resId}\`\n` +
+              `🕒 *Data:* ${horaAgora}\n\n` +
+              `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
+              `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📞 *Dúvidas ou Suporte:* Digite *Suporte*`,
+              { mentions: mentionsList }
+            ).catch(errSend => {
+              console.error(`❌ [NOTIFICAÇÃO WA ERRO] Falha ao enviar para ${clientJid}:`, errSend.message);
+            });
+            console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
+          } catch(errSendSync) {
+            console.error(`❌ [NOTIFICAÇÃO WA CRASH]:`, errSendSync.message);
+          }
         }
       } else {
         // 🛡️ NUNCA enviar mensagem de aviso de instabilidade ao cliente no WhatsApp!
@@ -1723,6 +1735,51 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       order.completedAt = new Date().toISOString();
       order.lastError = null;
       decrementDeviceSaldo(port, order);
+
+      // Notificar cliente no WhatsApp caso ainda não tenha sido notificado
+      if (!order.notified && baileysEngine) {
+        let clientJid = order.jid || null;
+        if (!clientJid && typeof baileysEngine.getJidForOrder === 'function') {
+          clientJid = baileysEngine.getJidForOrder(orderId);
+        }
+        if (!clientJid && (order.sender || order.senderPhone || order.senderNumber || order.numero)) {
+          const p = String(order.sender || order.senderPhone || order.senderNumber || order.numero).replace(/\D/g, '');
+          if (p.length === 9) clientJid = `258${p}@s.whatsapp.net`;
+          else if (p.length === 12 && p.startsWith('258')) clientJid = `${p}@s.whatsapp.net`;
+        }
+        if (clientJid) {
+          order.notified = true;
+          const rawQty = order.splitTotalMb || order.quantidade || 1024;
+          const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
+          const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
+          const valorPago = order.valor || order.valor_pago || null;
+          const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
+          const senderNome = order.senderName || order.nomeCliente || '';
+          const saudacao = (senderNome && senderNome !== 'Cliente')
+            ? `Olá *${senderNome}*, a sua recarga foi entregue com sucesso! 🎉\n\n`
+            : `A sua recarga foi entregue com sucesso! 🎉\n\n`;
+
+          try {
+            baileysEngine.sendTextMessage(clientJid,
+              `✅ *RECARGA CONCLUÍDA* ⚡\n` +
+              `━━━━━━━━━━━━━━━━━━\n\n` +
+              saudacao +
+              `📲 *Destino:* *${order.numero}*\n` +
+              `📦 *Pacote:* *${volStr}*\n` +
+              valorLinha +
+              `🔖 *Ref:* \`${orderId}\`\n` +
+              `🕒 *Data:* ${horaAgora}\n\n` +
+              `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
+              `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📞 *Dúvidas ou Suporte:* Digite *Suporte*`
+            ).catch(e => console.error('❌ [NOTIFICAÇÃO WA ERRO]:', e.message));
+            console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
+          } catch(e) {
+            console.error('❌ [NOTIFICAÇÃO WA CRASH]:', e.message);
+          }
+        }
+      }
     } else {
       order.retryCount = (order.retryCount || 0) + 1;
       order.failedPorts = order.failedPorts || [];
@@ -3162,7 +3219,7 @@ app.get('/api/app/hub/version', (req, res) => {
       version: '2.2.0',
       versionCode: 22,
       pwaVersion: '2026.10.02-v2',
-      apkUrl: 'https://kanet-cloud-api-v0gg.onrender.com/hub/KaNet-Client-Hub.apk',
+      apkUrl: 'https://kanet-cloud-api-f3le.onrender.com/hub/KaNet-Client-Hub.apk',
       changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
       releasedAt: new Date().toISOString()
     });
