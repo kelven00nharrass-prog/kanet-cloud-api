@@ -43,6 +43,7 @@ function sanitizeMimeType(mime, defaultType = 'audio/ogg') {
     if (clean.includes('jpeg') || clean.includes('jpg')) return 'image/jpeg';
     if (clean.includes('png')) return 'image/png';
     if (clean.includes('webp')) return 'image/webp';
+    if (clean.includes('pdf')) return 'application/pdf';
     return clean || defaultType;
 }
 
@@ -137,6 +138,66 @@ Se não for uma imagem de pagamento, retorna: {"valido": false, "motivo": "não 
         return result;
     } catch (err) {
         console.error('❌ [GEMINI VISION] Erro:', err.message);
+        return null;
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// FEATURE 2b: PDF — Leitura de Documentos de Pagamento
+// ────────────────────────────────────────────────────────────────
+/**
+ * Analisa um documento PDF enviado pelo cliente e tenta extrair dados de pagamento.
+ * Suporta comprovativos de M-Pesa, e-Mola e recibos bancários.
+ * @param {Buffer} pdfBuffer - Buffer do ficheiro PDF
+ * @returns {Object|null} - { valido, txnId, valor, remetente, para, servico, data, raw_text } ou null
+ */
+async function analisarDocumentoPDF(pdfBuffer) {
+    if (!isConfigured()) return null;
+
+    const base64 = pdfBuffer.toString('base64');
+
+    const prompt = `Analisa este documento PDF que pode ser um comprovativo de pagamento de M-Pesa, e-Mola ou transferência bancária de Moçambique.
+
+Extrai os seguintes dados SE existirem (responde APENAS com JSON válido, sem markdown):
+{
+  "valido": true/false,
+  "servico": "M-Pesa" ou "e-Mola" ou "Banco" ou "outro",
+  "txnId": "ID da transação (ex: ABC12345678)",
+  "valor": número em meticais (ex: 150),
+  "remetente": "nome ou número de quem enviou",
+  "para": "nome ou número de quem recebeu",
+  "data": "data/hora da transação se visível",
+  "tipo": "Envio de dinheiro" ou "Recarga" ou "Pagamento" ou "outro",
+  "raw_text": "todo o texto relevante do documento",
+  "confianca": "alta" ou "media" ou "baixa"
+}
+
+Se não for um documento de pagamento, retorna: {"valido": false, "motivo": "não é comprovativo de pagamento"}`;
+
+    try {
+        const payload = {
+            contents: [{
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType: 'application/pdf', data: base64 } },
+                    { text: prompt }
+                ]
+            }],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 1024
+            }
+        };
+
+        const text = await callGemini(VISION_MODEL, payload, 60000);
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return { valido: false, motivo: 'resposta inválida da IA' };
+
+        const result = JSON.parse(jsonMatch[0]);
+        return result;
+    } catch (err) {
+        console.error('❌ [GEMINI PDF] Erro:', err.message);
         return null;
     }
 }
@@ -329,6 +390,7 @@ function isMensagemConversacional(text) {
 module.exports = {
     isConfigured,
     analisarPrintPagamento,
+    analisarDocumentoPDF,
     transcreverAudio,
     cerebroGemini,
     limparHistoricoConversa,

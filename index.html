@@ -201,8 +201,8 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
     <button id="btnManutencao" class="btn btn-sm" onclick="toggleMaintenance()" style="font-weight:700;min-width:180px;background:#e53935;border:none;color:#fff;cursor:pointer;" title="Fecha vendas em grupos E no privado para todos os clientes">
       <i class="fa-solid fa-triangle-exclamation"></i> <span id="manutencaoLabel">🟢 Sistema Online</span>
     </button>
-    <div class="wa-status loading" id="waStatus"><div class="dot"></div><span id="waStatusText">A verificar...</span></div>
-    <span class="refresh-info" id="lastRefresh">A actualizar...</span>
+    <div class="wa-status loading" id="waStatus"><div class="dot"></div><span id="waStatusText">Verificando…</span></div>
+    <span class="refresh-info" id="lastRefresh">Atualizando…</span>
   </div>
 </div>
 
@@ -241,7 +241,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
         <button class="btn btn-sm btn-success" onclick="resetAllDevices()"><i class="fa-solid fa-unlock"></i> Libertar Todos</button>
       </div>
     </div>
-    <div class="grid-devices" id="devicesGrid"><div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar celulares...</div></div>
+    <div class="grid-devices" id="devicesGrid"><div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Carregando celulares...</div></div>
 
     <!-- QUEUE & MANUAL SEND -->
     <div class="grid-2">
@@ -264,7 +264,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
         </div>
 
         <div class="card" id="queuePanel" style="max-height:520px;overflow-y:auto;padding:14px">
-          <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i> A carregar fila...</div>
+          <div style="text-align:center;color:var(--muted);padding:20px"><i class="fa-solid fa-spinner fa-spin"></i> Carregando fila...</div>
         </div>
       </div>
       
@@ -367,7 +367,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
             <img id="remoteScreenImg" src="" alt="Ecrã do Celular" style="width:100%;height:100%;object-fit:contain;display:block">
             <div id="screenLoadingOverlay" style="position:absolute;inset:0;background:rgba(6,9,19,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--cyan);font-size:0.85rem">
               <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem"></i>
-              <span>A carregar ecrã do celular...</span>
+              <span>Carregando tela do celular...</span>
             </div>
             <!-- RIPPLE EFFECT ON TAP -->
             <div id="touchRipple" style="position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(0,240,255,0.7);border:2px solid #fff;transform:translate(-50%,-50%) scale(0);pointer-events:none;transition:transform 0.25s ease, opacity 0.25s ease;opacity:0;z-index:20"></div>
@@ -557,7 +557,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
     </div>
 
     <div class="grid-devices" id="groupsGrid" style="margin-bottom:32px">
-      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar grupos...</div>
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Carregando grupos...</div>
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -566,7 +566,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
     </div>
 
     <div class="grid-3" id="priceTablesGrid">
-      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar tabelas...</div>
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Carregando tabelas...</div>
     </div>
 
   <!-- ========================================== -->
@@ -598,13 +598,13 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
     <!-- TICKETS LIST -->
     <div class="section-title"><i class="fa-solid fa-comments"></i> Mensagens & Chamados de Suporte dos Clientes</div>
     <div class="card" id="crmTicketsCard" style="padding:16px;min-height:220px;margin-bottom:24px">
-      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar tickets de suporte...</div>
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Carregando tickets...</div>
     </div>
 
     <!-- SCHEDULED PLANS LIST -->
     <div class="section-title"><i class="fa-solid fa-calendar-days"></i> Planos Agendados Activos (Renováveis & Faseados)</div>
     <div class="card" id="crmPlansCard" style="padding:16px;min-height:160px">
-      <div style="text-align:center;padding:30px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> A carregar planos agendados...</div>
+      <div style="text-align:center;padding:30px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Carregando planos...</div>
     </div>
 
   </div>
@@ -658,7 +658,7 @@ body::after { content: ''; position: fixed; width: 600px; height: 600px; border-
 <div id="toast"></div>
 
 <script>
-const API = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.includes('file://')) ? window.location.origin : 'https://kanet-cloud-api-v0gg.onrender.com';
+const API = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.includes('file://')) ? window.location.origin : 'https://kanet-cloud-api-f3le.onrender.com';
 let allOrders = [];
 let allSalesData = [];
 
@@ -1299,17 +1299,17 @@ async function resetAllDevices() {
       toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
     }
   } catch(e) {
-    toast(`❌ Erro: ${e.message}`, 'err');
+    toast(`Erro: ${e.message}`, 'err');
   }
 }
 
 // ── MANUSEIO: ALTERNAR SIM ATIVO ──
 async function setDeviceSim(port, slot) {
   try {
-    toast(`A alterar porta ${port} para SIM ${slot}...`, 'ok');
+    toast(`Alterando porta ${port}...`, 'ok');
     const d = await fetchAPI(`/api/devices/${port}/set-sim`, { method: 'POST', body: JSON.stringify({ slot }) });
     if (d.success) {
-      toast(`✅ Porta ${port} agora está a usar SIM ${slot}!`, 'ok');
+      toast(`Porta ${port} OK`, 'ok');
       await loadDevices();
     } else {
       toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
@@ -1330,7 +1330,7 @@ async function togglePauseDevice(port) {
       toast(`❌ Erro: ${d.mensagem || 'Falha'}`, 'err');
     }
   } catch(e) {
-    toast(`❌ Erro: ${e.message}`, 'err');
+    toast(`Erro: ${e.message}`, 'err');
   }
 }
 
@@ -1380,7 +1380,7 @@ async function saveSaldoModal() {
   const smt = Number(document.getElementById('modalSaldoMt').value) || 0;
 
   try {
-    toast(`A guardar saldo da Porta ${port}...`, 'ok');
+    toast(`Guardando saldo porta ${port}...`, 'ok');
     const d = await fetchAPI(`/api/devices/${port}/set-saldo`, {
       method: 'POST',
       body: JSON.stringify({
@@ -1411,7 +1411,7 @@ async function forceDispatchOverride(port, orderId = null) {
       : `Despachar próximo pedido pendente (qualquer tipo) para porta ${port}?`;
     if (!confirm(confirm_msg)) return;
 
-    toast(`⚡ A despachar override para Porta ${port}...`, 'ok');
+    toast(`Despacho override porta ${port}...`, 'ok');
     const d = await fetchAPI(`/api/devices/${port}/force-dispatch-override`, {
       method: 'POST',
       body: JSON.stringify(orderId ? { orderId } : {})
@@ -1574,7 +1574,7 @@ async function loadQueue() {
 
 async function retryOrder(orderId, targetPort = null) {
   try {
-    toast('A re-enfileirar pedido ' + orderId.slice(-8) + '...', 'ok');
+    toast('Re-enfileirando pedido...', 'ok');
     const d = await fetchAPI('/api/orders/' + orderId + '/retry', {
       method: 'POST',
       body: JSON.stringify({ targetPort })
@@ -1637,7 +1637,7 @@ async function clearQueue() {
       method: 'POST',
       body: JSON.stringify({ type: 'all' })
     });
-    toast(`✅ Fila limpa: ${d.cleared || 0} pedidos removidos.`, 'ok');
+    toast(`Fila limpa: ${d.cleared || 0}`, 'ok');
     await loadQueue();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
@@ -1648,7 +1648,7 @@ async function clearCompletedQueue() {
       method: 'POST',
       body: JSON.stringify({ type: 'finalized' })
     });
-    toast(`✅ ${d.cleared || 0} pedidos concluídos limpos.`, 'ok');
+    toast(`Limpos concluídos: ${d.cleared || 0}`, 'ok');
     await loadQueue();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
@@ -1656,7 +1656,7 @@ async function clearCompletedQueue() {
 async function pingDevice(porta) {
   try {
     const d = await fetchAPI('/api/devices/' + porta + '/health');
-    toast('Porta ' + porta + ': ' + (d.online ? '✅ Online' : '❌ Offline'), d.online ? 'ok' : 'err');
+    toast('Porta ' + porta + ': ' + (d.online ? 'Online' : 'Offline'), d.online ? 'ok' : 'err');
   } catch(e) { toast('Erro ao pingar: ' + e.message, 'err'); }
 }
 

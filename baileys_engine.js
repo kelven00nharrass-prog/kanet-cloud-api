@@ -21,6 +21,7 @@ const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const geminiAI = require('./gemini_ai');
+const customerServices = require('./customer_services');
 
 let sock = null;
 let currentQrBase64 = null;
@@ -1678,9 +1679,13 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     const isImage = !!msg.message?.imageMessage;
                     const isAudio = !!(msg.message?.audioMessage || msg.message?.pttMessage);
+                    const isDocument = !!(msg.message?.documentMessage);
+                    const docMime = msg.message?.documentMessage?.mimetype || '';
+                    const isPdf = isDocument && docMime.toLowerCase().includes('pdf');
                     let text = msg.message?.conversation ||
                                  msg.message?.extendedTextMessage?.text ||
-                                 msg.message?.imageMessage?.caption || '';
+                                 msg.message?.imageMessage?.caption ||
+                                 msg.message?.documentMessage?.caption || '';
 
                     // ── 📸 GEMINI VISION: Analisa print de M-Pesa/e-Mola ──────────────────────
                     if (isImage && !isComprovativo(text) && geminiAI.isConfigured()) {
@@ -1711,6 +1716,47 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
                         } catch (imgErr) {
                             addLog(`🖼️ [GEMINI VISION] Erro ao processar imagem: ${imgErr.message}`);
+                            continue;
+                        }
+                    }
+
+                    // ── 📄 GEMINI PDF: Analisa documento PDF de pagamento ─────────────────────
+                    if (isPdf && geminiAI.isConfigured()) {
+                        try {
+                            const pdfBuffer = await downloadMediaMessage(msg, 'buffer', {});
+                            addLog(`📄 [GEMINI PDF] Analisando documento PDF de ${jid}`);
+                            const analise = await geminiAI.analisarDocumentoPDF(pdfBuffer);
+
+                            if (analise && analise.valido && analise.txnId) {
+                                const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de KaNet\n` + (analise.raw_text || '');
+                                const legenda = text.trim();
+                                text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
+                                addLog(`📄 [GEMINI PDF] Documento válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
+                                await sock.sendMessage(jid, {
+                                    text: `📄 *Comprovativo PDF lido pela IA!*\n\n` +
+                                          `🏦 Serviço: *${analise.servico || 'M-Pesa/e-Mola/Banco'}*\n` +
+                                          `💰 Valor: *${analise.valor} MT*\n` +
+                                          `🔑 Referência: *${analise.txnId}*\n\n` +
+                                          `⏳ A validar com a operadora...`
+                                });
+                            } else if (analise && !analise.valido) {
+                                await sock.sendMessage(jid, {
+                                    text: `📄 Recebi o teu PDF, mas não encontrei dados de pagamento nele.\n\n` +
+                                          `Por favor, envia o *SMS de confirmação* (texto) do M-Pesa ou e-Mola, ou um *print/screenshot* do comprovativo.`
+                                });
+                                continue;
+                            } else {
+                                addLog(`📄 [GEMINI PDF] Falha ao analisar PDF`);
+                                await sock.sendMessage(jid, {
+                                    text: `📄 Não consegui ler o PDF. Podes enviar o *texto do SMS* ou um *print* do comprovativo?`
+                                });
+                                continue;
+                            }
+                        } catch (pdfErr) {
+                            addLog(`📄 [GEMINI PDF] Erro ao processar PDF: ${pdfErr.message}`);
+                            await sock.sendMessage(jid, {
+                                text: `📄 Tive dificuldade a ler o PDF. Tenta enviar o *SMS de texto* ou um *print* do comprovativo.`
+                            });
                             continue;
                         }
                     }
@@ -1879,7 +1925,9 @@ async function startWhatsApp(orderCallback, db = null) {
                     const textLimpo = cleanText.trim();
                     const isSim = ['sim', 's', 'yes'].includes(textLimpo);
                     const isNao = ['nao', 'não', 'n', 'no'].includes(textLimpo);
-                    const isSaque = /^sacar\s+(\d+(?:[.,]\d+)?)\s*(gb|mb|g|m)?$/i.test(textLimpo);
+                    const saqueRegex = /^[.!]?sacar\s+(\d+(?:[.,]\d+)?)\s*(gb|mb|g|m)?(?:\s+(?:para\s+)?(8[2-7]\d{7}))?$/i;
+                    const matchSaque = textLimpo.match(saqueRegex);
+                    const isSaque = !!matchSaque;
                     const isMeuSaldo = ['meu saldo', 'saldo', 'meu plano', 'plano'].includes(textLimpo);
 
                     if (isSim || isNao) {
@@ -1901,15 +1949,19 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (isSaque) {
                         try {
                             const axios = require('axios');
-                            const matchSaque = textLimpo.match(/^sacar\s+(\d+(?:[.,]\d+)?)\s*(gb|mb|g|m)?$/i);
                             const qtd = parseFloat(matchSaque[1].replace(',', '.'));
                             const unidade = (matchSaque[2] || 'mb').toLowerCase();
                             const mbSolicitado = (unidade === 'gb' || unidade === 'g') ? Math.round(qtd * 1024) : Math.round(qtd);
+                            const numDestinoSaque = matchSaque[3] ? matchSaque[3].slice(-9) : null;
                             const apiBase = `http://localhost:${process.env.PORT || 3000}`;
-                            const resp = await axios.post(`${apiBase}/api/plans/saque`, { numero: senderNumber, mb: mbSolicitado }, { timeout: 8000 });
+                            const resp = await axios.post(`${apiBase}/api/plans/saque`, {
+                                numero: senderNumber,
+                                mb: mbSolicitado,
+                                numero_destino: numDestinoSaque
+                            }, { timeout: 8000 });
                             if (resp.data && resp.data.success) {
                                 await reply(resp.data.mensagem);
-                                addLog(`💸 [SAQUE] ${senderNumber} → ${mbSolicitado}MB | Saldo: ${resp.data.saldo_restante}MB`);
+                                addLog(`💸 [SAQUE] ${senderNumber} → ${mbSolicitado}MB (Destino: ${numDestinoSaque || senderNumber}) | Saldo: ${resp.data.saldo_restante}MB`);
                             } else {
                                 await reply(`❌ ${resp.data?.error || 'Não foi possível processar o saque. Verifique o seu saldo com *meu saldo*.'}`);
                             }
@@ -1977,6 +2029,67 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (pendingMatch) {
                         const { key: targetKey, pay } = pendingMatch;
                         if (pay.aguardando_numero) {
+                            // ── MULTI-DESTINO QUANDO O CLIENTE ENVIA MÚLTIPLOS NÚMEROS APÓS O COMPROVATIVO ──
+                            const multiDest = customerServices.parseMultiDestino(text, parseFloat(pay.valor), (v) => buscarPacotePorValor(v, jid));
+                            if (multiDest && multiDest.length >= 2) {
+                                pendingPayments.delete(targetKey);
+                                multiDest.forEach((item, idx) => {
+                                    const subOrderId = `WA-${pay.txn_id}-${idx + 1}-${Date.now()}`;
+                                    historicoVendas.push({
+                                        orderId: subOrderId,
+                                        numero: item.phone,
+                                        mb: item.mb,
+                                        valor: parseFloat(pay.valor) / multiDest.length,
+                                        timestamp: Date.now()
+                                    });
+                                    if (orderDispatchCallback) {
+                                        orderDispatchCallback({
+                                            orderId: subOrderId,
+                                            numero: item.phone,
+                                            quantidade: item.mb,
+                                            modo: 'diario',
+                                            jid,
+                                            sender: pay.senderNumber || senderNumber,
+                                            senderName: pay.senderName || nomeCliente,
+                                            txn_id: `${pay.txn_id}-${idx + 1}`,
+                                            valor: parseFloat(pay.valor) / multiDest.length
+                                        });
+                                    }
+                                });
+
+                                if (pay.txn_id) {
+                                    transacoesProcessadas.add(pay.txn_id);
+                                    transacoesProcessadasMap.set(pay.txn_id, {
+                                        sender: senderNumber,
+                                        jid,
+                                        destinos: multiDest,
+                                        valor: parseFloat(pay.valor),
+                                        status: 'completed',
+                                        completedAt: Date.now()
+                                    });
+                                    salvarTransacoes();
+                                }
+
+                                const { supportNum } = getSuporteDetails();
+                                const resumo = multiDest.map((d, i) => {
+                                    const vol = d.mb >= 1024 ? `${(d.mb/1024).toFixed(1)}GB` : `${d.mb}MB`;
+                                    return `  ${i + 1}. *${d.phone}* ➔ *${vol}*`;
+                                }).join('\n');
+
+                                await reply(
+                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                    `  🎉 *PAGAMENTO DIVIDIDO COM SUCESSO!* ⚡\n` +
+                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `O seu pagamento de *${pay.valor} MT* foi validado e distribuído entre *${multiDest.length} destinatários*:\n\n` +
+                                    resumo + `\n\n` +
+                                    `🔖 *Ref:* \`${pay.txn_id}\`\n` +
+                                    `🚀 *Todas as ativações automáticas já foram despachadas!*\n\n` +
+                                    `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                                );
+                                if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
+                                continue;
+                            }
+
                             const numDestino = extrairNumeroDestino(text);
                             if (numDestino) {
                                 pendingPayments.delete(targetKey);
@@ -2068,6 +2181,327 @@ async function startWhatsApp(orderCallback, db = null) {
                                 }
                             }
                         }
+                    }
+
+                    // ── 1.1 COMANDO .txenecar / .txenekar (CRÉDITO DE INTERNET DIÁRIO) ──
+                    const ehCmdTxenecar = cleanCmd === 'txenecar' || cleanCmd.startsWith('txenecar ') ||
+                                          cleanCmd === 'txenekar' || cleanCmd.startsWith('txenekar ') ||
+                                          cleanCmd === 'txeneco' || cleanCmd.startsWith('txeneco ');
+                    if (ehCmdTxenecar) {
+                        const rawArgs = text.replace(/^[.!/#]?(txenecar|txenekar|txeneco)\s*/i, '').trim();
+                        if (!rawArgs) {
+                            const totalCompras = customerServices.getComprasCount(senderNumber);
+                            const tetoMb = customerServices.calcularTetoTxeneco(totalCompras);
+                            const divida = customerServices.getClienteDivida(senderNumber);
+                            const divMb = divida ? (divida.activeDebtMb || 0) : 0;
+                            const dispMb = Math.max(0, tetoMb - divMb);
+                            const dispF = dispMb >= 1024 ? `${(dispMb/1024).toFixed(1)}GB` : `${dispMb}MB`;
+                            const tetoF = tetoMb >= 1024 ? `${(tetoMb/1024).toFixed(1)}GB` : `${tetoMb}MB`;
+
+                            await reply(
+                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                `  ⚡ *SERVIÇO TXENECO KA-NET* 📶\n` +
+                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                `Internet a crédito no pacote diário para clientes fiéis!\n\n` +
+                                `📊 *O Seu Status de Fidelidade:*\n` +
+                                `• Compras realizadas: *${totalCompras}*\n` +
+                                `• Teto total de crédito: *${tetoF}*\n` +
+                                `• Limite disponível agora: *${dispF}*\n` +
+                                (divida && divida.restanteMt > 0 ? `• Dívida ativa a pagar: *${divida.restanteMt} MT*\n` : '') +
+                                `\n📋 *Regras e Benefícios:*\n` +
+                                `• Exclusivo para quem tem *mais de 100 compras*.\n` +
+                                `• Faixa por pedido: *superior a 550MB e inferior a 2048MB*.\n` +
+                                `• 200+ compras: limite total de até *2GB*.\n` +
+                                `• 500+ compras: limite total de até *4GB*.\n` +
+                                `• Taxa de pagamento da dívida: *10%* sobre o valor do pacote.\n\n` +
+                                `💡 *Como usar:*\n` +
+                                `👉 *.txenecar <quantidade> <número_destino>*\n` +
+                                `_Exemplo: .txenecar 1gb 841234567_\n\n` +
+                                `💳 *Para pagar a dívida:*\n` +
+                                `👉 *.pagar <comprovativo>*`
+                            );
+                            continue;
+                        }
+
+                        const parts = rawArgs.split(/\s+/);
+                        let rawQtd = parts[0];
+                        let rawDest = parts[1] || (parts[2] ? parts[2] : null);
+
+                        let mbNum = 0;
+                        if (/gb|g$/i.test(rawQtd)) {
+                            mbNum = Math.round(parseFloat(rawQtd.replace(/,/g, '.').replace(/[^\d.]/g, '')) * 1024);
+                        } else if (/mb|m$/i.test(rawQtd)) {
+                            mbNum = Math.round(parseFloat(rawQtd.replace(/,/g, '.').replace(/[^\d.]/g, '')));
+                        } else {
+                            const val = parseFloat(rawQtd.replace(/,/g, '.'));
+                            if (!isNaN(val)) {
+                                mbNum = val <= 10 ? Math.round(val * 1024) : Math.round(val);
+                            }
+                        }
+
+                        const destNum = extrairNumeroDestino(rawDest || rawArgs) || (parts.length >= 2 ? extrairNumeroDestino(parts[parts.length - 1]) : null);
+
+                        if (!destNum) {
+                            await reply(`⚠️ Número de destino não encontrado. Use:\n👉 *.txenecar ${rawQtd} <número_vodacom>*\nExemplo: *.txenecar 1gb 841234567*`);
+                            continue;
+                        }
+
+                        const resTxn = await customerServices.solicitarTxeneco({
+                            senderPhone: senderNumber,
+                            mbSolicitado: mbNum,
+                            numDestino: destNum,
+                            jid,
+                            senderName: nomeCliente
+                        });
+                        await reply(resTxn.mensagem);
+                        continue;
+                    }
+
+                    // ── 1.2 COMANDO .pagar (LIQUIDAÇÃO OU AMORTIZAÇÃO DE DÍVIDA DE TXENECO) ──
+                    const ehCmdPagar = cleanCmd === 'pagar' || cleanCmd.startsWith('pagar ') ||
+                                       cleanCmd === 'pagardivida' || cleanCmd.startsWith('pagardivida ');
+                    if (ehCmdPagar) {
+                        const rawComprovativo = text.replace(/^[.!/#]?(pagardivida|pagar)\s*/i, '').trim();
+                        if (!rawComprovativo) {
+                            const divida = customerServices.getClienteDivida(senderNumber);
+                            if (!divida || !divida.restanteMt || divida.restanteMt <= 0) {
+                                await reply(
+                                    `ℹ️ *SEM DÍVIDAS DE TXENECO*\n━━━━━━━━━━━━━━━━━━\n` +
+                                    `Você não possui nenhuma dívida ativa de Txeneco pendente.\n` +
+                                    `O seu limite de crédito está totalmente livre!`
+                                );
+                            } else {
+                                await reply(
+                                    `📌 *SUA DÍVIDA ATIVA DE TXENECO*\n━━━━━━━━━━━━━━━━━━\n` +
+                                    `💰 *Valor restante devido:* *${divida.restanteMt} MT*\n` +
+                                    `💾 *Volume em uso:* *${divida.activeDebtMb || 0} MB*\n\n` +
+                                    `💡 Para liquidar total ou parcialmente, efetue a transferência M-Pesa ou e-Mola e envie:\n` +
+                                    `👉 *.pagar <comprovativo>*`
+                                );
+                            }
+                            continue;
+                        }
+
+                        const valorPago = extrairValorMT(rawComprovativo);
+                        const txnId = extrairTxId(rawComprovativo);
+
+                        const resPagar = await customerServices.processarPagamentoDivida({
+                            senderPhone: senderNumber,
+                            valorPago,
+                            txnId,
+                            rawText: rawComprovativo,
+                            jid
+                        });
+
+                        if (resPagar.success && txnId) {
+                            transacoesProcessadas.add(txnId);
+                            transacoesProcessadasMap.set(txnId, {
+                                sender: senderNumber,
+                                jid,
+                                valor: valorPago,
+                                status: 'completed',
+                                tipo: 'pagamento_txeneco',
+                                timestamp: Date.now()
+                            });
+                            salvarTransacoes();
+                            const smsRec = findSmsPayment(txnId);
+                            if (smsRec) {
+                                smsRec.usado = true;
+                                smsRec.usadoPor = `${senderNumber}_txeneco_quitacao`;
+                                smsRec.usadoEm = Date.now();
+                                salvarSmsPayments();
+                            }
+                        }
+
+                        await reply(resPagar.mensagem);
+                        continue;
+                    }
+
+                    // ── 1.3 COMANDOS DE RECEPTOR PADRÃO AUTOMÁTICO ──
+                    const ehCmdDefinirReceptor = cleanCmd.startsWith('definirreceptor') || cleanCmd.startsWith('setreceptor') || cleanCmd.startsWith('receptor ');
+                    if (ehCmdDefinirReceptor) {
+                        const rawBody = text.replace(/^[.!/#]?(definirreceptor|setreceptor|receptor)\s*/i, '').trim();
+                        
+                        // Extrair todos os números de Moçambique válidos no texto
+                        const pRegex = /(?:258)?(8[2-7]\d{7})/g;
+                        const foundPhones = [];
+                        let pM;
+                        while ((pM = pRegex.exec(rawBody)) !== null) {
+                            if (!foundPhones.includes(pM[1])) foundPhones.push(pM[1]);
+                        }
+
+                        let pagadores = [];
+                        let receptor = null;
+
+                        if (foundPhones.length >= 2) {
+                            // O último número é o receptor fixo que receberá os megas
+                            // Todos os números anteriores são os pagadores cadastrados
+                            receptor = foundPhones[foundPhones.length - 1];
+                            pagadores = foundPhones.slice(0, foundPhones.length - 1);
+                        } else if (foundPhones.length === 1) {
+                            // Se forneceu apenas 1 número, o próprio WhatsApp remetente é o pagador e o número fornecido é o receptor
+                            pagadores = [senderNumber];
+                            receptor = foundPhones[0];
+                        }
+
+                        if (!receptor || pagadores.length === 0) {
+                            await reply(
+                                `💡 *COMO DEFINIR O SEU RECEPTOR PADRÃO:*\n\n` +
+                                `Você pode cadastrar *um ou vários números pagadores* (ex: um 85 M-Pesa e um 87 e-Mola) para caírem no mesmo receptor!\n\n` +
+                                `👉 *.definirreceptor <pagador_1> [pagador_2] <número_receptor>*\n\n` +
+                                `_Exemplo 1 (1 pagador):_ *.definirreceptor 851234567 849998888*\n` +
+                                `_Exemplo 2 (2 pagadores):_ *.definirreceptor 851234567 871234567 para 849998888*\n\n` +
+                                `Assim, quando pagar por *qualquer um* desses números, os megas caem no receptor automaticamente sem precisar de enviar comprovativo!`
+                            );
+                            continue;
+                        }
+
+                        const resDef = customerServices.definirReceptorPadrao(pagadores, receptor, jid);
+                        await reply(resDef.mensagem);
+                        continue;
+                    }
+
+                    const ehCmdRemoverReceptor = cleanCmd === 'removerreceptor' || cleanCmd.startsWith('removerreceptor ') ||
+                                                 cleanCmd === 'limparreceptor' || cleanCmd === 'desconfigurar' || cleanCmd === 'delreceptor';
+                    if (ehCmdRemoverReceptor) {
+                        const rawTarget = text.replace(/^[.!/#]?(removerreceptor|limparreceptor|desconfigurar|delreceptor)\s*/i, '').trim();
+                        const pagador = extrairNumeroDestino(rawTarget);
+                        const resRem = customerServices.removerReceptorPadrao(pagador, senderNumber);
+                        await reply(resRem.mensagem);
+                        continue;
+                    }
+
+                    const ehCmdMeuReceptor = cleanCmd === 'meureceptor' || cleanCmd === 'receptorpadrao' || cleanCmd === 'verreceptor';
+                    if (ehCmdMeuReceptor) {
+                        const lista = customerServices.obterReceptoresPorOwner(senderNumber);
+                        if (lista && lista.length > 0) {
+                            const receptorFixo = lista[0].targetPhone;
+                            const linhasPagadores = lista.map((r, i) => `  ${i + 1}. *${r.payerPhone}*`).join('\n');
+                            await reply(
+                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                `  📱 *SEU RECEPTOR PADRÃO ATIVO* ⚡\n` +
+                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                `📲 *Número Receptor Fixo:* *${receptorFixo}*\n\n` +
+                                `📱 *Número(s) Pagador(es) Vinculado(s):*\n${linhasPagadores}\n\n` +
+                                `🚀 Sempre que pagar por *qualquer um* desses números, os megas cairão automaticamente em *${receptorFixo}* sem precisar de enviar comprovativo!\n\n` +
+                                `💡 Para desativar e voltar ao modo manual, envie: *.removerreceptor*`
+                            );
+                        } else {
+                            await reply(
+                                `ℹ️ *NENHUM RECEPTOR CONFIGURADO*\n━━━━━━━━━━━━━━━━━━\n` +
+                                `Você ainda não definiu um número receptor padrão.\n\n` +
+                                `Para configurar e receber recargas automaticamente sem enviar comprovativo, envie:\n` +
+                                `👉 *.definirreceptor <número_pagador> <número_receptor>*\n` +
+                                `_Ou com 2 pagadores:_ *.definirreceptor <pagador_1> <pagador_2> <número_receptor>*`
+                            );
+                        }
+                        continue;
+                    }
+
+                    // ── 1.4 COMANDOS DE BÔNUS (ADMIN MASTER & CLIENTE) ──
+                    const ehCmdDarBonus = cleanCmd.startsWith('darbonus') || cleanCmd.startsWith('addbonus');
+                    if (ehCmdDarBonus) {
+                        if (!senderIsMaster) {
+                            await reply('🚫 *ACESSO NEGADO*\n━━━━━━━━━━━━━━━━━━━\n⚠️ Comando restrito ao Administrador Master.');
+                            continue;
+                        }
+                        const rawBody = text.replace(/^[.!/#]?(darbonus|addbonus)\s*/i, '').trim();
+                        const parts = rawBody.split(/\s+/);
+                        if (parts.length < 2) {
+                            await reply('💡 Uso correto: *.darbonus <número_cliente> <quantidade_mb_ou_gb>*\nExemplo: *.darbonus 841234567 1000* ou *.darbonus 841234567 1gb*');
+                            continue;
+                        }
+                        const targetTel = extrairNumeroDestino(parts[0]) || parts[0];
+                        let rawQtd = parts[1];
+                        let mbNum = 0;
+                        if (/gb|g$/i.test(rawQtd)) {
+                            mbNum = Math.round(parseFloat(rawQtd.replace(/,/g, '.').replace(/[^\d.]/g, '')) * 1024);
+                        } else if (/mb|m$/i.test(rawQtd)) {
+                            mbNum = Math.round(parseFloat(rawQtd.replace(/,/g, '.').replace(/[^\d.]/g, '')));
+                        } else {
+                            const val = parseFloat(rawQtd.replace(/,/g, '.'));
+                            mbNum = val <= 10 ? Math.round(val * 1024) : Math.round(val);
+                        }
+
+                        const resBonus = customerServices.atribuirBonusAdmin(targetTel, mbNum, senderNumber);
+                        await reply(resBonus.mensagemAdmin);
+
+                        try {
+                            const clientJid = `258${targetTel.slice(-9)}@s.whatsapp.net`;
+                            await sock.sendMessage(clientJid, { text: resBonus.mensagemCliente });
+                        } catch (_) {}
+                        continue;
+                    }
+
+                    const ehCmdConsultarBonus = cleanCmd.startsWith('consultarbonus') || cleanCmd.startsWith('verbonus');
+                    if (ehCmdConsultarBonus) {
+                        if (!senderIsMaster) {
+                            await reply('🚫 *ACESSO NEGADO*\n━━━━━━━━━━━━━━━━━━━\n⚠️ Comando restrito ao Administrador Master.');
+                            continue;
+                        }
+                        const rawBody = text.replace(/^[.!/#]?(consultarbonus|verbonus)\s*/i, '').trim();
+                        const targetTel = extrairNumeroDestino(rawBody) || rawBody;
+                        const saldoMb = customerServices.consultarBonus(targetTel);
+                        const sldF = saldoMb >= 1024 ? `${(saldoMb/1024).toFixed(1)}GB (${saldoMb}MB)` : `${saldoMb}MB`;
+                        await reply(`🎁 *SALDO DE BÔNUS DO CLIENTE ${targetTel}:* *${sldF}*`);
+                        continue;
+                    }
+
+                    const ehCmdMeuBonus = cleanCmd === 'meubonus' || cleanCmd === 'bonus';
+                    if (ehCmdMeuBonus) {
+                        const saldoMb = customerServices.consultarBonus(senderNumber);
+                        if (saldoMb <= 0) {
+                            await reply(
+                                `🎁 *SALDO DE BÔNUS KA-NET*\n━━━━━━━━━━━━━━━━━━\n` +
+                                `Você não possui saldo de bônus acumulado no momento.\n` +
+                                `Fique atento às nossas promoções e sorteios no grupo!`
+                            );
+                        } else {
+                            const sldF = saldoMb >= 1024 ? `${(saldoMb/1024).toFixed(1)}GB (${saldoMb}MB)` : `${saldoMb}MB`;
+                            await reply(
+                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                `  🎁 *SEU SALDO DE BÔNUS KA-NET* 🎁\n` +
+                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                `💾 *Saldo Disponível:* *${sldF}*\n\n` +
+                                `💡 *Como Sacar:*\n` +
+                                `Você pode sacar quando quiser para qualquer número usando:\n` +
+                                `👉 *.sacarbonus <quantidade> [número]*\n` +
+                                `_Exemplo: .sacarbonus 1gb_ ou _.sacarbonus 500mb 841234567_`
+                            );
+                        }
+                        continue;
+                    }
+
+                    const ehCmdSacarBonus = cleanCmd.startsWith('sacarbonus') || cleanCmd.startsWith('resgatarbonus');
+                    if (ehCmdSacarBonus) {
+                        const rawBody = text.replace(/^[.!/#]?(sacarbonus|resgatarbonus)\s*/i, '').trim();
+                        const parts = rawBody.split(/\s+/);
+                        if (parts.length < 1 || !parts[0]) {
+                            await reply('💡 Uso correto: *.sacarbonus <quantidade> [número]*\nExemplo: *.sacarbonus 1gb* ou *.sacarbonus 500mb 841234567*');
+                            continue;
+                        }
+                        let rawQtd = parts[0];
+                        let mbNum = 0;
+                        if (/gb|g$/i.test(rawQtd)) {
+                            mbNum = Math.round(parseFloat(rawQtd.replace(/,/g, '.').replace(/[^\d.]/g, '')) * 1024);
+                        } else if (/mb|m$/i.test(rawQtd)) {
+                            mbNum = Math.round(parseFloat(rawQtd.replace(/,/g, '.').replace(/[^\d.]/g, '')));
+                        } else {
+                            const val = parseFloat(rawQtd.replace(/,/g, '.'));
+                            mbNum = val <= 10 ? Math.round(val * 1024) : Math.round(val);
+                        }
+
+                        const rawDest = parts[1] || (parts[2] ? parts[2] : null);
+                        const destNum = rawDest ? (extrairNumeroDestino(rawDest) || parts[1]) : senderNumber;
+
+                        const resSacar = await customerServices.sacarBonus({
+                            senderPhone: senderNumber,
+                            mbSolicitado: mbNum,
+                            numDestino: destNum,
+                            jid
+                        });
+                        await reply(resSacar.mensagem);
+                        continue;
                     }
 
                     // ── 2. COMANDO .addtabela e .addtabelagrupo (ADMIN MASTER) ──
@@ -2614,7 +3048,14 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
 
                             if (registoExistente) {
-                                if (registoExistente.status === 'completed') {
+                                if (registoExistente.isAutoReceptor) {
+                                    await reply(
+                                        `⚠️ *PAGAMENTO JÁ PROCESSADO AUTOMATICAMENTE*\n━━━━━━━━━━━━━━━━━━\n` +
+                                        `A recarga referente a esta transação (\`${txn_id}\`) de *${registoExistente.valor || valor} MT* já foi entregue automaticamente para o seu número receptor padrão: *${registoExistente.autoTarget || registoExistente.numeroDestino}*!\n\n` +
+                                        `✨ Não é necessário enviar o comprovativo no WhatsApp.`
+                                    );
+                                    continue;
+                                } else if (registoExistente.status === 'completed') {
                                     await reply(
                                         `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
                                         `❌ Esta transação (\`${txn_id}\`) já foi utilizada anteriormente no sistema e não pode ser reutilizada.\n\n` +
@@ -2694,6 +3135,92 @@ async function startWhatsApp(orderCallback, db = null) {
 
                         const { supportNum } = getSuporteDetails();
                         const numDestinoInline = extrairNumeroDestinoAbaixoDoComprovativo(text);
+
+                        // ── 📦 DIVISÃO MULTI-DESTINO EM PAGAMENTO ÚNICO ──
+                        const multiDestinos = customerServices.parseMultiDestino(text, parseFloat(valor), (v) => buscarPacotePorValor(v, jid));
+                        if (multiDestinos && multiDestinos.length >= 2) {
+                            console.log(`📦 [MULTI-DESTINO DETECTADO] Dividindo ${valor} MT entre ${multiDestinos.length} números:`, multiDestinos);
+
+                            const smsOperadora = findSmsPayment(txn_id);
+                            if (smsOperadora) {
+                                smsOperadora.usado = true;
+                                smsOperadora.usadoPor = senderNumber;
+                                smsOperadora.usadoEm = Date.now();
+                                salvarSmsPayments();
+                            }
+
+                            multiDestinos.forEach((item, idx) => {
+                                const subOrderId = `WA-${txn_id}-${idx + 1}-${Date.now()}`;
+                                historicoVendas.push({
+                                    orderId: subOrderId,
+                                    numero: item.phone,
+                                    mb: item.mb,
+                                    valor: parseFloat(valor) / multiDestinos.length,
+                                    timestamp: Date.now()
+                                });
+                                if (orderDispatchCallback) {
+                                    orderDispatchCallback({
+                                        orderId: subOrderId,
+                                        numero: item.phone,
+                                        quantidade: item.mb,
+                                        modo: 'diario',
+                                        jid,
+                                        sender: senderNumber,
+                                        senderPhone: isSenderPhone ? senderNumber : item.phone,
+                                        senderName: nomeCliente,
+                                        txn_id: `${txn_id}-${idx + 1}`,
+                                        valor: parseFloat(valor) / multiDestinos.length
+                                    });
+                                }
+                            });
+
+                            if (txn_id) {
+                                transacoesProcessadas.add(txn_id);
+                                transacoesProcessadasMap.set(txn_id, {
+                                    sender: senderNumber,
+                                    jid,
+                                    destinos: multiDestinos,
+                                    valor: parseFloat(valor),
+                                    status: 'completed',
+                                    timestamp: Date.now()
+                                });
+                                salvarTransacoes();
+                            }
+
+                            const resumo = multiDestinos.map((d, i) => {
+                                const vol = d.mb >= 1024 ? `${(d.mb/1024).toFixed(1)}GB` : `${d.mb}MB`;
+                                return `  ${i + 1}. *${d.phone}* ➔ *${vol}*`;
+                            }).join('\n');
+
+                            await reply(
+                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                `  🎉 *PAGAMENTO DIVIDIDO COM SUCESSO!* ⚡\n` +
+                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                `O seu pagamento de *${valor} MT* (${metodoNome}) foi validado e distribuído entre *${multiDestinos.length} destinatários*:\n\n` +
+                                resumo + `\n\n` +
+                                `🔖 *Ref:* \`${txn_id}\`\n` +
+                                `🚀 *Todas as ativações automáticas já foram enviadas para os modems!*\n\n` +
+                                `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                            );
+
+                            const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                            enviarNotificacaoGrupo(
+                                `🔔 *NOVO PEDIDO MULTI-DESTINO PROCESSADO* ⚡\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `📋 *Ref:* \`${txn_id}\`\n` +
+                                `💳 *Valor Pago:* *${valor} MT* (${metodoNome})\n` +
+                                `👤 *Cliente:* *${nomeCliente}* (${senderNumber})\n` +
+                                `🏢 *Origem:* *${origemMsg}*\n` +
+                                `📦 *Distribuição:*\n` +
+                                resumo + `\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `⏳ *Status:* Enviados para os Celulares USSD`
+                            );
+
+                            if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
+                            continue;
+                        }
+
                         // ── VALIDAÇÃO REAL CONTRA CONFIRMAÇÃO DA OPERADORA (M-PESA / E-MOLA) ──
                         const smsOperadora = findSmsPayment(txn_id);
                         const jaConfirmadoPelaOperadora = smsOperadora && !smsOperadora.usado;
@@ -3399,6 +3926,30 @@ function registrarSmsPayment({ txn_id, valor, remetente, metodo, raw_sms }) {
     }
 }
 
+function registrarTransacaoAutoReceptor(cleanTxnId, targetPhone, valor, payerPhone) {
+    if (!cleanTxnId) return;
+    const txnClean = String(cleanTxnId).trim().toUpperCase();
+    transacoesProcessadas.add(txnClean);
+    transacoesProcessadasMap.set(txnClean, {
+        status: 'completed',
+        isAutoReceptor: true,
+        autoTarget: targetPhone,
+        numeroDestino: targetPhone,
+        valor: Number(valor),
+        sender: payerPhone,
+        completedAt: Date.now()
+    });
+    const smsRec = findSmsPayment(txnClean);
+    if (smsRec) {
+        smsRec.usado = true;
+        smsRec.usadoPor = `auto_receptor_${targetPhone}`;
+        smsRec.usadoEm = Date.now();
+    }
+    salvarTransacoes();
+    salvarSmsPayments();
+    console.log(`⚡ [AUTO-RECEPTOR REGISTADO] Ref: ${txnClean} vinculada a ${targetPhone}`);
+}
+
 async function resetSession(db) {
     console.log('🧹 [BAILEYS] Reset total de sessão WhatsApp solicitado.');
     try {
@@ -3587,6 +4138,7 @@ module.exports = {
     sendAnnouncementToGroups,
     getJidForOrder,
     registrarSmsPayment,
+    registrarTransacaoAutoReceptor,
     salvarSmsPayments,
     smsPaymentsMap,
     aguardandoOperadora,

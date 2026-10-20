@@ -82,6 +82,7 @@ try {
 let pendingBotCommand = null;
 let inMemoryMetrics = null;
 const inMemoryDevices = {};
+let customerServices = null;
 
 const inMemoryOrders = new Map();
 
@@ -147,7 +148,7 @@ async function handleTransfer(req, res) {
           success: true,
           duplicado: true,
           orderId,
-          mensagem: `Este pedido com a referência ${orderId} já foi atendido e concluído anteriormente!`
+          mensagem: 'Pedido já concluído.'
         });
       }
       if (existing.status === 'assigned' || existing.status === 'processing' || existing.status === 'pending') {
@@ -1377,6 +1378,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     if (!clientJid && resId && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
       clientJid = baileysEngine.getJidForOrder(resId);
     }
+    if (!clientJid && order && (order.sender || order.senderPhone || order.senderNumber || order.cliente_solicitante || order.numero)) {
+      const p = String(order.sender || order.senderPhone || order.senderNumber || order.cliente_solicitante || order.numero).replace(/\D/g, '');
+      if (p.length === 9) clientJid = `258${p}@s.whatsapp.net`;
+      else if (p.length === 12 && p.startsWith('258')) clientJid = `${p}@s.whatsapp.net`;
+    }
 
     if (clientJid && (!order || !order.notified) && baileysEngine) {
       if (success) {
@@ -1384,7 +1390,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           order.notified = true;
           console.log(`ℹ️ [SILENT SPLIT] Parte 1 do pedido ${resId} entregue com sucesso. Notificação ao cliente aguarda conclusão da Parte 2.`);
         } else {
-          order.notified = true;
+          if (order) order.notified = true;
           const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
           let headerText = 'PACOTE ATIVADO COM SUCESSO! 📶';
           let modoBadge = '';
@@ -1455,24 +1461,31 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             }
           }
 
+          const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && (req.body.last_result.valor || req.body.last_result.valor_pago)) || null;
           const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
 
-          baileysEngine.sendTextMessage(clientJid,
-            `✅ *RECARGA CONCLUÍDA* ⚡\n` +
-            `━━━━━━━━━━━━━━━━━━\n\n` +
-            saudacao +
-            `📲 *Destino:* *${targetNum}*\n` +
-            `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
-            valorLinha +
-            `🔖 *Ref:* \`${resId}\`\n` +
-            `🕒 *Data:* ${horaAgora}\n\n` +
-            `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
-            `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
-            `━━━━━━━━━━━━━━━━━━\n` +
-            `📞 *Dúvidas ou Suporte:* Digite *Suporte*`,
-            { mentions: mentionsList }
-          );
-          console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
+          try {
+            baileysEngine.sendTextMessage(clientJid,
+              `✅ *RECARGA CONCLUÍDA* ⚡\n` +
+              `━━━━━━━━━━━━━━━━━━\n\n` +
+              saudacao +
+              `📲 *Destino:* *${targetNum}*\n` +
+              `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
+              valorLinha +
+              `🔖 *Ref:* \`${resId}\`\n` +
+              `🕒 *Data:* ${horaAgora}\n\n` +
+              `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
+              `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📞 *Dúvidas ou Suporte:* Digite *Suporte*`,
+              { mentions: mentionsList }
+            ).catch(errSend => {
+              console.error(`❌ [NOTIFICAÇÃO WA ERRO] Falha ao enviar para ${clientJid}:`, errSend.message);
+            });
+            console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
+          } catch(errSendSync) {
+            console.error(`❌ [NOTIFICAÇÃO WA CRASH]:`, errSendSync.message);
+          }
         }
       } else {
         // 🛡️ NUNCA enviar mensagem de aviso de instabilidade ao cliente no WhatsApp!
@@ -1595,6 +1608,14 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         }, { merge: true }).catch(e => {
           console.warn('⚠️ [FIREBASE] Erro ao sincronizar status do pedido no Firestore:', e.message);
         });
+      }
+    }
+
+    // 🌟 REGISTAR COMPRA NO SISTEMA DE FIDELIDADE & TXENECO
+    if (success) {
+      const clientTel = (order && (order.senderPhone || order.sender || order.cliente_solicitante || order.numero));
+      if (clientTel && customerServices && typeof customerServices.registrarCompra === 'function') {
+        customerServices.registrarCompra(clientTel, (order && order.orderId) || resId, (order && (order.valor || order.valor_pago)) || 0, (order && order.quantidade) || 0);
       }
     }
 
@@ -1723,6 +1744,51 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       order.completedAt = new Date().toISOString();
       order.lastError = null;
       decrementDeviceSaldo(port, order);
+
+      // Notificar cliente no WhatsApp caso ainda não tenha sido notificado
+      if (!order.notified && baileysEngine) {
+        let clientJid = order.jid || null;
+        if (!clientJid && typeof baileysEngine.getJidForOrder === 'function') {
+          clientJid = baileysEngine.getJidForOrder(orderId);
+        }
+        if (!clientJid && (order.sender || order.senderPhone || order.senderNumber || order.numero)) {
+          const p = String(order.sender || order.senderPhone || order.senderNumber || order.numero).replace(/\D/g, '');
+          if (p.length === 9) clientJid = `258${p}@s.whatsapp.net`;
+          else if (p.length === 12 && p.startsWith('258')) clientJid = `${p}@s.whatsapp.net`;
+        }
+        if (clientJid) {
+          order.notified = true;
+          const rawQty = order.splitTotalMb || order.quantidade || 1024;
+          const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
+          const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
+          const valorPago = order.valor || order.valor_pago || null;
+          const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
+          const senderNome = order.senderName || order.nomeCliente || '';
+          const saudacao = (senderNome && senderNome !== 'Cliente')
+            ? `Olá *${senderNome}*, a sua recarga foi entregue com sucesso! 🎉\n\n`
+            : `A sua recarga foi entregue com sucesso! 🎉\n\n`;
+
+          try {
+            baileysEngine.sendTextMessage(clientJid,
+              `✅ *RECARGA CONCLUÍDA* ⚡\n` +
+              `━━━━━━━━━━━━━━━━━━\n\n` +
+              saudacao +
+              `📲 *Destino:* *${order.numero}*\n` +
+              `📦 *Pacote:* *${volStr}*\n` +
+              valorLinha +
+              `🔖 *Ref:* \`${orderId}\`\n` +
+              `🕒 *Data:* ${horaAgora}\n\n` +
+              `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
+              `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📞 *Dúvidas ou Suporte:* Digite *Suporte*`
+            ).catch(e => console.error('❌ [NOTIFICAÇÃO WA ERRO]:', e.message));
+            console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
+          } catch(e) {
+            console.error('❌ [NOTIFICAÇÃO WA CRASH]:', e.message);
+          }
+        }
+      }
     } else {
       order.retryCount = (order.retryCount || 0) + 1;
       order.failedPorts = order.failedPorts || [];
@@ -3162,7 +3228,7 @@ app.get('/api/app/hub/version', (req, res) => {
       version: '2.2.0',
       versionCode: 22,
       pwaVersion: '2026.10.02-v2',
-      apkUrl: 'https://kanet-cloud-api-v0gg.onrender.com/hub/KaNet-Client-Hub.apk',
+      apkUrl: 'https://kanet-cloud-api-f3le.onrender.com/hub/KaNet-Client-Hub.apk',
       changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
       releasedAt: new Date().toISOString()
     });
@@ -3613,6 +3679,68 @@ try {
 }
 
 // ── ROTA DO QR CODE (PÁGINA WEB PARA ESCANEAR NO CELULAR) ───
+// ════════════════════════════════════════════════════════════════
+// 7.2 CUSTOMER SERVICES & LOYALTY ENGINE (TXENECO, BÔNUS, RECEPTOR PADRÃO)
+// ════════════════════════════════════════════════════════════════
+try {
+  customerServices = require('./customer_services');
+  customerServices.initCustomerServices(db, (order) => {
+    console.log(`🌟 [CUSTOMER SERVICES NUVEM] Nova ordem gerada: ${order.orderId} (${order.quantidade}MB para ${order.numero})`);
+    const valPago = Number(order.valor) || Number(order.valor_pago) || 0;
+    const orderDoc = {
+      ...order,
+      id: order.orderId,
+      valor: valPago,
+      valor_pago: valPago,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    splitMensalOrderIfEligible(orderDoc);
+    splitDailyOrderIfEligible(orderDoc);
+    handleSpecialPlanIfApplicable(orderDoc);
+
+    inMemoryOrders.set(order.orderId, orderDoc);
+    saveOrdersToCache();
+
+    if (db) {
+      db.collection('orders').doc(order.orderId).set(orderDoc).catch(e => {
+        console.warn('⚠️ [FIREBASE] Falha ao salvar ordem CustomerServices no Firestore:', e.message);
+      });
+    }
+
+    const targetPort = getPortForModo(orderDoc.modo, orderDoc.quantidade);
+    const isDiario = (orderDoc.modo || 'diario').toLowerCase().trim() === 'diario' || (orderDoc.modo || 'diario').toLowerCase().trim() === '24hrs';
+    const dev = inMemoryDevices[targetPort];
+    const devAvailable = dev ? getDeviceAvailableMb(dev) : 0;
+    const canDeviceHandle = isDeviceApto(dev) && (isDiario ? devAvailable >= orderDoc.quantidade : true);
+
+    if (canDeviceHandle) {
+      orderDoc.targetPort = targetPort;
+      orderDoc.status = 'assigned';
+      orderDoc.assignedToPort = targetPort;
+      dev.isBusy = true;
+      dev.pending_order = {
+        id: orderDoc.id || orderDoc.orderId,
+        orderId: orderDoc.id || orderDoc.orderId,
+        numero: orderDoc.numero,
+        quantidade: orderDoc.quantidade,
+        modo: orderDoc.modo || 'diario',
+        input_val: orderDoc.input_val || '',
+        jid: null,
+        timestamp: Date.now()
+      };
+      console.log(`🚀 [CUSTOMER SERVICES] Ordem entregue ao Celular Apto ${targetPort}`);
+    } else {
+      orderDoc.targetPort = isDiario ? null : targetPort;
+      orderDoc.status = 'pending';
+    }
+  }, (mb, modo) => getValorFromMb(mb, modo));
+  console.log('🌟 [CUSTOMER SERVICES] Motor de Fidelidade, Txeneco e Bônus inicializado com sucesso!');
+} catch (e) {
+  console.warn('⚠️ [CUSTOMER SERVICES] Erro ao carregar customer_services:', e.message);
+}
+
 app.get('/api/whatsapp/status', (req, res) => {
   if (baileysEngine) {
     return res.json(baileysEngine.getStatus());
@@ -4017,6 +4145,107 @@ app.post('/api/sms/payment', (req, res) => {
     }
 
     // Validar pedidos do Bot de Vendas por SMS aguardando confirmação da operadora
+    // ── 📲 AUTOMAÇÃO DE RECEPTOR PADRÃO (ENVIO DIRETO SEM COMPROVATIVO) ──────
+    if (customerServices && typeof customerServices.obterReceptorPadrao === 'function') {
+      let payerPhone = customerServices.normalizarTelefone(remetente);
+      if (!payerPhone || payerPhone.length !== 9) {
+        const mPayer = String(raw_sms || '').match(/(?:de|from)\s+(?:258)?(8[2-7]\d{7})/i);
+        if (mPayer) payerPhone = mPayer[1];
+      }
+
+      const defRec = payerPhone ? customerServices.obterReceptorPadrao(payerPhone) : null;
+      if (defRec && defRec.targetPhone) {
+        console.log(`⚡ [RECEPTOR PADRÃO DETECTADO] Pagador: ${payerPhone} -> Receptor Fixo: ${defRec.targetPhone} | Valor: ${valor} MT`);
+        let pacote = null;
+        if (baileysEngine && typeof baileysEngine.buscarPacotePorValor === 'function') {
+          pacote = baileysEngine.buscarPacotePorValor(Number(valor));
+        }
+        const mbQtd = pacote ? pacote.mb : Math.round((Number(valor) / 25) * 1024);
+        const autoOrderId = `AUTO-${cleanTxnId}-${Date.now()}`;
+        
+        const autoOrder = {
+          orderId: autoOrderId,
+          id: autoOrderId,
+          numero: defRec.targetPhone,
+          quantidade: mbQtd,
+          valor: Number(valor),
+          valor_pago: Number(valor),
+          modo: pacote ? pacote.tipo : 'diario',
+          status: 'pending',
+          origem: 'receptor_padrao_automatico',
+          sender: payerPhone,
+          senderPhone: payerPhone,
+          remetente: `Receptor Padrão (${payerPhone})`,
+          isAutoReceptor: true,
+          txn_id: cleanTxnId,
+          createdAt: new Date().toISOString()
+        };
+        
+        splitMensalOrderIfEligible(autoOrder);
+        splitDailyOrderIfEligible(autoOrder);
+        inMemoryOrders.set(autoOrderId, autoOrder);
+        saveOrdersToCache();
+        if (db) db.collection('orders').doc(autoOrderId).set(autoOrder).catch(e => console.warn('⚠️ [FIREBASE] Erro ao salvar autoOrder:', e.message));
+
+        const targetPort = getPortForModo(autoOrder.modo, autoOrder.quantidade);
+        const isDiario = (autoOrder.modo || 'diario').toLowerCase().trim() === 'diario' || (autoOrder.modo || 'diario').toLowerCase().trim() === '24hrs';
+        const dev = inMemoryDevices[targetPort];
+        const devAvailable = dev ? getDeviceAvailableMb(dev) : 0;
+        const canDeviceHandle = isDeviceApto(dev) && (isDiario ? devAvailable >= autoOrder.quantidade : true);
+        if (canDeviceHandle) {
+          autoOrder.targetPort = targetPort;
+          autoOrder.status = 'assigned';
+          autoOrder.assignedToPort = targetPort;
+          dev.isBusy = true;
+          dev.pending_order = {
+            id: autoOrder.id,
+            orderId: autoOrder.id,
+            numero: autoOrder.numero,
+            quantidade: autoOrder.quantidade,
+            modo: autoOrder.modo || 'diario',
+            input_val: autoOrder.input_val || '',
+            jid: null,
+            timestamp: Date.now()
+          };
+          console.log(`🚀 [RECEPTOR PADRÃO] Ordem entregue ao Celular Apto ${targetPort}`);
+        }
+
+        if (baileysEngine) {
+          if (typeof baileysEngine.registrarTransacaoAutoReceptor === 'function') {
+            baileysEngine.registrarTransacaoAutoReceptor(cleanTxnId, defRec.targetPhone, Number(valor), payerPhone);
+          }
+          const clientJid = defRec.ownerJid || `258${payerPhone}@s.whatsapp.net`;
+          if (typeof baileysEngine.enviarMensagemTexto === 'function') {
+            const volStr = mbQtd >= 1024 ? `${(mbQtd/1024).toFixed(1)}GB` : `${mbQtd}MB`;
+            baileysEngine.enviarMensagemTexto(
+              clientJid,
+              `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+              `  ⚡ *RECARGA AUTOMÁTICA ENVIADA!* 📦\n` +
+              `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+              `Detectamos a sua transferência de *${valor} MT* (${metodo || 'M-Pesa'}).\n\n` +
+              `📲 *Destino:* *${defRec.targetPhone}*\n` +
+              `📦 *Volume:* *${volStr}*\n` +
+              `🔖 *Ref:* \`${cleanTxnId}\`\n\n` +
+              `🚀 *Os megas já estão a ser ativados automaticamente no número de destino!*\n` +
+              `✨ _Não precisas de enviar comprovativo no WhatsApp._`
+            ).catch(() => {});
+          }
+          if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+            baileysEngine.enviarNotificacaoGrupo(
+              `🔔 *RECARGA AUTOMÁTICA (RECEPTOR PADRÃO)* ⚡\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📋 *Ref:* \`${cleanTxnId}\`\n` +
+              `📲 *Destino:* *${defRec.targetPhone}*\n` +
+              `👤 *Pagador:* *${payerPhone}*\n` +
+              `💳 *Valor:* *${valor} MT* (${metodo || 'M-Pesa'})\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `✨ *Status:* Disparado automaticamente sem necessidade de comprovativo manual!`
+            );
+          }
+        }
+      }
+    }
+
     if (smsSalesEngine && typeof smsSalesEngine.onOperadoraSmsPaymentReceived === 'function') {
       smsSalesEngine.onOperadoraSmsPaymentReceived({ txn_id: cleanTxnId, valor });
     }
@@ -5972,14 +6201,14 @@ async function handleConfirmacaoPlano(numero, resposta) {
 }
 
 // ── Saque imediato do saldo do plano ──────────────────────────────────────────
-async function executarSaquePlano(numero, mbSolicitado) {
+async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
   const numLimpo = String(numero).replace(/\D/g, '').slice(-9);
 
   // Encontrar plano activo com saldo
   let plan = null;
   let planId = null;
   for (const [pid, p] of scheduledPlans.entries()) {
-    if (p.status === 'ativo' && p.clientPhone.slice(-9) === numLimpo && (p.saldo_mb || 0) > 0) {
+    if (p.status === 'ativo' && (p.clientPhone.slice(-9) === numLimpo || p.numero.slice(-9) === numLimpo) && (p.saldo_mb || 0) > 0) {
       plan = p; planId = pid; break;
     }
   }
@@ -5989,12 +6218,14 @@ async function executarSaquePlano(numero, mbSolicitado) {
   const mbReal = Math.min(Number(mbSolicitado), plan.saldo_mb);
   if (mbReal < 100) return { success: false, error: 'Saque mínimo: 100MB.' };
 
+  const targetDestino = numeroDestino ? String(numeroDestino).replace(/\D/g, '').slice(-9) : plan.numero;
+
   // Criar ordem de saque
   const orderId   = `${planId}-SAQUE-${Date.now()}`;
   const timestamp = new Date().toISOString();
   const orderDoc  = {
     orderId, id: orderId,
-    numero:   plan.numero,
+    numero:   targetDestino,
     quantidade: mbReal,
     valor:    0, valor_pago: 0,
     modo:     'diario',
@@ -6012,7 +6243,7 @@ async function executarSaquePlano(numero, mbSolicitado) {
   // Descontar saldo e actualizar histórico
   plan.saldo_mb = Math.max(0, plan.saldo_mb - mbReal);
   if (plan.saldo_mb === 0) { plan.status = 'concluido'; plan.concluido_em = timestamp; }
-  plan.historico.push({ tipo: 'saque', orderId, timestamp, mb: mbReal });
+  plan.historico.push({ tipo: 'saque', orderId, timestamp, mb: mbReal, destino: targetDestino });
   saveScheduledPlans();
 
   const mbF  = mbReal >= 1024 ? `${(mbReal/1024).toFixed(1)}GB` : `${mbReal}MB`;
@@ -6023,7 +6254,7 @@ async function executarSaquePlano(numero, mbSolicitado) {
     `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
     `  💸 *SAQUE PROCESSADO!* ✅\n` +
     `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-    `✅ *${mbF}* activados para o *${plan.numero}*!\n` +
+    `✅ *${mbF}* activados para o *${targetDestino}*!\n` +
     `📊 *Saldo Restante:* *${sldF}*\n\n` +
     `Use *sacar Xgb* para sacar mais, ou aguarde a próxima entrega diária.`;
 
@@ -6031,7 +6262,7 @@ async function executarSaquePlano(numero, mbSolicitado) {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgCliente).catch(e => console.warn('⚠️ [WHATSAPP] Erro ao notificar cliente:', e.message));
   }
 
-  console.log(`💸 [SAQUE] Plano ${planId}: ${mbReal}MB → ${plan.numero} | Saldo: ${plan.saldo_mb}MB`);
+  console.log(`💸 [SAQUE] Plano ${planId}: ${mbReal}MB → ${targetDestino} | Saldo: ${plan.saldo_mb}MB`);
   return { success: true, orderId, mb_sacado: mbReal, saldo_restante: plan.saldo_mb, mensagem: msgCliente };
 }
 
@@ -6291,7 +6522,7 @@ app.post('/api/plans/pular', async (req, res) => {
 // ── Saque imediato do saldo ────────────────────────────────────────────────────
 app.post('/api/plans/saque', async (req, res) => {
   try {
-    const { numero, mb, gb, planId } = req.body || {};
+    const { numero, mb, gb, planId, numero_destino, destino } = req.body || {};
     if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatório.' });
 
     const mbSolicitado = mb ? Number(mb) : gb ? Math.round(Number(gb) * 1024) : 0;
@@ -6306,7 +6537,8 @@ app.post('/api/plans/saque', async (req, res) => {
     }
     if (!numParaBusca) return res.status(400).json({ success: false, error: 'Número não encontrado.' });
 
-    const result = await executarSaquePlano(numParaBusca, mbSolicitado);
+    const targetDestino = numero_destino || destino || null;
+    const result = await executarSaquePlano(numParaBusca, mbSolicitado, targetDestino);
     if (!result.success) return res.status(400).json(result);
     return res.json(result);
   } catch (err) {
