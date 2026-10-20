@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
 const { exec, spawn } = require('child_process');
 const crypto = require('crypto');
+const geminiAI = require('./gemini_ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -117,7 +118,8 @@ app.get(['/health', '/', '/status'], (req, res) => {
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     devices_online: onlineCount,
-    devices_total: Object.keys(inMemoryDevices).length
+    devices_total: Object.keys(inMemoryDevices).length,
+    gemini_ai_configured: geminiAI ? geminiAI.isConfigured() : false
   });
 });
 
