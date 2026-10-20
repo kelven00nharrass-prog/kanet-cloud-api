@@ -1248,6 +1248,61 @@ function extrairNumeroDestinoAbaixoDoComprovativo(texto) {
     return null;
 }
 
+function isPerguntaOnlineBot(texto) {
+    if (!texto) return false;
+    const s = String(texto).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return /\b(?:estao|esta|estas|tao|ta|tas)\s+(?:on|online|ativo|ativos|activos?|ativas?|funcionar|funcionando|operacional|a\s+trabalhar|pronto|prontos)\b/i.test(s) ||
+           /\b(?:online|ta\s+on|tao\s+on|estas?\s+ai|alguem\s+ai|voce\s+esta\s+ativo|vc\s+esta\s+ativo|estao\s+ativos?)\b/i.test(s) ||
+           /^(?:on|online|ativo|activos?)\??$/i.test(s);
+}
+
+function isPerguntaComprarBot(texto) {
+    if (!texto) return false;
+    const s = String(texto).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return /\b(?:posso\s+(?:comprar|pagar|transferir|mandar|pedir|fazer\s+pedido|recarregar))\b/i.test(s) ||
+           /\b(?:tem\s+(?:megas?|dados?|net|saldo|recarga))\b/i.test(s) ||
+           /\b(?:estao\s+a\s+vender|ainda\s+tem\s+(?:megas?|net)|quero\s+comprar)\b/i.test(s);
+}
+
+function gerarRespostaStatusOnline() {
+    if (modoManutencao) {
+        return (
+            `⚠️ *KA-NET EM MANUTENÇÃO MOMENTÂNEA* ⏳\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `De momento o sistema está em pausa para manutenção rápida e melhorias técnicas.\n\n` +
+            `Voltamos a operar normalmente dentro de instantes! Agradecemos a compreensão. 🌐`
+        );
+    }
+    return (
+        `🟢⚡ *SIM, ESTAMOS 100% ONLINE!* 📶\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `O sistema automático Ka-Net está totalmente ativo e a despachar recargas 24/7 sem paragens.\n\n` +
+        `📲 *Como comprar agora:*\n` +
+        `1. Transfira o valor para o *M-Pesa* ou *e-Mola*.\n` +
+        `2. Envie aqui o comprovativo com o seu número Vodacom.\n\n` +
+        `⚡ _A sua recarga entra imediatamente no mesmo segundo!_`
+    );
+}
+
+function gerarRespostaPossoComprar() {
+    if (modoManutencao) {
+        return (
+            `⚠️ *SISTEMA EM MANUTENÇÃO* ⏳\n` +
+            `De momento não estamos a aceitar novos pedidos. Voltamos dentro de instantes!`
+        );
+    }
+    const { mpesa_num, emola_num } = getPagamentoDetails();
+    return (
+        `🚀✨ *SIM, PODE COMPRAR À VONTADE!* 🛒\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `Temos todos os pacotes disponíveis para ativação imediata!\n\n` +
+        `💳 *Contas Oficiais Ka-Net:*\n` +
+        `🇲🇿 *M-Pesa:* \`${mpesa_num}\` _(Kelven Junior)_\n` +
+        `🇲🇿 *e-Mola:* \`${emola_num}\` _(Catia Anabela)_\n\n` +
+        `📝 _Basta transferir e enviar o comprovativo aqui com o seu número Vodacom._`
+    );
+}
+
 function extrairTextoAbaixoDoComprovativo(texto) {
     if (!texto) return '';
     const lines = String(texto).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -3942,20 +3997,45 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // ── 17. MENSAGEM DIRECIONADA OU MENÇÃO AO BOT NO GRUPO ──
+                    // ── 17. MENSAGEM DIRECIONADA OU PERGUNTAS AO BOT NO GRUPO ──
                     if (isGroupMsg) {
                         const myJidNumber = sock?.user?.id ? sock.user.id.split(':')[0].replace(/\D/g, '') : '258876692062';
                         const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
                         const mentionedJids = (contextInfo?.mentionedJid || []).map(j => String(j).replace(/\D/g, ''));
-                        const isBotMentioned = mentionedJids.some(m => m.includes(myJidNumber)) || 
-                                               text.includes(myJidNumber) || 
-                                               cleanText.startsWith('@bot') || 
-                                               cleanText === 'bot';
+                        
+                        const isCallToBot = mentionedJids.some(m => m.includes(myJidNumber)) || 
+                                           text.includes(myJidNumber) || 
+                                           /^(?:@?bot|kanet|ka-net)[,:\s]/i.test(cleanCmd) ||
+                                           /^(?:@?bot|kanet|ka-net)$/i.test(cleanCmd) ||
+                                           cleanText.startsWith('@bot') ||
+                                           cleanText.startsWith('bot ') ||
+                                           cleanText === 'bot';
 
-                        if (isBotMentioned) {
-                            if (geminiAI.isConfigured() && geminiAI.isMensagemConversacional(cleanCmd)) {
-                                addLog(`🧠 [GEMINI BRAIN GRUPO] Respondendo para ${senderNumber}`);
-                                const respostaIa = await geminiAI.cerebroGemini(senderNumber, cleanCmd, {
+                        const queryGroup = cleanCmd.replace(/^(?:@?bot|kanet|ka-net)[,:\s]*/i, '').trim();
+
+                        // Resposta instantânea de Status Online no grupo
+                        if (isPerguntaOnlineBot(queryGroup || cleanCmd) && (isCallToBot || isPerguntaOnlineBot(cleanCmd))) {
+                            addLog(`🟢 [STATUS ON GRUPO] Respondendo para ${senderNumber} em ${jid}`);
+                            await reply(gerarRespostaStatusOnline());
+                            continue;
+                        }
+
+                        // Resposta instantânea se Pode Comprar no grupo
+                        if (isPerguntaComprarBot(queryGroup || cleanCmd) && (isCallToBot || isPerguntaComprarBot(cleanCmd))) {
+                            addLog(`🛒 [POSSO COMPRAR GRUPO] Respondendo para ${senderNumber} em ${jid}`);
+                            await reply(gerarRespostaPossoComprar());
+                            continue;
+                        }
+
+                        if (isCallToBot) {
+                            if (!queryGroup || queryGroup === 'menu' || queryGroup === 'ajuda') {
+                                addLog(`📢 [BOT MENCIONADO EM GRUPO] Enviando menu para ${jid}`);
+                                await reply(gerarMenuOriginal(jid));
+                                continue;
+                            }
+                            if (geminiAI.isConfigured()) {
+                                addLog(`🧠 [GEMINI BRAIN GRUPO] Respondendo: "${queryGroup}" para ${senderNumber}`);
+                                const respostaIa = await geminiAI.cerebroGemini(senderNumber, queryGroup, {
                                     nomeCliente,
                                     modoManutencao
                                 });
@@ -3964,7 +4044,6 @@ async function startWhatsApp(orderCallback, db = null) {
                                     continue;
                                 }
                             }
-                            addLog(`📢 [BOT MENCIONADO EM GRUPO] Enviando menu para ${jid}`);
                             await reply(gerarMenuOriginal(jid));
                             continue;
                         }
@@ -3983,6 +4062,19 @@ async function startWhatsApp(orderCallback, db = null) {
                                 `💡 *Dica:* Envie o print nítido do SMS onde apareça o valor (MT) e o código da transação.`
                             );
                         }
+                        continue;
+                    }
+
+                    // Respostas instantâneas no privado: "estão on?", "posso comprar?", etc.
+                    if (isPerguntaOnlineBot(cleanCmd)) {
+                        addLog(`🟢 [STATUS ON PRIVADO] Respondendo para ${senderNumber}`);
+                        await reply(gerarRespostaStatusOnline());
+                        continue;
+                    }
+
+                    if (isPerguntaComprarBot(cleanCmd)) {
+                        addLog(`🛒 [POSSO COMPRAR PRIVADO] Respondendo para ${senderNumber}`);
+                        await reply(gerarRespostaPossoComprar());
                         continue;
                     }
 
