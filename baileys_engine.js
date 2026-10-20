@@ -2233,16 +2233,15 @@ async function startWhatsApp(orderCallback, db = null) {
                                     : `${valorFinal} MT (${pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa'})`;
 
                                 await reply(
-                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                    `  🎉 *${isCombined ? 'PEDIDO COMBINADO CONFIRMADO!' : 'PEDIDO CONFIRMADO COM SUCESSO!'}* ⚡\n` +
-                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `✅ *PEDIDO RECEBIDO* ⚡\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
                                     `📦 *Pacote:* *${pacote ? pacote.nome : valorFinal + ' MT'}*\n` +
                                     `📲 *Destino:* *${numDestino}*\n` +
-                                    `💳 *Valor Pago:* *${metodoStr}*\n` +
-                                    `🔖 *Ref:* \`${combinedTxnId}\`\n\n` +
-                                    `⏳ *Os seus dados estão a ser ativados automaticamente...*\n` +
-                                    `_Você receberá uma notificação aqui assim que for concluído!_\n\n` +
-                                    `📞 *Suporte se demorar:* Envie *Suporte* ou ligue para *${supportNum}*`
+                                    `💳 *Valor:* *${metodoStr}*\n` +
+                                    `🔖 *Ref:* \`${combinedTxnId}\`\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `🚀 *Ativação em andamento...*\n` +
+                                    `_Receberá a confirmação em instantes._`
                                 );
 
                                 // Registar venda
@@ -3301,20 +3300,16 @@ async function startWhatsApp(orderCallback, db = null) {
                             if (numDestinoInline) {
                                 const orderId = 'WA-' + validas[0].txn_id + '-' + Date.now();
                                 await reply(
-                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                    `  🎉 *PAGAMENTO COMBINADO VALIDADO!* ⚡\n` +
-                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                    `Identificamos e somamos os seus comprovativos válidos:\n\n` +
-                                    listaValidTxt + `\n` +
+                                    `✅ *PEDIDO RECEBIDO (COMBINADO)* ⚡\n` +
                                     `━━━━━━━━━━━━━━━━━━\n` +
-                                    `💰 *TOTAL PAGO:* *${valorTotalValido} MT*\n` +
                                     `📦 *Pacote:* *${pacoteCombinado ? pacoteCombinado.nome : valorTotalValido + ' MT'}*\n` +
                                     `📲 *Destino:* *${numDestinoInline}*\n` +
+                                    `💰 *Total:* *${valorTotalValido} MT*\n` +
                                     `🔖 *Refs:* \`${combinedTxnId}\`` +
-                                    avisoRejeitadas + `\n\n` +
-                                    `🚀 *Ativação automática em andamento!*\n` +
-                                    `_Você receberá uma confirmação assim que for concluído._\n\n` +
-                                    `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                                    avisoRejeitadas + `\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `🚀 *Ativação em andamento...*\n` +
+                                    `_Receberá a confirmação em instantes._`
                                 );
 
                                 historicoVendas.push({
@@ -3356,18 +3351,16 @@ async function startWhatsApp(orderCallback, db = null) {
                                 });
 
                                 await reply(
-                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                    `  🎉 *PAGAMENTO COMBINADO RECEBIDO!* 💳\n` +
-                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                    `Identificamos e somamos os seus comprovativos:\n\n` +
-                                    listaValidTxt + `\n` +
+                                    `✅ *PAGAMENTO COMBINADO RECEBIDO* 💳\n` +
                                     `━━━━━━━━━━━━━━━━━━\n` +
-                                    `💰 *TOTAL ACUMULADO:* *${valorTotalValido} MT*\n` +
-                                    `📦 *Pacote:* *${pacoteCombinado ? pacoteCombinado.nome : valorTotalValido + ' MT'}* (${pacoteCombinado && pacoteCombinado.mb ? pacoteCombinado.mb + ' MB' : ''})` +
-                                    avisoRejeitadas + `\n\n` +
-                                    `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?\n` +
-                                    `Por favor, responda com o seu *número Vodacom*:\n` +
-                                    `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
+                                    listaValidTxt + `\n` +
+                                    `💰 *Total:* *${valorTotalValido} MT*\n` +
+                                    `📦 *Pacote:* *${pacoteCombinado ? pacoteCombinado.nome : valorTotalValido + ' MT'}*\n` +
+                                    `🔖 *Refs:* \`${combinedTxnId}\`` +
+                                    avisoRejeitadas + `\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `📲 *Para qual número enviar?*\n` +
+                                    `_Responda com o número Vodacom (ex: 84XXXXXXX)_`
                                 );
                                 continue;
                             }
@@ -3586,17 +3579,15 @@ async function startWhatsApp(orderCallback, db = null) {
                             if (numDestinoInline) {
                                 const orderId = 'WA-' + txn_id + '-' + Date.now();
                                 await reply(
-                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                    `  🎉 *COMPROVATIVO VALIDADO COM SUCESSO!* ⚡\n` +
-                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                    `A sua transação foi confirmada pela operadora (*${metodoNome}*)!\n\n` +
-                                    `📦 *Pacote:* *${pacote.nome}*${pacote.calculado ? ' ⚡ _(Calculado Proporcionalmente)_' : ''}\n` +
+                                    `✅ *PEDIDO RECEBIDO* ⚡\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `📦 *Pacote:* *${pacote.nome}*${pacote.calculado ? ' ⚡ _(Calculado)_' : ''}\n` +
                                     `📲 *Destino:* *${numDestinoInline}*\n` +
                                     `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                    `🔖 *Ref:* \`${txn_id}\`\n\n` +
-                                    `🚀 *Ativação automática em andamento!*\n` +
-                                    `_Você receberá uma confirmação assim que for concluído._\n\n` +
-                                    `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                                    `🔖 *Ref:* \`${txn_id}\`\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `🚀 *Ativação em andamento...*\n` +
+                                    `_Receberá a confirmação em instantes._`
                                 );
 
                                 historicoVendas.push({
@@ -3680,15 +3671,14 @@ async function startWhatsApp(orderCallback, db = null) {
                                 });
 
                                 await reply(
-                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                    `  ✅ *COMPROVATIVO VALIDADO PELA OPERADORA!* 💳\n` +
-                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                    `🔖 *Transação:* \`${txn_id}\`\n` +
-                                    `💰 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                    `📦 *Pacote:* *${pacote.nome}* (${pacote.mb} MB)${pacote.calculado ? ' ⚡ _(Cálculo Proporcional)_' : ''}\n\n` +
-                                    `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?*\n` +
-                                    `Por favor, responda agora com o seu *número Vodacom*:\n` +
-                                    `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
+                                    `✅ *COMPROVATIVO VALIDADO* ⚡\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `📦 *Pacote:* *${pacote.nome}* (${pacote.mb} MB)${pacote.calculado ? ' ⚡ _(Calculado)_' : ''}\n` +
+                                    `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                    `🔖 *Ref:* \`${txn_id}\`\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `📲 *Para qual número enviar?*\n` +
+                                    `_Responda com o número Vodacom (ex: 84XXXXXXX)_`
                                 );
                                 continue;
                             }
@@ -3732,17 +3722,14 @@ async function startWhatsApp(orderCallback, db = null) {
 
                             // Responder imediatamente ao cliente
                             await reply(
-                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                `  ⏳ *STATUS: AGUARDANDO OPERADORA* 📡\n` +
-                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                `Identificamos o seu comprovativo:\n` +
-                                `🔖 *Ref:* \`${txn_id}\`\n` +
+                                `⏳ *COMPROVATIVO RECEBIDO* 📡\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `📦 *Pacote:* *${pacote.nome}*${pacote.calculado ? ' ⚡ _(Calculado)_' : ''}\n` +
+                                (numDestinoInline ? `📲 *Destino:* *${numDestinoInline}*\n` : '') +
                                 `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
-                                `📦 *Pacote:* *${pacote.nome}*${pacote.calculado ? ' ⚡ _(Calculado Proporcionalmente)_' : ''}\n` +
-                                (numDestinoInline ? `📲 *Destino:* *${numDestinoInline}*\n\n` : `\n`) +
-                                `📡 *Aguardando confirmação oficial da operadora (${metodoNome})...*\n` +
-                                `O sistema está a verificar o recebimento do valor na nossa conta. Isso costuma levar entre *30 segundos a 3 minutos*.\n\n` +
-                                `⚡ *Assim que a confirmação chegar, o seu pacote será ativado imediatamente!*`
+                                `🔖 *Ref:* \`${txn_id}\`\n` +
+                                `━━━━━━━━━━━━━━━━━━\n` +
+                                `_Aguardando confirmação da rede ${metodoNome} (30s a 2 min). Ativação automática assim que confirmado!_`
                             );
 
                             // Notificar o grupo de notificações
@@ -4126,17 +4113,15 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
 
             if (sock) {
                 await sock.sendMessage(item.jid, {
-                    text: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                          `  🎉 *COMPROVATIVO VALIDADO COM SUCESSO!* ⚡\n` +
-                          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                          `A sua transação foi confirmada oficialmente pela rede *${metodoNome}*!\n\n` +
+                    text: `✅ *PEDIDO RECEBIDO* ⚡\n` +
+                          `━━━━━━━━━━━━━━━━━━\n` +
                           `📦 *Pacote:* *${item.pacote.nome}*\n` +
                           `📲 *Destino:* *${item.numDestino}*\n` +
-                          `💳 *Valor Pago:* *${valorPago} MT*\n` +
-                          `🔖 *Ref:* \`${item.txn_id}\`\n\n` +
-                          `🚀 *Ativação automática em andamento!*\n` +
-                          `_Você receberá uma confirmação assim que for concluído._\n\n` +
-                          `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                          `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                          `🔖 *Ref:* \`${item.txn_id}\`\n` +
+                          `━━━━━━━━━━━━━━━━━━\n` +
+                          `🚀 *Ativação em andamento...*\n` +
+                          `_Receberá a confirmação em instantes._`
                 });
             }
 
@@ -4220,14 +4205,14 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
 
             if (sock) {
                 await sock.sendMessage(item.jid, {
-                    text: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                          `  ✅ *COMPROVATIVO VALIDADO PELA OPERADORA!* 💳\n` +
-                          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                          `A operadora (${metodoNome}) confirmou a sua transação (\`${item.txn_id}\`) de *${valorPago} MT*!\n\n` +
-                          `📦 *Pacote:* *${item.pacote.nome}* (${item.pacote.mb} MB)\n\n` +
-                          `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?*\n` +
-                          `Por favor, responda com o seu *número Vodacom* que deve receber os megas:\n` +
-                          `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
+                    text: `✅ *COMPROVATIVO VALIDADO* ⚡\n` +
+                          `━━━━━━━━━━━━━━━━━━\n` +
+                          `📦 *Pacote:* *${item.pacote.nome}* (${item.pacote.mb} MB)\n` +
+                          `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                          `🔖 *Ref:* \`${item.txn_id}\`\n` +
+                          `━━━━━━━━━━━━━━━━━━\n` +
+                          `📲 *Para qual número enviar?*\n` +
+                          `_Responda com o número Vodacom (ex: 84XXXXXXX)_`
                 });
             }
         }
