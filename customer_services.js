@@ -214,6 +214,41 @@ function initCustomerServices(db, dispatcherFn, getValMbFn) {
 
 // ── 1. GESTÃO DE FIDELIDADE (CONTAGEM DE COMPRAS) ──────────────────────────────
 
+function gerarMensagemDesbloqueioVip(totalCompras) {
+    if (totalCompras === 101) {
+        return (
+            '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
+            '  🎉 *PARABÉNS! VOCÊ É CLIENTE VIP!* 🌟\n' +
+            '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
+            'Incrível! Você acaba de completar a sua *101ª compra* na Ka-Net! 🏆✨\n\n' +
+            '🔓 *NOVO BENEFÍCIO LIBERADO: TXENECO* ⚡\n' +
+            'Pela sua fidelidade, você agora tem crédito de internet liberado sempre que precisar e estiver sem saldo!\n\n' +
+            '📊 *O Seu Limite de Crédito:* até *2.0 GB*\n' +
+            '📦 *Faixa por Pedido:* de *551 MB a 2047 MB*\n\n' +
+            '💡 *Como pedir quando precisar:*\n' +
+            '👉 *.txenecar 1gb 84XXXXXXX*\n\n' +
+            '💳 *Como pagar a dívida (taxa 10%):*\n' +
+            '👉 *.pagar <comprovativo>*\n\n' +
+            '🙏 _Muito obrigado pela confiança e por fazer parte da família Ka-Net!_ 🌐✨'
+        );
+    }
+    if (totalCompras === 500) {
+        return (
+            '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
+            '  👑 *NÍVEL MESTRE VIP ATINGIDO!* 💎\n' +
+            '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
+            'Sensacional! Você atingiu a incrível marca de *500 compras* na Ka-Net! 🚀🔥\n\n' +
+            '🔓 *O SEU LIMITE DE TXENECO SUBIU:* *4.0 GB!* ⚡\n' +
+            'Agora você pode txenecar até *4 GB* no total sempre que precisar!\n\n' +
+            '💡 *Como pedir:*\n' +
+            '👉 *.txenecar <quantidade> <número>*\n\n' +
+            '👑 _Você é um dos clientes mais especiais da Ka-Net. Parabéns e muito obrigado!_ 🌐✨'
+        );
+    }
+    return null;
+}
+
+
 function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
     const phone = normalizarTelefone(telefone);
     if (!phone || phone.length < 8) return;
@@ -243,7 +278,12 @@ function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
     salvarNoFirestore('client_loyalty', phone, record);
 
     console.log(`🌟 [FIDELIDADE] Compra registrada para ${phone}. Total de compras: ${record.totalCompras}`);
-    return record.totalCompras;
+    const milestoneMsg = gerarMensagemDesbloqueioVip(record.totalCompras);
+    return {
+        totalCompras: record.totalCompras,
+        milestone: record.totalCompras === 101 ? 'vip_101' : record.totalCompras === 500 ? 'vip_500' : null,
+        mensagemVip: milestoneMsg
+    };
 }
 
 function getComprasCount(telefone) {

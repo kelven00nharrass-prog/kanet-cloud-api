@@ -1617,7 +1617,13 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     if (success) {
       const clientTel = (order && (order.senderPhone || order.sender || order.cliente_solicitante || order.numero));
       if (clientTel && customerServices && typeof customerServices.registrarCompra === 'function') {
-        customerServices.registrarCompra(clientTel, (order && order.orderId) || resId, (order && (order.valor || order.valor_pago)) || 0, (order && order.quantidade) || 0);
+        const vipAlert = customerServices.registrarCompra(clientTel, (order && order.orderId) || resId, (order && (order.valor || order.valor_pago)) || 0, (order && order.quantidade) || 0);
+        if (vipAlert && vipAlert.mensagemVip && clientJid && baileysEngine && typeof baileysEngine.sendTextMessage === 'function') {
+          setTimeout(() => {
+            baileysEngine.sendTextMessage(clientJid, vipAlert.mensagemVip)
+              .catch(e => console.warn('⚠️ [VIP ALERT] Falha ao enviar para cliente:', e.message));
+          }, 2500);
+        }
       }
     }
 

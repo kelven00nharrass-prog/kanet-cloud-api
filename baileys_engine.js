@@ -2557,6 +2557,48 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
+                    // ── 1.5 CONSULTA DE STATUS DE COMPRAS & FIDELIDADE VIP ──
+                    const ehConsultaCompras = ['minhascompras', 'compras', 'meustatus', 'vip', 'statusvip'].includes(cleanCmd);
+                    if (ehConsultaCompras) {
+                        const total = customerServices.getComprasCount(senderNumber);
+                        const teto = customerServices.calcularTetoTxeneco(total);
+                        const divida = customerServices.getClienteDivida(senderNumber);
+                        const divMb = divida ? (divida.activeDebtMb || 0) : 0;
+                        const dispMb = Math.max(0, teto - divMb);
+                        const tetoF = teto >= 1024 ? `${(teto/1024).toFixed(1)}GB` : `${teto}MB`;
+                        const dispF = dispMb >= 1024 ? `${(dispMb/1024).toFixed(1)}GB` : `${dispMb}MB`;
+
+                        let statusNivel = '';
+                        let dicaProgresso = '';
+
+                        if (total < 101) {
+                            const faltam = 101 - total;
+                            statusNivel = '🥉 *Cliente Regular*';
+                            dicaProgresso = `🎯 *Faltam apenas ${faltam} compras* para você desbloquear o *Status VIP* e ter direito a *até 2.0 GB de Txeneco (crédito)* sempre que precisar!`;
+                        } else if (total < 500) {
+                            const faltam500 = 500 - total;
+                            statusNivel = '🌟 *CLIENTE VIP (Nível 1)*';
+                            dicaProgresso = `🔓 *Txeneco Liberado:* até *${tetoF}* (Disponível agora: *${dispF}*)\n` +
+                                            `🎯 *Faltam ${faltam500} compras* para subir para o *Nível Mestre VIP (4.0 GB)*!`;
+                        } else {
+                            statusNivel = '👑 *MESTRE VIP (Nível Máximo)*';
+                            dicaProgresso = `🔓 *Txeneco Máximo Liberado:* até *${tetoF}* (Disponível agora: *${dispF}*)`;
+                        }
+
+                        await reply(
+                            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                            `  📊 *SEU HISTÓRICO DE COMPRAS* 🏆\n` +
+                            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                            `📱 *Cliente:* *${senderNumber}*\n` +
+                            `🏷️ *Nível Atual:* ${statusNivel}\n` +
+                            `🛒 *Total de Compras:* *${total} compras*\n\n` +
+                            dicaProgresso + `\n\n` +
+                            (total >= 101 ? `💡 *Para pedir internet a crédito:*\n👉 *.txenecar <quantidade> <número>*\n\n` : '') +
+                            `🙏 _Obrigado pela preferência e confiança diária na Ka-Net!_ 🌐✨`
+                        );
+                        continue;
+                    }
+
                     // ── 1.4 COMANDOS DE BÔNUS (ADMIN MASTER & CLIENTE) ──
                     const ehCmdDarBonus = cleanCmd.startsWith('darbonus') || cleanCmd.startsWith('addbonus');
                     if (ehCmdDarBonus) {
