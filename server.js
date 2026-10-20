@@ -690,6 +690,15 @@ function splitSpecialOrderIfEligible(orderDoc) {
       modo: 'diario',
       input_val: '',
       jid: orderDoc.jid || null,
+      sender: orderDoc.sender || null,
+      senderPhone: orderDoc.senderPhone || null,
+      senderNumber: orderDoc.senderNumber || null,
+      senderName: orderDoc.senderName || null,
+      senderJid: orderDoc.senderJid || null,
+      valor: orderDoc.valor || null,
+      valor_pago: orderDoc.valor_pago || null,
+      txn_id: orderDoc.txn_id || null,
+      sms_ref: orderDoc.sms_ref || null,
       remetente: orderDoc.remetente || 'Bot',
       targetPort: null,
       isSplit: true,
@@ -742,6 +751,15 @@ function splitSpecialOrderIfEligible(orderDoc) {
       modo: 'diario',
       input_val: '',
       jid: orderDoc.jid || null,
+      sender: orderDoc.sender || null,
+      senderPhone: orderDoc.senderPhone || null,
+      senderNumber: orderDoc.senderNumber || null,
+      senderName: orderDoc.senderName || null,
+      senderJid: orderDoc.senderJid || null,
+      valor: orderDoc.valor || null,
+      valor_pago: orderDoc.valor_pago || null,
+      txn_id: orderDoc.txn_id || null,
+      sms_ref: orderDoc.sms_ref || null,
       remetente: orderDoc.remetente || 'Bot',
       targetPort: null,
       isSplit: true,
@@ -844,6 +862,15 @@ function splitDailyOrderIfEligible(orderDoc) {
       modo: 'diario',
       input_val: '',
       jid: orderDoc.jid || null,
+      sender: orderDoc.sender || null,
+      senderPhone: orderDoc.senderPhone || null,
+      senderNumber: orderDoc.senderNumber || null,
+      senderName: orderDoc.senderName || null,
+      senderJid: orderDoc.senderJid || null,
+      valor: orderDoc.valor || null,
+      valor_pago: orderDoc.valor_pago || null,
+      txn_id: orderDoc.txn_id || null,
+      sms_ref: orderDoc.sms_ref || null,
       remetente: orderDoc.remetente || 'Bot',
       targetPort: null,
       isSplit: true,
@@ -1388,83 +1415,107 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
     if (clientJid && (!order || !order.notified) && baileysEngine) {
       if (success) {
+        if (order) order.notified = true;
+
+        const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
+        let modoBadge = '';
+        if (modoStr === 'semanal') {
+          modoBadge = ' (Semanal - 7 Dias)';
+        } else if (modoStr === 'mensal') {
+          modoBadge = ' (Mensal - 30 Dias)';
+        } else if (modoStr === 'tudo_top' || modoStr === 'ilimitado') {
+          modoBadge = ' (Tudo Top / Ilimitado)';
+        }
+
+        const rawSender = (order && (order.senderPhone || order.sender || order.senderNumber)) || (req.body.last_result && req.body.last_result.sender) || '';
+        const senderNome = (order && (order.senderName || order.nomeCliente)) || (req.body.last_result && req.body.last_result.senderName) || '';
+        const senderJid = (order && (order.senderJid || order.participant)) || null;
+
+        const isGroup = clientJid && clientJid.endsWith('@g.us');
+        
+        // Validação rigorosa: NUNCA usar LID como menção de número
+        let realPhone = null;
+        const cleanSenderDigits = String(rawSender).replace(/\D/g, '');
+        if (cleanSenderDigits.length === 12 && cleanSenderDigits.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanSenderDigits)) {
+          realPhone = cleanSenderDigits;
+        } else if (cleanSenderDigits.length === 9 && /^8[2-7]\d{7}$/.test(cleanSenderDigits)) {
+          realPhone = '258' + cleanSenderDigits;
+        }
+
+        // Se o remetente for LID (sem telefone limpo direto), usar o número ativado (targetNum) para mencionar o comprador
+        if (!realPhone && targetNum) {
+          const cleanTarget = String(targetNum).replace(/\D/g, '');
+          if (cleanTarget.length === 9 && /^8[2-7]\d{7}$/.test(cleanTarget)) {
+            realPhone = '258' + cleanTarget;
+          } else if (cleanTarget.length === 12 && cleanTarget.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanTarget)) {
+            realPhone = cleanTarget;
+          }
+        }
+
+        let saudacao = '';
+        const mentionsList = [];
+
+        if (isGroup) {
+          if (realPhone) {
+            saudacao = `👤 *Cliente:* @${realPhone}\n`;
+            mentionsList.push(realPhone + '@s.whatsapp.net');
+            if (senderJid && String(senderJid).endsWith('@lid')) {
+              mentionsList.push(senderJid);
+            }
+          } else if (senderNome && senderNome !== 'Cliente') {
+            saudacao = `👤 *Cliente:* @${senderNome}\n`;
+            if (senderJid) mentionsList.push(senderJid);
+          }
+        }
+
+        const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && (req.body.last_result.valor || req.body.last_result.valor_pago)) || null;
+        const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
+        const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(resId).startsWith('WA-') ? String(resId).split('-')[1] : resId);
+
+        // ── 📦 NOTIFICAÇÃO ESPECÍFICA DE PACOTES EM PARTES (SPLIT) ──
         if (order && order.isSplit && order.splitPart === 1) {
-          order.notified = true;
-          console.log(`ℹ️ [SILENT SPLIT] Parte 1 do pedido ${resId} entregue com sucesso. Notificação ao cliente aguarda conclusão da Parte 2.`);
+          const part1Mb = Number(order.quantidade) || 0;
+          const part1Str = part1Mb < 1024 ? `${part1Mb} MB` : `${(part1Mb / 1024).toFixed(part1Mb % 1024 === 0 ? 0 : 1)} GB`;
+          const part2Mb = Number(order.splitOtherPartMb) || 0;
+          const part2Str = part2Mb < 1024 ? `${part2Mb} MB` : `${(part2Mb / 1024).toFixed(part2Mb % 1024 === 0 ? 0 : 1)} GB`;
+          const totalMb = Number(order.splitTotalMb) || (part1Mb + part2Mb);
+          const totalStr = totalMb < 1024 ? `${totalMb} MB` : `${(totalMb / 1024).toFixed(totalMb % 1024 === 0 ? 0 : 1)} GB`;
+
+          const msgParte1 = (
+            `📦 *1ª PARTE ENTREGUE (1/2)* ⚡\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            saudacao +
+            `✅ *Entregue agora:* *${part1Str}*\n` +
+            `⏳ *Restante a caminho:* *${part2Str}* _(Total: ${totalStr})_\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
+            valorLinha +
+            `🔖 *Ref:* \`${cleanRef}\`\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `🔄 _A 2ª parte já está a ser processada e entra em instantes!_`
+          );
+
+          try {
+            baileysEngine.sendTextMessage(clientJid, msgParte1, { mentions: mentionsList })
+              .catch(errSend => console.error(`❌ [NOTIFICAÇÃO WA PARTE 1 ERRO]:`, errSend.message));
+            console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de 1ª PARTE (${part1Str} de ${totalStr}) no pedido ${resId}`);
+          } catch(errSendSync) {
+            console.error(`❌ [NOTIFICAÇÃO WA PARTE 1 CRASH]:`, errSendSync.message);
+          }
         } else {
-          if (order) order.notified = true;
-          const modoStr = String((order && order.modo) || req.body.last_result.modo || 'diario').toLowerCase().trim();
-          let headerText = 'PACOTE ATIVADO COM SUCESSO! 📶';
-          let modoBadge = '';
-          let duracaoText = 'A sua recarga já está pronta para uso!';
+          let headerConclusao = `✅ *RECARGA CONCLUÍDA* ⚡\n`;
+          let pacoteLinha = `📦 *Pacote:* *${volStr}*${modoBadge}\n`;
 
-          if (modoStr === 'semanal') {
-            headerText = 'PACOTE SEMANAL ATIVADO! 🗓️';
-            modoBadge = ' (Semanal - 7 Dias)';
-            duracaoText = 'O seu pacote Semanal de 7 Dias já está ativo e pronto para uso!';
-          } else if (modoStr === 'mensal') {
-            headerText = 'PACOTE MENSAL ATIVADO! 📅';
-            modoBadge = ' (Mensal - 30 Dias)';
-            duracaoText = 'O seu pacote Mensal de 30 Dias já está ativo e pronto para uso!';
-          } else if (modoStr === 'tudo_top' || modoStr === 'ilimitado') {
-            headerText = 'PACOTE TUDO TOP ATIVADO! 💎';
-            modoBadge = ' (Tudo Top / Ilimitado)';
-            duracaoText = 'O seu pacote Tudo Top já está ativo e pronto para uso!';
+          if (order && order.isSplit && order.splitPart === 2) {
+            headerConclusao = `✅ *RECARGA 100% CONCLUÍDA (2/2)* ⚡\n`;
+            pacoteLinha = `📦 *Pacote Total:* *${volStr}*${modoBadge} _(Entregue em 2 partes)_\n`;
           }
-
-          const rawSender = (order && (order.senderPhone || order.sender || order.senderNumber)) || (req.body.last_result && req.body.last_result.sender) || '';
-          const senderNome = (order && (order.senderName || order.nomeCliente)) || (req.body.last_result && req.body.last_result.senderName) || '';
-          const senderJid = (order && (order.senderJid || order.participant)) || null;
-
-          const isGroup = clientJid && clientJid.endsWith('@g.us');
-          
-          // Validação rigorosa: NUNCA usar LID como menção de número
-          let realPhone = null;
-          const cleanSenderDigits = String(rawSender).replace(/\D/g, '');
-          if (cleanSenderDigits.length === 12 && cleanSenderDigits.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanSenderDigits)) {
-            realPhone = cleanSenderDigits;
-          } else if (cleanSenderDigits.length === 9 && /^8[2-7]\d{7}$/.test(cleanSenderDigits)) {
-            realPhone = '258' + cleanSenderDigits;
-          }
-
-          // Se o remetente for LID (sem telefone limpo direto), usar o número ativado (targetNum) para mencionar o comprador
-          if (!realPhone && targetNum) {
-            const cleanTarget = String(targetNum).replace(/\D/g, '');
-            if (cleanTarget.length === 9 && /^8[2-7]\d{7}$/.test(cleanTarget)) {
-              realPhone = '258' + cleanTarget;
-            } else if (cleanTarget.length === 12 && cleanTarget.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanTarget)) {
-              realPhone = cleanTarget;
-            }
-          }
-
-          // Montar saudação e menções reais (sem qualquer exibição de LID)
-          // Montar menção ao cliente (se for em grupo)
-          let saudacao = '';
-          const mentionsList = [];
-
-          if (isGroup) {
-            if (realPhone) {
-              saudacao = `👤 *Cliente:* @${realPhone}\n`;
-              mentionsList.push(realPhone + '@s.whatsapp.net');
-              if (senderJid && String(senderJid).endsWith('@lid')) {
-                mentionsList.push(senderJid);
-              }
-            } else if (senderNome && senderNome !== 'Cliente') {
-              saudacao = `👤 *Cliente:* @${senderNome}\n`;
-              if (senderJid) mentionsList.push(senderJid);
-            }
-          }
-
-          const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && (req.body.last_result.valor || req.body.last_result.valor_pago)) || null;
-          const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
-          const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(resId).startsWith('WA-') ? String(resId).split('-')[1] : resId);
 
           try {
             baileysEngine.sendTextMessage(clientJid,
-              `✅ *RECARGA CONCLUÍDA* ⚡\n` +
+              headerConclusao +
               `━━━━━━━━━━━━━━━━━━\n` +
               saudacao +
-              `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
+              pacoteLinha +
               `📲 *Destino:* *${targetNum}*\n` +
               valorLinha +
               `🔖 *Ref:* \`${cleanRef}\`\n` +
@@ -1536,8 +1587,22 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           modo: order.modo || 'diario',
           input_val: '', // ⚠️ Limpar input_val para que envie estritamente a diferença restante (restanteMb)
           jid: order.jid || null,
+          sender: order.sender || null,
+          senderPhone: order.senderPhone || null,
+          senderNumber: order.senderNumber || null,
+          senderName: order.senderName || null,
+          senderJid: order.senderJid || null,
+          valor: order.valor || null,
+          valor_pago: order.valor_pago || null,
+          txn_id: order.txn_id || null,
+          sms_ref: order.sms_ref || null,
           remetente: order.remetente || 'Bot',
           targetPort: null,
+          isSplit: true,
+          splitPart: 2,
+          splitTotalParts: 2,
+          splitTotalMb: qtdPedida,
+          splitOtherPartMb: qtdEntregue,
           status: 'pending',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -1546,6 +1611,50 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         };
         inMemoryOrders.set(restanteId, orderRestante);
         console.log(`🔀 [ENVIO PARCIAL REGISTADO] Pedido ${resId} entregou ${qtdEntregue}MB. Criado pedido ${restanteId} de ${restanteMb}MB na fila para conclusão!`);
+
+        // Notificar cliente da 1ª parte parcial entregue no WhatsApp
+        if (clientJid && baileysEngine) {
+          const part1Str = qtdEntregue < 1024 ? `${qtdEntregue} MB` : `${(qtdEntregue / 1024).toFixed(qtdEntregue % 1024 === 0 ? 0 : 1)} GB`;
+          const part2Str = restanteMb < 1024 ? `${restanteMb} MB` : `${(restanteMb / 1024).toFixed(restanteMb % 1024 === 0 ? 0 : 1)} GB`;
+          const totalStr = qtdPedida < 1024 ? `${qtdPedida} MB` : `${(qtdPedida / 1024).toFixed(qtdPedida % 1024 === 0 ? 0 : 1)} GB`;
+          const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(resId).startsWith('WA-') ? String(resId).split('-')[1] : resId);
+
+          const rawSender = (order && (order.senderPhone || order.sender || order.senderNumber)) || '';
+          const senderNome = (order && (order.senderName || order.nomeCliente)) || '';
+          const isGroup = clientJid && clientJid.endsWith('@g.us');
+          let saudacao = '';
+          const mentionsList = [];
+          if (isGroup) {
+            const cleanSenderDigits = String(rawSender).replace(/\D/g, '');
+            if (cleanSenderDigits.length === 9) {
+              saudacao = `👤 *Cliente:* @258${cleanSenderDigits}\n`;
+              mentionsList.push(`258${cleanSenderDigits}@s.whatsapp.net`);
+            } else if (cleanSenderDigits.length === 12 && cleanSenderDigits.startsWith('258')) {
+              saudacao = `👤 *Cliente:* @${cleanSenderDigits}\n`;
+              mentionsList.push(`${cleanSenderDigits}@s.whatsapp.net`);
+            } else if (senderNome && senderNome !== 'Cliente') {
+              saudacao = `👤 *Cliente:* @${senderNome}\n`;
+            }
+          }
+          const valorPago = order.valor || order.valor_pago || null;
+          const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
+
+          const msgParcial = (
+            `📦 *1ª PARTE ENTREGUE (1/2)* ⚡\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            saudacao +
+            `✅ *Entregue agora:* *${part1Str}*\n` +
+            `⏳ *Restante a caminho:* *${part2Str}* _(Total: ${totalStr})_\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
+            valorLinha +
+            `🔖 *Ref:* \`${cleanRef}\`\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `🔄 _A 2ª parte já está na fila para envio imediato por outro terminal!_`
+          );
+
+          baileysEngine.sendTextMessage(clientJid, msgParcial, { mentions: mentionsList })
+            .catch(e => console.warn('⚠️ [ENVIO PARCIAL WA ERRO]:', e.message));
+        }
       } else {
         const errorMsg = (req.body.last_result && req.body.last_result.error) || 'Falha USSD / Timeout';
         order.lastError = errorMsg;
@@ -1744,6 +1853,16 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       order.lastError = null;
       decrementDeviceSaldo(port, order);
 
+      // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
+      if (order.isSplit && order.splitPart === 1 && order.part2Id) {
+        const part2Order = inMemoryOrders.get(order.part2Id);
+        if (part2Order && part2Order.status === 'waiting_part1') {
+          part2Order.status = 'pending';
+          part2Order.updatedAt = new Date().toISOString();
+          console.log(`🚀 [PARTE 2 LIBERADA] Parte 2 (${part2Order.id} - ${part2Order.quantidade}MB) liberada para envio imediato por outra porta!`);
+        }
+      }
+
       // Notificar cliente no WhatsApp caso ainda não tenha sido notificado
       if (!order.notified && baileysEngine) {
         let clientJid = order.jid || null;
@@ -1759,7 +1878,6 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
           order.notified = true;
           const rawQty = order.splitTotalMb || order.quantidade || 1024;
           const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
-          const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
           const valorPago = order.valor || order.valor_pago || null;
           const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
           const senderNome = order.senderName || order.nomeCliente || '';
@@ -1783,23 +1901,61 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
 
           const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(orderId).startsWith('WA-') ? String(orderId).split('-')[1] : orderId);
 
-          try {
-            baileysEngine.sendTextMessage(clientJid,
-              `✅ *RECARGA CONCLUÍDA* ⚡\n` +
+          if (order && order.isSplit && order.splitPart === 1) {
+            const part1Mb = Number(order.quantidade) || 0;
+            const part1Str = part1Mb < 1024 ? `${part1Mb} MB` : `${(part1Mb / 1024).toFixed(part1Mb % 1024 === 0 ? 0 : 1)} GB`;
+            const part2Mb = Number(order.splitOtherPartMb) || 0;
+            const part2Str = part2Mb < 1024 ? `${part2Mb} MB` : `${(part2Mb / 1024).toFixed(part2Mb % 1024 === 0 ? 0 : 1)} GB`;
+            const totalMb = Number(order.splitTotalMb) || (part1Mb + part2Mb);
+            const totalStr = totalMb < 1024 ? `${totalMb} MB` : `${(totalMb / 1024).toFixed(totalMb % 1024 === 0 ? 0 : 1)} GB`;
+
+            const msgParte1 = (
+              `📦 *1ª PARTE ENTREGUE (1/2)* ⚡\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               saudacao +
-              `📦 *Pacote:* *${volStr}*\n` +
+              `✅ *Entregue agora:* *${part1Str}*\n` +
+              `⏳ *Restante a caminho:* *${part2Str}* _(Total: ${totalStr})_\n` +
               `📲 *Destino:* *${order.numero}*\n` +
               valorLinha +
               `🔖 *Ref:* \`${cleanRef}\`\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `📶 *Consultar Saldo:* \`*100*03#\`\n` +
-              `_Obrigado por escolher a Ka-Net!_`,
-              { mentions: mentionsList }
-            ).catch(e => console.error('❌ [NOTIFICAÇÃO WA ERRO]:', e.message));
-            console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
-          } catch(e) {
-            console.error('❌ [NOTIFICAÇÃO WA CRASH]:', e.message);
+              `🔄 _A 2ª parte já está a ser processada e entra em instantes!_`
+            );
+
+            try {
+              baileysEngine.sendTextMessage(clientJid, msgParte1, { mentions: mentionsList })
+                .catch(e => console.error('❌ [NOTIFICAÇÃO WA PARTE 1 ERRO]:', e.message));
+              console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de 1ª PARTE no pedido ${orderId}`);
+            } catch(e) {
+              console.error('❌ [NOTIFICAÇÃO WA PARTE 1 CRASH]:', e.message);
+            }
+          } else {
+            let headerConclusao = `✅ *RECARGA CONCLUÍDA* ⚡\n`;
+            let pacoteLinha = `📦 *Pacote:* *${volStr}*\n`;
+
+            if (order && order.isSplit && order.splitPart === 2) {
+              headerConclusao = `✅ *RECARGA 100% CONCLUÍDA (2/2)* ⚡\n`;
+              pacoteLinha = `📦 *Pacote Total:* *${volStr}* _(Entregue em 2 partes)_\n`;
+            }
+
+            try {
+              baileysEngine.sendTextMessage(clientJid,
+                headerConclusao +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                saudacao +
+                pacoteLinha +
+                `📲 *Destino:* *${order.numero}*\n` +
+                valorLinha +
+                `🔖 *Ref:* \`${cleanRef}\`\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                `📶 *Consultar Saldo:* \`*100*03#\`\n` +
+                `_Obrigado por escolher a Ka-Net!_`,
+                { mentions: mentionsList }
+              ).catch(e => console.error('❌ [NOTIFICAÇÃO WA ERRO]:', e.message));
+              console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
+            } catch(e) {
+              console.error('❌ [NOTIFICAÇÃO WA CRASH]:', e.message);
+            }
           }
         }
       }
