@@ -11,12 +11,12 @@ require('dotenv').config();
 const axios = require('axios');
 
 function getApiKey() {
-    return (process.env.GEMINI_API_KEY || '').trim();
+    return (process.env.GEMINI_API_KEY || process.env.Geminiai || process.env.geminiai || process.env.GEMINI_KEY || process.env.GEMINI_AI || '').trim();
 }
  
 const GEMINI_BASE    = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_MODEL  = 'gemini-3.1-flash-lite';
-const FALLBACK_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+const DEFAULT_MODEL  = 'gemini-3.8-flash';
+const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 
 const VISION_MODEL   = DEFAULT_MODEL;
 const AUDIO_MODEL    = DEFAULT_MODEL;
