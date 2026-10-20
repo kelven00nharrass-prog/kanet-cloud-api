@@ -532,14 +532,17 @@ async function processarPagamentoDivida({ senderPhone, valorPago, txnId, rawText
             success: true,
             quitado: true,
             trocoMt,
+            jidOrigem: loanRecord.jidOrigem || null,
             mensagem: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                       `  🎉 *DÍVIDA 100% LIQUIDADA!* ⚡\n` +
                       `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                      `Recebemos o seu pagamento de *${vPago} MT* (Ref: \`${txnId || 'PAGAMENTO'}\`).\n\n` +
-                      `✅ *Status da Dívida:* TOTALMENTE PAGA!\n` +
+                      `Confirmamos com sucesso o seu pagamento de *${vPago} MT* (Ref: \`${txnId || 'PAGAMENTO'}\`).\n\n` +
+                      `✅ *Status da Dívida:* TOTALMENTE PAGA E ENCERRADA!\n` +
                       `💰 *Valor Liquidado:* ${dividaAnteriorMt} MT` +
                       trocoMsg + `\n\n` +
-                      `🔓 *O seu limite de Txeneco foi totalmente restaurado para ${tetoF}!* Muito obrigado pela preferência e honestidade.`
+                      `🔓 *O seu crédito de Txeneco foi totalmente restaurado para ${tetoF}!* Já pode solicitar internet adiantada sempre que precisar.\n\n` +
+                      `🙏 *MUITO OBRIGADO PELA SUA HONESTIDADE E PREFERÊNCIA!* 🌟✨\n` +
+                      `_A Ka-Net valoriza imensamente clientes fiéis e pontuais como você._ 🌐🤝`
         };
     } else {
         // Quitação Parcial
@@ -561,15 +564,17 @@ async function processarPagamentoDivida({ senderPhone, valorPago, txnId, rawText
             quitado: false,
             valorPago: vPago,
             restanteMt: novoRestanteMt,
+            jidOrigem: loanRecord.jidOrigem || null,
             mensagem: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                       `  ⚠️ *PAGAMENTO PARCIAL RECEBIDO* 💳\n` +
                       `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                      `Recebemos *${vPago} MT* da sua dívida (Ref: \`${txnId || 'PAGAMENTO'}\`).\n\n` +
+                      `Muito obrigado! Recebemos *${vPago} MT* da sua dívida (Ref: \`${txnId || 'PAGAMENTO'}\`).\n\n` +
                       `💰 *Dívida Anterior:* ${dividaAnteriorMt} MT\n` +
                       `💵 *Valor Abatido:* ${vPago} MT\n` +
                       `🔴 *VALOR QUE AINDA FALTA:* *${novoRestanteMt} MT*\n\n` +
-                      `📌 Para concluir o pagamento do resto, efetue o pagamento dos *${novoRestanteMt} MT* e envie novamente:\n` +
-                      `👉 *.pagar <comprovativo>*`
+                      `📌 Para concluir a quitação do resto, efetue o pagamento dos *${novoRestanteMt} MT* restantes e envie novamente:\n` +
+                      `👉 *.pagar <comprovativo>*\n\n` +
+                      `🙏 _Agradecemos pelo seu esforço em manter a sua conta em dia!_ ✨`
         };
     }
 }

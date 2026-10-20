@@ -2473,6 +2473,27 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
 
                         await reply(resPagar.mensagem);
+
+                        // 🎉 Agradecimento público no grupo onde o cliente solicitou ou no grupo oficial
+                        if (resPagar.quitado) {
+                            let grupoAgradecimento = null;
+                            if (jid.endsWith('@g.us')) grupoAgradecimento = jid;
+                            else if (resPagar.jidOrigem && resPagar.jidOrigem.endsWith('@g.us')) grupoAgradecimento = resPagar.jidOrigem;
+                            else if (DYN_CFG.GRUPO_NOTIFICACOES) grupoAgradecimento = DYN_CFG.GRUPO_NOTIFICACOES;
+
+                            if (grupoAgradecimento && sock) {
+                                const mentionUser = `258${senderNumber}@s.whatsapp.net`;
+                                sock.sendMessage(grupoAgradecimento, {
+                                    text: `🎉 *TXENECO REGULARIZADO COM SUCESSO!* 👏\n` +
+                                          `━━━━━━━━━━━━━━━━━━\n` +
+                                          `O cliente @${senderNumber} acabou de quitar 100% da sua dívida de Txeneco!\n\n` +
+                                          `🔓 *Status:* Crédito totalmente restaurado!\n` +
+                                          `🙏 *MUITO OBRIGADO PELA SUA PREFERÊNCIA E HONESTIDADE!* 🌟✨`,
+                                    mentions: [mentionUser]
+                                }).catch(e => console.warn('⚠️ Erro ao postar agradecimento no grupo:', e.message));
+                            }
+                        }
+
                         continue;
                     }
 
