@@ -756,25 +756,15 @@ function gerarMensagemBoasVindasGrupo(groupName, participantJids) {
 
 function gerarMensagemPagamento(nomeCliente) {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
-    const { supportNum } = getSuporteDetails();
     return (
-        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-        `  💳 *CONTAS PARA PAGAMENTO* 💳\n` +
-        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-        `Olá, *${nomeCliente}*! Pode efectuar a transferência para qualquer uma das contas abaixo:\n\n` +
-        `📱 *VODACOM (M-PESA)*\n` +
-        `├ 📞 *Número:* \`${mpesa_num}\`\n` +
-        `└ 👤 *Titular:* *${mpesa_name}*\n\n` +
-        `📱 *MOVITEL (E-MOLA)*\n` +
-        `├ 📞 *Número:* \`${emola_num}\`\n` +
-        `└ 👤 *Titular:* *${emola_name}*\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📝 *COMO FINALIZAR SUA RECARGA:*\n` +
-        `1. Faça a transferência do valor exato.\n` +
-        `2. Encaminhe o SMS do comprovativo aqui.\n` +
-        `3. Adicione o seu número Vodacom (*84* ou *85*) na última linha.\n\n` +
-        `⏳ *A ativação pelo robô é imediata e 24h por dia!*\n\n` +
-        `❓ *Dúvidas ou problemas?* Digite *Suporte* ou ligue para *${supportNum}*`
+        `💳 *FORMAS DE PAGAMENTO*\n\n` +
+        `🔴 *M-Pesa:* \`${mpesa_num}\`\n` +
+        `👤 *Titular:* ${mpesa_name}\n\n` +
+        `🟠 *e-Mola:* \`${emola_num}\`\n` +
+        `👤 *Titular:* ${emola_name}\n\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `📲 Envie o comprovativo com o seu número na última linha.\n` +
+        `⚡ _Ativação imediata 24h!_`
     );
 }
 
