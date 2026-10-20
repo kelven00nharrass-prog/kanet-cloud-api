@@ -4270,6 +4270,31 @@ app.post('/api/sms/payment', (req, res) => {
     let cleanTxnId = String(txn_id || '').trim().toUpperCase();
     if (cleanTxnId.endsWith('.')) cleanTxnId = cleanTxnId.slice(0, -1);
 
+    // 🛑 REGRA ESTRITA: Apenas M-Pesa e e-Mola são aceitos como pagamento!
+    const cleanMetodo = String(metodo || '').toLowerCase().trim();
+    const isMpesa = cleanMetodo === 'mpesa' || cleanMetodo === 'm-pesa';
+    const isEmola = cleanMetodo === 'emola' || cleanMetodo === 'e-mola';
+
+    if (!isMpesa && !isEmola) {
+      console.warn(`🛑 [SMS PAYMENT REJEITADO] Método "${metodo}" não é M-Pesa nem e-Mola. Ignorando.`);
+      return res.status(400).json({
+        success: false,
+        mensagem: 'Apenas pagamentos M-Pesa e e-Mola são aceitos pelo sistema.'
+      });
+    }
+
+    // Se o SMS bruto foi enviado, validar que não é mensagem de saldo de recarga/voz/txuna/empréstimo
+    if (raw_sms) {
+      const rawLower = String(raw_sms).toLowerCase();
+      if (/(?:saldo\s+(?:de\s+)?(?:voz|dados|megas|internet|recarga|principal)|transferiste\s+saldo|recebeste\s+saldo|partilha\s+de\s+saldo|txuna|empr[eé]stimo|recarga\s+(?:de\s+)?\d|b[oó]nus)/i.test(rawLower)) {
+        console.warn(`🛑 [SMS PAYMENT REJEITADO] SMS bruto é transferência de saldo/recarga/txuna, não é pagamento: "${raw_sms.slice(0, 70)}"`);
+        return res.status(400).json({
+          success: false,
+          mensagem: 'Transferências de saldo, recargas ou txuna não são aceitas como pagamento.'
+        });
+      }
+    }
+
     // Anti-fraude: verificar duplicação
     if (inMemoryPayments.has(cleanTxnId)) {
       console.warn(`⚠️ [SMS PAYMENT] Transação duplicada ignorada no cache geral: ${cleanTxnId}`);

@@ -419,19 +419,8 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
     console.log(`📩 [SMS BOT] Mensagem de ${cleanSender} (Porta ${port || 'Auto'}, SIM ${simSlot + 1}): "${text.slice(0, 80)}"`);
 
     // ── 1. DETECTAR SE É UM COMPROVATIVO ENCAMINHADO PELO CLIENTE (PRIMEIRA PRIORIDADE!) ──
-    const isComprovativo = (
-        cleanText.includes('confirmado') ||
-        cleanText.includes('transferiste') ||
-        cleanText.includes('recebeste') ||
-        cleanText.includes('recebeu') ||
-        cleanText.includes('transacao') ||
-        cleanText.includes('transação') ||
-        cleanText.includes('id da transacao') ||
-        cleanText.includes('id trans') ||
-        cleanText.includes('pp2') ||
-        (cleanText.includes('m-pesa') && (cleanText.includes('mzn') || cleanText.includes('mt'))) ||
-        (cleanText.includes('emola') && (cleanText.includes('mzn') || cleanText.includes('mt')))
-    );
+    // 🛑 REGRA ESTRITA: Apenas comprovativos legítimos de M-Pesa ou e-Mola são aceitos como pagamento!
+    const isComprovativo = isMpesaReceipt(text) || isEmolaReceipt(text);
 
     if (isComprovativo) {
         const txnId = extrairTxnId(text);

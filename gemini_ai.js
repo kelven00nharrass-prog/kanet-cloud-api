@@ -93,23 +93,25 @@ async function analisarPrintPagamento(imageBuffer, mimeType = 'image/jpeg') {
 
     const base64 = imageBuffer.toString('base64');
 
-    const prompt = `Analisa esta imagem de SMS ou screenshot de M-Pesa ou e-Mola de Moçambique.
+    const prompt = `Analisa esta imagem de SMS ou screenshot de Moçambique.
+REGRA OBRIGATÓRIA: APENAS comprovativos legítimos de M-Pesa (Vodacom) ou e-Mola (Movitel) são válidos!
+Bancos (BIM, BCI, etc.), transferências de saldo de recarga/voz/crédito, Txuna ou mensagens normais NÃO SÃO VÁLIDOS (devem ter "valido": false).
 
-Extrai os seguintes dados SE existirem (responde APENAS com JSON válido, sem markdown):
+Extrai os seguintes dados SE for M-Pesa ou e-Mola (responde APENAS com JSON válido, sem markdown):
 {
   "valido": true/false,
-  "servico": "M-Pesa" ou "e-Mola" ou "outro",
-  "txnId": "ID da transação (ex: ABC12345678)",
+  "servico": "M-Pesa" ou "e-Mola",
+  "txnId": "ID da transação (ex: ABC12345678 ou PP...)",
   "valor": número em meticais (ex: 150),
   "remetente": "nome ou número de quem enviou",
   "para": "nome ou número de quem recebeu",
   "data": "data/hora da transação se visível",
-  "tipo": "Envio de dinheiro" ou "Recarga" ou "Pagamento" ou "outro",
+  "tipo": "Transferência M-Pesa" ou "Transferência e-Mola",
   "raw_text": "todo o texto que consegues ler na imagem",
   "confianca": "alta" ou "media" ou "baixa"
 }
 
-Se não for uma imagem de pagamento, retorna: {"valido": false, "motivo": "não é comprovativo de pagamento"}`;
+Se não for M-Pesa ou e-Mola, retorna: {"valido": false, "motivo": "apenas comprovativos M-Pesa e e-Mola são aceitos"}`;
 
     const cleanMime = sanitizeMimeType(mimeType, 'image/jpeg');
 
@@ -156,23 +158,25 @@ async function analisarDocumentoPDF(pdfBuffer) {
 
     const base64 = pdfBuffer.toString('base64');
 
-    const prompt = `Analisa este documento PDF que pode ser um comprovativo de pagamento de M-Pesa, e-Mola ou transferência bancária de Moçambique.
+    const prompt = `Analisa este documento PDF de Moçambique.
+REGRA OBRIGATÓRIA: APENAS comprovativos legítimos de M-Pesa (Vodacom) ou e-Mola (Movitel) são válidos!
+Bancos (BIM, BCI, etc.), faturas, transferências de saldo ou outros documentos NÃO SÃO VÁLIDOS (devem ter "valido": false).
 
-Extrai os seguintes dados SE existirem (responde APENAS com JSON válido, sem markdown):
+Extrai os seguintes dados SE for M-Pesa ou e-Mola (responde APENAS com JSON válido, sem markdown):
 {
   "valido": true/false,
-  "servico": "M-Pesa" ou "e-Mola" ou "Banco" ou "outro",
-  "txnId": "ID da transação (ex: ABC12345678)",
+  "servico": "M-Pesa" ou "e-Mola",
+  "txnId": "ID da transação (ex: ABC12345678 ou PP...)",
   "valor": número em meticais (ex: 150),
   "remetente": "nome ou número de quem enviou",
   "para": "nome ou número de quem recebeu",
   "data": "data/hora da transação se visível",
-  "tipo": "Envio de dinheiro" ou "Recarga" ou "Pagamento" ou "outro",
+  "tipo": "Transferência M-Pesa" ou "Transferência e-Mola",
   "raw_text": "todo o texto relevante do documento",
   "confianca": "alta" ou "media" ou "baixa"
 }
 
-Se não for um documento de pagamento, retorna: {"valido": false, "motivo": "não é comprovativo de pagamento"}`;
+Se não for M-Pesa ou e-Mola, retorna: {"valido": false, "motivo": "apenas comprovativos M-Pesa e e-Mola são aceitos"}`;
 
     try {
         const payload = {

@@ -1140,11 +1140,73 @@ function extrairTxId(texto) {
     return results.sort((a,b) => b.score - a.score || b.val.length - a.val.length)[0].val;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// VALIDADORES ESTRITOS DE COMPROVATIVO: APENAS M-PESA E E-MOLA SÃO VÁLIDOS!
+// ══════════════════════════════════════════════════════════════════════════
+
+function isMpesaReceipt(texto) {
+    if (!texto) return false;
+    const cleanLower = String(texto).trim().toLowerCase();
+
+    // 1. Rejeições estritas: transferências de saldo/crédito, recarga voucher, txuna, empréstimo, bónus
+    if (/(?:saldo\s+(?:de\s+)?(?:voz|dados|megas|internet|recarga|principal)|transferiste\s+saldo|recebeste\s+saldo|transferiu\s+saldo|recebeu\s+saldo|txuna|empr[eé]stimo|recarga\s+(?:de\s+)?\d|b[oó]nus)/i.test(cleanLower)) {
+        return false;
+    }
+
+    // 2. Rejeitar mensagens de bancos e outros canais se não for M-Pesa
+    if (/(?:bci|millennium|bim|standard\s*bank|moza|banco|carteira\s*m[oó]vel|mkesh|tmcel)/i.test(cleanLower) && !cleanLower.includes('m-pesa') && !cleanLower.includes('mpesa')) {
+        return false;
+    }
+
+    // 3. Indicadores M-Pesa obrigatórios (Confirmado ou palavra-chave M-Pesa)
+    const hasMpesaKeyword = /\bm-?pesa\b/i.test(cleanLower);
+    const hasConfirmado = /\bconfirmado\b/i.test(cleanLower);
+    if (!hasMpesaKeyword && !hasConfirmado) {
+        return false;
+    }
+
+    // 4. Ação de transação em dinheiro
+    const hasAction = /(?:recebeu|recebeste|depositou|creditou|transferiste|transferiu|pagou|enviou)\s+(?:de\s+)?[\d.,]+\s*(?:mt|mzn|mts?)/i.test(cleanLower) ||
+                      /[\d.,]+\s*(?:mt|mzn|mts?)\s+(?:de|para)\s+/i.test(cleanLower);
+
+    // 5. Valor monetário em MT/MZN
+    const hasValor = /[\d.,]+\s*(?:mt|mzn|mts?)\b/i.test(cleanLower);
+
+    return (hasMpesaKeyword || hasConfirmado) && hasAction && hasValor;
+}
+
+function isEmolaReceipt(texto) {
+    if (!texto) return false;
+    const cleanLower = String(texto).trim().toLowerCase();
+
+    // 1. Rejeições estritas: partilha de saldo de voz/dados, empréstimo, recarga
+    if (/(?:partilha\s+de\s+saldo|saldo\s+(?:de\s+)?(?:voz|dados|megas|internet)|cr[eé]dito\s+emprestado|empresta\s+movitel|recarga\s+(?:de\s+)?\d)/i.test(cleanLower)) {
+        return false;
+    }
+
+    // 2. Rejeitar mensagens de bancos e outros
+    if (/(?:bci|millennium|bim|standard\s*bank|moza|banco)/i.test(cleanLower) && !cleanLower.includes('emola') && !cleanLower.includes('e-mola')) {
+        return false;
+    }
+
+    // 3. Indicadores e-Mola obrigatórios (ID da transação PP... ou palavra-chave e-Mola)
+    const hasEmolaKeyword = /\be-?mola\b/i.test(cleanLower);
+    const hasIdTrans = /\b(?:id\s*(?:da\s*)?transa[cç][aã]o|id\s*trans|transaction\s*id)\b/i.test(cleanLower);
+    const hasPPCode = /\bpp[0-9]{6}\b/i.test(cleanLower);
+
+    if (!hasEmolaKeyword && !hasIdTrans && !hasPPCode) {
+        return false;
+    }
+
+    // 4. Valor monetário em MT/MZN
+    const hasValor = /[\d.,]+\s*(?:mt|mzn|mts?)\b/i.test(cleanLower);
+
+    return hasValor;
+}
+
 function isComprovativo(texto) {
     if (!texto) return false;
-    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|Transf|e-Mola|eMola|M-Pesa|MPesa|TxId|Transação|Transacao|ID\s*(?:da)?\s*transa|ID\s*Trans|PP2\d{5})/i.test(texto);
-    const temValor = /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(texto);
-    return temIndicador && temValor;
+    return isMpesaReceipt(texto) || isEmolaReceipt(texto);
 }
 
 function separarMultiplosComprovativos(texto) {
@@ -1158,12 +1220,14 @@ function separarMultiplosComprovativos(texto) {
     const comprovativos = [];
     const idsVistos = new Set();
     for (const bloco of blocos) {
+        // 🛑 APENAS processa o bloco se for comprovativo genuíno M-Pesa ou e-Mola!
+        if (!isComprovativo(bloco)) continue;
+
         const val = extrairValorMT(bloco);
         const tx = extrairTxId(bloco);
-        const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|Transf|e-Mola|eMola|M-Pesa|MPesa|TxId|Transação|Transacao|ID\s*(?:da)?\s*transa|PP2\d{5})/i.test(bloco);
-        if (val && tx && temIndicador && !idsVistos.has(tx)) {
+        if (val && tx && !idsVistos.has(tx)) {
             idsVistos.add(tx);
-            const isEmola = /e-?mola|PP2|movitel|864882152/i.test(bloco) || /^ID\s*(?:da\s*)?trans/i.test(bloco);
+            const isEmola = isEmolaReceipt(bloco);
             comprovativos.push({
                 txn_id: tx,
                 valor: parseFloat(val),
@@ -1784,6 +1848,15 @@ async function startWhatsApp(orderCallback, db = null) {
                             const analise = await geminiAI.analisarPrintPagamento(imgBuffer, mimeType);
 
                             if (analise && analise.valido && analise.txnId) {
+                                const sClean = String(analise.servico || '').toLowerCase();
+                                const isMpesaOrEmola = sClean.includes('mpesa') || sClean.includes('m-pesa') || sClean.includes('emola') || sClean.includes('e-mola');
+                                if (!isMpesaOrEmola) {
+                                    addLog(`🛑 [GEMINI VISION] Imagem rejeitada: serviço "${analise.servico}" não é M-Pesa nem e-Mola.`);
+                                    await sock.sendMessage(jid, {
+                                        text: `⚠️ *Aviso Ka-Net:* O sistema aceita exclusivamente comprovativos oficiais de *M-Pesa* ou *e-Mola*. Outros serviços ou bancos não são aceitos.`
+                                    });
+                                    continue;
+                                }
                                 const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de KaNet\n` + (analise.raw_text || '');
                                 const legenda = text.trim();
                                 text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
@@ -1816,6 +1889,15 @@ async function startWhatsApp(orderCallback, db = null) {
                             const analise = await geminiAI.analisarDocumentoPDF(pdfBuffer);
 
                             if (analise && analise.valido && analise.txnId) {
+                                const sClean = String(analise.servico || '').toLowerCase();
+                                const isMpesaOrEmola = sClean.includes('mpesa') || sClean.includes('m-pesa') || sClean.includes('emola') || sClean.includes('e-mola');
+                                if (!isMpesaOrEmola) {
+                                    addLog(`🛑 [GEMINI PDF] Documento rejeitado: serviço "${analise.servico}" não é M-Pesa nem e-Mola.`);
+                                    await sock.sendMessage(jid, {
+                                        text: `⚠️ *Aviso Ka-Net:* O sistema aceita exclusivamente comprovativos oficiais de *M-Pesa* ou *e-Mola*. Outros serviços ou bancos não são aceitos.`
+                                    });
+                                    continue;
+                                }
                                 const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de KaNet\n` + (analise.raw_text || '');
                                 const legenda = text.trim();
                                 text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
