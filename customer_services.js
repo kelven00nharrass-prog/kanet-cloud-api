@@ -356,6 +356,23 @@ async function solicitarTxeneco({ senderPhone, mbSolicitado, numDestino, jid, se
     };
 
     const dividaAtualMb = loanRecord.activeDebtMb || 0;
+
+    // 🛡️ REGRA ESTRITA: Enquanto tiver dívida ativa pendente, NÃO pode txenecar mais!
+    if (loanRecord.status === 'pendente' && (loanRecord.restanteMt > 0 || dividaAtualMb > 0)) {
+        return {
+            success: false,
+            mensagem: `⚠️ *VOCÊ JÁ POSSUI UM TXENECO ATIVO PENDENTE* 💳\n` +
+                      `━━━━━━━━━━━━━━━━━━\n` +
+                      `Enquanto tiver uma dívida pendente, não é permitido solicitar novo crédito.\n\n` +
+                      `💰 *Valor Atual a Liquidar:* *${loanRecord.restanteMt} MT* (com taxa de 10%)\n` +
+                      `📦 *Txeneco Ativo em Uso:* *${dividaAtualMb >= 1024 ? (dividaAtualMb/1024).toFixed(1)+'GB' : dividaAtualMb+'MB'}*\n\n` +
+                      `💡 *Como Quitar a Dívida:*\n` +
+                      `Transfira o valor via M-Pesa ou e-Mola e envie aqui o comando:\n` +
+                      `👉 *.pagar <comprovativo>*\n\n` +
+                      `🛒 _Lembre-se: Você pode continuar a comprar recargas normais a qualquer momento!_`
+        };
+    }
+
     const limiteDisponivelMb = Math.max(0, tetoMaximoMb - dividaAtualMb);
 
     if (qtdMb > limiteDisponivelMb) {
@@ -396,6 +413,9 @@ async function solicitarTxeneco({ senderPhone, mbSolicitado, numDestino, jid, se
     loanRecord.totalDevidoMt = (loanRecord.totalDevidoMt || 0) + totalNovoEmprestimoMt;
     loanRecord.restanteMt = (loanRecord.restanteMt || 0) + totalNovoEmprestimoMt;
     loanRecord.status = 'pendente';
+    loanRecord.jidOrigem = jid || loanRecord.jidOrigem || null;
+    loanRecord.senderName = senderName || loanRecord.senderName || null;
+    loanRecord.ultimoLembreteSlot = null;
 
     const orderId = `TXN-${Date.now()}`;
     if (!Array.isArray(loanRecord.historico)) loanRecord.historico = [];
@@ -917,6 +937,33 @@ function parseMultiDestino(texto, totalValorMT = 0, buscarPacoteFn = null) {
     return segments;
 }
 
+
+// ── GESTÃO DE COBRANÇAS E LEMBRETES DE DÍVIDAS ───────────────────────────────
+
+function obterDevedoresAtivos() {
+    const devedores = [];
+    for (const [phone, loan] of clientLoans.entries()) {
+        if (loan.status === 'pendente' && (loan.restanteMt > 0 || (loan.activeDebtMb || 0) > 0)) {
+            devedores.push(loan);
+        }
+    }
+    return devedores;
+}
+
+function registrarLembreteEnviado(phone, slotId) {
+    const tel = normalizarTelefone(phone);
+    const loan = clientLoans.get(tel);
+    if (loan) {
+        loan.ultimoLembreteSlot = slotId;
+        loan.ultimoLembreteData = new Date().toISOString();
+        if (!Array.isArray(loan.lembretesEnviados)) loan.lembretesEnviados = [];
+        loan.lembretesEnviados.push({ slotId, data: loan.ultimoLembreteData });
+        if (loan.lembretesEnviados.length > 30) loan.lembretesEnviados.shift();
+        salvarCacheLocal();
+        salvarNoFirestore('client_loans', tel, loan);
+    }
+}
+
 module.exports = {
     initCustomerServices,
     normalizarTelefone,
@@ -928,6 +975,8 @@ module.exports = {
     solicitarTxeneco,
     processarPagamentoDivida,
     getClienteDivida,
+    obterDevedoresAtivos,
+    registrarLembreteEnviado,
     // Receptor Padrão
     definirReceptorPadrao,
     obterReceptorPadrao,

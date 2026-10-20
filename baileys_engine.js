@@ -4455,6 +4455,102 @@ async function sendAnnouncementToGroups(mensagem, targetJids = null) {
     return { count: results.filter(r => r.ok).length, total: jidsToAnnounce.length, results };
 }
 
+
+// ────────────────────────────────────────────────────────────────
+// MOTOR AUTOMÁTICO DE LEMBRETES DE TXENECO (3X AO DIA)
+// ────────────────────────────────────────────────────────────────
+async function executarLembretesDividas() {
+    try {
+        if (!sock || connectionStatus !== 'connected') return;
+        const agora = new Date();
+        const horaStr = agora.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour12: false });
+        const dataStr = agora.toLocaleDateString('pt-PT', { timeZone: 'Africa/Maputo' });
+        const hora = parseInt(horaStr.split(':')[0], 10);
+
+        // 3 Horários de envio por dia (Fuso de Maputo / Moçambique):
+        // 1. Manhã: 08:00 às 11:59
+        // 2. Tarde: 12:00 às 16:59
+        // 3. Noite: 17:00 às 21:59
+        let slot = null;
+        if (hora >= 8 && hora < 12) slot = { slotId: `${dataStr}:manha`, turno: 'Manhã' };
+        else if (hora >= 12 && hora < 17) slot = { slotId: `${dataStr}:tarde`, turno: 'Tarde' };
+        else if (hora >= 17 && hora < 22) slot = { slotId: `${dataStr}:noite`, turno: 'Noite' };
+
+        if (!slot) return; // Não envia de madrugada para não incomodar o cliente
+
+        const devedores = customerServices.obterDevedoresAtivos();
+        if (!devedores || devedores.length === 0) return;
+
+        for (const dev of devedores) {
+            // Se já enviou neste turno de hoje, não repete
+            if (dev.ultimoLembreteSlot === slot.slotId) continue;
+
+            const clientPhone = dev.phone;
+            const jidPrivado = `258${clientPhone}@s.whatsapp.net`;
+            const volStr = dev.activeDebtMb >= 1024 ? `${(dev.activeDebtMb / 1024).toFixed(1)}GB` : `${dev.activeDebtMb}MB`;
+            const nomeStr = dev.senderName ? `*${dev.senderName}*` : `Cliente *${clientPhone}*`;
+
+            // 1. Lembrete no PRIVADO do cliente
+            const msgPrivado = (
+                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                `  ⏰ *LEMBRETE DE PAGAMENTO TXENECO* ⏳\n` +
+                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                `Olá ${nomeStr}! Este é um lembrete do seu adiantamento de internet no Ka-Net:\n\n` +
+                `💰 *Valor Pendente a Liquidar:* *${dev.restanteMt} MT*\n` +
+                `📦 *Internet Adiantada:* *${volStr}*\n` +
+                `🏷️ *Taxa de Serviço (10%):* já inclusa no valor acima\n\n` +
+                `💡 *Como Efetuar o Pagamento:*\n` +
+                `1. Transfira o valor de *${dev.restanteMt} MT* via M-Pesa ou e-Mola.\n` +
+                `2. Envie aqui o comprovativo com o comando:\n` +
+                `👉 *.pagar <comprovativo>*\n\n` +
+                `🔓 _Assim que quitar, o seu limite de Txeneco será totalmente liberado!_\n` +
+                `🛒 _Lembramos que pode continuar a fazer recargas normais normalmente._ 🌐✨`
+            );
+
+            sock.sendMessage(jidPrivado, { text: msgPrivado }).catch(e => {
+                console.warn(`⚠️ [LEMBRETE PRIVADO FALHOU] ${clientPhone}:`, e.message);
+            });
+
+            // 2. Lembrete no GRUPO (onde o cliente interagiu ou no grupo oficial)
+            let targetGrupoJid = null;
+            if (dev.jidOrigem && dev.jidOrigem.endsWith('@g.us')) {
+                targetGrupoJid = dev.jidOrigem;
+            } else if (DYN_CFG.GRUPO_NOTIFICACOES) {
+                targetGrupoJid = DYN_CFG.GRUPO_NOTIFICACOES;
+            }
+
+            if (targetGrupoJid) {
+                const mentionJid = `258${clientPhone}@s.whatsapp.net`;
+                const msgGrupo = (
+                    `⏰ *AVISO DE REGULARIZAÇÃO TXENECO* ⏳\n` +
+                    `━━━━━━━━━━━━━━━━━━\n` +
+                    `Olá @${clientPhone}! Lembramos que tens um saldo pendente de Txeneco de *${dev.restanteMt} MT* (*${volStr}*).\n\n` +
+                    `💳 Para quitar e liberar novo crédito de internet, efetue o pagamento e envie no privado do bot:\n` +
+                    `👉 *.pagar <comprovativo>*\n\n` +
+                    `🛒 _(Você pode continuar a comprar recargas normais a qualquer momento!)_`
+                );
+
+                sock.sendMessage(targetGrupoJid, {
+                    text: msgGrupo,
+                    mentions: [mentionJid]
+                }).catch(e => {
+                    console.warn(`⚠️ [LEMBRETE GRUPO FALHOU] ${clientPhone}:`, e.message);
+                });
+            }
+
+            customerServices.registrarLembreteEnviado(clientPhone, slot.slotId);
+            console.log(`⏰ [LEMBRETE TXENECO ENVIADO] Cliente ${clientPhone} (${slot.turno}): ${dev.restanteMt} MT.`);
+        }
+    } catch (err) {
+        console.error('❌ [ERRO LEMBRETES TXENECO]:', err.message);
+    }
+}
+
+// Iniciar verificação automática a cada 15 minutos
+setInterval(executarLembretesDividas, 15 * 60 * 1000);
+// E agendar primeira verificação 1 minuto após início
+setTimeout(executarLembretesDividas, 60 * 1000);
+
 module.exports = { 
     startWhatsApp, 
     getStatus, 
@@ -4490,6 +4586,7 @@ module.exports = {
     calcularPacoteProporcional,
     buscarPacotePorValor,
     separarMultiplosComprovativos,
+    executarLembretesDividas,
     get DYN_CFG() { return DYN_CFG; },
     getRecentLogs: () => recentLogs
 };
