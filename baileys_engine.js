@@ -1248,6 +1248,21 @@ function extrairNumeroDestinoAbaixoDoComprovativo(texto) {
     return null;
 }
 
+function extrairTextoAbaixoDoComprovativo(texto) {
+    if (!texto) return '';
+    const lines = String(texto).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return '';
+    const nonReceiptLines = [];
+    for (let i = 1; i < lines.length; i++) {
+        const l = lines[i];
+        if (/(?:confirmado|transferiste|recebeste|recebeu|transferiu|saldo|taxa foi|liga 100|m-pesa|e-mola|vodacom|movitel|em caso de duvida)/i.test(l)) {
+            continue;
+        }
+        nonReceiptLines.push(l);
+    }
+    return nonReceiptLines.join('\n');
+}
+
 function processarAddTabelaCompleta(corpo, targetJid = null) {
     function _parseToMB(sizeStr) {
         sizeStr = sizeStr.trim().replace(/,/g, '.');
@@ -2164,7 +2179,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                 }
                             }
                             // ── MULTI-DESTINO QUANDO O CLIENTE ENVIA MÚLTIPLOS NÚMEROS APÓS O COMPROVATIVO ──
-                            const multiDest = customerServices.parseMultiDestino(text, parseFloat(pay.valor), (v) => buscarPacotePorValor(v, jid));
+                            const textoAbaixo2 = extrairTextoAbaixoDoComprovativo(text);
+                            const multiDest = customerServices.parseMultiDestino(textoAbaixo2 || text, parseFloat(pay.valor), (v) => buscarPacotePorValor(v, jid));
                             if (multiDest && multiDest.length >= 2) {
                                 pendingPayments.delete(targetKey);
                                 multiDest.forEach((item, idx) => {
@@ -3489,7 +3505,8 @@ async function startWhatsApp(orderCallback, db = null) {
                         const numDestinoInline = extrairNumeroDestinoAbaixoDoComprovativo(text);
 
                         // ── 📦 DIVISÃO MULTI-DESTINO EM PAGAMENTO ÚNICO ──
-                        const multiDestinos = customerServices.parseMultiDestino(text, parseFloat(valor), (v) => buscarPacotePorValor(v, jid));
+                        const textoAbaixoDoComprovativo = extrairTextoAbaixoDoComprovativo(text);
+                        const multiDestinos = customerServices.parseMultiDestino(textoAbaixoDoComprovativo || text, parseFloat(valor), (v) => buscarPacotePorValor(v, jid));
                         if (multiDestinos && multiDestinos.length >= 2) {
                             console.log(`📦 [MULTI-DESTINO DETECTADO] Dividindo ${valor} MT entre ${multiDestinos.length} números:`, multiDestinos);
 

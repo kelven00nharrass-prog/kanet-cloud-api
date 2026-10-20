@@ -833,14 +833,33 @@ async function sacarBonus({ senderPhone, mbSolicitado, numDestino, jid }) {
 
 // ── 6. PARSER E DISTRIBUIÇÃO MULTI-DESTINO ────────────────────────────────────
 
+const DEPOSIT_NUMBERS = new Set([
+    '856268811', '864882152', '850401416', '856116039',
+    '258856268811', '258864882152', '258850401416', '258856116039'
+]);
+
+function isNumeroDepositoCS(num) {
+    if (!num) return false;
+    const clean = String(num).replace(/\D/g, '');
+    const clean9 = clean.startsWith('258') && clean.length === 12 ? clean.slice(3) : clean;
+    return DEPOSIT_NUMBERS.has(clean) || DEPOSIT_NUMBERS.has(clean9);
+}
+
 /**
  * Analisa instruções de multi-destino em um texto de pagamento.
- * Ex: "manda 2gb para 856268811 e dois para 841234567"
+ * Ex: "manda 2gb para 841111111 e dois para 841234567"
  * ou "2gb para 841111111 e 1gb para 852222222"
  */
 function parseMultiDestino(texto, totalValorMT = 0, buscarPacoteFn = null) {
     if (!texto) return null;
-    const clean = String(texto).trim();
+    let clean = String(texto).trim();
+
+    // Se o texto contiver linhas de comprovativo, isolar apenas linhas de instruções/números
+    const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const nonReceiptLines = lines.filter(l => !/(?:confirmado|transferiste|recebeste|recebeu|transferiu|saldo|taxa foi|liga 100|m-pesa|e-mola|vodacom|movitel|em caso de duvida)/i.test(l));
+    if (nonReceiptLines.length > 0 && lines.length > nonReceiptLines.length) {
+        clean = nonReceiptLines.join('\n');
+    }
 
     const wordToNum = {
         'meio': 0.5,
@@ -851,15 +870,19 @@ function parseMultiDestino(texto, totalValorMT = 0, buscarPacoteFn = null) {
         'cinco': 5, '5': 5
     };
 
-    // Procurar todos os números Vodacom (84 ou 85)
+    // Procurar todos os números Vodacom (84 ou 85), descartando números de depósito oficiais da empresa
     const phoneRegex = /(?:258)?(8[45]\d{7})/g;
     const phones = [];
     let pMatch;
     while ((pMatch = phoneRegex.exec(clean)) !== null) {
+        const pNum = pMatch[1];
+        if (isNumeroDepositoCS(pNum)) {
+            continue;
+        }
         // Evitar números repetidos no mesmo índice
         if (!phones.some(p => p.index === pMatch.index)) {
             phones.push({
-                phone: pMatch[1],
+                phone: pNum,
                 index: pMatch.index
             });
         }
@@ -880,7 +903,7 @@ function parseMultiDestino(texto, totalValorMT = 0, buscarPacoteFn = null) {
         let mb = null;
 
         // 1. Procura formato explícito de volume (ex: 2gb, 1024mb, 2.5gb)
-        const volRegex = /(\d+(?:[.,]\d+)?)\s*(gb|mb|g|m)\b/i;
+        const volRegex = /(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(gb|mb|g|m)\b/i;
         const vMatch = textBefore.match(volRegex) || textAfter.match(volRegex);
         if (vMatch) {
             const val = parseFloat(vMatch[1].replace(',', '.'));
@@ -898,11 +921,12 @@ function parseMultiDestino(texto, totalValorMT = 0, buscarPacoteFn = null) {
         }
 
         // 3. Procura valor em MT associado a este número (ex: 50mt para 84..., 50 para 85...)
+        // Evitar pegar casas decimais como 3.90MT sendo lido como 90MT
         if (!mb) {
-            const mtRegex = /(\d+)\s*(?:mt|mzn|meticais)\b/i;
+            const mtRegex = /(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(?:mt|mzn|meticais)\b/i;
             const mtMatch = textBefore.match(mtRegex) || textAfter.match(mtRegex);
             if (mtMatch && buscarPacoteFn) {
-                const subValor = parseInt(mtMatch[1], 10);
+                const subValor = Math.round(parseFloat(mtMatch[1].replace(',', '.')));
                 const pac = buscarPacoteFn(subValor);
                 if (pac && pac.mb) mb = pac.mb;
             }
