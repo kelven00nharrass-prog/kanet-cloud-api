@@ -1678,9 +1678,13 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     const isImage = !!msg.message?.imageMessage;
                     const isAudio = !!(msg.message?.audioMessage || msg.message?.pttMessage);
+                    const isDocument = !!(msg.message?.documentMessage);
+                    const docMime = msg.message?.documentMessage?.mimetype || '';
+                    const isPdf = isDocument && docMime.toLowerCase().includes('pdf');
                     let text = msg.message?.conversation ||
                                  msg.message?.extendedTextMessage?.text ||
-                                 msg.message?.imageMessage?.caption || '';
+                                 msg.message?.imageMessage?.caption ||
+                                 msg.message?.documentMessage?.caption || '';
 
                     // ── 📸 GEMINI VISION: Analisa print de M-Pesa/e-Mola ──────────────────────
                     if (isImage && !isComprovativo(text) && geminiAI.isConfigured()) {
@@ -1711,6 +1715,47 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
                         } catch (imgErr) {
                             addLog(`🖼️ [GEMINI VISION] Erro ao processar imagem: ${imgErr.message}`);
+                            continue;
+                        }
+                    }
+
+                    // ── 📄 GEMINI PDF: Analisa documento PDF de pagamento ─────────────────────
+                    if (isPdf && geminiAI.isConfigured()) {
+                        try {
+                            const pdfBuffer = await downloadMediaMessage(msg, 'buffer', {});
+                            addLog(`📄 [GEMINI PDF] Analisando documento PDF de ${jid}`);
+                            const analise = await geminiAI.analisarDocumentoPDF(pdfBuffer);
+
+                            if (analise && analise.valido && analise.txnId) {
+                                const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de KaNet\n` + (analise.raw_text || '');
+                                const legenda = text.trim();
+                                text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
+                                addLog(`📄 [GEMINI PDF] Documento válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
+                                await sock.sendMessage(jid, {
+                                    text: `📄 *Comprovativo PDF lido pela IA!*\n\n` +
+                                          `🏦 Serviço: *${analise.servico || 'M-Pesa/e-Mola/Banco'}*\n` +
+                                          `💰 Valor: *${analise.valor} MT*\n` +
+                                          `🔑 Referência: *${analise.txnId}*\n\n` +
+                                          `⏳ A validar com a operadora...`
+                                });
+                            } else if (analise && !analise.valido) {
+                                await sock.sendMessage(jid, {
+                                    text: `📄 Recebi o teu PDF, mas não encontrei dados de pagamento nele.\n\n` +
+                                          `Por favor, envia o *SMS de confirmação* (texto) do M-Pesa ou e-Mola, ou um *print/screenshot* do comprovativo.`
+                                });
+                                continue;
+                            } else {
+                                addLog(`📄 [GEMINI PDF] Falha ao analisar PDF`);
+                                await sock.sendMessage(jid, {
+                                    text: `📄 Não consegui ler o PDF. Podes enviar o *texto do SMS* ou um *print* do comprovativo?`
+                                });
+                                continue;
+                            }
+                        } catch (pdfErr) {
+                            addLog(`📄 [GEMINI PDF] Erro ao processar PDF: ${pdfErr.message}`);
+                            await sock.sendMessage(jid, {
+                                text: `📄 Tive dificuldade a ler o PDF. Tenta enviar o *SMS de texto* ou um *print* do comprovativo.`
+                            });
                             continue;
                         }
                     }
