@@ -1438,48 +1438,39 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           }
 
           // Montar saudação e menções reais (sem qualquer exibição de LID)
+          // Montar menção ao cliente (se for em grupo)
           let saudacao = '';
           const mentionsList = [];
 
           if (isGroup) {
             if (realPhone) {
-              saudacao = `Olá @${realPhone}, a sua recarga foi entregue com sucesso! 🎉\n\n`;
+              saudacao = `👤 *Cliente:* @${realPhone}\n`;
               mentionsList.push(realPhone + '@s.whatsapp.net');
               if (senderJid && String(senderJid).endsWith('@lid')) {
                 mentionsList.push(senderJid);
               }
             } else if (senderNome && senderNome !== 'Cliente') {
-              saudacao = `Olá @${senderNome}, a sua recarga foi entregue com sucesso! 🎉\n\n`;
+              saudacao = `👤 *Cliente:* @${senderNome}\n`;
               if (senderJid) mentionsList.push(senderJid);
-            } else {
-              saudacao = `A sua recarga foi entregue com sucesso! 🎉\n\n`;
-              if (senderJid) mentionsList.push(senderJid);
-            }
-          } else {
-            if (senderNome && senderNome !== 'Cliente') {
-              saudacao = `Olá *${senderNome}*, a sua recarga foi entregue com sucesso! 🎉\n\n`;
-            } else {
-              saudacao = `A sua recarga foi entregue com sucesso! 🎉\n\n`;
             }
           }
 
           const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && (req.body.last_result.valor || req.body.last_result.valor_pago)) || null;
           const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
+          const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(resId).startsWith('WA-') ? String(resId).split('-')[1] : resId);
 
           try {
             baileysEngine.sendTextMessage(clientJid,
               `✅ *RECARGA CONCLUÍDA* ⚡\n` +
-              `━━━━━━━━━━━━━━━━━━\n\n` +
-              saudacao +
-              `📲 *Destino:* *${targetNum}*\n` +
-              `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
-              valorLinha +
-              `🔖 *Ref:* \`${resId}\`\n` +
-              `🕒 *Data:* ${horaAgora}\n\n` +
-              `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
-              `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `📞 *Dúvidas ou Suporte:* Digite *Suporte*`,
+              saudacao +
+              `📦 *Pacote:* *${volStr}*${modoBadge}\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
+              valorLinha +
+              `🔖 *Ref:* \`${cleanRef}\`\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📶 *Consultar Saldo:* \`*100*03#\`\n` +
+              `_Obrigado por escolher a Ka-Net!_`,
               { mentions: mentionsList }
             ).catch(errSend => {
               console.error(`❌ [NOTIFICAÇÃO WA ERRO] Falha ao enviar para ${clientJid}:`, errSend.message);
@@ -1772,24 +1763,39 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
           const valorPago = order.valor || order.valor_pago || null;
           const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
           const senderNome = order.senderName || order.nomeCliente || '';
-          const saudacao = (senderNome && senderNome !== 'Cliente')
-            ? `Olá *${senderNome}*, a sua recarga foi entregue com sucesso! 🎉\n\n`
-            : `A sua recarga foi entregue com sucesso! 🎉\n\n`;
+          const isGroup = clientJid && clientJid.endsWith('@g.us');
+          let saudacao = '';
+          const mentionsList = [];
+
+          if (isGroup) {
+            const rawSender = order.senderPhone || order.sender || order.senderNumber || '';
+            const cleanDigits = String(rawSender).replace(/\D/g, '');
+            if (cleanDigits.length === 9) {
+              saudacao = `👤 *Cliente:* @258${cleanDigits}\n`;
+              mentionsList.push(`258${cleanDigits}@s.whatsapp.net`);
+            } else if (cleanDigits.length === 12 && cleanDigits.startsWith('258')) {
+              saudacao = `👤 *Cliente:* @${cleanDigits}\n`;
+              mentionsList.push(`${cleanDigits}@s.whatsapp.net`);
+            } else if (senderNome && senderNome !== 'Cliente') {
+              saudacao = `👤 *Cliente:* @${senderNome}\n`;
+            }
+          }
+
+          const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(orderId).startsWith('WA-') ? String(orderId).split('-')[1] : orderId);
 
           try {
             baileysEngine.sendTextMessage(clientJid,
               `✅ *RECARGA CONCLUÍDA* ⚡\n` +
-              `━━━━━━━━━━━━━━━━━━\n\n` +
-              saudacao +
-              `📲 *Destino:* *${order.numero}*\n` +
-              `📦 *Pacote:* *${volStr}*\n` +
-              valorLinha +
-              `🔖 *Ref:* \`${orderId}\`\n` +
-              `🕒 *Data:* ${horaAgora}\n\n` +
-              `📶 *Consultar Saldo:* Digite *\\*100\\*03#*\n\n` +
-              `🙏 _Muito obrigado pela preferência na Ka-Net! Volte sempre._ 🌐✨\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `📞 *Dúvidas ou Suporte:* Digite *Suporte*`
+              saudacao +
+              `📦 *Pacote:* *${volStr}*\n` +
+              `📲 *Destino:* *${order.numero}*\n` +
+              valorLinha +
+              `🔖 *Ref:* \`${cleanRef}\`\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📶 *Consultar Saldo:* \`*100*03#\`\n` +
+              `_Obrigado por escolher a Ka-Net!_`,
+              { mentions: mentionsList }
             ).catch(e => console.error('❌ [NOTIFICAÇÃO WA ERRO]:', e.message));
             console.log(`📲 [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
           } catch(e) {
