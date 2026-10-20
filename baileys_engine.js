@@ -711,20 +711,19 @@ function gerarMensagemBoasVindas(nomeCliente) {
     const sd = getSaudacaoHora();
     const { supportNum, sysName } = getSuporteDetails();
     return (
-        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-        `  👋 *${sd.toUpperCase()}, ${nomeCliente.toUpperCase()}!* 🌟\n` +
-        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-        `Seja bem-vindo(a) à *${sysName}*!\n` +
-        `A sua plataforma rápida e automática de megas e pacotes de internet 🇲🇿\n\n` +
+        `👋 *${sd.toUpperCase()}, ${nomeCliente.toUpperCase()}!*\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `Seja bem-vindo(a) à *${sysName}*! 🇲🇿\n\n` +
         `📌 *COMO DESEJA COMEÇAR?*\n\n` +
         `1️⃣ *Menu* ➔ Ver Pacotes e Preços\n` +
         `2️⃣ *Pagamento* ➔ Ver Contas M-Pesa e e-Mola\n` +
         `3️⃣ *Estudante* ➔ Tabela com Descontos Escolares\n` +
         `4️⃣ *Fidelidade* ➔ Ganhe Megas Indicando Amigos 🏆\n` +
         `5️⃣ *Suporte* ➔ Falar com Atendimento Humano 📞\n\n` +
+        `💡 _Responda com o número da opção (ex: *1* ou *2*)\n\n` +
         `⚡ *COMPRA RÁPIDA:*\n` +
-        `Já fez o pagamento? Basta enviar o *comprovativo* com o seu *número de destino* para ativar em segundos!\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+        `Já fez o pagamento? Basta enviar o comprovativo com o seu número Vodacom para ativar em segundos!\n` +
+        `━━━━━━━━━━━━━━━━━━`
     );
 }
 
@@ -1866,6 +1865,12 @@ async function startWhatsApp(orderCallback, db = null) {
                     const cleanText = (textSemMencoes || text).trim().toLowerCase();
                     const cleanCmd = cleanText.replace(/^[.!/#]/, '').trim();
 
+                    // Normalizador de opções numéricas (1, 1., 1), [1], opção 1, opcao 1, numero 1, 1 - menu, etc.)
+                    const sLimpoOpcao = cleanCmd.replace(/^[\[(]/, '').replace(/[\])]$/, '').trim();
+                    const matchOpcaoMenu = sLimpoOpcao.match(/^(?:op[cç][aã]o|opt|n[uú]mero|n[oº]|n)?\s*([1-5])(?:\s*[.):\-—]|\s+.*|$)/i) ||
+                                           cleanCmd.match(/^([1-5])\uFE0F?\u20E3?$/);
+                    const opcaoMenuNum = matchOpcaoMenu ? matchOpcaoMenu[1] : null;
+
                     // Lista de todos os identificadores possíveis que o Baileys nos dá
                     const candidateSenders = [
                         msg.key?.participantPn,
@@ -2048,6 +2053,10 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (pendingMatch) {
                         const { key: targetKey, pay } = pendingMatch;
                         if (pay.aguardando_numero) {
+                            // Se o cliente enviar "1", "menu", "cancelar" ou "sair", liberta o pagamento pendente para permitir ver o menu
+                            if (opcaoMenuNum === '1' || ['menu', 'tabela', 'cancelar', 'sair', 'voltar', 'tabelas'].includes(cleanCmd)) {
+                                pendingPayments.delete(targetKey);
+                            } else
                             // ── NOVO: PAGAMENTO COMBINADO / SOMA DE COMPROVATIVOS SEQUENCIAIS ──
                             if (isComprovativo(text)) {
                                 const novoValor = extrairValorMT(text);
@@ -3749,8 +3758,8 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
-                    // ── 11. SISTEMA DE FIDELIDADE E INDICAÇÃO ───────────────
-                    if (['!convite', 'convite', '!fidelidade', 'fidelidade', '3', '3️⃣'].includes(cleanText)) {
+                    // ── 11. SISTEMA DE FIDELIDADE E INDICAÇÃO (OPÇÃO 4) ───────────────
+                    if (opcaoMenuNum === '4' || ['4', '4️⃣', '!convite', 'convite', '!fidelidade', 'fidelidade', 'indicar', 'indicacao', 'indicação'].includes(cleanCmd)) {
                         const meuCodigo = senderNumber;
                         await reply(
                             `🎁 *GANHE BÓNUS INDICANDO AMIGOS*\n\n` +
@@ -3833,14 +3842,14 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
-                    // ── 12. TABELA DE ESTUDANTES ────────────────────────────
-                    if (cleanText.includes('estudante')) {
+                    // ── 12. TABELA DE ESTUDANTES (OPÇÃO 3) ────────────────────────────
+                    if (opcaoMenuNum === '3' || ['3', '3️⃣', 'estudante', 'estudantes', 'escola', 'escolar'].includes(cleanCmd) || cleanText.includes('estudante')) {
                         await reply(gerarMenuEstudante());
                         continue;
                     }
 
-                    // ── 13. MENU / TABELA ORIGINAL ──────────────────────────
-                    const ehPedidoMenu = [
+                    // ── 13. MENU / TABELA ORIGINAL (OPÇÃO 1) ──────────────────────────
+                    const ehPedidoMenu = (opcaoMenuNum === '1') || [
                         '1', '1️⃣', 'menu', 'tabela', 'tabelas', 'pacote', 'pacotes', 'plano', 'planos',
                         'preco', 'precos', 'preço', 'preços', 'valores', 'megas', 'gigas', 'comprar'
                     ].includes(cleanCmd) || 
@@ -3864,8 +3873,8 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // ── 14. PAGAMENTO ORIGINAL ──────────────────────────────
-                    const ehPedidoPagamento = [
+                    // ── 14. PAGAMENTO ORIGINAL (OPÇÃO 2) ──────────────────────────────
+                    const ehPedidoPagamento = (opcaoMenuNum === '2') || [
                         '2', '2️⃣', 'pagamento', 'pagar', 'conta', 'contas', 'mpesa', 'emola', 'dados de pagamento'
                     ].includes(cleanCmd) || 
                     cleanCmd.startsWith('pagamento') ||
@@ -3882,8 +3891,8 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // ── 15. SUPORTE & AJUDA (OU QUANDO NÃO RECEBEU O PACOTE) ──
-                    const ehPedidoSuporte = ['5', '5️⃣', 'suporte', 'ajuda', 'socorro', 'contato', 'contacto', 'admin'].includes(cleanCmd);
+                    // ── 15. SUPORTE & AJUDA (OPÇÃO 5 OU QUANDO NÃO RECEBEU O PACOTE) ──
+                    const ehPedidoSuporte = (opcaoMenuNum === '5') || ['5', '5️⃣', 'suporte', 'ajuda', 'socorro', 'contato', 'contacto', 'admin'].includes(cleanCmd);
                     const ehReclamacaoPacote = [
                         'nao recebi', 'não recebi', 'nao chegou', 'não chegou', 'ainda nao', 'ainda não',
                         'cade meu', 'cadê meu', 'onde esta meu', 'onde está o meu', 'nao ativou', 'não ativou',
