@@ -1158,6 +1158,35 @@ function isComprovativo(texto) {
     return temIndicador && temValor;
 }
 
+function separarMultiplosComprovativos(texto) {
+    if (!texto) return [];
+    const regexDivisor = /(?=(?:\bConfirmado\s+[A-Z0-9]{6,}|\b(?:ID\s*(?:da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)\b))/gi;
+    let blocos = texto.split(regexDivisor).map(b => b.trim()).filter(b => b.length > 15);
+    if (blocos.length < 2) {
+        const porLinhas = texto.split(/(?:\r?\n){2,}/).map(b => b.trim()).filter(b => b.length > 15);
+        if (porLinhas.length >= 2) blocos = porLinhas;
+    }
+    const comprovativos = [];
+    const idsVistos = new Set();
+    for (const bloco of blocos) {
+        const val = extrairValorMT(bloco);
+        const tx = extrairTxId(bloco);
+        const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|Transf|e-Mola|eMola|M-Pesa|MPesa|TxId|Transação|Transacao|ID\s*(?:da)?\s*transa|PP2\d{5})/i.test(bloco);
+        if (val && tx && temIndicador && !idsVistos.has(tx)) {
+            idsVistos.add(tx);
+            const isEmola = /e-?mola|PP2|movitel|864882152/i.test(bloco) || /^ID\s*(?:da\s*)?trans/i.test(bloco);
+            comprovativos.push({
+                txn_id: tx,
+                valor: parseFloat(val),
+                metodo: isEmola ? 'emola' : 'mpesa',
+                metodoNome: isEmola ? 'e-Mola' : 'M-Pesa',
+                raw: bloco
+            });
+        }
+    }
+    return comprovativos;
+}
+
 function getNumerosDeposito() {
     const list = new Set();
     try {
@@ -2029,6 +2058,112 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (pendingMatch) {
                         const { key: targetKey, pay } = pendingMatch;
                         if (pay.aguardando_numero) {
+                            // ── NOVO: PAGAMENTO COMBINADO / SOMA DE COMPROVATIVOS SEQUENCIAIS ──
+                            if (isComprovativo(text)) {
+                                const novoValor = extrairValorMT(text);
+                                const novoTxnId = extrairTxId(text);
+                                const isEmolaPattern = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(text.trim());
+                                const isMpesaPattern = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(text.trim());
+                                const novoMetodo = isEmolaPattern ? 'emola' : isMpesaPattern ? 'mpesa' : /e-?mola|emola|movitel|864882152/i.test(text) ? 'emola' : 'mpesa';
+                                const novoMetodoNome = novoMetodo === 'emola' ? 'e-Mola' : 'M-Pesa';
+
+                                // 1. Verificar se é repetição da mesma sessão
+                                if (novoTxnId && (pay.txn_id === novoTxnId || (Array.isArray(pay.txn_ids) && pay.txn_ids.includes(novoTxnId)))) {
+                                    const vTotal = pay.valor_total || pay.valor;
+                                    await reply(
+                                        `⚠️ *COMPROVATIVO JÁ ADICIONADO!*\n━━━━━━━━━━━━━━━━━━\n` +
+                                        `A transação (\`${novoTxnId}\`) já foi registrada no seu pagamento pendente.\n\n` +
+                                        `💰 *Total Acumulado:* *${vTotal} MT*\n` +
+                                        `📲 Por favor, envie agora o seu *número Vodacom* que deve receber os megas.`
+                                    );
+                                    continue;
+                                }
+
+                                // 2. Verificar se a transação é falsa ou já utilizada no sistema
+                                let jaUsada = false;
+                                if (novoTxnId) {
+                                    if (transacoesProcessadas.has(novoTxnId)) jaUsada = true;
+                                    const reg = transacoesProcessadasMap.get(novoTxnId);
+                                    if (reg && (reg.status === 'completed' || (reg.sender && reg.sender !== senderNumber))) {
+                                        jaUsada = true;
+                                    }
+                                }
+
+                                if (jaUsada || !novoValor) {
+                                    const valorValido = pay.valor_total || pay.valor;
+                                    const pacValido = buscarPacotePorValor(valorValido, jid);
+                                    await reply(
+                                        `⚠️ *SEGUNDO COMPROVATIVO INVÁLIDO OU JÁ UTILIZADO* ❌\n━━━━━━━━━━━━━━━━━━\n` +
+                                        `A transação (\`${novoTxnId || 'N/D'}\`) é inválida ou já foi utilizada anteriormente no sistema.\n\n` +
+                                        `💰 *Saldo Válido Mantido:* *${valorValido} MT*\n` +
+                                        `📦 *Pacote Correspondente:* *${pacValido ? pacValido.nome : valorValido + ' MT'}*\n\n` +
+                                        `📲 *O que fazer agora:*\n` +
+                                        `• Envie agora o seu *número Vodacom* para receber o pacote referente aos *${valorValido} MT* já confirmados.\n` +
+                                        `• Ou envie outro comprovativo válido caso deseje somar mais valor!`
+                                    );
+                                    continue;
+                                }
+
+                                // 3. Transação válida! Acumular saldo
+                                if (!Array.isArray(pay.txn_ids)) pay.txn_ids = [pay.txn_id];
+                                if (!Array.isArray(pay.transacoes)) pay.transacoes = [{ txn_id: pay.txn_id, valor: parseFloat(pay.valor), metodo: pay.metodo || 'mpesa', metodoNome: pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa', validado: true }];
+
+                                pay.txn_ids.push(novoTxnId);
+                                pay.transacoes.push({
+                                    txn_id: novoTxnId,
+                                    valor: parseFloat(novoValor),
+                                    metodo: novoMetodo,
+                                    metodoNome: novoMetodoNome,
+                                    validado: true
+                                });
+                                pay.valor_total = (pay.valor_total || parseFloat(pay.valor)) + parseFloat(novoValor);
+                                pay.valor = pay.valor_total;
+                                pay.pacote = buscarPacotePorValor(pay.valor_total, jid);
+
+                                // Lock no banco de transações
+                                transacoesProcessadas.add(novoTxnId);
+                                transacoesProcessadasMap.set(novoTxnId, {
+                                    sender: senderNumber,
+                                    jid,
+                                    valor: parseFloat(novoValor),
+                                    status: 'locked',
+                                    timestamp: Date.now()
+                                });
+                                salvarTransacoes();
+
+                                // Marcar SMS da operadora como usado se já tiver chegado
+                                const smsOp = findSmsPayment(novoTxnId);
+                                if (smsOp) {
+                                    smsOp.usado = true;
+                                    smsOp.usadoPor = senderNumber;
+                                    smsOp.usadoEm = Date.now();
+                                    salvarSmsPayments();
+                                }
+
+                                // Verificar se o cliente já enviou o número na linha abaixo do 2º comprovativo
+                                const numDestinoInline2 = extrairNumeroDestinoAbaixoDoComprovativo(text);
+                                if (!numDestinoInline2) {
+                                    const listaTxns = pay.transacoes.map((t, idx) => `  ${idx + 1}. *${t.valor} MT* (${t.metodoNome || t.metodo} - \`${t.txn_id}\`)`).join('\n');
+                                    const pacoteAtual = pay.pacote;
+                                    const volStr = pacoteAtual && pacoteAtual.mb ? (pacoteAtual.mb >= 1024 ? `${(pacoteAtual.mb/1024).toFixed(1)}GB` : `${pacoteAtual.mb}MB`) : '';
+
+                                    await reply(
+                                        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                        `  🎉 *PAGAMENTO COMBINADO ADICIONADO!* ➕\n` +
+                                        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                        `Mais *${novoValor} MT* (${novoMetodoNome}) adicionados à sua compra!\n\n` +
+                                        `📋 *Comprovativos Juntos:*\n` +
+                                        listaTxns + `\n` +
+                                        `━━━━━━━━━━━━━━━━━━\n` +
+                                        `💰 *TOTAL ACUMULADO:* *${pay.valor_total} MT*\n` +
+                                        `📦 *Pacote Resultante:* *${pacoteAtual ? pacoteAtual.nome : pay.valor_total + ' MT'}*${volStr ? ' (' + volStr + ')' : ''}\n\n` +
+                                        `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?\n` +
+                                        `Por favor, envie agora o seu *número Vodacom* (ex: *84XXXXXXX* ou *85XXXXXXX*).\n` +
+                                        `_(Ou envie mais um comprovativo se desejar somar mais valor)_`
+                                    );
+                                    continue;
+                                }
+                            }
                             // ── MULTI-DESTINO QUANDO O CLIENTE ENVIA MÚLTIPLOS NÚMEROS APÓS O COMPROVATIVO ──
                             const multiDest = customerServices.parseMultiDestino(text, parseFloat(pay.valor), (v) => buscarPacotePorValor(v, jid));
                             if (multiDest && multiDest.length >= 2) {
@@ -2096,18 +2231,25 @@ async function startWhatsApp(orderCallback, db = null) {
                                 if (rawLidClean) {
                                     lidToPhoneMap.set(rawLidClean, numDestino.startsWith('258') ? numDestino : '258' + numDestino);
                                 }
-                                const pacote = pay.pacote || buscarPacotePorValor(pay.valor, jid);
-                                const orderId = 'WA-' + pay.txn_id + '-' + Date.now();
+                                const isCombined = Array.isArray(pay.transacoes) && pay.transacoes.length > 1;
+                                const combinedTxnId = (pay.txn_ids && pay.txn_ids.length > 0) ? pay.txn_ids.join('+') : pay.txn_id;
+                                const valorFinal = pay.valor_total || parseFloat(pay.valor);
+                                const pacote = pay.pacote || buscarPacotePorValor(valorFinal, jid);
+                                const orderId = 'WA-' + (isCombined ? pay.txn_ids[0] : pay.txn_id) + '-' + Date.now();
 
                                 const { supportNum } = getSuporteDetails();
+                                const metodoStr = isCombined
+                                    ? pay.transacoes.map(t => `${t.valor} MT (${t.metodoNome || t.metodo})`).join(' + ')
+                                    : `${valorFinal} MT (${pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa'})`;
+
                                 await reply(
                                     `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                    `  🎉 *PEDIDO CONFIRMADO COM SUCESSO!* ⚡\n` +
+                                    `  🎉 *${isCombined ? 'PEDIDO COMBINADO CONFIRMADO!' : 'PEDIDO CONFIRMADO COM SUCESSO!'}* ⚡\n` +
                                     `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                    `📦 *Pacote:* *${pacote ? pacote.nome : pay.valor + ' MT'}*\n` +
+                                    `📦 *Pacote:* *${pacote ? pacote.nome : valorFinal + ' MT'}*\n` +
                                     `📲 *Destino:* *${numDestino}*\n` +
-                                    `💳 *Valor Pago:* *${pay.valor} MT* (${pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa'})\n` +
-                                    `🔖 *Ref:* \`${pay.txn_id}\`\n\n` +
+                                    `💳 *Valor Pago:* *${metodoStr}*\n` +
+                                    `🔖 *Ref:* \`${combinedTxnId}\`\n\n` +
                                     `⏳ *Os seus dados estão a ser ativados automaticamente...*\n` +
                                     `_Você receberá uma notificação aqui assim que for concluído!_\n\n` +
                                     `📞 *Suporte se demorar:* Envie *Suporte* ou ligue para *${supportNum}*`
@@ -2121,7 +2263,24 @@ async function startWhatsApp(orderCallback, db = null) {
                                     valor: parseFloat(pay.valor),
                                     timestamp: Date.now()
                                 });
-                                if (pay.txn_id) {
+                                if (isCombined && Array.isArray(pay.transacoes)) {
+                                    for (const t of pay.transacoes) {
+                                        transacoesProcessadas.add(t.txn_id);
+                                        const reg = transacoesProcessadasMap.get(t.txn_id) || {};
+                                        transacoesProcessadasMap.set(t.txn_id, {
+                                            ...reg,
+                                            sender: senderNumber,
+                                            jid,
+                                            numeroDestino: numDestino,
+                                            valor: t.valor,
+                                            status: 'completed',
+                                            completedAt: Date.now(),
+                                            isCombined: true,
+                                            parentTxn: combinedTxnId
+                                        });
+                                    }
+                                    salvarTransacoes();
+                                } else if (pay.txn_id) {
                                     transacoesProcessadas.add(pay.txn_id);
                                     const reg = transacoesProcessadasMap.get(pay.txn_id) || {};
                                     transacoesProcessadasMap.set(pay.txn_id, {
@@ -2129,7 +2288,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                         sender: senderNumber,
                                         jid,
                                         numeroDestino: numDestino,
-                                        valor: parseFloat(pay.valor),
+                                        valor: valorFinal,
                                         status: 'completed',
                                         completedAt: Date.now()
                                     });
@@ -2162,8 +2321,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                         jid,
                                         sender: pay.senderNumber || senderNumber,
                                         senderName: pay.senderName || nomeCliente,
-                                        txn_id: pay.txn_id,
-                                        valor: pay.valor
+                                        txn_id: combinedTxnId,
+                                        valor: valorFinal
                                     });
                                 }
                                 if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
@@ -3022,6 +3181,144 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 9. COMPROVATIVO UNIVERSAL (M-PESA / E-MOLA) ──────────
                     if (isComprovativo(text)) {
+                        // ── NOVO: DETECÇÃO DE MÚLTIPLOS COMPROVATIVOS NA MESMA MENSAGEM ──
+                        const multiCompMsg = separarMultiplosComprovativos(text);
+                        if (multiCompMsg && multiCompMsg.length >= 2) {
+                            console.log(`💳 [COMPROVATIVOS COMBINADOS NA MESMA MSG] Detectados ${multiCompMsg.length} comprovativos!`);
+                            const validas = [];
+                            const rejeitadas = [];
+
+                            for (const c of multiCompMsg) {
+                                let jaUsada = transacoesProcessadas.has(c.txn_id);
+                                const reg = transacoesProcessadasMap.get(c.txn_id);
+                                if (reg && (reg.status === 'completed' || (reg.sender && reg.sender !== senderNumber))) {
+                                    jaUsada = true;
+                                }
+                                if (jaUsada) {
+                                    rejeitadas.push({ ...c, motivo: 'já utilizada anteriormente' });
+                                } else {
+                                    validas.push(c);
+                                }
+                            }
+
+                            if (validas.length === 0) {
+                                await reply(
+                                    `⚠️ *TODAS AS CONFIRMAÇÕES SÃO INVÁLIDAS OU JÁ UTILIZADAS* ❌\n━━━━━━━━━━━━━━━━━━\n` +
+                                    `Nenhum dos ${multiCompMsg.length} comprovativos pôde ser aceito no sistema.\n\n` +
+                                    rejeitadas.map(r => `• ${r.metodoNome} (\`${r.txn_id}\`): ${r.motivo}`).join('\n') +
+                                    `\n\n💡 Por favor, certifique-se de enviar comprovativos válidos e não reutilizados.`
+                                );
+                                continue;
+                            }
+
+                            const valorTotalValido = validas.reduce((acc, cur) => acc + cur.valor, 0);
+                            const pacoteCombinado = buscarPacotePorValor(valorTotalValido, jid);
+                            const combinedTxnId = validas.map(v => v.txn_id).join('+');
+                            const numDestinoInline = extrairNumeroDestinoAbaixoDoComprovativo(text);
+                            const { supportNum } = getSuporteDetails();
+
+                            // Dar lock nas transações válidas
+                            for (const v of validas) {
+                                transacoesProcessadas.add(v.txn_id);
+                                transacoesProcessadasMap.set(v.txn_id, {
+                                    sender: senderNumber,
+                                    jid,
+                                    valor: v.valor,
+                                    status: numDestinoInline ? 'completed' : 'locked',
+                                    numeroDestino: numDestinoInline || null,
+                                    isCombined: true,
+                                    parentTxn: combinedTxnId,
+                                    timestamp: Date.now()
+                                });
+                                const smsOp = findSmsPayment(v.txn_id);
+                                if (smsOp) {
+                                    smsOp.usado = true;
+                                    smsOp.usadoPor = senderNumber;
+                                    smsOp.usadoEm = Date.now();
+                                    salvarSmsPayments();
+                                }
+                            }
+                            salvarTransacoes();
+
+                            const listaValidTxt = validas.map((v, i) => `  ${i + 1}. *${v.valor} MT* (${v.metodoNome} - \`${v.txn_id}\`)`).join('\n');
+                            const avisoRejeitadas = rejeitadas.length > 0
+                                ? `\n\n⚠️ *Atenção:* ${rejeitadas.length} comprovativo(s) descartado(s) por serem inválidos ou já utilizados:\n` + rejeitadas.map(r => `• \`${r.txn_id}\` (${r.valor} MT) - ${r.motivo}`).join('\n')
+                                : '';
+
+                            if (numDestinoInline) {
+                                const orderId = 'WA-' + validas[0].txn_id + '-' + Date.now();
+                                await reply(
+                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                    `  🎉 *PAGAMENTO COMBINADO VALIDADO!* ⚡\n` +
+                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `Identificamos e somamos os seus comprovativos válidos:\n\n` +
+                                    listaValidTxt + `\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `💰 *TOTAL PAGO:* *${valorTotalValido} MT*\n` +
+                                    `📦 *Pacote:* *${pacoteCombinado ? pacoteCombinado.nome : valorTotalValido + ' MT'}*\n` +
+                                    `📲 *Destino:* *${numDestinoInline}*\n` +
+                                    `🔖 *Refs:* \`${combinedTxnId}\`` +
+                                    avisoRejeitadas + `\n\n` +
+                                    `🚀 *Ativação automática em andamento!*\n` +
+                                    `_Você receberá uma confirmação assim que for concluído._\n\n` +
+                                    `📞 *Suporte:* Envie *Suporte* ou ligue para *${supportNum}*`
+                                );
+
+                                historicoVendas.push({
+                                    orderId,
+                                    numero: numDestinoInline,
+                                    mb: pacoteCombinado ? pacoteCombinado.mb : 1024,
+                                    valor: valorTotalValido,
+                                    timestamp: Date.now()
+                                });
+
+                                if (orderDispatchCallback) {
+                                    orderDispatchCallback({
+                                        orderId,
+                                        numero: numDestinoInline,
+                                        quantidade: pacoteCombinado ? pacoteCombinado.mb : 1024,
+                                        modo: pacoteCombinado ? pacoteCombinado.tipo : 'diario',
+                                        jid,
+                                        sender: senderNumber,
+                                        senderName: nomeCliente,
+                                        txn_id: combinedTxnId,
+                                        valor: valorTotalValido
+                                    });
+                                }
+                                if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
+                                continue;
+                            } else {
+                                const pendingKey = `${jid}:${senderNumber}`;
+                                pendingPayments.set(pendingKey, {
+                                    txn_ids: validas.map(v => v.txn_id),
+                                    txn_id: validas[0].txn_id,
+                                    transacoes: validas,
+                                    valor_total: valorTotalValido,
+                                    valor: valorTotalValido,
+                                    metodo: validas[0].metodo,
+                                    senderName: nomeCliente,
+                                    senderNumber,
+                                    pacote: pacoteCombinado,
+                                    aguardando_numero: true
+                                });
+
+                                await reply(
+                                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                    `  🎉 *PAGAMENTO COMBINADO RECEBIDO!* 💳\n` +
+                                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                    `Identificamos e somamos os seus comprovativos:\n\n` +
+                                    listaValidTxt + `\n` +
+                                    `━━━━━━━━━━━━━━━━━━\n` +
+                                    `💰 *TOTAL ACUMULADO:* *${valorTotalValido} MT*\n` +
+                                    `📦 *Pacote:* *${pacoteCombinado ? pacoteCombinado.nome : valorTotalValido + ' MT'}* (${pacoteCombinado && pacoteCombinado.mb ? pacoteCombinado.mb + ' MB' : ''})` +
+                                    avisoRejeitadas + `\n\n` +
+                                    `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?\n` +
+                                    `Por favor, responda com o seu *número Vodacom*:\n` +
+                                    `_(Exemplo: 84XXXXXXX ou 85XXXXXXX)_`
+                                );
+                                continue;
+                            }
+                        }
                         const valor = extrairValorMT(text);
                         const txn_id = extrairTxId(text);
                         // Detecção fiável: e-Mola começa com "ID da transacao" / "Transaction ID"
@@ -4150,6 +4447,7 @@ module.exports = {
     salvarBotConfig,
     calcularPacoteProporcional,
     buscarPacotePorValor,
+    separarMultiplosComprovativos,
     get DYN_CFG() { return DYN_CFG; },
     getRecentLogs: () => recentLogs
 };
