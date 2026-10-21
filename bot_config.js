@@ -114,84 +114,91 @@ module.exports = {
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "25": {
+            "23": {
                 "quantidade": 1024,
                 "nome": "1.0 GB 24h",
                 "quantidade_mb": 1024,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "27": {
+            "28": {
                 "quantidade": 1228,
                 "nome": "1.2 GB 24h",
                 "quantidade_mb": 1228,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "36": {
+            "30": {
+                "quantidade": 1331,
+                "nome": "1.3 GB 24h",
+                "quantidade_mb": 1331,
+                "periodo": "24hrs",
+                "tipo": "diario"
+            },
+            "37": {
                 "quantidade": 1638,
                 "nome": "1.6 GB 24h",
                 "quantidade_mb": 1638,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "50": {
+            "46": {
                 "quantidade": 2048,
                 "nome": "2.0 GB 24h",
                 "quantidade_mb": 2048,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "75": {
+            "69": {
                 "quantidade": 3072,
                 "nome": "3.0 GB 24h",
                 "quantidade_mb": 3072,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "100": {
+            "92": {
                 "quantidade": 4096,
                 "nome": "4.0 GB 24h",
                 "quantidade_mb": 4096,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "125": {
+            "115": {
                 "quantidade": 5120,
                 "nome": "5.0 GB 24h",
                 "quantidade_mb": 5120,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "150": {
+            "138": {
                 "quantidade": 6144,
                 "nome": "6.0 GB 24h",
                 "quantidade_mb": 6144,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "175": {
+            "161": {
                 "quantidade": 7168,
                 "nome": "7.0 GB 24h",
                 "quantidade_mb": 7168,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "200": {
+            "184": {
                 "quantidade": 8192,
                 "nome": "8.0 GB 24h",
                 "quantidade_mb": 8192,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "225": {
+            "207": {
                 "quantidade": 9216,
                 "nome": "9.0 GB 24h",
                 "quantidade_mb": 9216,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "250": {
+            "230": {
                 "quantidade": 10240,
                 "nome": "10.0 GB 24h",
                 "quantidade_mb": 10240,
@@ -605,122 +612,122 @@ module.exports = {
                 "24hrs": {
                     "11": {
                         "quantidade": 350,
-                        "nome": "350MB 24h",
+                        "nome": "350 MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "15": {
                         "quantidade": 550,
-                        "nome": "550MB 24h",
+                        "nome": "550 MB 24h",
                         "quantidade_mb": 550,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "18": {
                         "quantidade": 696,
-                        "nome": "696MB 24h",
+                        "nome": "696 MB 24h",
                         "quantidade_mb": 696,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "20": {
                         "quantidade": 800,
-                        "nome": "800MB 24h",
+                        "nome": "800 MB 24h",
                         "quantidade_mb": 800,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "23": {
                         "quantidade": 1024,
-                        "nome": "1GB 24h",
+                        "nome": "1.0 GB 24h",
                         "quantidade_mb": 1024,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "28": {
-                        "quantidade": 1229,
-                        "nome": "1.2GB 24h",
-                        "quantidade_mb": 1229,
+                        "quantidade": 1228,
+                        "nome": "1.2 GB 24h",
+                        "quantidade_mb": 1228,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "30": {
                         "quantidade": 1331,
-                        "nome": "1.3GB 24h",
+                        "nome": "1.3 GB 24h",
                         "quantidade_mb": 1331,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "37": {
                         "quantidade": 1638,
-                        "nome": "1.6GB 24h",
+                        "nome": "1.6 GB 24h",
                         "quantidade_mb": 1638,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "46": {
                         "quantidade": 2048,
-                        "nome": "2GB 24h",
+                        "nome": "2.0 GB 24h",
                         "quantidade_mb": 2048,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "69": {
                         "quantidade": 3072,
-                        "nome": "3GB 24h",
+                        "nome": "3.0 GB 24h",
                         "quantidade_mb": 3072,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "92": {
                         "quantidade": 4096,
-                        "nome": "4GB 24h",
+                        "nome": "4.0 GB 24h",
                         "quantidade_mb": 4096,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "115": {
                         "quantidade": 5120,
-                        "nome": "5GB 24h",
+                        "nome": "5.0 GB 24h",
                         "quantidade_mb": 5120,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "138": {
                         "quantidade": 6144,
-                        "nome": "6GB 24h",
+                        "nome": "6.0 GB 24h",
                         "quantidade_mb": 6144,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "161": {
                         "quantidade": 7168,
-                        "nome": "7GB 24h",
+                        "nome": "7.0 GB 24h",
                         "quantidade_mb": 7168,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "184": {
                         "quantidade": 8192,
-                        "nome": "8GB 24h",
+                        "nome": "8.0 GB 24h",
                         "quantidade_mb": 8192,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "207": {
                         "quantidade": 9216,
-                        "nome": "9GB 24h",
+                        "nome": "9.0 GB 24h",
                         "quantidade_mb": 9216,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "230": {
                         "quantidade": 10240,
-                        "nome": "10GB 24h",
+                        "nome": "10.0 GB 24h",
                         "quantidade_mb": 10240,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     }
                 },
                 "semanal": {
@@ -1139,122 +1146,122 @@ module.exports = {
                 "24hrs": {
                     "11": {
                         "quantidade": 350,
-                        "nome": "350MB 24h",
+                        "nome": "350 MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "15": {
                         "quantidade": 550,
-                        "nome": "550MB 24h",
+                        "nome": "550 MB 24h",
                         "quantidade_mb": 550,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "18": {
                         "quantidade": 696,
-                        "nome": "696MB 24h",
+                        "nome": "696 MB 24h",
                         "quantidade_mb": 696,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "20": {
                         "quantidade": 800,
-                        "nome": "800MB 24h",
+                        "nome": "800 MB 24h",
                         "quantidade_mb": 800,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "23": {
                         "quantidade": 1024,
-                        "nome": "1GB 24h",
+                        "nome": "1.0 GB 24h",
                         "quantidade_mb": 1024,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "28": {
-                        "quantidade": 1229,
-                        "nome": "1.2GB 24h",
-                        "quantidade_mb": 1229,
+                        "quantidade": 1228,
+                        "nome": "1.2 GB 24h",
+                        "quantidade_mb": 1228,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "30": {
                         "quantidade": 1331,
-                        "nome": "1.3GB 24h",
+                        "nome": "1.3 GB 24h",
                         "quantidade_mb": 1331,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "37": {
                         "quantidade": 1638,
-                        "nome": "1.6GB 24h",
+                        "nome": "1.6 GB 24h",
                         "quantidade_mb": 1638,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "46": {
                         "quantidade": 2048,
-                        "nome": "2GB 24h",
+                        "nome": "2.0 GB 24h",
                         "quantidade_mb": 2048,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "69": {
                         "quantidade": 3072,
-                        "nome": "3GB 24h",
+                        "nome": "3.0 GB 24h",
                         "quantidade_mb": 3072,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "92": {
                         "quantidade": 4096,
-                        "nome": "4GB 24h",
+                        "nome": "4.0 GB 24h",
                         "quantidade_mb": 4096,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "115": {
                         "quantidade": 5120,
-                        "nome": "5GB 24h",
+                        "nome": "5.0 GB 24h",
                         "quantidade_mb": 5120,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "138": {
                         "quantidade": 6144,
-                        "nome": "6GB 24h",
+                        "nome": "6.0 GB 24h",
                         "quantidade_mb": 6144,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "161": {
                         "quantidade": 7168,
-                        "nome": "7GB 24h",
+                        "nome": "7.0 GB 24h",
                         "quantidade_mb": 7168,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "184": {
                         "quantidade": 8192,
-                        "nome": "8GB 24h",
+                        "nome": "8.0 GB 24h",
                         "quantidade_mb": 8192,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "207": {
                         "quantidade": 9216,
-                        "nome": "9GB 24h",
+                        "nome": "9.0 GB 24h",
                         "quantidade_mb": 9216,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "230": {
                         "quantidade": 10240,
-                        "nome": "10GB 24h",
+                        "nome": "10.0 GB 24h",
                         "quantidade_mb": 10240,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     }
                 },
                 "semanal": {
@@ -1673,122 +1680,122 @@ module.exports = {
                 "24hrs": {
                     "11": {
                         "quantidade": 350,
-                        "nome": "350MB 24h",
+                        "nome": "350 MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "15": {
                         "quantidade": 550,
-                        "nome": "550MB 24h",
+                        "nome": "550 MB 24h",
                         "quantidade_mb": 550,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "18": {
                         "quantidade": 696,
-                        "nome": "696MB 24h",
+                        "nome": "696 MB 24h",
                         "quantidade_mb": 696,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "20": {
                         "quantidade": 800,
-                        "nome": "800MB 24h",
+                        "nome": "800 MB 24h",
                         "quantidade_mb": 800,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "23": {
                         "quantidade": 1024,
-                        "nome": "1GB 24h",
+                        "nome": "1.0 GB 24h",
                         "quantidade_mb": 1024,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "28": {
-                        "quantidade": 1229,
-                        "nome": "1.2GB 24h",
-                        "quantidade_mb": 1229,
+                        "quantidade": 1228,
+                        "nome": "1.2 GB 24h",
+                        "quantidade_mb": 1228,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "30": {
                         "quantidade": 1331,
-                        "nome": "1.3GB 24h",
+                        "nome": "1.3 GB 24h",
                         "quantidade_mb": 1331,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "37": {
                         "quantidade": 1638,
-                        "nome": "1.6GB 24h",
+                        "nome": "1.6 GB 24h",
                         "quantidade_mb": 1638,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "46": {
                         "quantidade": 2048,
-                        "nome": "2GB 24h",
+                        "nome": "2.0 GB 24h",
                         "quantidade_mb": 2048,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "69": {
                         "quantidade": 3072,
-                        "nome": "3GB 24h",
+                        "nome": "3.0 GB 24h",
                         "quantidade_mb": 3072,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "92": {
                         "quantidade": 4096,
-                        "nome": "4GB 24h",
+                        "nome": "4.0 GB 24h",
                         "quantidade_mb": 4096,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "115": {
                         "quantidade": 5120,
-                        "nome": "5GB 24h",
+                        "nome": "5.0 GB 24h",
                         "quantidade_mb": 5120,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "138": {
                         "quantidade": 6144,
-                        "nome": "6GB 24h",
+                        "nome": "6.0 GB 24h",
                         "quantidade_mb": 6144,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "161": {
                         "quantidade": 7168,
-                        "nome": "7GB 24h",
+                        "nome": "7.0 GB 24h",
                         "quantidade_mb": 7168,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "184": {
                         "quantidade": 8192,
-                        "nome": "8GB 24h",
+                        "nome": "8.0 GB 24h",
                         "quantidade_mb": 8192,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "207": {
                         "quantidade": 9216,
-                        "nome": "9GB 24h",
+                        "nome": "9.0 GB 24h",
                         "quantidade_mb": 9216,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "230": {
                         "quantidade": 10240,
-                        "nome": "10GB 24h",
+                        "nome": "10.0 GB 24h",
                         "quantidade_mb": 10240,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     }
                 },
                 "semanal": {
@@ -2207,115 +2214,122 @@ module.exports = {
                 "24hrs": {
                     "11": {
                         "quantidade": 350,
-                        "nome": "350MB 24h",
+                        "nome": "350 MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "15": {
                         "quantidade": 550,
-                        "nome": "550MB 24h",
+                        "nome": "550 MB 24h",
                         "quantidade_mb": 550,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
                     "18": {
+                        "quantidade": 696,
+                        "nome": "696 MB 24h",
+                        "quantidade_mb": 696,
+                        "periodo": "24hrs",
+                        "tipo": "diario"
+                    },
+                    "20": {
                         "quantidade": 800,
-                        "nome": "800MB 24h",
+                        "nome": "800 MB 24h",
                         "quantidade_mb": 800,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "22": {
+                    "23": {
                         "quantidade": 1024,
-                        "nome": "1GB 24h",
+                        "nome": "1.0 GB 24h",
                         "quantidade_mb": 1024,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "27": {
-                        "quantidade": 1229,
-                        "nome": "1.2GB 24h",
-                        "quantidade_mb": 1229,
+                    "28": {
+                        "quantidade": 1228,
+                        "nome": "1.2 GB 24h",
+                        "quantidade_mb": 1228,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "29": {
+                    "30": {
                         "quantidade": 1331,
-                        "nome": "1.3GB 24h",
+                        "nome": "1.3 GB 24h",
                         "quantidade_mb": 1331,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "36": {
+                    "37": {
                         "quantidade": 1638,
-                        "nome": "1.6GB 24h",
+                        "nome": "1.6 GB 24h",
                         "quantidade_mb": 1638,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "44": {
+                    "46": {
                         "quantidade": 2048,
-                        "nome": "2GB 24h",
+                        "nome": "2.0 GB 24h",
                         "quantidade_mb": 2048,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "66": {
+                    "69": {
                         "quantidade": 3072,
-                        "nome": "3GB 24h",
+                        "nome": "3.0 GB 24h",
                         "quantidade_mb": 3072,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "88": {
+                    "92": {
                         "quantidade": 4096,
-                        "nome": "4GB 24h",
+                        "nome": "4.0 GB 24h",
                         "quantidade_mb": 4096,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "110": {
+                    "115": {
                         "quantidade": 5120,
-                        "nome": "5GB 24h",
+                        "nome": "5.0 GB 24h",
                         "quantidade_mb": 5120,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "132": {
+                    "138": {
                         "quantidade": 6144,
-                        "nome": "6GB 24h",
+                        "nome": "6.0 GB 24h",
                         "quantidade_mb": 6144,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "154": {
+                    "161": {
                         "quantidade": 7168,
-                        "nome": "7GB 24h",
+                        "nome": "7.0 GB 24h",
                         "quantidade_mb": 7168,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "176": {
+                    "184": {
                         "quantidade": 8192,
-                        "nome": "8GB 24h",
+                        "nome": "8.0 GB 24h",
                         "quantidade_mb": 8192,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "198": {
+                    "207": {
                         "quantidade": 9216,
-                        "nome": "9GB 24h",
+                        "nome": "9.0 GB 24h",
                         "quantidade_mb": 9216,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     },
-                    "220": {
+                    "230": {
                         "quantidade": 10240,
-                        "nome": "10GB 24h",
+                        "nome": "10.0 GB 24h",
                         "quantidade_mb": 10240,
                         "periodo": "24hrs",
-                        "tipo": "24hrs"
+                        "tipo": "diario"
                     }
                 },
                 "semanal": {
