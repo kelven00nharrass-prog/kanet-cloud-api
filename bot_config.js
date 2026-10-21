@@ -2,7 +2,7 @@ module.exports = {
     "BOT_EXPIRACAO_DIAS": 10000000,
     "SMS_GATEWAY_SEND_URL": "http://192.168.43.1:8080/send",
     "CUSTO_GB_MT": 17.5,
-    "PRECO_VENDA_GB_MT": 23.0,
+    "PRECO_VENDA_GB_MT": 23,
     "TABELAS_FORNECIMENTO": {
         "183": {
             "quantidade": 100,
@@ -345,33 +345,13 @@ module.exports = {
             }
         },
         "ilimitado": {
-            "240": {
-                "quantidade": 10940,
-                "nome": "10GB+700 (Renov)",
-                "quantidade_mb": 10940,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
-            "255": {
-                "quantidade": 10240,
-                "nome": "10GB (Faseado)",
-                "quantidade_mb": 10240,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
-            "381": {
-                "quantidade": 15360,
-                "nome": "15GB (Faseado)",
-                "quantidade_mb": 15360,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
             "450": {
                 "quantidade": 11264,
                 "nome": "Vodacom 11GB + Minutos",
                 "quantidade_mb": 11264,
                 "periodo": "ilimitado",
                 "tipo": "ilimitado",
+                "ativacao_mb": 11264,
                 "input_val": "1"
             },
             "469": {
@@ -379,14 +359,8 @@ module.exports = {
                 "nome": "Movitel 9GB + Minutos",
                 "quantidade_mb": 9216,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
-            "510": {
-                "quantidade": 20480,
-                "nome": "20GB (Faseado)",
-                "quantidade_mb": 20480,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
+                "tipo": "ilimitado",
+                "ativacao_mb": 9216
             },
             "570": {
                 "quantidade": 15360,
@@ -394,6 +368,7 @@ module.exports = {
                 "quantidade_mb": 15360,
                 "periodo": "ilimitado",
                 "tipo": "ilimitado",
+                "ativacao_mb": 15360,
                 "input_val": "1"
             },
             "850": {
@@ -402,6 +377,7 @@ module.exports = {
                 "quantidade_mb": 25600,
                 "periodo": "ilimitado",
                 "tipo": "ilimitado",
+                "ativacao_mb": 25600,
                 "input_val": "1"
             },
             "950": {
@@ -409,7 +385,16 @@ module.exports = {
                 "nome": "Movitel 23GB + Minutos",
                 "quantidade_mb": 23552,
                 "periodo": "ilimitado",
-                "tipo": "ilimitado"
+                "tipo": "ilimitado",
+                "ativacao_mb": 23552
+            },
+            "1450": {
+                "quantidade": 38912,
+                "nome": "Movitel 38GB + Minutos",
+                "quantidade_mb": 38912,
+                "periodo": "ilimitado",
+                "tipo": "ilimitado",
+                "ativacao_mb": 38912
             }
         }
     },
@@ -900,75 +885,54 @@ module.exports = {
                 "ilimitado": {
                     "450": {
                         "quantidade": 11264,
-                        "nome": "💎 11GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 11GB + Minutos",
                         "quantidade_mb": 11264,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 11264,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "469": {
                         "quantidade": 9216,
-                        "nome": "💎 9GB + Ilimitado (Movi)",
+                        "nome": "Movitel 9GB + Minutos",
                         "quantidade_mb": 9216,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 9216,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 9216
                     },
                     "570": {
                         "quantidade": 15360,
-                        "nome": "💎 15GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 15GB + Minutos",
                         "quantidade_mb": 15360,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 15360,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "850": {
                         "quantidade": 25600,
-                        "nome": "💎 25GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 25GB + Minutos",
                         "quantidade_mb": 25600,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 25600,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "950": {
                         "quantidade": 23552,
-                        "nome": "💎 23GB + Ilimitado (Movi)",
+                        "nome": "Movitel 23GB + Minutos",
                         "quantidade_mb": 23552,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 23552,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 23552
                     },
                     "1450": {
                         "quantidade": 38912,
-                        "nome": "💎 38GB + Ilimitado (Movi)",
+                        "nome": "Movitel 38GB + Minutos",
                         "quantidade_mb": 38912,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 38912,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 38912
                     }
                 },
                 "saldo": {
@@ -1434,75 +1398,54 @@ module.exports = {
                 "ilimitado": {
                     "450": {
                         "quantidade": 11264,
-                        "nome": "💎 11GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 11GB + Minutos",
                         "quantidade_mb": 11264,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 11264,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "469": {
                         "quantidade": 9216,
-                        "nome": "💎 9GB + Ilimitado (Movi)",
+                        "nome": "Movitel 9GB + Minutos",
                         "quantidade_mb": 9216,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 9216,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 9216
                     },
                     "570": {
                         "quantidade": 15360,
-                        "nome": "💎 15GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 15GB + Minutos",
                         "quantidade_mb": 15360,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 15360,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "850": {
                         "quantidade": 25600,
-                        "nome": "💎 25GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 25GB + Minutos",
                         "quantidade_mb": 25600,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 25600,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "950": {
                         "quantidade": 23552,
-                        "nome": "💎 23GB + Ilimitado (Movi)",
+                        "nome": "Movitel 23GB + Minutos",
                         "quantidade_mb": 23552,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 23552,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 23552
                     },
                     "1450": {
                         "quantidade": 38912,
-                        "nome": "💎 38GB + Ilimitado (Movi)",
+                        "nome": "Movitel 38GB + Minutos",
                         "quantidade_mb": 38912,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 38912,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 38912
                     }
                 },
                 "saldo": {
@@ -1968,75 +1911,54 @@ module.exports = {
                 "ilimitado": {
                     "450": {
                         "quantidade": 11264,
-                        "nome": "💎 11GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 11GB + Minutos",
                         "quantidade_mb": 11264,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 11264,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "469": {
                         "quantidade": 9216,
-                        "nome": "💎 9GB + Ilimitado (Movi)",
+                        "nome": "Movitel 9GB + Minutos",
                         "quantidade_mb": 9216,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 9216,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 9216
                     },
                     "570": {
                         "quantidade": 15360,
-                        "nome": "💎 15GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 15GB + Minutos",
                         "quantidade_mb": 15360,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 15360,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "850": {
                         "quantidade": 25600,
-                        "nome": "💎 25GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 25GB + Minutos",
                         "quantidade_mb": 25600,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 25600,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "950": {
                         "quantidade": 23552,
-                        "nome": "💎 23GB + Ilimitado (Movi)",
+                        "nome": "Movitel 23GB + Minutos",
                         "quantidade_mb": 23552,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 23552,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 23552
                     },
                     "1450": {
                         "quantidade": 38912,
-                        "nome": "💎 38GB + Ilimitado (Movi)",
+                        "nome": "Movitel 38GB + Minutos",
                         "quantidade_mb": 38912,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 38912,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 38912
                     }
                 },
                 "saldo": {
@@ -2502,75 +2424,54 @@ module.exports = {
                 "ilimitado": {
                     "450": {
                         "quantidade": 11264,
-                        "nome": "💎 11GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 11GB + Minutos",
                         "quantidade_mb": 11264,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 11264,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "469": {
                         "quantidade": 9216,
-                        "nome": "💎 9GB + Ilimitado (Movi)",
+                        "nome": "Movitel 9GB + Minutos",
                         "quantidade_mb": 9216,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 9216,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 9216
                     },
                     "570": {
                         "quantidade": 15360,
-                        "nome": "💎 15GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 15GB + Minutos",
                         "quantidade_mb": 15360,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 15360,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "850": {
                         "quantidade": 25600,
-                        "nome": "💎 25GB + Ilimitado (Voda)",
+                        "nome": "Vodacom 25GB + Minutos",
                         "quantidade_mb": 25600,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
                         "ativacao_mb": 25600,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "input_val": "1"
                     },
                     "950": {
                         "quantidade": 23552,
-                        "nome": "💎 23GB + Ilimitado (Movi)",
+                        "nome": "Movitel 23GB + Minutos",
                         "quantidade_mb": 23552,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 23552,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 23552
                     },
                     "1450": {
                         "quantidade": 38912,
-                        "nome": "💎 38GB + Ilimitado (Movi)",
+                        "nome": "Movitel 38GB + Minutos",
                         "quantidade_mb": 38912,
                         "periodo": "ilimitado",
                         "tipo": "ilimitado",
-                        "input_val": 1,
-                        "ativacao_mb": 38912,
-                        "extras": 0,
-                        "porta_obrigatoria": 8077,
-                        "permite_retry": false
+                        "ativacao_mb": 38912
                     }
                 },
                 "saldo": {}

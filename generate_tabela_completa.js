@@ -625,11 +625,11 @@ const html = `<!DOCTYPE html>
       </div>
       <div class="price-list">
         <div class="price-item"><div class="item-left"><i class="fa-solid fa-sim-card"></i> Voda 11GB + Min</div><div class="item-right">450 <span>MT</span></div></div>
-        <div class="price-item"><div class="item-left"><i class="fa-solid fa-sim-card"></i> Voda 9GB + Min</div><div class="item-right">469 <span>MT</span></div></div>
-        <div class="price-item highlight"><div class="item-left"><i class="fa-solid fa-star" style="color:#F87171;"></i> Voda 15GB + Min</div><div class="item-right">570 <span>MT</span></div></div>
+        <div class="price-item"><div class="item-left"><i class="fa-solid fa-sim-card"></i> Voda 15GB + Min</div><div class="item-right">570 <span>MT</span></div></div>
         <div class="price-item"><div class="item-left"><i class="fa-solid fa-sim-card"></i> Voda 25GB + Min</div><div class="item-right">850 <span>MT</span></div></div>
-        <div class="price-item"><div class="item-left"><i class="fa-solid fa-sim-card"></i> Voda 23GB + Min</div><div class="item-right">950 <span>MT</span></div></div>
-        <div class="price-item highlight"><div class="item-left"><i class="fa-solid fa-crown" style="color:#F87171;"></i> Voda 38GB + Min</div><div class="item-right">1450 <span>MT</span></div></div>
+        <div class="price-item"><div class="item-left"><i class="fa-solid fa-sim-card" style="color:#00FF9D;"></i> Movi 9GB + Min</div><div class="item-right">469 <span>MT</span></div></div>
+        <div class="price-item"><div class="item-left"><i class="fa-solid fa-sim-card" style="color:#00FF9D;"></i> Movi 23GB + Min</div><div class="item-right">950 <span>MT</span></div></div>
+        <div class="price-item highlight"><div class="item-left"><i class="fa-solid fa-crown" style="color:#00FF9D;"></i> Movi 38GB + Min</div><div class="item-right">1450 <span>MT</span></div></div>
       </div>
     </div>
   </div>
