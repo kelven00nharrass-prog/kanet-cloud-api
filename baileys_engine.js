@@ -921,25 +921,44 @@ function gerarMensagemBoasVindasGrupo(groupName, participantJids) {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
     const { supportNum, sysName } = getSuporteDetails();
     const mentions = Array.isArray(participantJids) ? participantJids : [participantJids];
-    const mentionsText = mentions.map(j => `@${String(j).split('@')[0].split(':')[0].replace(/\D/g, '')}`).join(' ');
+
+    // Normalizar mentions para garantir JID completo válido no WhatsApp
+    const finalMentions = mentions.map(j => {
+        const str = String(j || '');
+        if (str.includes('@')) return str;
+        return `${str.replace(/\D/g, '')}@s.whatsapp.net`;
+    }).filter(j => j.length > 5);
+
+    const mentionsText = finalMentions.map(j => {
+        const num = String(j).split('@')[0].split(':')[0].replace(/\D/g, '');
+        return num ? `@${num}` : '';
+    }).filter(Boolean).join(' ');
+
+    const saudacao = getSaudacaoHora();
 
     return {
         text:
             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-            `  👋 *BEM-VINDO(A) AO GRUPO!* 🎉\n` +
+            `  🎉 *BEM-VINDO(A) AO GRUPO!* 🇲🇿\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-            `Olá ${mentionsText}! Seja muito bem-vindo(a) ao *${groupName || sysName}*! 🚀\n\n` +
-            `Aqui você adquire os seus pacotes de dados Vodacom com envio *100% automático* e aos melhores preços de Moçambique:\n\n` +
-            `📌 *COMO COMPRAR AQUI NO GRUPO OU NO PRIVADO:*\n` +
-            `1️⃣ Digite *Menu* para consultar todos os pacotes e preços disponíveis.\n` +
-            `2️⃣ Faça o pagamento para uma das nossas contas oficiais:\n` +
+            `Olá ${mentionsText || 'Novo Membro'}! ${saudacao}! ✨\n` +
+            `Seja muito bem-vindo(a) ao *${groupName || sysName}*! 🚀\n\n` +
+            `Aqui você adquire megas e gigas da Vodacom com recarga *100% automática*, rápida e aos melhores preços de Moçambique:\n\n` +
+            `📌 *COMO COMPRAR O SEU PACOTE:\n` +
+            `1️⃣ Digite *Menu* aqui no grupo ou no meu privado para consultar todos os pacotes e preços.\n` +
+            `2️⃣ Faça a transferência para uma das contas oficiais:\n` +
             `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
             `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
-            `3️⃣ Envie o comprovativo aqui ou no privado do bot junto com o seu *número Vodacom* (ex: 84XXXXXXX).\n\n` +
-            `⚡ *Ativação instantânea 24h por dia!*\n` +
-            `📞 *Dúvidas ou Suporte:* Digite *Suporte* ou ligue para *${supportNum}*.\n\n` +
-            `Boas compras e excelente navegação! 🌐✨`,
-        mentions
+            `3️⃣ Cole o SMS do comprovativo aqui ou no privado com o seu *número Vodacom* (ex: 84XXXXXXX).\n\n` +
+            `⚡ *Os megas entram em segundos após o envio do comprovativo!*\n\n` +
+            `💡 *OUTROS COMANDOS ÚTEIS:\n` +
+            `• *Menu* ➔ Ver preços\n` +
+            `• *Pagamento* ➔ Ver contas bancárias\n` +
+            `• *.configurar* ➔ Ativar recarga automática sem comprovativo\n` +
+            `• *.txenecar* ➔ Crédito de megas para clientes fiéis\n` +
+            `• *Suporte* ➔ Falar com atendimento humano (${supportNum})\n\n` +
+            `Desejamos uma ótima estadia e excelente navegação! 🌐🤝`,
+        mentions: finalMentions
     };
 }
 
@@ -1968,32 +1987,109 @@ async function startWhatsApp(orderCallback, db = null) {
             return null;
         }
 
-        // ── BOAS-VINDAS AUTOMÁTICAS PARA NOVOS PARTICIPANTES EM GRUPOS ──
+        // Cache para evitar boas-vindas duplicadas em curto intervalo
+        const recentGroupWelcomes = new Map();
+
+        async function processarBoasVindasGrupo(groupJid, rawParticipants) {
+            if (!groupJid || !groupJid.endsWith('@g.us')) return;
+            if (!Array.isArray(rawParticipants) || rawParticipants.length === 0) return;
+            if (botSilenciado) return;
+
+            const myJid = sock?.user?.id ? sock.user.id.split(':')[0].replace(/\D/g, '') : '';
+            const now = Date.now();
+            const validParticipants = [];
+            let botWasAdded = false;
+
+            for (const p of rawParticipants) {
+                const rawStr = String(p || '');
+                const numOnly = rawStr.split('@')[0].split(':')[0].replace(/\D/g, '');
+                if (!numOnly && !rawStr.endsWith('@lid')) continue;
+
+                // Verificar se é o próprio bot
+                if (myJid && numOnly === myJid) {
+                    botWasAdded = true;
+                    continue;
+                }
+
+                const fullJid = rawStr.includes('@') ? rawStr : `${numOnly}@s.whatsapp.net`;
+                const cacheKey = `${groupJid}_${numOnly || rawStr}`;
+
+                const lastSent = recentGroupWelcomes.get(cacheKey) || 0;
+                if (now - lastSent < 45000) {
+                    // Já recebeu boas-vindas neste grupo nos últimos 45 segundos
+                    continue;
+                }
+
+                recentGroupWelcomes.set(cacheKey, now);
+                validParticipants.push(fullJid);
+            }
+
+            // Limpar cache antigo
+            if (recentGroupWelcomes.size > 200) {
+                for (const [k, time] of recentGroupWelcomes.entries()) {
+                    if (now - time > 120000) recentGroupWelcomes.delete(k);
+                }
+            }
+
+            // Se o próprio bot foi adicionado ao grupo, apresentar-se!
+            if (botWasAdded) {
+                await new Promise(r => setTimeout(r, 1200));
+                let groupName = 'Grupo Ka-Net';
+                try {
+                    const meta = await getCachedGroupMetadata(groupJid);
+                    if (meta && meta.subject) groupName = meta.subject;
+                } catch (_) {}
+
+                const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
+                const { supportNum, sysName } = getSuporteDetails();
+
+                const introText =
+                    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                    `  🤖 *${sysName.toUpperCase()} ONLINE NO GRUPO!* 🇲🇿\n` +
+                    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                    `Olá a todos do *${groupName}*! 👋\n` +
+                    `Estou conectado e pronto para ativar pacotes de internet Vodacom de forma *100% automática* 24 horas por dia! ⚡\n\n` +
+                    `📌 *COMO FUNCIONA:\n` +
+                    `• Digite *Menu* para ver a tabela completa de pacotes e preços.\n` +
+                    `• Faça o pagamento para:\n` +
+                    `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+                    `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+                    `• Cole o comprovativo aqui no grupo ou no meu privado com o seu número Vodacom para receber na hora!\n\n` +
+                    `📞 *Suporte:* Digite *Suporte* ou ligue para *${supportNum}*.\n` +
+                    `Boas compras a todos! 🌐✨`;
+
+                await sock.sendMessage(groupJid, { text: introText });
+                addLog(`🤖 [APRESENTAÇÃO NO GRUPO] Bot apresentado no grupo ${groupJid} ("${groupName}")`);
+            }
+
+            if (validParticipants.length === 0) return;
+
+            // Aguardar 1.5s para sincronização dos dados do grupo
+            await new Promise(r => setTimeout(r, 1500));
+
+            let groupName = 'Grupo Ka-Net';
+            try {
+                const meta = await getCachedGroupMetadata(groupJid);
+                if (meta && meta.subject) groupName = meta.subject;
+            } catch (_) {}
+
+            const welcomeObj = gerarMensagemBoasVindasGrupo(groupName, validParticipants);
+            await sock.sendMessage(groupJid, {
+                text: welcomeObj.text,
+                mentions: welcomeObj.mentions
+            });
+            addLog(`✅ [BOAS-VINDAS ENVIADAS NO GRUPO] "${groupName}" para: ${validParticipants.join(', ')}`);
+        }
+
+        // ── BOAS-VINDAS AUTOMÁTICAS PARA NOVOS PARTICIPANTES EM GRUPOS (EVENTO DE GRUPO) ──
         sock.ev.on('group-participants.update', async (update) => {
             try {
                 const { id, participants, action } = update || {};
                 if (!id || !Array.isArray(participants) || participants.length === 0) return;
 
                 if (action === 'add') {
-                    addLog(`👥 [NOVO MEMBRO NO GRUPO] ${participants.length} participante(s) entraram no grupo ${id}`);
-                    
-                    // Pequeno atraso de 1.5s para sincronização do WhatsApp
-                    await new Promise(r => setTimeout(r, 1500));
-
-                    let groupName = 'Grupo Ka-Net';
-                    try {
-                        const meta = await getCachedGroupMetadata(id);
-                        if (meta && meta.subject) groupName = meta.subject;
-                    } catch (_) {
-                        console.warn('⚠️ [GRUPO] Erro ao obter metadados para boas-vindas:', _.message);
-                    }
-
-                    const welcomeObj = gerarMensagemBoasVindasGrupo(groupName, participants);
-                    await sock.sendMessage(id, {
-                        text: welcomeObj.text,
-                        mentions: welcomeObj.mentions
-                    });
-                    addLog(`✅ [BOAS-VINDAS ENVIADAS NO GRUPO] "${groupName}" para: ${participants.join(', ')}`);
+                    addLog(`👥 [NOVO MEMBRO NO GRUPO EVENT] ${participants.length} participante(s) entraram no grupo ${id}`);
+                    await processarBoasVindasGrupo(id, participants);
                 }
             } catch (err) {
                 console.warn('⚠️ [GRUPO BOAS-VINDAS ERRO]:', err.message);
@@ -2015,6 +2111,16 @@ async function startWhatsApp(orderCallback, db = null) {
                         const msgAgeMs = Date.now() - (msgTimestampSec * 1000);
                         if (msgAgeMs > 5 * 60 * 1000) { // > 5 minutos
                             addLog(`⏳ [MSG ANTIGA IGNORADA] Mensagem acumulada de ${jid} (${Math.round(msgAgeMs / 1000)}s atrás). Descartada.`);
+                            continue;
+                        }
+                    }
+
+                    // 👥 BOAS-VINDAS: Novo membro que entra via link de convite ou adicionado (detectado via StubType do WhatsApp)
+                    if (jid.endsWith('@g.us') && (msg.messageStubType === 27 || msg.messageStubType === 28 || msg.messageStubType === 31)) {
+                        const stParticipants = msg.messageStubParameters || [];
+                        if (stParticipants.length > 0) {
+                            addLog(`👥 [NOVO MEMBRO STUB ${msg.messageStubType}] ${stParticipants.join(', ')} no grupo ${jid}`);
+                            await processarBoasVindasGrupo(jid, stParticipants);
                             continue;
                         }
                     }
@@ -2680,6 +2786,27 @@ async function startWhatsApp(orderCallback, db = null) {
                                     continue;
                                 }
                             }
+                        }
+                    }
+
+                    // ── 1.0 COMANDO PARA TESTAR BOAS-VINDAS NO GRUPO ──
+                    if (cleanCmd === 'testarboasvindas' || cleanCmd === '.testarboasvindas' || cleanCmd === 'boasvindas' || cleanCmd === '.boasvindas') {
+                        if (jid.endsWith('@g.us')) {
+                            let gName = 'Grupo Ka-Net';
+                            try {
+                                const meta = await getCachedGroupMetadata(jid);
+                                if (meta && meta.subject) gName = meta.subject;
+                            } catch (_) {}
+                            const welcomeObj = gerarMensagemBoasVindasGrupo(gName, [senderNumber + '@s.whatsapp.net']);
+                            await sock.sendMessage(jid, {
+                                text: welcomeObj.text,
+                                mentions: welcomeObj.mentions
+                            });
+                            addLog(`🧪 [TESTE BOAS-VINDAS GRUPO] Disparado por ${senderNumber} em ${jid}`);
+                            continue;
+                        } else {
+                            await reply('💡 Envie *.testarboasvindas* dentro de um *grupo* para visualizar a mensagem que os novos membros recebem!');
+                            continue;
                         }
                     }
 
