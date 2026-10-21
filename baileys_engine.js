@@ -863,23 +863,56 @@ function gerarMenuOriginal(jid = null) {
     return out;
 }
 
-function gerarMensagemBoasVindas(nomeCliente) {
+function gerarMensagemBoasVindas(nomeCliente, senderNumber = null) {
     const sd = getSaudacaoHora();
     const { supportNum, sysName } = getSuporteDetails();
+    const compras = (senderNumber && customerServices && typeof customerServices.getComprasCount === 'function')
+        ? customerServices.getComprasCount(senderNumber)
+        : 0;
+    const ehNovo = compras === 0;
+
+    if (ehNovo) {
+        return (
+            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+            `  🎉 *BEM-VINDO(A) À ${sysName.toUpperCase()}!* 🇲🇿\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+            `Olá, *${nomeCliente}*! ${sd}! ✨\n` +
+            `Somos a sua plataforma de internet rápida, económica e com ativação automática 24 horas por dia! 🚀\n\n` +
+            `📌 *COMO DESEJA COMEÇAR?\n\n` +
+            `1️⃣ *Menu* ➔ Ver Pacotes e Preços (Diários, Semanais e Mensais)\n` +
+            `2️⃣ *Pagamento* ➔ Ver Contas M-Pesa e e-Mola\n` +
+            `3️⃣ *Estudante* ➔ Tabela com Descontos Escolares\n` +
+            `4️⃣ *Fidelidade* ➔ Ganhe Megas Indicando Amigos 🏆\n` +
+            `5️⃣ *Suporte* ➔ Falar com Atendimento Humano 📞\n` +
+            `6️⃣ *Txeneco* ➔ Internet a Crédito (Regras, Taxa e Limites) 💸\n` +
+            `7️⃣ *Configurar Número* ➔ Recargas Automáticas sem Comprovativo ⚡\n\n` +
+            `👉 _Basta responder com o número da opção desejada (ex: *1*, *2* ou *7*)\n\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `⚡ *COMO COMPRAR PELA PRIMEIRA VEZ (3 PASSOS):\n` +
+            `1️⃣ Digite *1* para escolher o seu pacote.\n` +
+            `2️⃣ Transfira o valor para a nossa conta M-Pesa ou e-Mola (opção *2*).\n` +
+            `3️⃣ Cole o SMS do comprovativo aqui com o seu número Vodacom na última linha!\n` +
+            `━━━━━━━━━━━━━━━━━━`
+        );
+    }
+
     return (
-        `👋 *${sd.toUpperCase()}, ${nomeCliente.toUpperCase()}!*\n` +
-        `━━━━━━━━━━━━━━━━━━\n` +
-        `Seja bem-vindo(a) à *${sysName}*! 🇲🇿\n\n` +
-        `📌 *COMO DESEJA COMEÇAR?*\n\n` +
+        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+        `  👋 *${sd.toUpperCase()}, ${nomeCliente.toUpperCase()}!* ✨\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `Que bom ter você de volta à *${sysName}*! 🇲🇿\n` +
+        `📊 *Seu Histórico:* ${compras} compra(s) realizada(s)\n\n` +
+        `📌 *COMO POSSO AJUDAR HOJE?\n\n` +
         `1️⃣ *Menu* ➔ Ver Pacotes e Preços\n` +
         `2️⃣ *Pagamento* ➔ Ver Contas M-Pesa e e-Mola\n` +
         `3️⃣ *Estudante* ➔ Tabela com Descontos Escolares\n` +
         `4️⃣ *Fidelidade* ➔ Ganhe Megas Indicando Amigos 🏆\n` +
-        `5️⃣ *Suporte* ➔ Falar com Atendimento Humano 📞\n6️⃣ *Txeneco* ➔ Internet a Crédito (Regras, Taxa e Limites) 💸\n` +
+        `5️⃣ *Suporte* ➔ Falar com Atendimento Humano 📞\n` +
+        `6️⃣ *Txeneco* ➔ Internet a Crédito (Regras, Taxa e Limites) 💸\n` +
         `7️⃣ *Configurar Número* ➔ Recargas Automáticas sem Comprovativo ⚡\n\n` +
-        `💡 _Responda com o número da opção (ex: *1*, *6* ou *7*)\n\n` +
-        `⚡ *COMPRA RÁPIDA:*\n` +
-        `Já fez o pagamento? Basta enviar o comprovativo com o seu número Vodacom para ativar em segundos!\n` +
+        `👉 _Responda com o número da opção (ex: *1*, *6* ou *7*)\n\n` +
+        `⚡ *COMPRA RÁPIDA:\n` +
+        `Já fez o pagamento? Envie o comprovativo com o seu número Vodacom para ativar em segundos!\n` +
         `━━━━━━━━━━━━━━━━━━`
     );
 }
@@ -4248,15 +4281,15 @@ async function startWhatsApp(orderCallback, db = null) {
                         .replace(/\s+/g, ' ')
                         .trim();
 
-                    const regexSaudacao = /^(?:ola|oi+|bom dia|boa tarde|boa noite|tudo bem|td bem|tudo bom|opa|salve|alo|hello|hi|eae|eai|start|iniciar|comecar|bot|ka net)(?:\s|$)/i;
+                    const regexSaudacao = /^(?:ola|oi+|bom dia|boa tarde|boa noite|tudo bem|td bem|tudo bom|opa|salve|alo|hello|hi|eae|eai|start|iniciar|comecar|bot|ka net|kanet|ajuda|info|ajude|menu)(?:\s|$)/i;
                     const ehSaudacaoExplicita = regexSaudacao.test(textNorm) ||
                         /^(?:ola|oi+|opa|salve)\s+(?:tudo bem|como esta|amigo|mano|irmao|boa|bom)/i.test(textNorm) ||
                         /^(?:como esta|tudo bem|td bem)\??$/i.test(textNorm) ||
-                        ['preciso de megas', 'quero megas', 'comprar'].some(w => textNorm.startsWith(w));
+                        ['preciso de megas', 'quero megas', 'comprar', 'quero net', 'preciso de net', 'quero comprar', 'como comprar', 'como funciona', 'quanto custa', 'preco', 'precos'].some(w => textNorm.startsWith(w));
 
                     if (ehSaudacaoExplicita) {
                         addLog(`👋 [SAUDAÇÃO] Mensagem padrão de boas-vindas enviada para ${jid}`);
-                        await reply(gerarMensagemBoasVindas(nomeCliente));
+                        await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber));
                         continue;
                     }
 
@@ -4355,7 +4388,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
 
                     // No privado, se o cliente mandar algo desconhecido, enviar as boas-vindas de suporte
-                    await reply(gerarMensagemBoasVindas(nomeCliente));
+                    await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber));
                 }
             } catch (err) {
                 addLog(`❌ [ERRO MSG]: ${err.message}`);

@@ -254,6 +254,19 @@ function initCustomerServices(db, dispatcherFn, getValMbFn) {
 // ── 1. GESTÃO DE FIDELIDADE (CONTAGEM DE COMPRAS) ──────────────────────────────
 
 function gerarMensagemDesbloqueioVip(totalCompras) {
+    if (totalCompras === 1) {
+        return (
+            '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
+            '  🎉 *BEM-VINDO(A) À FAMÍLIA KA-NET!* 🌟\n' +
+            '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
+            'Parabéns pela sua primeira compra na Ka-Net! 🚀✨\n\n' +
+            '🎁 *SEU NÚMERO JÁ FOI CADASTRADO NO CLUBE DE FIDELIDADE:*\n' +
+            '• A partir de agora, todas as suas recargas contam no seu histórico! 📊\n' +
+            '• ⚡ Você já pode enviar *.configurar* para receber internet automática nas próximas vezes sem precisar de mandar comprovativo!\n' +
+            '• 💸 Ao acumular compras, você sobe de nível e desbloqueia o *Txeneco* (internet a crédito de confiança)!\n\n' +
+            '🙏 _Muito obrigado pela sua preferência e bem-vindo(a) à Ka-Net!_ 🌐🤝'
+        );
+    }
     if (totalCompras === 100) {
         return (
             '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
@@ -335,7 +348,7 @@ function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
     const milestoneMsg = gerarMensagemDesbloqueioVip(record.totalCompras);
     return {
         totalCompras: record.totalCompras,
-        milestone: record.totalCompras === 100 ? 'vip_100' : record.totalCompras === 200 ? 'vip_200' : record.totalCompras === 800 ? 'vip_800' : null,
+        milestone: record.totalCompras === 1 ? 'primeira_compra' : record.totalCompras === 100 ? 'vip_100' : record.totalCompras === 200 ? 'vip_200' : record.totalCompras === 800 ? 'vip_800' : null,
         mensagemVip: milestoneMsg
     };
 }
