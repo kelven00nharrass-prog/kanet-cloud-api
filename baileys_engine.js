@@ -1057,12 +1057,18 @@ function gerarPainelAjudaCompleto() {
 }
 
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
 // CALCULADOR PROPORCIONAL INTELIGENTE (VALORES FORA DA TABELA)
-// Converte qualquer valor em megas justos protegendo o lucro
+// Converte qualquer valor em megas justos protegendo rigorosamente o lucro
 // ══════════════════════════════════════════════════
 function calcularPacoteProporcional(valor, jid = null) {
     const vNum = Math.round(parseFloat(String(valor).replace(',', '.')));
     if (isNaN(vNum) || vNum < 5) return null; // valor mínimo de segurança
+
+    // Custo e Venda por GB configurados (Padrão: Compra 17.5 MT, Venda 23.0 MT)
+    const custoGb = Number(DYN_CFG.CUSTO_GB_MT) || 17.5;
+    const precoVendaGb = Number(DYN_CFG.PRECO_VENDA_GB_MT) || 23.0;
+    const custoPorMb = custoGb / 1024;
 
     // 1. Obter pontos da tabela de referência (preferência absoluta pela tabela exclusiva do Grupo!)
     const pontos = [];
@@ -1071,7 +1077,6 @@ function calcularPacoteProporcional(valor, jid = null) {
     if (jid && String(jid).endsWith('@g.us') && DYN_CFG.TABELAS_GRUPO && DYN_CFG.TABELAS_GRUPO[jid]) {
         const grpCfg = DYN_CFG.TABELAS_GRUPO[jid];
         const grpTabs = grpCfg.TABELAS || grpCfg;
-        // Percorrer todas as categorias configuradas neste grupo (24hrs, semanal, mensal, estudantes, revenda, etc.)
         for (const [catName, catObj] of Object.entries(grpTabs)) {
             if (catObj && typeof catObj === 'object') {
                 for (const [pStr, pObj] of Object.entries(catObj)) {
@@ -1086,7 +1091,6 @@ function calcularPacoteProporcional(valor, jid = null) {
         if (pontos.length > 0) origemPersonalizada = true;
     }
 
-    // Se não encontrou pontos na tabela do grupo (ou mensagem privada), usar a Tabela Geral
     if (pontos.length === 0 && DYN_CFG.TABELAS) {
         for (const catName of ['24hrs', 'semanal', 'mensal']) {
             const catObj = DYN_CFG.TABELAS[catName];
@@ -1105,16 +1109,11 @@ function calcularPacoteProporcional(valor, jid = null) {
     pontos.sort((a, b) => a.preco - b.preco);
 
     let mbEstimado = 0;
-    if (pontos.length === 0) {
-        mbEstimado = Math.round(vNum * 39); // Fallback: ~39 MB/MT
-    } else if (vNum <= pontos[0].preco) {
-        const taxa = pontos[0].mb / pontos[0].preco;
-        mbEstimado = Math.round(vNum * taxa);
-    } else if (vNum >= pontos[pontos.length - 1].preco) {
-        const taxa = pontos[pontos.length - 1].mb / pontos[pontos.length - 1].preco;
-        mbEstimado = Math.round(vNum * taxa);
-    } else {
-        // Interpolação linear entre os dois pontos mais próximos
+    if (vNum >= precoVendaGb) {
+        // Para valores a partir de 23 MT, entrega proporcional à escala oficial de 23 MT por GB
+        mbEstimado = Math.floor((vNum / precoVendaGb) * 1024);
+    } else if (pontos.length > 0 && vNum >= pontos[0].preco) {
+        // Interpolação linear entre os pontos da tabela
         let pInf = pontos[0];
         let pSup = pontos[pontos.length - 1];
         for (let i = 0; i < pontos.length - 1; i++) {
@@ -1127,22 +1126,36 @@ function calcularPacoteProporcional(valor, jid = null) {
         const deltaPreco = pSup.preco - pInf.preco;
         const fator = deltaPreco > 0 ? (vNum - pInf.preco) / deltaPreco : 0;
         mbEstimado = Math.round(pInf.mb + fator * (pSup.mb - pInf.mb));
+    } else {
+        // Para valores abaixo do menor pacote da tabela (ex: 5 a 10 MT), garantir margem mínima de 40% de lucro
+        const gastoMaximo = vNum * 0.60;
+        mbEstimado = Math.floor(gastoMaximo / custoPorMb);
     }
 
-    // 3. PROTEÇÃO ANTI-PREJUÍZO (Garante margem mínima calculada com o CUSTO_GB_MT)
-    const custoGb = Number(DYN_CFG.CUSTO_GB_MT) || 20;
-    const custoPorMb = custoGb / 1024;
-    // O cliente nunca recebe mais do que o valor pago com 15% de margem líquida garantida
-    const tetoMbPermitido = Math.floor((vNum * 0.85) / custoPorMb);
+    // 2. 🛡️ PROTEÇÃO RIGOROSA DE LUCRO (Meta de Lucro >= 50 MT a cada 10 vendas)
+    let tetoMbPermitido = 0;
+    if (vNum >= 11 && vNum <= 22) {
+        // Para valores de 11 a 22 MT: o lucro por venda NUNCA pode ser menor que 5.00 MT!
+        // Custo máximo = vNum - 5.00 MT
+        tetoMbPermitido = Math.floor((vNum - 5.00) / custoPorMb);
+    } else if (vNum > 22) {
+        // Para valores >= 23 MT: o custo não pode exceder a margem oficial (23 MT venda x 17.5 MT custo)
+        const margemCustoMax = (custoGb / precoVendaGb); // ~0.7608 (76.1% custo, 23.9% lucro)
+        tetoMbPermitido = Math.floor((vNum * margemCustoMax) / custoPorMb);
+    } else {
+        // Para valores < 11 MT: margem mínima de 40%
+        tetoMbPermitido = Math.floor((vNum * 0.60) / custoPorMb);
+    }
+
     if (tetoMbPermitido > 0 && mbEstimado > tetoMbPermitido) {
         mbEstimado = tetoMbPermitido;
     }
 
     // Arredondamento comercial amigável (múltiplos de 50 MB para pacotes grandes, ou 10 MB para pequenos)
     if (mbEstimado >= 1000) {
-        mbEstimado = Math.round(mbEstimado / 50) * 50;
+        mbEstimado = Math.floor(mbEstimado / 50) * 50;
     } else {
-        mbEstimado = Math.round(mbEstimado / 10) * 10;
+        mbEstimado = Math.floor(mbEstimado / 10) * 10;
     }
 
     if (mbEstimado < 100) mbEstimado = 100;
