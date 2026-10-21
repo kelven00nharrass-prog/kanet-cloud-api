@@ -1065,9 +1065,8 @@ function calcularPacoteProporcional(valor, jid = null) {
     const vNum = Math.round(parseFloat(String(valor).replace(',', '.')));
     if (isNaN(vNum) || vNum < 5) return null; // valor mínimo de segurança
 
-    // Custo e Venda por GB configurados (Padrão: Compra 17.5 MT, Venda 23.0 MT)
+    // Custo de compra dinâmico configurado (Padrão: 17.5 MT por GB)
     const custoGb = Number(DYN_CFG.CUSTO_GB_MT) || 17.5;
-    const precoVendaGb = Number(DYN_CFG.PRECO_VENDA_GB_MT) || 23.0;
     const custoPorMb = custoGb / 1024;
 
     // 1. Obter pontos da tabela de referência (preferência absoluta pela tabela exclusiva do Grupo!)
@@ -1108,9 +1107,21 @@ function calcularPacoteProporcional(valor, jid = null) {
 
     pontos.sort((a, b) => a.preco - b.preco);
 
+    // ⚡ ADAPTAÇÃO TOTAL E DINÂMICA: Detecta o preço de venda de 1GB da tabela ativa (Geral ou Grupo)
+    let precoVendaGb = Number(DYN_CFG.PRECO_VENDA_GB_MT) || 23.0;
+    const ponto1Gb = pontos.find(p => p.mb === 1024 || (p.mb >= 1000 && p.mb <= 1048));
+    if (ponto1Gb && ponto1Gb.preco > 0) {
+        precoVendaGb = ponto1Gb.preco;
+    } else if (pontos.length > 0) {
+        const maiores = pontos.filter(p => p.mb >= 1000);
+        if (maiores.length > 0) {
+            precoVendaGb = Math.round((maiores[0].preco / (maiores[0].mb / 1024)) * 10) / 10;
+        }
+    }
+
     let mbEstimado = 0;
     if (vNum >= precoVendaGb) {
-        // Para valores a partir de 23 MT, entrega proporcional à escala oficial de 23 MT por GB
+        // Para valores a partir de 1GB, entrega estritamente proporcional ao preço do GB da tabela ativa
         mbEstimado = Math.floor((vNum / precoVendaGb) * 1024);
     } else if (pontos.length > 0 && vNum >= pontos[0].preco) {
         // Interpolação linear entre os pontos da tabela
