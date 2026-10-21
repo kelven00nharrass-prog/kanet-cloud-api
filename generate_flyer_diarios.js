@@ -17,9 +17,9 @@ const pacotesDiarios = [
     { vol: '5.0 GB', preco: 115, desc: 'Super Oferta', badge: '🚀 CUSTO-BENEFÍCIO', highlight: true },
     { vol: '6.0 GB', preco: 138, desc: 'Download Rápido', badge: '' },
     { vol: '7.0 GB', preco: 161, desc: 'Heavy User', badge: '' },
-    { vol: '8.0 GB', preco: 184, desc: 'Full HD', badge: '' },
+    { vol: '8.0 GB', preco: 184, desc: 'Full HD 24h', badge: '' },
     { vol: '9.0 GB', preco: 207, desc: 'Mega Volume', badge: '' },
-    { vol: '10.0 GB', preco: 230, desc: 'Navegação Total VIP', badge: '👑 MÁXIMO VALOR', highlight: true }
+    { vol: '10.0 GB', preco: 230, desc: 'VIP Total', badge: '👑 MÁXIMO VALOR', highlight: true }
 ];
 
 const col1 = pacotesDiarios.slice(0, 9);
@@ -53,45 +53,59 @@ const html = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@700;800&family=Monoton&family=Bungee+Outline&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
     width: 1080px;
-    height: 1680px;
-    background: #040814;
+    height: 1920px;
+    background: #020718;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
     font-family: 'Plus Jakarta Sans', sans-serif;
-    color: #F8FAFC;
+    color: #FFFFFF;
     overflow: hidden;
     position: relative;
-    padding: 40px 45px 35px 45px;
+    padding: 50px 48px 45px 48px;
   }
 
-  /* Efeitos de Fundo Luminosos Cybernetic */
-  .glow-top-left {
+  /* Iluminação e Efeitos Azul e Branco */
+  .glow-top {
     position: absolute;
-    width: 700px;
-    height: 500px;
-    top: -150px;
-    left: -100px;
-    background: radial-gradient(circle, rgba(0, 240, 255, 0.18) 0%, rgba(99, 102, 241, 0.12) 40%, transparent 70%);
-    filter: blur(65px);
+    width: 900px;
+    height: 550px;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(0, 102, 255, 0.35) 0%, rgba(37, 99, 235, 0.20) 45%, transparent 70%);
+    filter: blur(80px);
     pointer-events: none;
   }
 
-  .glow-bottom-right {
+  .glow-mid {
     position: absolute;
-    width: 750px;
+    width: 800px;
+    height: 800px;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(0, 149, 255, 0.15) 0%, rgba(30, 64, 175, 0.10) 50%, transparent 75%);
+    filter: blur(90px);
+    pointer-events: none;
+  }
+
+  .glow-bottom {
+    position: absolute;
+    width: 850px;
     height: 600px;
     bottom: -150px;
-    right: -100px;
-    background: radial-gradient(circle, rgba(99, 102, 241, 0.22) 0%, rgba(0, 255, 157, 0.10) 45%, transparent 70%);
-    filter: blur(75px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(0, 102, 255, 0.30) 0%, rgba(59, 130, 246, 0.15) 50%, transparent 70%);
+    filter: blur(85px);
     pointer-events: none;
   }
 
@@ -99,13 +113,13 @@ const html = `<!DOCTYPE html>
     position: absolute;
     inset: 0;
     background-image: 
-      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 40px 40px;
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 45px 45px;
     pointer-events: none;
   }
 
-  /* Header */
+  /* HEADER */
   .header {
     width: 100%;
     display: flex;
@@ -118,98 +132,108 @@ const html = `<!DOCTYPE html>
   .top-badge {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    background: rgba(0, 240, 255, 0.08);
-    border: 1px solid rgba(0, 240, 255, 0.35);
-    padding: 6px 18px;
+    gap: 10px;
+    background: rgba(0, 102, 255, 0.16);
+    border: 1.5px solid #38BDF8;
+    padding: 8px 24px;
     border-radius: 50px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #00F0FF;
-    letter-spacing: 2px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
-    box-shadow: 0 0 25px rgba(0, 240, 255, 0.2);
-    margin-bottom: 12px;
+    box-shadow: 0 0 25px rgba(0, 102, 255, 0.4);
+    margin-bottom: 14px;
   }
 
   .pulse-dot {
-    width: 8px;
-    height: 8px;
-    background: #00FF9D;
+    width: 10px;
+    height: 10px;
+    background: #FFFFFF;
     border-radius: 50%;
-    box-shadow: 0 0 10px #00FF9D;
+    box-shadow: 0 0 12px #38BDF8;
   }
 
-  .brand-title {
-    font-family: 'Outfit', sans-serif;
-    font-size: 52px;
+  /* Estilo de Letra Double-Struck (Blackboard Bold ℍ𝕖𝕝𝕝𝕠 𝕨𝕠𝕣𝕝𝕕) */
+  .brand-title-double {
+    font-size: 64px;
     font-weight: 900;
-    letter-spacing: -1px;
-    line-height: 1.1;
-    background: linear-gradient(135deg, #FFFFFF 20%, #A5F3FC 60%, #00F0FF 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 4px 15px rgba(0, 240, 255, 0.3));
+    letter-spacing: 3px;
+    color: #FFFFFF;
+    text-shadow: 
+      0 0 15px rgba(56, 189, 248, 0.8),
+      0 0 35px rgba(0, 102, 255, 0.6);
+    margin-bottom: 8px;
   }
 
-  .category-title {
+  .brand-title-sub {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: #38BDF8;
+    text-transform: uppercase;
+  }
+
+  .category-title-box {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.2), rgba(0, 240, 255, 0.2));
-    border: 1px solid rgba(0, 240, 255, 0.3);
-    padding: 8px 24px;
-    border-radius: 12px;
-    font-family: 'Outfit', sans-serif;
-    font-size: 22px;
-    font-weight: 800;
-    color: #F8FAFC;
-    letter-spacing: 1px;
-    margin-top: 10px;
+    gap: 14px;
+    background: linear-gradient(90deg, rgba(0, 102, 255, 0.35), rgba(30, 64, 175, 0.35));
+    border: 2px solid #0095FF;
+    padding: 12px 36px;
+    border-radius: 16px;
+    font-size: 28px;
+    font-weight: 900;
+    color: #FFFFFF;
+    letter-spacing: 1.5px;
+    margin-top: 14px;
+    box-shadow: 0 0 30px rgba(0, 102, 255, 0.35);
   }
 
-  .category-title i {
-    color: #00F0FF;
+  .category-title-box i {
+    color: #38BDF8;
+    font-size: 26px;
   }
 
   .subtext {
-    font-size: 14px;
-    color: #94A3B8;
-    margin-top: 8px;
-    font-weight: 500;
+    font-size: 17px;
+    color: #CBD5E1;
+    margin-top: 10px;
+    font-weight: 600;
   }
 
-  /* Highlight Feature Pill Banner */
+  /* FEATURES STRIP */
   .features-strip {
     width: 100%;
     display: flex;
     justify-content: space-between;
-    gap: 12px;
-    margin: 18px 0;
+    gap: 14px;
+    margin: 20px 0 16px 0;
     z-index: 10;
   }
 
   .feature-pill {
     flex: 1;
-    background: rgba(15, 23, 42, 0.65);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(12px);
-    border-radius: 12px;
-    padding: 10px 14px;
+    background: rgba(10, 25, 60, 0.75);
+    border: 1.5px solid rgba(56, 189, 248, 0.3);
+    backdrop-filter: blur(14px);
+    border-radius: 14px;
+    padding: 12px 14px;
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #CBD5E1;
+    font-size: 14px;
+    font-weight: 700;
+    color: #FFFFFF;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   }
 
   .feature-pill i {
-    font-size: 16px;
-    color: #00F0FF;
+    font-size: 18px;
+    color: #38BDF8;
   }
 
-  /* Two Columns Grid */
+  /* GRID DE PACOTES */
   .grid-container {
     width: 100%;
     display: grid;
@@ -221,52 +245,51 @@ const html = `<!DOCTYPE html>
   .column {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
-  /* Package Cards */
+  /* CARDS DOS PACOTES */
   .pkg-card {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(12px);
-    border-radius: 14px;
-    padding: 11px 16px;
+    background: rgba(8, 22, 54, 0.75);
+    border: 1.5px solid rgba(56, 189, 248, 0.22);
+    backdrop-filter: blur(14px);
+    border-radius: 16px;
+    padding: 13px 18px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: all 0.2s ease;
   }
 
   .pkg-highlight {
-    background: linear-gradient(135deg, rgba(0, 240, 255, 0.12) 0%, rgba(99, 102, 241, 0.12) 100%);
-    border: 1.5px solid rgba(0, 240, 255, 0.45);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.12);
+    background: linear-gradient(135deg, rgba(0, 102, 255, 0.25) 0%, rgba(8, 22, 54, 0.9) 100%);
+    border: 2px solid #38BDF8;
+    box-shadow: 0 0 25px rgba(0, 102, 255, 0.35);
   }
 
   .pkg-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }
 
   .pkg-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(0, 102, 255, 0.15);
+    border: 1.5px solid rgba(56, 189, 248, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
-    color: #94A3B8;
+    font-size: 18px;
+    color: #38BDF8;
   }
 
   .icon-glow {
-    background: rgba(0, 240, 255, 0.15);
-    border-color: rgba(0, 240, 255, 0.4);
-    color: #00F0FF;
-    box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+    background: #0066FF;
+    border-color: #FFFFFF;
+    color: #FFFFFF;
+    box-shadow: 0 0 15px rgba(0, 102, 255, 0.6);
   }
 
   .pkg-info {
@@ -276,210 +299,233 @@ const html = `<!DOCTYPE html>
 
   .pkg-vol {
     font-family: 'Outfit', sans-serif;
-    font-size: 20px;
-    font-weight: 800;
+    font-size: 26px;
+    font-weight: 900;
     color: #FFFFFF;
     letter-spacing: -0.5px;
   }
 
   .pkg-highlight .pkg-vol {
-    color: #00F0FF;
-    text-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+    color: #FFFFFF;
+    text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);
   }
 
   .pkg-desc {
-    font-size: 11px;
-    color: #64748B;
-    font-weight: 500;
+    font-size: 13px;
+    color: #94A3B8;
+    font-weight: 600;
   }
 
   .pkg-highlight .pkg-desc {
-    color: #94A3B8;
+    color: #38BDF8;
+    font-weight: 700;
   }
 
   .pkg-right {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 2px;
+    gap: 3px;
   }
 
   .pkg-badge {
-    font-size: 9px;
-    font-weight: 800;
+    font-size: 11px;
+    font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    background: linear-gradient(90deg, #00F0FF, #00FF9D);
-    color: #040814;
-    padding: 2px 7px;
+    letter-spacing: 0.8px;
+    background: #FFFFFF;
+    color: #0044CC;
+    padding: 3px 9px;
     border-radius: 6px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
   }
 
   .pkg-price {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 24px;
-    font-weight: 800;
-    color: #F8FAFC;
+    font-size: 32px;
+    font-weight: 900;
+    color: #FFFFFF;
   }
 
   .pkg-highlight .pkg-price {
-    color: #00FF9D;
-    text-shadow: 0 0 10px rgba(0, 255, 157, 0.4);
+    color: #38BDF8;
+    text-shadow: 0 0 15px rgba(56, 189, 248, 0.7);
   }
 
   .cur {
-    font-size: 14px;
-    font-weight: 600;
-    color: #94A3B8;
+    font-size: 18px;
+    font-weight: 800;
+    color: #FFFFFF;
   }
 
-  /* Bottom Details Section */
+  /* PAINEL INFERIOR: PAGAMENTO & ATIVAÇÃO */
   .bottom-card {
     width: 100%;
-    background: rgba(15, 23, 42, 0.75);
-    border: 1px solid rgba(0, 240, 255, 0.25);
-    border-radius: 18px;
-    padding: 20px 24px;
+    background: rgba(6, 18, 48, 0.85);
+    border: 2px solid #0077FF;
+    border-radius: 22px;
+    padding: 24px 28px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
     z-index: 10;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6), 0 0 35px rgba(0, 102, 255, 0.25);
   }
 
   .bottom-grid {
     display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 20px;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 24px;
     align-items: center;
   }
 
-  /* Payment Channels */
+  /* Contas */
   .payments-box {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
 
   .payments-title {
-    font-size: 12px;
-    font-weight: 800;
-    color: #00F0FF;
-    letter-spacing: 1px;
+    font-size: 15px;
+    font-weight: 900;
+    color: #38BDF8;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
 
   .payment-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    padding: 8px 14px;
+    background: rgba(0, 102, 255, 0.12);
+    border: 1.5px solid rgba(56, 189, 248, 0.35);
+    border-radius: 12px;
+    padding: 10px 16px;
   }
 
   .pay-brand {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-weight: 700;
-    font-size: 13px;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 15px;
+    color: #FFFFFF;
   }
 
-  .dot-red { width: 10px; height: 10px; border-radius: 50%; background: #EF4444; }
-  .dot-orange { width: 10px; height: 10px; border-radius: 50%; background: #F59E0B; }
+  .dot-blue { width: 12px; height: 12px; border-radius: 50%; background: #38BDF8; box-shadow: 0 0 8px #38BDF8; }
+  .dot-white { width: 12px; height: 12px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 0 8px #FFFFFF; }
 
   .pay-number {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 15px;
-    font-weight: 800;
+    font-size: 20px;
+    font-weight: 900;
     color: #FFFFFF;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 3px 8px;
-    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
   }
 
-  /* Activation Steps */
+  /* Passos de Ativação */
   .steps-box {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
 
   .step-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    color: #CBD5E1;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #E2E8F0;
   }
 
   .step-num {
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    background: rgba(0, 240, 255, 0.15);
-    border: 1px solid rgba(0, 240, 255, 0.4);
-    color: #00F0FF;
-    font-size: 11px;
-    font-weight: 800;
+    background: #0066FF;
+    border: 1.5px solid #FFFFFF;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 900;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 0 10px rgba(0, 102, 255, 0.6);
   }
 
-  /* Footer strip */
+  /* Rodapé do Painel */
   .footer-strip {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    font-size: 12px;
+    padding-top: 14px;
+    border-top: 1.5px solid rgba(56, 189, 248, 0.2);
+    font-size: 14px;
     color: #94A3B8;
+  }
+
+  .tip-text {
+    color: #E2E8F0;
+    font-size: 14px;
+  }
+
+  .tip-text b {
+    color: #38BDF8;
   }
 
   .support-tag {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     color: #FFFFFF;
-    font-weight: 700;
+    font-weight: 800;
+    font-size: 15px;
   }
 
   .support-tag span {
-    color: #00FF9D;
+    color: #38BDF8;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
+    font-size: 18px;
+    background: rgba(0, 102, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(56, 189, 248, 0.4);
   }
 </style>
 </head>
 <body>
 
-  <!-- Glows -->
-  <div class="glow-top-left"></div>
-  <div class="glow-bottom-right"></div>
+  <!-- Glows Azul e Branco -->
+  <div class="glow-top"></div>
+  <div class="glow-mid"></div>
+  <div class="glow-bottom"></div>
   <div class="grid-pattern"></div>
 
-  <!-- HEADER -->
+  <!-- HEADER COM ESTILO DOUBLE-STRUCK (ℍ𝕖𝕝𝕝𝕠 𝕨𝕠𝕣𝕝𝕕) -->
   <div class="header">
     <div class="top-badge">
       <div class="pulse-dot"></div>
-      Sistema Oficial Ka-Net • Ativação 24H
+      𝕊𝕀𝕊𝕋𝔼𝕄𝔸 𝕆𝔽𝕀ℂ𝕀𝔸𝕃 • 𝔸𝕋𝕀𝕍𝔸ℂ̧𝔸̃𝕆 𝟚𝟜ℍ
     </div>
-    <h1 class="brand-title">KA-NET SYSTEM</h1>
-    <div class="category-title">
+    <h1 class="brand-title-double">𝕂𝔸-ℕ𝔼𝕋 𝕊𝕐𝕊𝕋𝔼𝕄</h1>
+    <div class="brand-title-sub">𝕀ℕ𝕋𝔼ℝℕ𝔼𝕋 𝕌𝕃𝕋ℝ𝔸 𝔽𝔸𝕊𝕋</div>
+    
+    <div class="category-title-box">
       <i class="fa-solid fa-bolt-lightning"></i>
-      TABELA DE PACOTES DIÁRIOS (24H)
+      ℙ𝔸ℂ𝕆𝕋𝔼𝕊 𝔻𝕀𝔸́ℝ𝕀𝕆𝕊 (𝟚𝟜ℍ)
     </div>
-    <div class="subtext">Os melhores preços de internet Vodacom em Moçambique com recarga 100% automática</div>
+    <div class="subtext">Os melhores pacotes de dados Vodacom em Moçambique com ativação 100% automática</div>
   </div>
 
-  <!-- FEATURES STRIP -->
+  <!-- BARRA DE RECURSOS -->
   <div class="features-strip">
     <div class="feature-pill">
       <i class="fa-solid fa-bolt"></i>
@@ -491,7 +537,7 @@ const html = `<!DOCTYPE html>
     </div>
     <div class="feature-pill">
       <i class="fa-solid fa-clock"></i>
-      <span>Disponível 24/7 sem Pausa</span>
+      <span>24H Online sem Pausa</span>
     </div>
     <div class="feature-pill">
       <i class="fa-solid fa-credit-card"></i>
@@ -499,7 +545,7 @@ const html = `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- TWO COLUMNS GRID -->
+  <!-- GRID DE 2 COLUNAS DE PACOTES COM LETRAS GRANDES -->
   <div class="grid-container">
     <!-- Coluna 1: 350MB até 2GB -->
     <div class="column">
@@ -512,34 +558,34 @@ const html = `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- BOTTOM CARD: PAGAMENTO & ATIVAÇÃO -->
+  <!-- PAINEL INFERIOR: PAGAMENTO AZUL E BRANCO -->
   <div class="bottom-card">
     <div class="bottom-grid">
-      <!-- Contas de Pagamento -->
+      <!-- Contas Oficiais -->
       <div class="payments-box">
         <div class="payments-title">
           <i class="fa-solid fa-wallet"></i> Contas de Pagamento Oficiais
         </div>
         <div class="payment-item">
           <div class="pay-brand">
-            <div class="dot-red"></div>
+            <div class="dot-blue"></div>
             <span>M-Pesa (Kelven Junior)</span>
           </div>
           <div class="pay-number">856268811</div>
         </div>
         <div class="payment-item">
           <div class="pay-brand">
-            <div class="dot-orange"></div>
+            <div class="dot-white"></div>
             <span>e-Mola (Catia Anabela)</span>
           </div>
           <div class="pay-number">864882152</div>
         </div>
       </div>
 
-      <!-- Como Ativar -->
+      <!-- Como Comprar -->
       <div class="steps-box">
-        <div class="payments-title" style="color:#00FF9D;">
-          <i class="fa-solid fa-wand-magic-sparkles"></i> Como Comprar em 3 Passos
+        <div class="payments-title" style="color:#FFFFFF;">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Como Ativar em 3 Passos
         </div>
         <div class="step-row">
           <div class="step-num">1</div>
@@ -556,11 +602,11 @@ const html = `<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Linha de Suporte e Recarga Automática -->
+    <!-- Linha de Dica e Suporte -->
     <div class="footer-strip">
-      <div>⚡ <b>Dica:</b> Envie <b>.configurar</b> para recarregar no automático sem mandar comprovativo!</div>
+      <div class="tip-text">⚡ <b>Dica VIP:</b> Envie <b>.configurar</b> para recarregar direto sem mandar comprovativo!</div>
       <div class="support-tag">
-        <i class="fa-brands fa-whatsapp"></i> Suporte Humano: <span>850401416</span>
+        <i class="fa-brands fa-whatsapp"></i> Suporte Direto: <span>850401416</span>
       </div>
     </div>
   </div>
@@ -569,14 +615,14 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 async function main() {
-    console.log('🚀 Gerando Flyer Moderno dos Pacotes Diários Ka-Net...');
+    console.log('🚀 Gerando Novo Flyer dos Pacotes Diários (Azul & Branco, Letras Grandes, Estilo Double-Struck)...');
     const browser = await puppeteer.launch({
         headless: 'new',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     });
 
     const page = await browser.newPage();
-    await page.setViewport({ width: 1080, height: 1680, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 1080, height: 1920, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
     const outPath = path.join(__dirname, 'marketing_pacotes_diarios.png');
