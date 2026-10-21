@@ -1,4 +1,3 @@
-// GERADO PELO SISTEMA KA-NET CLOUD
 module.exports = {
     "BOT_EXPIRACAO_DIAS": 10000000,
     "SMS_GATEWAY_SEND_URL": "http://192.168.43.1:8080/send",
@@ -87,28 +86,28 @@ module.exports = {
     },
     "TABELAS": {
         "24hrs": {
-            "9": {
+            "11": {
                 "quantidade": 350,
                 "nome": "350 MB 24h",
                 "quantidade_mb": 350,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "14": {
+            "15": {
                 "quantidade": 550,
                 "nome": "550 MB 24h",
                 "quantidade_mb": 550,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "17": {
+            "18": {
                 "quantidade": 696,
                 "nome": "696 MB 24h",
                 "quantidade_mb": 696,
                 "periodo": "24hrs",
                 "tipo": "diario"
             },
-            "19": {
+            "20": {
                 "quantidade": 800,
                 "nome": "800 MB 24h",
                 "quantidade_mb": 800,
@@ -538,6 +537,13 @@ module.exports = {
             "inicial": 8192,
             "diaria": 100
         },
+        "232": {
+            "nome": "📆 10GB Faseado Mensal",
+            "tipo": "faseado_mensal",
+            "total": 10240,
+            "inicial": 1024,
+            "diaria": 1024
+        },
         "240": {
             "nome": "♻️ 10GB+700 (Renovação)",
             "tipo": "renovacao",
@@ -559,23 +565,16 @@ module.exports = {
             "inicial": 1024,
             "diaria": 1024
         },
-        "510": {
-            "nome": "📉 20GB Faseado",
-            "tipo": "faseado",
+        "461": {
+            "nome": "📆 20GB Faseado Mensal",
+            "tipo": "faseado_mensal",
             "total": 20480,
             "inicial": 1024,
             "diaria": 1024
         },
-        "232": {
-            "nome": "📆 10GB Faseado Mensal",
-            "tipo": "faseado_mensal",
-            "total": 10240,
-            "inicial": 1024,
-            "diaria": 1024
-        },
-        "461": {
-            "nome": "📆 20GB Faseado Mensal",
-            "tipo": "faseado_mensal",
+        "510": {
+            "nome": "📉 20GB Faseado",
+            "tipo": "faseado",
             "total": 20480,
             "inicial": 1024,
             "diaria": 1024
@@ -604,28 +603,28 @@ module.exports = {
         "120363409763663650@g.us": {
             "TABELAS": {
                 "24hrs": {
-                    "10": {
+                    "11": {
                         "quantidade": 350,
                         "nome": "350MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "14": {
+                    "15": {
                         "quantidade": 550,
                         "nome": "550MB 24h",
                         "quantidade_mb": 550,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "17": {
+                    "18": {
                         "quantidade": 696,
                         "nome": "696MB 24h",
                         "quantidade_mb": 696,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "19": {
+                    "20": {
                         "quantidade": 800,
                         "nome": "800MB 24h",
                         "quantidade_mb": 800,
@@ -1138,28 +1137,28 @@ module.exports = {
         "120363424022382579@g.us": {
             "TABELAS": {
                 "24hrs": {
-                    "10": {
+                    "11": {
                         "quantidade": 350,
                         "nome": "350MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "14": {
+                    "15": {
                         "quantidade": 550,
                         "nome": "550MB 24h",
                         "quantidade_mb": 550,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "17": {
+                    "18": {
                         "quantidade": 696,
                         "nome": "696MB 24h",
                         "quantidade_mb": 696,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "19": {
+                    "20": {
                         "quantidade": 800,
                         "nome": "800MB 24h",
                         "quantidade_mb": 800,
@@ -1672,28 +1671,28 @@ module.exports = {
         "120363426787478258@g.us": {
             "TABELAS": {
                 "24hrs": {
-                    "10": {
+                    "11": {
                         "quantidade": 350,
                         "nome": "350MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "14": {
+                    "15": {
                         "quantidade": 550,
                         "nome": "550MB 24h",
                         "quantidade_mb": 550,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "17": {
+                    "18": {
                         "quantidade": 696,
                         "nome": "696MB 24h",
                         "quantidade_mb": 696,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "19": {
+                    "20": {
                         "quantidade": 800,
                         "nome": "800MB 24h",
                         "quantidade_mb": 800,
@@ -2206,24 +2205,17 @@ module.exports = {
         "120363424819563179@g.us": {
             "TABELAS": {
                 "24hrs": {
-                    "10": {
+                    "11": {
                         "quantidade": 350,
                         "nome": "350MB 24h",
                         "quantidade_mb": 350,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
-                    "14": {
+                    "15": {
                         "quantidade": 550,
                         "nome": "550MB 24h",
                         "quantidade_mb": 550,
-                        "periodo": "24hrs",
-                        "tipo": "24hrs"
-                    },
-                    "17": {
-                        "quantidade": 696,
-                        "nome": "696MB 24h",
-                        "quantidade_mb": 696,
                         "periodo": "24hrs",
                         "tipo": "24hrs"
                     },
