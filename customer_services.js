@@ -29,20 +29,23 @@ let firestoreDb = null;
 let orderDispatcher = null;
 let valorFromMbHelper = null;
 
-// Normalizador de telefone Moçambicano (retorna sempre 9 dígitos, ex: 841234567)
+// Normalizador de telefone Moçambicano (retorna sempre 9 dígitos válidos: 82/83/84/85/86/87XXXXXXX)
 function normalizarTelefone(tel) {
     if (!tel) return '';
-    const limpo = String(tel).replace(/\D/g, '');
-    if (limpo.length === 12 && limpo.startsWith('258')) {
+    const limpo = String(tel).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (limpo.length === 12 && limpo.startsWith('258') && /^2588[2-7]\d{7}$/.test(limpo)) {
         return limpo.slice(3);
     }
-    if (limpo.length >= 9) {
-        return limpo.slice(-9);
+    if (limpo.length === 9 && /^8[2-7]\d{7}$/.test(limpo)) {
+        return limpo;
     }
-    return limpo;
+    const m = limpo.match(/(?:258)?(8[2-7]\d{7})/);
+    if (m) return m[1];
+    return '';
 }
 
-// ── PERSISTÊNCIA: CACHE LOCAL EM JSON ─────────────────────────────────────────
+// ── PERSISTÊNCIA REFORÇADA: CACHE LOCAL EM JSON + BACKUP AUTOMÁTICO ───────────
+const CACHE_BACKUP_FILE = path.resolve(__dirname, 'customer_services_cache.bak.json');
 
 function salvarCacheLocal() {
     try {
@@ -53,16 +56,39 @@ function salvarCacheLocal() {
             bonuses: [...clientBonuses.entries()],
             savedAt: new Date().toISOString()
         };
-        fs.writeFileSync(CACHE_FILE, JSON.stringify(payload, null, 2), 'utf8');
+        const content = JSON.stringify(payload, null, 2);
+        const tempFile = CACHE_FILE + '.tmp';
+        
+        // 1. Gravar primeiro em ficheiro temporário para evitar truncamento em caso de queda de energia
+        fs.writeFileSync(tempFile, content, 'utf8');
+        
+        // 2. Criar cópia de segurança do cache anterior (.bak)
+        if (fs.existsSync(CACHE_FILE)) {
+            try { fs.copyFileSync(CACHE_FILE, CACHE_BACKUP_FILE); } catch (_) {}
+        }
+        
+        // 3. Substituição atómica e segura
+        fs.renameSync(tempFile, CACHE_FILE);
     } catch (err) {
         console.warn('⚠️ [CUSTOMER-SERVICES] Erro ao salvar cache local:', err.message);
     }
 }
 
 function carregarCacheLocal() {
+    let raw = null;
+    let fonte = CACHE_FILE;
+
     try {
-        if (!fs.existsSync(CACHE_FILE)) return;
-        const raw = fs.readFileSync(CACHE_FILE, 'utf8');
+        if (fs.existsSync(CACHE_FILE)) {
+            raw = fs.readFileSync(CACHE_FILE, 'utf8');
+        } else if (fs.existsSync(CACHE_BACKUP_FILE)) {
+            console.log('🔄 [CUSTOMER-SERVICES] Cache principal ausente, restaurando cópia de segurança (.bak)...');
+            raw = fs.readFileSync(CACHE_BACKUP_FILE, 'utf8');
+            fonte = CACHE_BACKUP_FILE;
+        }
+
+        if (!raw) return;
+
         const data = JSON.parse(raw);
         if (Array.isArray(data.loyalty)) {
             data.loyalty.forEach(([k, v]) => clientLoyalty.set(k, v));
@@ -76,9 +102,22 @@ function carregarCacheLocal() {
         if (Array.isArray(data.bonuses)) {
             data.bonuses.forEach(([k, v]) => clientBonuses.set(k, v));
         }
-        console.log(`📦 [CUSTOMER-SERVICES] Cache local carregado: ${clientLoyalty.size} clientes fidelidade, ${clientLoans.size} empréstimos, ${defaultRecipients.size} receptores, ${clientBonuses.size} bônus.`);
+        console.log(`📦 [CUSTOMER-SERVICES] Cache carregado (${path.basename(fonte)}): ${clientLoyalty.size} clientes fidelidade, ${clientLoans.size} empréstimos, ${defaultRecipients.size} receptores, ${clientBonuses.size} bônus.`);
     } catch (err) {
-        console.warn('⚠️ [CUSTOMER-SERVICES] Erro ao carregar cache local:', err.message);
+        console.warn('⚠️ [CUSTOMER-SERVICES] Falha ao ler cache principal, tentando backup:', err.message);
+        try {
+            if (fs.existsSync(CACHE_BACKUP_FILE)) {
+                const bakRaw = fs.readFileSync(CACHE_BACKUP_FILE, 'utf8');
+                const bakData = JSON.parse(bakRaw);
+                if (Array.isArray(bakData.loyalty)) bakData.loyalty.forEach(([k, v]) => clientLoyalty.set(k, v));
+                if (Array.isArray(bakData.loans)) bakData.loans.forEach(([k, v]) => clientLoans.set(k, v));
+                if (Array.isArray(bakData.defaultRecipients)) bakData.defaultRecipients.forEach(([k, v]) => defaultRecipients.set(k, v));
+                if (Array.isArray(bakData.bonuses)) bakData.bonuses.forEach(([k, v]) => clientBonuses.set(k, v));
+                console.log('✅ [CUSTOMER-SERVICES] Restaurado com sucesso a partir do backup!');
+            }
+        } catch (e2) {
+            console.error('❌ [CUSTOMER-SERVICES] Erro crítico em ambos os caches:', e2.message);
+        }
     }
 }
 
@@ -215,34 +254,49 @@ function initCustomerServices(db, dispatcherFn, getValMbFn) {
 // ── 1. GESTÃO DE FIDELIDADE (CONTAGEM DE COMPRAS) ──────────────────────────────
 
 function gerarMensagemDesbloqueioVip(totalCompras) {
-    if (totalCompras === 101) {
+    if (totalCompras === 100) {
         return (
             '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
             '  🎉 *PARABÉNS! VOCÊ É CLIENTE VIP!* 🌟\n' +
             '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
-            'Incrível! Você acaba de completar a sua *101ª compra* na Ka-Net! 🏆✨\n\n' +
-            '🔓 *NOVO BENEFÍCIO LIBERADO: TXENECO* ⚡\n' +
+            'Incrível! Você acaba de completar a sua *100ª compra* na Ka-Net! 🏆✨\n\n' +
+            '🔓 *NOVO BENEFÍCIO DESBLOQUEADO: TXENECO* ⚡\n' +
             'Pela sua fidelidade, você agora tem crédito de internet liberado sempre que precisar e estiver sem saldo!\n\n' +
-            '📊 *O Seu Limite de Crédito:* até *2.0 GB*\n' +
-            '📦 *Faixa por Pedido:* de *551 MB a 2047 MB*\n\n' +
+            '🥉 *Nível Bronze:* até *3.0 GB* de limite\n' +
+            '📦 *Faixa por Pedido:* a partir de *350 MB*\n\n' +
             '💡 *Como pedir quando precisar:*\n' +
             '👉 *.txenecar 1gb 84XXXXXXX*\n\n' +
             '💳 *Como pagar a dívida (taxa 10%):*\n' +
             '👉 *.pagar <comprovativo>*\n\n' +
+            '🆙 _Ao atingir 200 compras, seu limite subirá para 5 GB!_\n' +
             '🙏 _Muito obrigado pela confiança e por fazer parte da família Ka-Net!_ 🌐✨'
         );
     }
-    if (totalCompras === 500) {
+    if (totalCompras === 200) {
         return (
             '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
-            '  👑 *NÍVEL MESTRE VIP ATINGIDO!* 💎\n' +
+            '  🥈 *NOVO NÍVEL ALCANÇADO: PRATA!* 💎\n' +
             '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
-            'Sensacional! Você atingiu a incrível marca de *500 compras* na Ka-Net! 🚀🔥\n\n' +
-            '🔓 *O SEU LIMITE DE TXENECO SUBIU:* *4.0 GB!* ⚡\n' +
-            'Agora você pode txenecar até *4 GB* no total sempre que precisar!\n\n' +
+            'Sensacional! Você atingiu a marca de *200 compras* na Ka-Net! 🚀🔥\n\n' +
+            '🔓 *O SEU LIMITE DE TXENECO SUBIU PARA 5.0 GB!* ⚡\n' +
+            'Agora você pode txenecar pacotes de até *5 GB* no total sempre que precisar!\n\n' +
             '💡 *Como pedir:*\n' +
-            '👉 *.txenecar <quantidade> <número>*\n\n' +
-            '👑 _Você é um dos clientes mais especiais da Ka-Net. Parabéns e muito obrigado!_ 🌐✨'
+            '👉 *.txenecar 3gb 84XXXXXXX*\n\n' +
+            '👑 _Próxima meta: Ao atingir 800 compras, você escolhe qualquer valor até 10 GB!_\n' +
+            '🙏 _Muito obrigado pela sua preferência!_ 🌐✨'
+        );
+    }
+    if (totalCompras === 800) {
+        return (
+            '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
+            '  👑 *NÍVEL OURO VIP SUPREMO!* 👑\n' +
+            '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
+            'INCRÍVEL! Você atingiu a lendária marca de *800 compras* na Ka-Net! 🌟🚀🔥\n\n' +
+            '🔓 *CRÉDITO TOTALMENTE LIVRE: ATÉ 10 GB!* ⚡\n' +
+            'Você é um dos clientes mais fiéis de todo o sistema! Agora você tem a liberdade de escolher qualquer quantidade até *10 GB* a crédito!\n\n' +
+            '💡 *Como pedir:*\n' +
+            '👉 *.txenecar 5gb 84XXXXXXX* ou *.txenecar 10gb 84XXXXXXX*\n\n' +
+            '👑 _Toda a equipe Ka-Net agradece pela sua lealdade incomparável!_ 🌐✨'
         );
     }
     return null;
@@ -281,7 +335,7 @@ function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
     const milestoneMsg = gerarMensagemDesbloqueioVip(record.totalCompras);
     return {
         totalCompras: record.totalCompras,
-        milestone: record.totalCompras === 101 ? 'vip_101' : record.totalCompras === 500 ? 'vip_500' : null,
+        milestone: record.totalCompras === 100 ? 'vip_100' : record.totalCompras === 200 ? 'vip_200' : record.totalCompras === 800 ? 'vip_800' : null,
         mensagemVip: milestoneMsg
     };
 }
@@ -299,9 +353,10 @@ function getComprasCount(telefone) {
  * Calcula o limite máximo de MB que o cliente pode tomar emprestado com base nas compras
  */
 function calcularTetoTxeneco(compras) {
-    if (compras < 101) return 0;       // Exclusivo para mais de 100 compras
-    if (compras >= 500) return 4096;   // 500+ compras -> até 4GB
-    return 2048;                       // 101 a 499 compras -> até 2GB
+    if (compras < 100) return 0;        // Exclusivo para quem tem a partir de 100 compras
+    if (compras >= 800) return 10240;   // 800+ compras -> até 10GB (cliente escolhe a quantidade)
+    if (compras >= 200) return 5120;    // 200 a 799 compras -> até 5GB
+    return 3072;                        // 100 a 199 compras -> até 3GB
 }
 
 /**
@@ -319,25 +374,27 @@ async function solicitarTxeneco({ senderPhone, mbSolicitado, numDestino, jid, se
         return { success: false, mensagem: '⚠️ Número de destino inválido. Use um número de Moçambique com 9 dígitos (ex: *84XXXXXXX* ou *85XXXXXXX*).' };
     }
 
-    // 1. Validação da faixa: superior a 550MB e inferior a 2048MB por pedido
-    if (isNaN(qtdMb) || qtdMb <= 550 || qtdMb >= 2048) {
+    // 1. Validação da quantidade solicitada (mínimo 350MB, máximo 10GB)
+    if (isNaN(qtdMb) || qtdMb < 350 || qtdMb > 10240) {
         return {
             success: false,
             mensagem: `⚠️ *QUANTIDADE INVÁLIDA PARA TXENECO*\n━━━━━━━━━━━━━━━━━━\n` +
-                      `A quantidade escolhida deve ser *superior a 550MB* e *inferior a 2048MB* por pedido.\n\n` +
-                      `💡 _Exemplos válidos:_ *.txenecar 600 ${dest}* ou *.txenecar 1024 ${dest}* (1GB).`
+                      `A quantidade escolhida deve ser de no mínimo *350 MB* e até no máximo *10 GB* (10240 MB) de acordo com o seu nível de fidelidade.\n\n` +
+                      `💡 _Exemplos válidos:_ *.txenecar 1gb ${dest}*, *.txenecar 3gb ${dest}* ou *.txenecar 5gb ${dest}*.`
         };
     }
 
-    // 2. Validação da fidelidade (> 100 compras)
+    // 2. Validação da fidelidade (a partir de 100 compras)
     const totalCompras = getComprasCount(phone);
-    if (totalCompras <= 100) {
+    if (totalCompras < 100) {
+        const faltam = 100 - totalCompras;
         return {
             success: false,
             mensagem: `🚫 *PRIVILÉGIO EXCLUSIVO DE CLIENTE FIEL*\n━━━━━━━━━━━━━━━━━━\n` +
-                      `O serviço *Txeneco Ka-Net* é um benefício reservado exclusivamente para clientes com *mais de 100 compras* realizadas.\n\n` +
+                      `O serviço *Txeneco Ka-Net* é um benefício reservado exclusivamente para clientes com *100 ou mais compras* realizadas.\n\n` +
                       `📊 *O seu total de compras:* *${totalCompras}*\n` +
-                      `Continue a comprar na Ka-Net para desbloquear o seu crédito de internet!`
+                      `🎯 Faltam apenas *${faltam} compras* para desbloquear o seu crédito de até *3 GB*!\n\n` +
+                      `🛒 Continue a comprar na Ka-Net para liberar o seu benefício!`
         };
     }
 
@@ -376,20 +433,28 @@ async function solicitarTxeneco({ senderPhone, mbSolicitado, numDestino, jid, se
     const limiteDisponivelMb = Math.max(0, tetoMaximoMb - dividaAtualMb);
 
     if (qtdMb > limiteDisponivelMb) {
-        const dispF = limiteDisponivelMb >= 1024 ? `${(limiteDisponivelMb / 1024).toFixed(1)}GB` : `${limiteDisponivelMb}MB`;
-        const tetoF = tetoMaximoMb >= 1024 ? `${(tetoMaximoMb / 1024).toFixed(1)}GB` : `${tetoMaximoMb}MB`;
-        const divF = dividaAtualMb >= 1024 ? `${(dividaAtualMb / 1024).toFixed(1)}GB` : `${dividaAtualMb}MB`;
+        const dispF = limiteDisponivelMb >= 1024 ? `${(limiteDisponivelMb / 1024).toFixed(0)}GB` : `${limiteDisponivelMb}MB`;
+        const tetoF = tetoMaximoMb >= 1024 ? `${(tetoMaximoMb / 1024).toFixed(0)}GB` : `${tetoMaximoMb}MB`;
+        const divF = dividaAtualMb >= 1024 ? `${(dividaAtualMb / 1024).toFixed(0)}GB` : `${dividaAtualMb}MB`;
         
+        let proximoNivel = '';
+        if (totalCompras < 200) {
+            proximoNivel = `\n🆙 *Próximo Nível:* Ao atingir *200 compras*, seu limite sobe para *5 GB*! (Faltam ${200 - totalCompras})`;
+        } else if (totalCompras < 800) {
+            proximoNivel = `\n👑 *Nível VIP Ouro:* Ao atingir *800 compras*, você poderá escolher a quantidade que quiser até *10 GB*! (Faltam ${800 - totalCompras})`;
+        }
+
         return {
             success: false,
             mensagem: `⚠️ *LIMITE DE TXENECO INSUFICIENTE*\n━━━━━━━━━━━━━━━━━━\n` +
-                      `Você solicitou: *${qtdMb}MB*\n` +
-                      `Limite disponível restante: *${dispF}*\n\n` +
+                      `Você solicitou: *${qtdMb >= 1024 ? (qtdMb/1024).toFixed(1)+'GB' : qtdMb+'MB'}*\n` +
+                      `Seu limite disponível restante: *${dispF}*\n\n` +
                       `📊 *Detalhes da sua Conta:*\n` +
                       `• Teto total (${totalCompras} compras): *${tetoF}*\n` +
                       `• Txeneco ativo em uso: *${divF}*\n` +
-                      `• Dívida financeira pendente: *${loanRecord.restanteMt || 0} MT*\n\n` +
-                      `💡 Pague a sua dívida atual com *.pagar <comprovativo>* para restaurar o seu teto total!`
+                      `• Dívida financeira pendente: *${loanRecord.restanteMt || 0} MT*\n` +
+                      proximoNivel + `\n\n` +
+                      `💡 Ajuste o valor ou pague a dívida pendente com *.pagar <comprovativo>*`
         };
     }
 

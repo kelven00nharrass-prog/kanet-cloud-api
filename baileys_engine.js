@@ -552,6 +552,162 @@ const DEFAULT_PLANOS_ESPECIAIS = {
     "700": { nome: "📆 30GB Faseado Mensal",    tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
 };
 
+
+// ══════════════════════════════════════════════════
+// GUIA OFICIAL E INFORMAÇÕES DE TXENECO (CRÉDITO)
+// ══════════════════════════════════════════════════
+function gerarInfoTxenecoCompleta(senderNumber) {
+    const totalCompras = customerServices.getComprasCount(senderNumber);
+    const tetoMb = customerServices.calcularTetoTxeneco(totalCompras);
+    const divida = customerServices.getClienteDivida(senderNumber);
+    const divMb = divida ? (divida.activeDebtMb || 0) : 0;
+    const dispMb = Math.max(0, tetoMb - divMb);
+    const dispF = dispMb >= 1024 ? `${(dispMb / 1024).toFixed(0)}GB` : `${dispMb}MB`;
+    const tetoF = tetoMb >= 1024 ? `${(tetoMb / 1024).toFixed(0)}GB` : `${tetoMb}MB`;
+    const divF = divMb >= 1024 ? `${(divMb / 1024).toFixed(0)}GB` : `${divMb}MB`;
+
+    let statusBox = '';
+    if (totalCompras < 100) {
+        const faltam = 100 - totalCompras;
+        statusBox = `📊 *O SEU STATUS DE FIDELIDADE:*\n` +
+                    `• Compras realizadas: *${totalCompras}*\n` +
+                    `• Status: *Em Progresso* ⏳\n` +
+                    `🎯 *Faltam apenas ${faltam} compras* para desbloquear o seu crédito de até *3 GB*!\n` +
+                    `_Continue a comprar recargas na Ka-Net para liberar o benefício._\n`;
+    } else if (totalCompras < 200) {
+        const faltam = 200 - totalCompras;
+        statusBox = `📊 *O SEU STATUS VIP DE CRÉDITO:*\n` +
+                    `• Nível: *Bronze 🥉* (100+ compras)\n` +
+                    `• Compras realizadas: *${totalCompras}*\n` +
+                    `• Teto total de crédito: *3 GB* (${tetoF})\n` +
+                    `• Limite disponível agora: *${dispF}*\n` +
+                    `🆙 _Faltam ${faltam} compras para subir para 5 GB!_\n` +
+                    (divida && divida.restanteMt > 0
+                        ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
+                        : `• Situação atual: *Sem dívidas (Crédito 100% Livre!)* ✅\n`);
+    } else if (totalCompras < 800) {
+        const faltam = 800 - totalCompras;
+        statusBox = `📊 *O SEU STATUS VIP DE CRÉDITO:*\n` +
+                    `• Nível: *Prata 🥈* (200+ compras)\n` +
+                    `• Compras realizadas: *${totalCompras}*\n` +
+                    `• Teto total de crédito: *5 GB* (${tetoF})\n` +
+                    `• Limite disponível agora: *${dispF}*\n` +
+                    `👑 _Faltam ${faltam} compras para o Nível Ouro (até 10 GB)!_\n` +
+                    (divida && divida.restanteMt > 0
+                        ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
+                        : `• Situação atual: *Sem dívidas (Crédito 100% Livre!)* ✅\n`);
+    } else {
+        statusBox = `📊 *O SEU STATUS VIP DE CRÉDITO:*\n` +
+                    `• Nível: *Ouro VIP 👑* (800+ compras)\n` +
+                    `• Compras realizadas: *${totalCompras}*\n` +
+                    `• Teto total de crédito: *10 GB* (Escolha livre até 10 GB!)\n` +
+                    `• Limite disponível agora: *${dispF}*\n` +
+                    (divida && divida.restanteMt > 0
+                        ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
+                        : `• Situação atual: *Sem dívidas (Crédito VIP Livre!)* ✅\n`);
+    }
+
+    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
+
+    return `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+           `  ⚡ *GUIA OFICIAL: TXENECO KA-NET* 📶\n` +
+           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+           `O *Txeneco* é o serviço exclusivo de *Internet a Crédito* da Ka-Net: você recebe os seus Megabytes adiantados no celular e paga depois! 🚀\n\n` +
+           statusBox + `\n` +
+           `━━━━━━━━━━━━━━━━━━\n` +
+           `📋 *COMO FUNCIONA? (NOVOS LIMITES)*\n` +
+           `1️⃣ *Escalões de Fidelidade:*
+` +
+           `   🥉 *A partir de 100 compras:* até *3 GB* no máximo\n` +
+           `   🥈 *A partir de 200 compras:* até *5 GB* no máximo\n` +
+           `   👑 *A partir de 800 compras:* Você escolhe a quantidade até *10 GB*!\n\n` +
+           `2️⃣ *Faixa por pedido:*
+` +
+           `   Solicite a partir de *350 MB* até o teto do seu nível (3GB, 5GB ou 10GB).\n\n` +
+           `3️⃣ *Qual é a taxa?*
+` +
+           `   Apenas *10% de taxa de serviço* sobre o valor do pacote!\n` +
+           `   💡 _Exemplo transparente:_\n` +
+           `   1 GB diário custa 23 MT ➔ taxa 10% = 3 MT ➔ *Total a reembolsar: 26 MT*.\n` +
+           `   _Sem juros diários ou taxas abusivas!_\n\n` +
+           `4️⃣ *Quando pagar?*
+` +
+           `   • Pague assim que recarregar o celular ou puder transferir.\n` +
+           `   • ⚠️ _Regra:_ Enquanto tiver uma dívida pendente, não pode pedir novo crédito.\n` +
+           `   • Pagou, o seu teto é liberado e restaurado automaticamente!\n\n` +
+           `5️⃣ *Como pagar a dívida?*
+` +
+           `   Transfira para as nossas contas oficiais:\n` +
+           `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+           `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+           `   E envie aqui no WhatsApp:\n` +
+           `   👉 *.pagar <comprovativo>\n\n` +
+           `━━━━━━━━━━━━━━━━━━\n` +
+           `📲 *COMANDOS RÁPIDOS:*\n` +
+           `🔹 *.txenecar* ➔ Consultar seu nível e regras\n` +
+           `🔹 *.txenecar <quantidade> <número>* ➔ Pedir crédito\n` +
+           `   _Exemplos: .txenecar 1gb 841234567 | .txenecar 3gb 841234567_\n` +
+           `🔹 *.pagar* ➔ Ver sua dívida atual\n` +
+           `🔹 *.pagar <comprovativo>* ➔ Quitar e restaurar crédito\n` +
+           `━━━━━━━━━━━━━━━━━━`;
+}
+
+// ══════════════════════════════════════════════════
+// GUIA OFICIAL: CONFIGURAR NÚMERO / RECEPTOR PADRÃO
+// ══════════════════════════════════════════════════
+function gerarGuiaConfigurarNumero(senderNumber) {
+    const lista = customerServices.obterReceptoresPorOwner(senderNumber);
+    let statusBox = '';
+
+    if (lista && lista.length > 0) {
+        const receptorFixo = lista[0].targetPhone;
+        const linhasPagadores = lista.map((r, i) => `   ${i + 1}. *${r.payerPhone}*`).join('\n');
+        statusBox = `╭─────────────────────────────╮\n` +
+                    `  📱 *SEU NÚMERO ATUALMENTE CONFIGURADO:*\n` +
+                    `  🎯 *Destino Fixo:* *${receptorFixo}*\n` +
+                    `  💳 *Carteiras Vinculadas:*\n${linhasPagadores}\n` +
+                    `  ⚡ *Status:* Ativo e Pronto (100% Automático) ✅\n` +
+                    `╰─────────────────────────────╯\n\n` +
+                    `💡 _Sempre que pagar por essas contas, os Megas caem direto em *${receptorFixo}* sem você precisar enviar comprovativo!_\n`;
+    } else {
+        statusBox = `╭─────────────────────────────╮\n` +
+                    `  📱 *STATUS:* Nenhum número configurado ainda ⏳\n` +
+                    `  Configure abaixo para ativar a recarga automática!\n` +
+                    `╰─────────────────────────────╯\n\n`;
+    }
+
+    return `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+           `  ⚡ *CONFIGURAR NÚMERO FIXO* 📶\n` +
+           `  _(Recarga Automática Sem Comprovativo)_\n` +
+           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+           `Cansado de ter que enviar o SMS de comprovativo toda vez que compra internet? 🤯\n` +
+           `Com o *Receptor Padrão Ka-Net*, o sistema vincula o seu M-Pesa / e-Mola ao seu número Vodacom!\n\n` +
+           statusBox +
+           `━━━━━━━━━━━━━━━━━━\n` +
+           `🚀 *COMO FUNCIONA?\n` +
+           `1️⃣ Você configura o seu número uma única vez aqui no WhatsApp.\n` +
+           `2️⃣ Quando fizer um pagamento no *M-Pesa* ou *e-Mola*, o nosso sistema identifica a transferência na hora.\n` +
+           `3️⃣ Os Megabytes correspondentes ao valor pago são recarregados *imediatamente* no seu celular, *sem precisar abrir o WhatsApp nem colar comprovativo*! ⚡\n\n` +
+           `━━━━━━━━━━━━━━━━━━\n` +
+           `🛠️ *COMO CONFIGURAR (PASSO A PASSO):\n\n` +
+           `🔹 *Caso 1: Você paga com o mesmo número deste WhatsApp:*\n` +
+           `   Basta enviar o número Vodacom que deve receber os Megas:\n` +
+           `   👉 *.configurar 84XXXXXXX*\n\n` +
+           `🔹 *Caso 2: Você paga por outra carteira M-Pesa ou e-Mola:*\n` +
+           `   Envie o número pagador seguido do número Vodacom que recebe:\n` +
+           `   👉 *.configurar <número_pagador> <número_vodacom>*\n` +
+           `   _Exemplo:_ *.configurar 851234567 849998888*\n\n` +
+           `🔹 *Caso 3: Você tem 2 carteiras (M-Pesa e e-Mola):*\n` +
+           `   Cadastre as duas contas para caírem no mesmo receptor:\n` +
+           `   👉 *.configurar 851234567 861234567 para 849998888*\n\n` +
+           `━━━━━━━━━━━━━━━━━━\n` +
+           `📋 *COMANDOS ÚTEIS:\n` +
+           `▫️ *.configurar* ➔ Ver este guia explicativo e seu status\n` +
+           `▫️ *.meunumero* ➔ Consultar o número atualmente cadastrado\n` +
+           `▫️ *.desconfigurar* ➔ Desativar o envio automático e voltar ao modo manual\n` +
+           `━━━━━━━━━━━━━━━━━━`;
+}
+
 function gerarMenuOriginal(jid = null) {
     const { supportNum, sysName } = getSuporteDetails();
     
@@ -719,8 +875,9 @@ function gerarMensagemBoasVindas(nomeCliente) {
         `2️⃣ *Pagamento* ➔ Ver Contas M-Pesa e e-Mola\n` +
         `3️⃣ *Estudante* ➔ Tabela com Descontos Escolares\n` +
         `4️⃣ *Fidelidade* ➔ Ganhe Megas Indicando Amigos 🏆\n` +
-        `5️⃣ *Suporte* ➔ Falar com Atendimento Humano 📞\n\n` +
-        `💡 _Responda com o número da opção (ex: *1* ou *2*)\n\n` +
+        `5️⃣ *Suporte* ➔ Falar com Atendimento Humano 📞\n6️⃣ *Txeneco* ➔ Internet a Crédito (Regras, Taxa e Limites) 💸\n` +
+        `7️⃣ *Configurar Número* ➔ Recargas Automáticas sem Comprovativo ⚡\n\n` +
+        `💡 _Responda com o número da opção (ex: *1*, *6* ou *7*)\n\n` +
         `⚡ *COMPRA RÁPIDA:*\n` +
         `Já fez o pagamento? Basta enviar o comprovativo com o seu número Vodacom para ativar em segundos!\n` +
         `━━━━━━━━━━━━━━━━━━`
@@ -2019,8 +2176,8 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // Normalizador de opções numéricas (1, 1., 1), [1], opção 1, opcao 1, numero 1, 1 - menu, etc.)
                     const sLimpoOpcao = cleanCmd.replace(/^[\[(]/, '').replace(/[\])]$/, '').trim();
-                    const matchOpcaoMenu = sLimpoOpcao.match(/^(?:op[cç][aã]o|opt|n[uú]mero|n[oº]|n)?\s*([1-5])(?:\s*[.):\-—]|\s+.*|$)/i) ||
-                                           cleanCmd.match(/^([1-5])\uFE0F?\u20E3?$/);
+                    const matchOpcaoMenu = sLimpoOpcao.match(/^(?:op[cç][aã]o|opt|n[uú]mero|n[oº]|n)?\s*([1-7])(?:\s*[.):\-—]|\s+.*|$)/i) ||
+                                           cleanCmd.match(/^([1-7])\uFE0F?\u20E3?$/);
                     const opcaoMenuNum = matchOpcaoMenu ? matchOpcaoMenu[1] : null;
 
                     // Lista de todos os identificadores possíveis que o Baileys nos dá
@@ -2500,36 +2657,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (ehCmdTxenecar) {
                         const rawArgs = text.replace(/^[.!/#]?(txenecar|txenekar|txeneco)\s*/i, '').trim();
                         if (!rawArgs) {
-                            const totalCompras = customerServices.getComprasCount(senderNumber);
-                            const tetoMb = customerServices.calcularTetoTxeneco(totalCompras);
-                            const divida = customerServices.getClienteDivida(senderNumber);
-                            const divMb = divida ? (divida.activeDebtMb || 0) : 0;
-                            const dispMb = Math.max(0, tetoMb - divMb);
-                            const dispF = dispMb >= 1024 ? `${(dispMb/1024).toFixed(1)}GB` : `${dispMb}MB`;
-                            const tetoF = tetoMb >= 1024 ? `${(tetoMb/1024).toFixed(1)}GB` : `${tetoMb}MB`;
-
-                            await reply(
-                                `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                `  ⚡ *SERVIÇO TXENECO KA-NET* 📶\n` +
-                                `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                `Internet a crédito no pacote diário para clientes fiéis!\n\n` +
-                                `📊 *O Seu Status de Fidelidade:*\n` +
-                                `• Compras realizadas: *${totalCompras}*\n` +
-                                `• Teto total de crédito: *${tetoF}*\n` +
-                                `• Limite disponível agora: *${dispF}*\n` +
-                                (divida && divida.restanteMt > 0 ? `• Dívida ativa a pagar: *${divida.restanteMt} MT*\n` : '') +
-                                `\n📋 *Regras e Benefícios:*\n` +
-                                `• Exclusivo para quem tem *mais de 100 compras*.\n` +
-                                `• Faixa por pedido: *superior a 550MB e inferior a 2048MB*.\n` +
-                                `• 200+ compras: limite total de até *2GB*.\n` +
-                                `• 500+ compras: limite total de até *4GB*.\n` +
-                                `• Taxa de pagamento da dívida: *10%* sobre o valor do pacote.\n\n` +
-                                `💡 *Como usar:*\n` +
-                                `👉 *.txenecar <quantidade> <número_destino>*\n` +
-                                `_Exemplo: .txenecar 1gb 841234567_\n\n` +
-                                `💳 *Para pagar a dívida:*\n` +
-                                `👉 *.pagar <comprovativo>*`
-                            );
+                            await reply(gerarInfoTxenecoCompleta(senderNumber));
                             continue;
                         }
 
@@ -2648,10 +2776,14 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // ── 1.3 COMANDOS DE RECEPTOR PADRÃO AUTOMÁTICO ──
-                    const ehCmdDefinirReceptor = cleanCmd.startsWith('definirreceptor') || cleanCmd.startsWith('setreceptor') || cleanCmd.startsWith('receptor ');
-                    if (ehCmdDefinirReceptor) {
-                        const rawBody = text.replace(/^[.!/#]?(definirreceptor|setreceptor|receptor)\s*/i, '').trim();
+                    // ── 1.3 COMANDOS DE CONFIGURAR NÚMERO / RECEPTOR PADRÃO ──
+                    const ehCmdConfigurar = 
+                        cleanCmd.startsWith('configurar') || cleanCmd.startsWith('configurarnumero') ||
+                        cleanCmd.startsWith('definirreceptor') || cleanCmd.startsWith('setreceptor') || cleanCmd.startsWith('receptor') ||
+                        cleanCmd.startsWith('definirnumero') || cleanCmd.startsWith('setnumero');
+
+                    if (ehCmdConfigurar) {
+                        const rawBody = text.replace(/^[.!/#]?(configurar|configurarnumero|definirreceptor|setreceptor|receptor|definirnumero|setnumero)\s*/i, '').trim();
                         
                         // Extrair todos os números de Moçambique válidos no texto
                         const pRegex = /(?:258)?(8[2-7]\d{7})/g;
@@ -2659,6 +2791,12 @@ async function startWhatsApp(orderCallback, db = null) {
                         let pM;
                         while ((pM = pRegex.exec(rawBody)) !== null) {
                             if (!foundPhones.includes(pM[1])) foundPhones.push(pM[1]);
+                        }
+
+                        // Se não forneceu nenhum número, exibir o GUIA EXPLICATIVO COMPLETO!
+                        if (foundPhones.length === 0) {
+                            await reply(gerarGuiaConfigurarNumero(senderNumber));
+                            continue;
                         }
 
                         let pagadores = [];
@@ -2670,20 +2808,13 @@ async function startWhatsApp(orderCallback, db = null) {
                             receptor = foundPhones[foundPhones.length - 1];
                             pagadores = foundPhones.slice(0, foundPhones.length - 1);
                         } else if (foundPhones.length === 1) {
-                            // Se forneceu apenas 1 número, o próprio WhatsApp remetente é o pagador e o número fornecido é o receptor
+                            // Se forneceu apenas 1 número: o próprio WhatsApp remetente é o pagador e o número fornecido é o receptor
                             pagadores = [senderNumber];
                             receptor = foundPhones[0];
                         }
 
                         if (!receptor || pagadores.length === 0) {
-                            await reply(
-                                `💡 *COMO DEFINIR O SEU RECEPTOR PADRÃO:*\n\n` +
-                                `Você pode cadastrar *um ou vários números pagadores* (ex: um 85 M-Pesa e um 87 e-Mola) para caírem no mesmo receptor!\n\n` +
-                                `👉 *.definirreceptor <pagador_1> [pagador_2] <número_receptor>*\n\n` +
-                                `_Exemplo 1 (1 pagador):_ *.definirreceptor 851234567 849998888*\n` +
-                                `_Exemplo 2 (2 pagadores):_ *.definirreceptor 851234567 871234567 para 849998888*\n\n` +
-                                `Assim, quando pagar por *qualquer um* desses números, os megas caem no receptor automaticamente sem precisar de enviar comprovativo!`
-                            );
+                            await reply(gerarGuiaConfigurarNumero(senderNumber));
                             continue;
                         }
 
@@ -2692,17 +2823,26 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    const ehCmdRemoverReceptor = cleanCmd === 'removerreceptor' || cleanCmd.startsWith('removerreceptor ') ||
-                                                 cleanCmd === 'limparreceptor' || cleanCmd === 'desconfigurar' || cleanCmd === 'delreceptor';
+                    const ehCmdRemoverReceptor = 
+                        cleanCmd === 'removerreceptor' || cleanCmd.startsWith('removerreceptor ') ||
+                        cleanCmd === 'limparreceptor' || cleanCmd === 'delreceptor' ||
+                        cleanCmd === 'desconfigurar' || cleanCmd.startsWith('desconfigurar ') ||
+                        cleanCmd === 'removernumero' || cleanCmd.startsWith('removernumero ') ||
+                        cleanCmd === 'limparnumero';
+
                     if (ehCmdRemoverReceptor) {
-                        const rawTarget = text.replace(/^[.!/#]?(removerreceptor|limparreceptor|desconfigurar|delreceptor)\s*/i, '').trim();
+                        const rawTarget = text.replace(/^[.!/#]?(removerreceptor|limparreceptor|delreceptor|desconfigurar|removernumero|limparnumero)\s*/i, '').trim();
                         const pagador = extrairNumeroDestino(rawTarget);
                         const resRem = customerServices.removerReceptorPadrao(pagador, senderNumber);
                         await reply(resRem.mensagem);
                         continue;
                     }
 
-                    const ehCmdMeuReceptor = cleanCmd === 'meureceptor' || cleanCmd === 'receptorpadrao' || cleanCmd === 'verreceptor';
+                    const ehCmdMeuReceptor = 
+                        cleanCmd === 'meureceptor' || cleanCmd === 'receptorpadrao' || cleanCmd === 'verreceptor' ||
+                        cleanCmd === 'meunumero' || cleanCmd === 'vernumero' || cleanCmd === 'consultarnumero' ||
+                        cleanCmd === 'meu numero' || cleanCmd === 'ver numero';
+
                     if (ehCmdMeuReceptor) {
                         const lista = customerServices.obterReceptoresPorOwner(senderNumber);
                         if (lista && lista.length > 0) {
@@ -2710,21 +2850,15 @@ async function startWhatsApp(orderCallback, db = null) {
                             const linhasPagadores = lista.map((r, i) => `  ${i + 1}. *${r.payerPhone}*`).join('\n');
                             await reply(
                                 `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                `  📱 *SEU RECEPTOR PADRÃO ATIVO* ⚡\n` +
+                                `  📱 *SEU NÚMERO CONFIGURADO* ⚡\n` +
                                 `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                                 `📲 *Número Receptor Fixo:* *${receptorFixo}*\n\n` +
                                 `📱 *Número(s) Pagador(es) Vinculado(s):*\n${linhasPagadores}\n\n` +
                                 `🚀 Sempre que pagar por *qualquer um* desses números, os megas cairão automaticamente em *${receptorFixo}* sem precisar de enviar comprovativo!\n\n` +
-                                `💡 Para desativar e voltar ao modo manual, envie: *.removerreceptor*`
+                                `💡 Para desativar e voltar ao modo manual, envie: *.desconfigurar*`
                             );
                         } else {
-                            await reply(
-                                `ℹ️ *NENHUM RECEPTOR CONFIGURADO*\n━━━━━━━━━━━━━━━━━━\n` +
-                                `Você ainda não definiu um número receptor padrão.\n\n` +
-                                `Para configurar e receber recargas automaticamente sem enviar comprovativo, envie:\n` +
-                                `👉 *.definirreceptor <número_pagador> <número_receptor>*\n` +
-                                `_Ou com 2 pagadores:_ *.definirreceptor <pagador_1> <pagador_2> <número_receptor>*`
-                            );
+                            await reply(gerarGuiaConfigurarNumero(senderNumber));
                         }
                         continue;
                     }
@@ -3672,7 +3806,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                         modo: 'diario',
                                         jid,
                                         sender: senderNumber,
-                                        senderPhone: isSenderPhone ? senderNumber : item.phone,
+                                        senderPhone: senderNumber, // Cliente é quem compra/paga, NUNCA o destinatário
                                         senderName: nomeCliente,
                                         txn_id: `${txn_id}-${idx + 1}`,
                                         valor: parseFloat(valor) / multiDestinos.length
@@ -3802,7 +3936,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                         jid,
                                         sender: senderNumber,
                                         senderJid: msg.key.participant || msg.participant || realSender || jid,
-                                        senderPhone: isSenderPhone ? senderNumber : (numDestinoInline || null),
+                                        senderPhone: senderNumber, // Cliente é quem compra/paga, NUNCA o destinatário
                                         senderName: nomeCliente,
                                         txn_id,
                                         valor
@@ -4057,6 +4191,53 @@ async function startWhatsApp(orderCallback, db = null) {
                         await reply(gerarMensagemSuporte(nomeCliente));
                         continue;
                     }
+
+                    // ── 16.5 GUIA DE CONFIGURAR NÚMERO / RECEPTOR PADRÃO (OPÇÃO 7) ──
+                    const ehConsultaConfigurarNumero = (opcaoMenuNum === '7') || [
+                        '7', '7️⃣', 'configurar', 'configurar numero', 'configurarnumero', 'como configurar', 'como configurar numero',
+                        'como configurar meu numero', 'ajuda configurar', 'guia configurar', 'recarga automatica', 'sem comprovativo',
+                        'recarga direta', 'envio automatico'
+                    ].includes(cleanCmd) ||
+                    cleanText.includes('como configurar numero') ||
+                    cleanText.includes('como configurar o numero') ||
+                    cleanText.includes('como configurar meu numero') ||
+                    cleanText.includes('configurar meu numero') ||
+                    cleanText.includes('recarga automatica sem comprovativo');
+
+                    if (ehConsultaConfigurarNumero) {
+                        await reply(gerarGuiaConfigurarNumero(senderNumber));
+                        continue;
+                    }
+
+                    // ── 16. GUIA DO TXENECO / CRÉDITO DE INTERNET (OPÇÃO 6) ──────────
+                    const ehConsultaTxeneco = (opcaoMenuNum === '6') || [
+                        '6', '6️⃣', 'txeneca', 'txeneco', 'txenecar', 'txenekar', 'tcheneca', 'tcheneco', 'tchenecar',
+                        'emprestimo', 'emprestimos', 'empréstimo', 'empréstimos', 'credito', 'crédito', 'adiantamento'
+                    ].includes(cleanCmd) ||
+                    cleanText.includes('como funciona o txeneca') ||
+                    cleanText.includes('como funciona txeneca') ||
+                    cleanText.includes('o que e txeneca') ||
+                    cleanText.includes('o que é txeneca') ||
+                    cleanText.includes('o que e o txeneca') ||
+                    cleanText.includes('o que é o txeneca') ||
+                    cleanText.includes('taxa do txeneca') ||
+                    cleanText.includes('taxa txeneca') ||
+                    cleanText.includes('quando pagar txeneca') ||
+                    cleanText.includes('como pagar txeneca') ||
+                    cleanText.includes('quando pagar') ||
+                    cleanText.includes('regras txeneca') ||
+                    cleanText.includes('como txenecar') ||
+                    cleanText.includes('quero txenecar') ||
+                    cleanText.includes('quero credito') ||
+                    cleanText.includes('quero crédito') ||
+                    cleanText.includes('posso txenecar');
+
+                    if (ehConsultaTxeneco) {
+                        addLog(`⚡ [RESPONDENDO] Guia e Info de Txeneco enviado para ${jid}`);
+                        await reply(gerarInfoTxenecoCompleta(senderNumber));
+                        continue;
+                    }
+
 
                     // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
                     const isGroupMsg = jid.endsWith('@g.us');
@@ -4373,7 +4554,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                     jid: item.jid,
                     sender: item.senderNumber,
                     senderJid: item.realSender || item.jid,
-                    senderPhone: item.numDestino,
+                    senderPhone: item.senderNumber, // Cliente é quem compra/paga, NUNCA o destinatário
                     senderName: item.nomeCliente,
                     txn_id: item.txn_id,
                     valor: valorPago

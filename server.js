@@ -1714,9 +1714,22 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     }
 
     // 🌟 REGISTAR COMPRA NO SISTEMA DE FIDELIDADE & TXENECO
+    // REGRA FUNDAMENTAL: O cliente é EXCLUSIVAMENTE quem compra (envia comprovativo / paga), NUNCA o destinatário que apenas recebe os Megas!
     if (success) {
-      const clientTel = (order && (order.senderPhone || order.sender || order.cliente_solicitante || order.numero));
-      if (clientTel && customerServices && typeof customerServices.registrarCompra === 'function') {
+      let buyerCandidate = order && (order.senderPhone || order.sender || order.senderNumber || order.cliente_solicitante || order.pagador);
+      
+      let clientTel = customerServices && typeof customerServices.normalizarTelefone === 'function'
+        ? customerServices.normalizarTelefone(buyerCandidate)
+        : String(buyerCandidate || '').replace(/\D/g, '');
+
+      // Se o buyerCandidate estiver vazio e for uma ordem direta sem remetente externo
+      if (!clientTel && order && !order.sender && !order.senderPhone) {
+        clientTel = customerServices && typeof customerServices.normalizarTelefone === 'function'
+          ? customerServices.normalizarTelefone(order.numero)
+          : String(order.numero || '').replace(/\D/g, '');
+      }
+
+      if (clientTel && clientTel.length === 9 && /^8[2-7]\d{7}$/.test(clientTel) && customerServices && typeof customerServices.registrarCompra === 'function') {
         const vipAlert = customerServices.registrarCompra(clientTel, (order && order.orderId) || resId, (order && (order.valor || order.valor_pago)) || 0, (order && order.quantidade) || 0);
         if (vipAlert && vipAlert.mensagemVip && clientJid && baileysEngine && typeof baileysEngine.sendTextMessage === 'function') {
           setTimeout(() => {
@@ -4344,7 +4357,9 @@ app.post('/api/sms/payment', (req, res) => {
     if (customerServices && typeof customerServices.obterReceptorPadrao === 'function') {
       let payerPhone = customerServices.normalizarTelefone(remetente);
       if (!payerPhone || payerPhone.length !== 9) {
-        const mPayer = String(raw_sms || '').match(/(?:de|from)\s+(?:258)?(8[2-7]\d{7})/i);
+        const mPayer = String(raw_sms || '').match(/(?:de|from)\s+[^0-9]{0,40}?(?:258)?(8[2-7]\d{7})/i) ||
+                       String(raw_sms || '').match(/(?:de|from)\s+(?:258)?(8[2-7]\d{7})/i) ||
+                       String(raw_sms || '').match(/(?:258)?(8[2-7]\d{7})/);
         if (mPayer) payerPhone = mPayer[1];
       }
 
@@ -4399,7 +4414,7 @@ app.post('/api/sms/payment', (req, res) => {
             quantidade: autoOrder.quantidade,
             modo: autoOrder.modo || 'diario',
             input_val: autoOrder.input_val || '',
-            jid: null,
+            jid: autoOrder.jid || (defRec && defRec.ownerJid) || null,
             timestamp: Date.now()
           };
           console.log(`🚀 [RECEPTOR PADRÃO] Ordem entregue ao Celular Apto ${targetPort}`);
