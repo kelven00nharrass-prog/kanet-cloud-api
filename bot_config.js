@@ -344,34 +344,6 @@ module.exports = {
             }
         },
         "ilimitado": {
-            "76": {
-                "quantidade": 3772,
-                "nome": "3GB+700 (Renov)",
-                "quantidade_mb": 3772,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
-            "120": {
-                "quantidade": 5820,
-                "nome": "5GB+700 (Renov)",
-                "quantidade_mb": 5820,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
-            "130": {
-                "quantidade": 5120,
-                "nome": "5GB (Faseado)",
-                "quantidade_mb": 5120,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
-            "195": {
-                "quantidade": 8892,
-                "nome": "8GB+700 (Renov)",
-                "quantidade_mb": 8892,
-                "periodo": "ilimitado",
-                "tipo": "ilimitado"
-            },
             "240": {
                 "quantidade": 10940,
                 "nome": "10GB+700 (Renov)",
