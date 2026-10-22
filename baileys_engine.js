@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * KA-NET CLOUD WHATSAPP ENGINE (POWERED BY BAILEYS) - 100% BOT ORIGINAL
  * ==============================================================================
@@ -693,17 +693,20 @@ function gerarGuiaConfigurarNumero(senderNumber) {
            `🔹 *Caso 1: Você paga com o mesmo número deste WhatsApp:*\n` +
            `   Basta enviar o número Vodacom que deve receber os Megas:\n` +
            `   👉 *.configurar 84XXXXXXX*\n\n` +
-           `🔹 *Caso 2: Você paga por outra carteira (M-Pesa ou e-Mola):*\n` +
-           `   Formato: *.configurar <número_pagador> <número_receptor>*\n` +
-           `   O *2.º número* é sempre o receptor que recebe os Megas:\n` +
+           `🔹 *Caso 2: Voce paga por outra carteira (M-Pesa ou e-Mola):*\n` +
+           `   Formato: *.configurar <numero_pagador> <numero_receptor>*\n` +
+           `   O *ULTIMO numero* e sempre o receptor que recebe os Megas:\n` +
            `   👉 *.configurar 851234567 849998888*\n` +
-           `   _Exemplo: paga pelo 851234567, recebe no 849998888_\n\n` +
+           `   _Paga pelo 851234567, recebe no 849998888_\n\n` +
            `🔹 *Caso 3: Tem 2 ou mais carteiras pagadoras:*\n` +
-           `   Formato: *.configurar <pagador1> <receptor> <pagador2>*\n` +
-           `   Ou com "para": *.configurar <pagador1> <receptor> para <pagador2>*\n` +
+           `   Os primeiros sao pagadores, o ULTIMO e o receptor:\n` +
            `   👉 *.configurar 856268811 840401416 840401414*\n` +
            `   👉 *.configurar 856268811 840401416 para 840401414*\n` +
-           `   _O número do meio (840401416) é sempre o receptor!_\n\n` +
+           `   _Pagadores: 856268811 e 840401416 | Receptor: 840401414_\n\n` +
+           `🔹 *Caso especial: o numero pagador e o mesmo que recebe:*\n` +
+           `   Repita o numero duas vezes (pagador e receptor ao mesmo tempo):\n` +
+           `   👉 *.configurar 856268811 840401416 para 840401416*\n` +
+           `   _Pagadores: 856268811 e 840401416 | Receptor: 840401416_\n\n` +
            `━━━━━━━━━━━━━━━━━━\n` +
            `📋 *COMANDOS ÚTEIS:\n` +
            `▫️ *.configurar* ➔ Ver este guia e o seu status actual\n` +
@@ -2990,56 +2993,38 @@ async function startWhatsApp(orderCallback, db = null) {
                         let pagadores = [];
                         let receptor = null;
 
-                        if (foundPhones.length === 1) {
-                            // Apenas 1 número → receptor é esse, pagador é o próprio WhatsApp do cliente
-                            pagadores = [senderNumber];
-                            receptor  = foundPhones[0];
+                        // Extrair numeros COM repeticoes para detectar numero duplicado
+                        const rawAllNums = [...rawBody.matchAll(/(?:258)?(8[2-7]\d{7})/g)].map(m => m[1]);
 
-                        } else if (foundPhones.length >= 2) {
-                            // ── NOVA LÓGICA ────────────────────────────
-                            // O receptor é SEMPRE o número imediatamente ANTES da
-                            // palavra "para" (se existir), ou o 2.º número da lista.
-                            // Os restantes são pagadores.
-                            //
-                            // Exemplos:
-                            //   .configurar 856268811 840401416             → receptor=840401416
-                            //   .configurar 856268811 840401416 840401414   → receptor=840401416
-                            //   .configurar 856268811 840401416 para 840401414 → receptor=840401416
-                            // ────────────────────────────────────────────────────
-                            const rawLower = rawBody.toLowerCase();
-                            const paraIdx  = rawLower.indexOf(' para ');
-
-                            if (paraIdx !== -1) {
-                                // Encontrar todos os números antes e depois de "para"
-                                const textBeforePara = rawBody.substring(0, paraIdx);
-                                const textAfterPara  = rawBody.substring(paraIdx + 6);
-                                const beforeMatches  = [...textBeforePara.matchAll(/(?:258)?(8[2-7]\d{7})/g)];
-                                const afterMatches   = [...textAfterPara.matchAll(/(?:258)?(8[2-7]\d{7})/g)];
-
-                                if (beforeMatches.length > 0) {
-                                    // Último número antes de "para" = receptor
-                                    receptor = beforeMatches[beforeMatches.length - 1][1];
-                                    const outrosBefore = beforeMatches.slice(0, -1).map(m => m[1]);
-                                    const outrosAfter  = afterMatches.map(m => m[1]);
-                                    pagadores = [...outrosBefore, ...outrosAfter].filter(p => p !== receptor);
-                                    if (pagadores.length === 0) pagadores = [senderNumber];
-                                } else {
-                                    // "para" sem número antes → 2.º número = receptor
-                                    receptor  = foundPhones[1];
-                                    pagadores = [foundPhones[0], ...foundPhones.slice(2)].filter(p => p !== receptor);
-                                    if (pagadores.length === 0) pagadores = [senderNumber];
-                                }
-                            } else {
-                                // Sem "para" → 2.º número = receptor, resto = pagadores
-                                receptor  = foundPhones[1];
-                                pagadores = [foundPhones[0], ...foundPhones.slice(2)].filter(p => p !== receptor);
-                                if (pagadores.length === 0) pagadores = [senderNumber];
-                            }
-                        }
-
-                        if (!receptor || pagadores.length === 0) {
+                        if (rawAllNums.length === 0) {
                             await reply(gerarGuiaConfigurarNumero(senderNumber));
                             continue;
+
+                        } else if (rawAllNums.length === 1) {
+                            // Apenas 1 numero unico: receptor e esse, pagador e o WhatsApp do cliente
+                            pagadores = [senderNumber];
+                            receptor  = rawAllNums[0];
+
+                        } else {
+                            // LOGICA: ULTIMO numero = receptor, PRIMEIROS = pagadores
+                            // Se o receptor aparecer repetido, e tambem pagador.
+                            //
+                            // Exemplos:
+                            //   .configurar 851234567 849998888             -> receptor=849998888, pagador=851234567
+                            //   .configurar 856268811 840401416 840401414   -> receptor=840401414, pagadores=[856268811,840401416]
+                            //   .configurar 856268811 840401416 para 840401414 -> receptor=840401414, pagadores=[856268811,840401416]
+                            //   .configurar 856268811 840401416 para 840401416 -> receptor=840401416, pagadores=[856268811,840401416]
+                            //   .configurar 840401416 840401416 -> receptor=840401416, pagadores=[840401416]
+
+                            receptor = rawAllNums[rawAllNums.length - 1];
+                            const pagadoresRaw    = rawAllNums.slice(0, -1);
+                            const receptorRepetido = pagadoresRaw.includes(receptor);
+
+                            pagadores = [...new Set(pagadoresRaw)];
+                            if (!receptorRepetido) {
+                                pagadores = pagadores.filter(p => p !== receptor);
+                            }
+                            if (pagadores.length === 0) pagadores = [senderNumber];
                         }
 
                         const resDef = customerServices.definirReceptorPadrao(pagadores, receptor, jid);
