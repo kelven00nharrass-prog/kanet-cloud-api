@@ -2975,20 +2975,6 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     if (ehCmdConfigurar) {
                         const rawBody = text.replace(/^[.!/#]?(configurar|configurarnumero|definirreceptor|setreceptor|receptor|definirnumero|setnumero)\s*/i, '').trim();
-                        
-                        // Extrair todos os números de Moçambique válidos no texto
-                        const pRegex = /(?:258)?(8[2-7]\d{7})/g;
-                        const foundPhones = [];
-                        let pM;
-                        while ((pM = pRegex.exec(rawBody)) !== null) {
-                            if (!foundPhones.includes(pM[1])) foundPhones.push(pM[1]);
-                        }
-
-                        // Se não forneceu nenhum número, exibir o GUIA EXPLICATIVO COMPLETO!
-                        if (foundPhones.length === 0) {
-                            await reply(gerarGuiaConfigurarNumero(senderNumber));
-                            continue;
-                        }
 
                         let pagadores = [];
                         let receptor = null;
