@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ka-Net Admin — Gestão de Licenças</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ── LOGIN ────────────────────────────────────────────────────────────────── -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">⚡</div>
+      <h1>Ka-Net</h1>
+      <p>Sistema de Licenciamento</p>
+    </div>
+    <div class="login-form">
+      <label>Token de Acesso</label>
+      <input type="password" id="tokenInput" placeholder="KaNet-MASTER-..." autocomplete="off"/>
+      <button id="loginBtn" onclick="doLogin()">Entrar</button>
+      <div id="loginError" class="error-msg hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PAINEL PRINCIPAL ──────────────────────────────────────────────────────── -->
+<div id="mainApp" class="app hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">⚡</span>
+      <div>
+        <strong>Ka-Net</strong>
+        <small>Licenciamento</small>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" onclick="showTab('dashboard')" id="nav-dashboard">
+        📊 Dashboard
+      </button>
+      <button class="nav-btn" onclick="showTab('licenses')" id="nav-licenses">
+        🔐 Licenças
+      </button>
+      <button class="nav-btn" onclick="showTab('create')" id="nav-create">
+        ➕ Nova Licença
+      </button>
+      <button class="nav-btn" onclick="showTab('packages')" id="nav-packages">
+        📦 Pacotes
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">🚪 Sair</button>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="main-content">
+
+    <!-- ── DASHBOARD ───────────────────────────────────────────────────────── -->
+    <section id="tab-dashboard" class="tab active">
+      <div class="page-header">
+        <h2>Dashboard</h2>
+        <button class="btn-refresh" onclick="loadDashboard()">↻ Actualizar</button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card" id="stat-total">
+          <div class="stat-icon">🔐</div>
+          <div class="stat-value">—</div>
+          <div class="stat-label">Total de Licenças</div>
+        </div>
+        <div class="stat-card active-card" id="stat-active">
+          <div class="stat-icon">🟢</div>
+          <div class="stat-value">—</div>
+          <div class="stat-label">Licenças Activas</div>
+        </div>
+        <div class="stat-card expired-card" id="stat-expired">
+          <div class="stat-icon">🔴</div>
+          <div class="stat-value">—</div>
+          <div class="stat-label">Expiradas</div>
+        </div>
+        <div class="stat-card revenue-card" id="stat-revenue">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value">—</div>
+          <div class="stat-label">Receita Mensal (MT)</div>
+        </div>
+      </div>
+
+      <div class="cards-row">
+        <div class="card">
+          <div class="card-title">📦 Licenças por Pacote</div>
+          <div id="packageBreakdown" class="package-breakdown">Carregando...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚠️ A Expirar em Breve</div>
+          <div id="expiringSoon" class="expiring-list">Carregando...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── LICENÇAS ─────────────────────────────────────────────────────────── -->
+    <section id="tab-licenses" class="tab hidden">
+      <div class="page-header">
+        <h2>Licenças</h2>
+        <div class="header-actions">
+          <input type="text" id="searchInput" placeholder="🔍 Pesquisar..." oninput="filterLicenses()"/>
+          <button class="btn-refresh" onclick="loadLicenses()">↻ Actualizar</button>
+        </div>
+      </div>
+
+      <div id="licensesTable" class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nome</th>
+              <th>Telefone</th>
+              <th>Pacote</th>
+              <th>Estado</th>
+              <th>Expira em</th>
+              <th>WA</th>
+              <th>Acções</th>
+            </tr>
+          </thead>
+          <tbody id="licensesBody">
+            <tr><td colspan="8" class="loading-row">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── CRIAR LICENÇA ────────────────────────────────────────────────────── -->
+    <section id="tab-create" class="tab hidden">
+      <div class="page-header">
+        <h2>Nova Licença</h2>
+      </div>
+
+      <div class="form-card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nome do Licenciado *</label>
+            <input type="text" id="newName" placeholder="Ex: João Silva"/>
+          </div>
+          <div class="form-group">
+            <label>Número de Telefone *</label>
+            <input type="text" id="newPhone" placeholder="Ex: 258841234567"/>
+          </div>
+          <div class="form-group">
+            <label>Pacote *</label>
+            <select id="newPackage" onchange="onPackageChange()">
+              <option value="">Escolha um pacote...</option>
+              <option value="revendedor_basico">🔵 Revendedor Básico — 500 MT/mês</option>
+              <option value="revendedor_pro">🟡 Revendedor Pro — 1.200 MT/mês</option>
+              <option value="fornecedor">🟠 Fornecedor — 1.500 MT/mês</option>
+              <option value="full">🔴 FULL (Revenda + Fornecimento) — 2.000 MT/mês</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Duração (dias)</label>
+            <input type="number" id="newDuration" value="30" min="1" max="365"/>
+          </div>
+        </div>
+
+        <div class="form-group" id="portMappingSection" style="display:none">
+          <label>🔌 Mapeamento de Portas (Pacote FULL)</label>
+          <div class="port-mapping-grid" id="portMappingGrid">
+            <!-- gerado por JS -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Número(s) Master <span class="hint">(opcional)</span></label>
+          <div id="masterNumbersList">
+            <div class="master-entry" id="masterEntry0">
+              <input type="text" placeholder="258841234567" class="master-number-input"/>
+              <div class="permissions-check">
+                <label><input type="checkbox" value="admin" checked/> Admin</label>
+                <label><input type="checkbox" value="relatorios"/> Relatórios</label>
+                <label><input type="checkbox" value="configurar"/> Config</label>
+                <label><input type="checkbox" value="txeneco"/> Txeneco</label>
+                <label><input type="checkbox" value="grupos"/> Grupos</label>
+                <label><input type="checkbox" value="clientes"/> Clientes</label>
+              </div>
+            </div>
+          </div>
+          <button class="btn-secondary" onclick="addMasterRow()">+ Adicionar número master</button>
+        </div>
+
+        <div id="createError" class="error-msg hidden"></div>
+        <div id="createSuccess" class="success-msg hidden"></div>
+
+        <div class="form-actions">
+          <button class="btn-primary" onclick="createLicense()">✅ Criar Licença</button>
+          <button class="btn-secondary" onclick="clearForm()">🗑 Limpar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PACOTES ──────────────────────────────────────────────────────────── -->
+    <section id="tab-packages" class="tab hidden">
+      <div class="page-header">
+        <h2>Pacotes Disponíveis</h2>
+      </div>
+      <div class="packages-grid" id="packagesGrid">Carregando...</div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── MODAL DETALHES / ACÇÕES ───────────────────────────────────────────────── -->
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modalContent"><!-- conteúdo dinâmico --></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

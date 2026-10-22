@@ -6823,6 +6823,9 @@ app.post('/api/plans/hora-preferida', (req, res) => {
 });
 
 
+// ── Ka-Net Licensing System (3 linhas — não altera nada existente) ──
+app.use('/licensing', require('./licensing/license_routes'));
+require('./licensing/license_checker').startChecker();
 
 app.listen(PORT, '0.0.0.0', () => {
 

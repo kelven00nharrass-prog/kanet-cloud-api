@@ -4129,6 +4129,68 @@ async function startWhatsApp(orderCallback, db = null) {
                                 if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
                                 continue;
                             } else {
+                                // ── VERIFICAR RECEPTOR PADRÃO CONFIGURADO VIA .configurar ──
+                                const receptorConfig = customerServices.obterReceptorPadrao(senderNumber);
+                                if (receptorConfig && receptorConfig.targetPhone) {
+                                    const numReceptor = receptorConfig.targetPhone;
+                                    const orderId = 'WA-' + txn_id + '-' + Date.now();
+                                    console.log(`⚡ [AUTO-RECEPTOR] Comprovativo de ${senderNumber} → receptor configurado: ${numReceptor}`);
+
+                                    registrarTransacaoAutoReceptor(txn_id, numReceptor, parseFloat(valor), senderNumber);
+
+                                    historicoVendas.push({
+                                        orderId,
+                                        numero: numReceptor,
+                                        mb: pacote.mb,
+                                        valor: parseFloat(valor),
+                                        timestamp: Date.now()
+                                    });
+
+                                    const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                                    enviarNotificacaoGrupo(
+                                        `🔔 *NOVO PEDIDO (AUTO-RECEPTOR)* ⚡\n` +
+                                        `━━━━━━━━━━━━━━━━━━\n` +
+                                        `📋 *Ref:* \`${orderId}\`\n` +
+                                        `📲 *Destino (Receptor Fixo):* *${numReceptor}*\n` +
+                                        `📦 *Pacote:* *${pacote.nome}*\n` +
+                                        `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                        `👤 *Pagador:* *${nomeCliente}* (${senderNumber})\n` +
+                                        `🏢 *Origem:* *${origemMsg}*\n` +
+                                        `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+                                        `━━━━━━━━━━━━━━━━━━\n` +
+                                        `⏳ *Status:* Enviado automaticamente via receptor configurado`
+                                    );
+
+                                    await reply(
+                                        `✅ *PEDIDO AUTOMÁTICO CONFIRMADO* ⚡\n` +
+                                        `━━━━━━━━━━━━━━━━━━\n` +
+                                        `📦 *Pacote:* *${pacote.nome}*\n` +
+                                        `📲 *Receptor Fixo:* *${numReceptor}*\n` +
+                                        `💳 *Valor:* *${valor} MT* (${metodoNome})\n` +
+                                        `🔖 *Ref:* \`${txn_id}\`\n` +
+                                        `━━━━━━━━━━━━━━━━━━\n` +
+                                        `🚀 *Ativação automática em andamento!*\n` +
+                                        `_Sem precisar de enviar número — receptor fixo ativo!_`
+                                    );
+
+                                    if (orderDispatchCallback) {
+                                        orderDispatchCallback({
+                                            orderId,
+                                            numero: numReceptor,
+                                            quantidade: pacote.mb,
+                                            modo: pacote.tipo,
+                                            jid,
+                                            sender: senderNumber,
+                                            senderName: nomeCliente,
+                                            txn_id,
+                                            valor
+                                        });
+                                    }
+                                    if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
+                                    continue;
+                                }
+
+                                // Sem receptor configurado — pedir o número manualmente
                                 if (txn_id) {
                                     transacoesProcessadas.add(txn_id);
                                     transacoesProcessadasMap.set(txn_id, {
@@ -4188,7 +4250,11 @@ async function startWhatsApp(orderCallback, db = null) {
                                 rawLidClean,
                                 realSender,
                                 nomeCliente,
-                                numDestino: numDestinoInline || null,
+                                // Usar receptor configurado via .configurar se existir e não vier número inline
+                                numDestino: numDestinoInline || (() => {
+                                    const rc = customerServices.obterReceptorPadrao(senderNumber);
+                                    return rc && rc.targetPhone ? rc.targetPhone : null;
+                                })(),
                                 pacote,
                                 timestamp: Date.now(),
                                 timer: null
@@ -4745,6 +4811,69 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 });
             }
         } else {
+            // ── VERIFICAR RECEPTOR CONFIGURADO VIA .configurar ──
+            const receptorConfig = customerServices.obterReceptorPadrao(item.senderNumber);
+            if (receptorConfig && receptorConfig.targetPhone) {
+                const numReceptor = receptorConfig.targetPhone;
+                const orderId = 'WA-' + item.txn_id + '-' + Date.now();
+                console.log(`⚡ [AUTO-RECEPTOR SMS] Operadora confirmou para ${item.senderNumber} → receptor fixo: ${numReceptor}`);
+
+                registrarTransacaoAutoReceptor(item.txn_id, numReceptor, parseFloat(valorPago), item.senderNumber);
+
+                historicoVendas.push({
+                    orderId,
+                    numero: numReceptor,
+                    mb: item.pacote.mb,
+                    valor: parseFloat(valorPago),
+                    timestamp: Date.now()
+                });
+
+                const origemMsg = item.jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
+                enviarNotificacaoGrupo(
+                    `🔔 *NOVO PEDIDO (AUTO-RECEPTOR + OPERADORA)* ⚡\n` +
+                    `━━━━━━━━━━━━━━━━━━\n` +
+                    `📋 *Ref:* \`${orderId}\`\n` +
+                    `📲 *Destino (Receptor Fixo):* *${numReceptor}*\n` +
+                    `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                    `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                    `👤 *Pagador:* *${item.nomeCliente}* (${item.senderNumber})\n` +
+                    `🏢 *Origem:* *${origemMsg}*\n` +
+                    `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+                    `━━━━━━━━━━━━━━━━━━\n` +
+                    `⚡ *Status:* Validado pela operadora + receptor fixo aplicado!`
+                );
+
+                if (sock) {
+                    await sock.sendMessage(item.jid, {
+                        text: `✅ *PEDIDO AUTOMÁTICO CONFIRMADO* ⚡\n` +
+                              `━━━━━━━━━━━━━━━━━━\n` +
+                              `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                              `📲 *Receptor Fixo:* *${numReceptor}*\n` +
+                              `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                              `🔖 *Ref:* \`${item.txn_id}\`\n` +
+                              `━━━━━━━━━━━━━━━━━━\n` +
+                              `🚀 *Ativação automática em andamento!*\n` +
+                              `_Receptor fixo ativo — sem necessidade de enviar número!_`
+                    });
+                }
+
+                if (orderDispatchCallback) {
+                    orderDispatchCallback({
+                        orderId,
+                        numero: numReceptor,
+                        quantidade: item.pacote.mb,
+                        modo: item.pacote.tipo,
+                        jid: item.jid,
+                        sender: item.senderNumber,
+                        senderName: item.nomeCliente,
+                        txn_id: item.txn_id,
+                        valor: valorPago
+                    });
+                }
+                return;
+            }
+
+            // Sem receptor configurado — pedir o número ao cliente
             const pendingKey = `${item.jid}:${item.senderNumber}`;
             pendingPayments.set(pendingKey, {
                 txn_id: item.txn_id,
@@ -4771,7 +4900,8 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             if (sock) {
                 await sock.sendMessage(item.jid, {
                     text: `✅ *COMPROVATIVO VALIDADO* ⚡\n` +
-                          `━━━━━━━━━━━━━━━━━━\n` +
+                          `━━━━━━━━━━━━━━━━━━\n`
+ +
                           `📦 *Pacote:* *${item.pacote.nome}* (${item.pacote.mb} MB)\n` +
                           `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
                           `🔖 *Ref:* \`${item.txn_id}\`\n` +
