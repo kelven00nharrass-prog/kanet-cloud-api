@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ka-Net Portal — Área do Licenciado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ── LOGIN COM TOKEN ──────────────────────────────────────────────────────── -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">⚡</div>
+      <h1>Ka-Net Portal</h1>
+      <p>Área de Gestão do Licenciado</p>
+    </div>
+    <div class="login-form">
+      <label for="tokenInput">Chave de Licença (Token)</label>
+      <input type="text" id="tokenInput" placeholder="Ex: KN-REVENDEDOR-A1B2C3D4" autocomplete="off" spellcheck="false"/>
+      <button id="loginBtn" onclick="doLogin()">Aceder ao Painel</button>
+      <div id="loginError" class="error-msg hidden"></div>
+      <div class="login-footer">
+        <small>Esqueceu ou ainda não tem licença? <a href="https://wa.me/258850401416?text=Ola%20Kelven,%20gostaria%20de%20ativar%20minha%20licenca%20Ka-Net" target="_blank">Contacte o Kelven</a></small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PAINEL PRINCIPAL DO LICENCIADO ────────────────────────────────────────── -->
+<div id="mainApp" class="app hidden">
+
+  <!-- Header Superior -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <strong id="headerOwnerName">Ka-Net Licenciado</strong>
+          <small id="headerLicenseId">Carregando...</small>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="statusBadge" class="badge badge-active">🟢 Ativa</div>
+      <button class="logout-btn" onclick="doLogout()">🚪 Sair</button>
+    </div>
+  </header>
+
+  <!-- Navegação por Abas -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="showTab('dashboard')" id="nav-dashboard">📊 Minha Licença</button>
+    <button class="tab-btn" onclick="showTab('masters')" id="nav-masters">👑 Números Master</button>
+    <button class="tab-btn" onclick="showTab('ports')" id="nav-ports">🔌 Portas & Sessões</button>
+    <button class="tab-btn" onclick="showTab('guide')" id="nav-guide">📖 Guia de Comandos</button>
+  </nav>
+
+  <!-- Conteúdo Principal -->
+  <main class="main-container">
+
+    <!-- ── ABA 1: MINHA LICENÇA ────────────────────────────────────────────── -->
+    <section id="tab-dashboard" class="tab-content active">
+      <div class="page-title">
+        <div>
+          <h2>Resumo da Licença</h2>
+          <p class="subtitle">Acompanhe a validade e limites do seu plano</p>
+        </div>
+        <button class="btn-refresh" onclick="loadLicenseData()">↻ Atualizar</button>
+      </div>
+
+      <!-- Banner de Alerta (quando prestes a expirar ou expirado) -->
+      <div id="expiryAlert" class="alert-box alert-warning hidden"></div>
+
+      <!-- Grid de Cards de Métricas -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon">📦</div>
+          <div class="metric-body">
+            <span class="metric-label">Plano Contratado</span>
+            <strong id="cardPackageName" class="metric-val">—</strong>
+            <small id="cardPackagePrice" class="metric-sub">—</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">⏳</div>
+          <div class="metric-body">
+            <span class="metric-label">Dias Restantes</span>
+            <strong id="cardDaysLeft" class="metric-val text-green">—</strong>
+            <small id="cardExpiryDate" class="metric-sub">—</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">📱</div>
+          <div class="metric-body">
+            <span class="metric-label">WhatsApp Permitidos</span>
+            <strong id="cardPhonesLimit" class="metric-val">—</strong>
+            <small id="cardPhonesUsed" class="metric-sub">0 conectados</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon">🔌</div>
+          <div class="metric-body">
+            <span class="metric-label">Portas Celulares</span>
+            <strong id="cardPortsLimit" class="metric-val">—</strong>
+            <small id="cardVipPort" class="metric-sub">—</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detalhes do Contrato & Renovação -->
+      <div class="section-card">
+        <h3>Detalhes do Titular & Acesso</h3>
+        <div class="details-table">
+          <div class="row">
+            <span class="row-label">Titular:</span>
+            <strong id="detOwnerName" class="row-val">—</strong>
+          </div>
+          <div class="row">
+            <span class="row-label">Telefone Registado:</span>
+            <span id="detOwnerPhone" class="row-val mono">—</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Código da Licença:</span>
+            <span id="detLicenseId" class="row-val mono text-accent">—</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Início da Validade:</span>
+            <span id="detStartDate" class="row-val">—</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Data de Expiração:</span>
+            <span id="detExpiryDate" class="row-val">—</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Último Heartbeat:</span>
+            <span id="detLastHeartbeat" class="row-val text-muted">—</span>
+          </div>
+        </div>
+
+        <div class="renew-action-bar">
+          <a id="btnWhatsAppRenew" href="#" target="_blank" class="btn-renew">
+            <span>💬 Solicitar Renovação via WhatsApp</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 2: NÚMEROS MASTER ────────────────────────────────────────────── -->
+    <section id="tab-masters" class="tab-content">
+      <div class="page-title">
+        <div>
+          <h2>Números Master (Administradores no WhatsApp)</h2>
+          <p class="subtitle">Estes números têm permissão de enviar comandos diretamente no chat do bot</p>
+        </div>
+      </div>
+
+      <!-- Formulário para adicionar Master -->
+      <div class="section-card">
+        <h3>➕ Registar Novo Administrador</h3>
+        <form id="formAddMaster" onsubmit="handleAddMaster(event)" class="master-form">
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="masterPhoneInput">Número de Telefone (Vodacom/Movitel)</label>
+              <input type="tel" id="masterPhoneInput" placeholder="Ex: 841234567 ou 258841234567" required autocomplete="off"/>
+            </div>
+            <div class="form-group">
+              <label>Permissões Autorizadas:</label>
+              <div class="checkboxes-row">
+                <label class="chk-label"><input type="checkbox" id="permAdmin" checked/> 👑 Total (Admin)</label>
+                <label class="chk-label"><input type="checkbox" id="permRelatorios" checked/> 📊 Relatórios</label>
+                <label class="chk-label"><input type="checkbox" id="permConfigurar" checked/> ⚙️ Configurar</label>
+                <label class="chk-label"><input type="checkbox" id="permTxeneco" checked/> 💳 Txeneco/Crédito</label>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary" id="btnAddMaster">Adicionar Master</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Lista de Masters Cadastrados -->
+      <div class="section-card">
+        <h3>📋 Administradores Ativos</h3>
+        <div id="mastersListContainer">
+          <p class="text-muted">A carregar mestres...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 3: PORTAS & SESSÕES ─────────────────────────────────────────── -->
+    <section id="tab-ports" class="tab-content">
+      <div class="page-title">
+        <div>
+          <h2>Portas do Gateway & Conexões</h2>
+          <p class="subtitle">Monitoramento de portas de rede e telemóveis do Ka-Net Gateway</p>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h3>🔌 Limites de Conexão do seu Pacote</h3>
+        <div class="ports-info-grid" id="portsInfoGrid">
+          <!-- Carregado via JS -->
+        </div>
+      </div>
+
+      <div class="section-card" id="fullPortMappingCard" style="display:none;">
+        <h3>🔀 Atribuição de Portas (Exclusivo Pacote FULL)</h3>
+        <p class="subtitle">Defina qual o papel de cada porta normal conectada ao seu sistema:</p>
+        <div id="portMappingFormContainer">
+          <!-- Form dinâmico gerado para pacote Full -->
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h3>📱 Sessões WhatsApp Registadas</h3>
+        <div id="sessionsListContainer">
+          <p class="text-muted">Nenhuma sessão adicional registada.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 4: GUIA DE COMANDOS ─────────────────────────────────────────── -->
+    <section id="tab-guide" class="tab-content">
+      <div class="page-title">
+        <div>
+          <h2>Guia de Comandos WhatsApp</h2>
+          <p class="subtitle">Comandos que os seus Números Master podem usar no WhatsApp</p>
+        </div>
+      </div>
+
+      <div class="guide-grid">
+        <div class="guide-card">
+          <div class="guide-header">
+            <span class="guide-tag tag-config">⚙️ Configuração</span>
+            <h4>.configurar</h4>
+          </div>
+          <p>Configura o número receptor das transferências e números autorizados a pagar.</p>
+          <div class="code-box">.configurar [pagador] [receptor]</div>
+          <small>Exemplo: <code>.configurar 856268811 840401416</code></small>
+        </div>
+
+        <div class="guide-card">
+          <div class="guide-header">
+            <span class="guide-tag tag-reports">📊 Vendas & Relatório</span>
+            <h4>.relatorio</h4>
+          </div>
+          <p>Mostra as vendas do dia, volume de megas transferidos e receitas obtidas.</p>
+          <div class="code-box">.relatorio</div>
+          <small>Disponível para masters com permissão <code>relatorios</code>.</small>
+        </div>
+
+        <div class="guide-card">
+          <div class="guide-header">
+            <span class="guide-tag tag-txeneco">💳 Txeneco / Crédito</span>
+            <h4>.txeneco</h4>
+          </div>
+          <p>Gera e envia pacotes de crédito/txeneco com débito para acerto posterior.</p>
+          <div class="code-box">.txeneco [número] [quantidade]</div>
+          <small>Exemplo: <code>.txeneco 841234567 1000</code></small>
+        </div>
+
+        <div class="guide-card">
+          <div class="guide-header">
+            <span class="guide-tag tag-menu">👑 Menu Completo</span>
+            <h4>.menu</h4>
+          </div>
+          <p>Exibe o menu interativo com atalhos para todas as opções de administração.</p>
+          <div class="code-box">.menu</div>
+          <small>Enviado em mensagem privada ou no grupo de controle.</small>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Toast de Notificação -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

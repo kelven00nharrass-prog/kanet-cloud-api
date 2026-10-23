@@ -15,6 +15,10 @@ const router  = express.Router();
 router.use('/admin', express.static(path.join(__dirname, 'admin')));
 router.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'index.html')));
 
+// ─── Painel do Licenciado (Portal do Cliente) ─────────────────────────────
+router.use('/portal', express.static(path.join(__dirname, 'client')));
+router.get('/portal', (req, res) => res.sendFile(path.join(__dirname, 'client', 'index.html')));
+
 const {
   createLicense, getAllLicenses, getLicenseById,
   getLicenseByToken, renewLicense, suspendLicense,

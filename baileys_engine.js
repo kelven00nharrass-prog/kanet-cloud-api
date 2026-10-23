@@ -272,6 +272,20 @@ function getMasterNumbers() {
     if (DYN_CFG.MASTER_NUMBERS && Array.isArray(DYN_CFG.MASTER_NUMBERS)) {
         DYN_CFG.MASTER_NUMBERS.forEach(n => list.add(String(n).replace(/\D/g, '')));
     }
+    // Integrar números master cadastrados pelos licenciados no Portal de Licenciamento
+    try {
+        const { getAllLicenses } = require('./licensing/license_manager');
+        const activeLicenses = getAllLicenses().filter(l => l.status === 'active');
+        for (const lic of activeLicenses) {
+            if (Array.isArray(lic.masterNumbers)) {
+                for (const m of lic.masterNumbers) {
+                    if (m && m.number) {
+                        list.add(String(m.number).replace(/\D/g, ''));
+                    }
+                }
+            }
+        }
+    } catch (_) {}
     return Array.from(list);
 }
 
