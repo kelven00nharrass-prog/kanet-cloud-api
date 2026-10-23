@@ -3721,6 +3721,7 @@ app.post('/api/admin/sync', async (req, res) => {
 // 7. BAILEYS WHATSAPP BOT ENGINE (24h/7d CLOUD NATIVO)
 // ════════════════════════════════════════════════════════════════
 let baileysEngine = null;
+let baileysFornecimento = null;
 try {
   baileysEngine = require('./baileys_engine');
   baileysEngine.startWhatsApp((order) => {
@@ -3787,6 +3788,19 @@ try {
   }
 } catch(e) {
   console.warn('⚠️ [BAILEYS] Inicializando em modo standard:', e.message);
+}
+
+// ════════════════════════════════════════════════════════════════
+// 7.0 BAILEYS FORNECIMENTO (WHATSAPP ATACADO / PARCEIROS)
+// ════════════════════════════════════════════════════════════════
+try {
+  baileysFornecimento = require('./baileys_fornecimento');
+  baileysFornecimento.startWhatsApp((order) => {
+    console.log('📦 [FORNECIMENTO NUVEM] Nova ordem atacado recebida:', order);
+  }, db);
+  console.log('📦 [FORNECIMENTO NUVEM] Motor WhatsApp Fornecimento inicializado com sucesso!');
+} catch (e) {
+  console.warn('⚠️ [FORNECIMENTO NUVEM] Erro ao carregar baileys_fornecimento:', e.message);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3925,19 +3939,42 @@ try {
 }
 
 app.get('/api/whatsapp/status', (req, res) => {
-  if (baileysEngine) {
-    return res.json(baileysEngine.getStatus());
+  const session = (req.query.session || req.query.type || '').toLowerCase().trim();
+  const revendaStatus = baileysEngine ? baileysEngine.getStatus() : { status: 'offline', hasQr: false };
+  const fornecimentoStatus = baileysFornecimento ? baileysFornecimento.getStatus() : { status: 'offline', hasQr: false };
+
+  if (session === 'fornecimento') {
+    return res.json({ session: 'fornecimento', ...fornecimentoStatus });
   }
-  return res.json({ status: 'offline', hasQr: false });
+  if (session === 'revenda') {
+    return res.json({ session: 'revenda', ...revendaStatus });
+  }
+
+  // Resumo compatível por defeito (retorna revenda no nível raiz para apps antigas, mais objetos separados)
+  return res.json({
+    ...revendaStatus,
+    session: 'revenda',
+    revenda: revendaStatus,
+    fornecimento: fornecimentoStatus
+  });
 });
 
 app.post(['/api/whatsapp/reset', '/api/admin/whatsapp/reset'], async (req, res) => {
   try {
+    const session = (req.body?.session || req.query?.session || req.body?.type || req.query?.type || 'revenda').toLowerCase().trim();
+    if (session === 'fornecimento') {
+      if (baileysFornecimento && typeof baileysFornecimento.resetSession === 'function') {
+        const result = await baileysFornecimento.resetSession(db);
+        return res.json(result);
+      }
+      return res.status(500).json({ success: false, message: 'Baileys Fornecimento não inicializado' });
+    }
+
     if (baileysEngine && typeof baileysEngine.resetSession === 'function') {
       const result = await baileysEngine.resetSession(db);
       return res.json(result);
     }
-    return res.status(500).json({ success: false, message: 'Baileys não inicializado' });
+    return res.status(500).json({ success: false, message: 'Baileys Revenda não inicializado' });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -4020,12 +4057,32 @@ app.get('/qr', (req, res) => {
     <h1>⚡ Ka-Net WhatsApp Cloud</h1>
     <p>Conecte o seu WhatsApp diretamente ao servidor na Nuvem (sem computador ligado).</p>
 
+    <!-- Seletor de Sessão Multi-WhatsApp -->
+    <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px;">
+      <button id="tab-revenda" onclick="switchSession('revenda')" style="padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #0284c7; color: white; transition: all 0.2s;">
+        🟢 WhatsApp Revenda
+      </button>
+      <button id="tab-fornecimento" onclick="switchSession('fornecimento')" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #334155; font-weight: 600; cursor: pointer; background: #0f172a; color: #94a3b8; transition: all 0.2s;">
+        🔵 WhatsApp Fornecimento
+      </button>
+    </div>
+
+    <div id="session-desc" style="font-size: 13px; color: #38bdf8; margin-bottom: 12px; font-weight: 500;">
+      📱 Sessão Ativa: Revenda (Clientes, Vouchers & Varejo)
+    </div>
+
     <div id="status-container" class="status status-waiting">
       <span>⏳ A carregar estado...</span>
     </div>
 
     <div id="qr-wrapper" class="qr-box">
       <div style="padding-top: 100px; color: #64748b;">A carregar QR...</div>
+    </div>
+
+    <div style="margin-top: 10px;">
+      <button onclick="resetCurrentSession()" style="background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+        🔄 Gerar Novo QR Code / Desconectar Esta Linha
+      </button>
     </div>
 
     <div class="steps">
@@ -4040,30 +4097,68 @@ app.get('/qr', (req, res) => {
   </div>
 
   <script>
+    let activeSession = 'revenda';
+
+    function switchSession(sess) {
+      activeSession = sess;
+      const btnRev = document.getElementById('tab-revenda');
+      const btnForn = document.getElementById('tab-fornecimento');
+      const desc = document.getElementById('session-desc');
+
+      if (sess === 'revenda') {
+        btnRev.style.background = '#0284c7';
+        btnRev.style.color = '#ffffff';
+        btnForn.style.background = '#0f172a';
+        btnForn.style.color = '#94a3b8';
+        desc.innerText = '📱 Sessão Ativa: Revenda (Clientes, Vouchers & Varejo)';
+      } else {
+        btnForn.style.background = '#0284c7';
+        btnForn.style.color = '#ffffff';
+        btnRev.style.background = '#0f172a';
+        btnRev.style.color = '#94a3b8';
+        desc.innerText = '📦 Sessão Ativa: Fornecimento (Atacado, Dados por Grosso)';
+      }
+      updateQR();
+    }
+
+    async function resetCurrentSession() {
+      if (!confirm('Deseja realmente gerar um novo QR Code / reiniciar a sessão ' + activeSession.toUpperCase() + '?')) return;
+      try {
+        await fetch('/api/whatsapp/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: activeSession })
+        });
+        updateQR();
+      } catch(e) {
+        alert('Erro ao reiniciar: ' + e.message);
+      }
+    }
+
     async function updateQR() {
       try {
-        const res = await fetch('/api/whatsapp/status');
+        const res = await fetch('/api/whatsapp/status?session=' + activeSession);
         const data = await res.json();
         const statusBox = document.getElementById('status-container');
         const qrBox = document.getElementById('qr-wrapper');
 
         if (data.status === 'connected') {
           statusBox.className = 'status status-online';
-          statusBox.innerHTML = '✅ WhatsApp Conectado com Sucesso! (' + (data.user || 'Online') + ')';
-          qrBox.innerHTML = '<div style="padding: 60px 20px; color: #10b981; font-weight: bold; font-size: 18px;">✅ Conectado 24h na Nuvem!</div>';
+          statusBox.innerHTML = '✅ WhatsApp ' + activeSession.toUpperCase() + ' Conectado! (' + (data.user || 'Online') + ')';
+          qrBox.innerHTML = '<div style="padding: 60px 20px; color: #10b981; font-weight: bold; font-size: 18px;">✅ ' + activeSession.toUpperCase() + ' Conectado 24h na Nuvem!</div>';
         } else if (data.hasQr && data.qrImage) {
           statusBox.className = 'status status-waiting';
-          statusBox.innerHTML = '📱 Aponte a câmara do WhatsApp para o QR Code';
-          qrBox.innerHTML = '<img src="' + data.qrImage + '" alt="QR Code WhatsApp" />';
+          statusBox.innerHTML = '📱 Aponte a câmara do WhatsApp (' + activeSession.toUpperCase() + ') para o QR Code';
+          qrBox.innerHTML = '<img src="' + data.qrImage + '" alt="QR Code WhatsApp ' + activeSession + '" />';
         } else {
           statusBox.className = 'status status-waiting';
-          statusBox.innerHTML = '⏳ A gerar novo QR Code...';
+          statusBox.innerHTML = '⏳ A gerar novo QR Code (' + activeSession.toUpperCase() + ')...';
         }
       } catch(e) { console.error('Erro ao atualizar QR Code:', e.message); }
     }
 
     updateQR();
-    setInterval(updateQR, 3000);
+    setInterval(updateQR, 2500);
   </script>
 </body>
 </html>
