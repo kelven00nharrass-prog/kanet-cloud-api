@@ -997,6 +997,11 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
     console.log(`📱 [NOVO DISPOSITIVO] Celular Porta ${port} registado automaticamente! (${carrierName})`);
   }
 
+  const reqLicenseId = (req.headers['x-license-id'] || req.query.license_id || '').trim();
+  const reqOpMode = (req.headers['x-operation-mode'] || req.query.operation_mode || (port === 8777 ? 'fornecimento' : 'revenda')).trim().toLowerCase();
+  if (reqLicenseId) dev.licenseId = reqLicenseId;
+  if (reqOpMode) dev.operationMode = reqOpMode;
+
   // ── AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA (ROTEAMENTO ESTRITO & APTIDÃO) ──
   // - Portas Diárias (8025, 8023, 8024): Exclusivas para pacotes diários (24hrs)
   // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados (NUNCA assume diários)
@@ -1005,6 +1010,24 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   if (isDeviceApto(dev)) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
         if (order.status !== 'pending') continue;
+
+        // ── FILTRO MULTI-TENANT DE LICENÇA (ISOLAMENTO DE CLIENTES) ──
+        const devLic = (dev.licenseId || 'master').toLowerCase().trim();
+        const ordLic = (order.licenseId || 'master').toLowerCase().trim();
+        if (devLic !== ordLic) {
+          continue; // Pedido pertence a outro cliente/licença!
+        }
+
+        // ── FILTRO RIGOROSO DE MODO DE OPERAÇÃO (REVENDA vs FORNECIMENTO) ──
+        const devMode = (dev.operationMode || (port === 8777 ? 'fornecimento' : 'revenda')).toLowerCase().trim();
+        const isFornecOrder = !!(order.isFornecimento || order.tipo === 'saldo' || order.origem === 'fornecimento' || port === 8777);
+
+        if (devMode === 'fornecimento' && !isFornecOrder) {
+          continue; // Celular de fornecimento NÃO processa pacotes normais de revenda
+        }
+        if (devMode === 'revenda' && isFornecOrder) {
+          continue; // Celular de revenda NÃO processa saldo ou atacado
+        }
 
         // TTL / Validade máxima do pedido: 45 minutos (evita que pedidos velhos repitam horas depois)
         if (order.createdAt) {
@@ -1313,6 +1336,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   // O app Android envia null quando o saldo ainda não foi consultado via USSD.
   // Preservar o último saldo real para não confundir o roteador de pedidos.
   const bodyClean = { ...req.body };
+
+  const reqStatusLic = (req.body?.license_id || req.headers['x-license-id'] || req.query.license_id || '').trim();
+  const reqStatusMode = (req.body?.operation_mode || req.headers['x-operation-mode'] || req.query.operation_mode || '').trim().toLowerCase();
+  if (reqStatusLic) bodyClean.licenseId = reqStatusLic;
+  if (reqStatusMode) bodyClean.operationMode = reqStatusMode;
 
   // ── REGRA OBRIGATÓRIA PORTA 8077: Apenas 1 Cartão SIM (SIM 1) ──
   if (port === 8077) {
