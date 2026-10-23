@@ -234,6 +234,7 @@ function renderLicenses(licenses) {
         <td>${daysText}</td>
         <td style="font-family:var(--mono)">${sessions}</td>
         <td>
+          <button class="action-btn" style="background:rgba(59,130,246,0.15);color:var(--accent2);border-color:rgba(59,130,246,0.3)" title="Abrir Portal deste Licenciado" onclick="openClientPortal('${l.masterToken}')">👤 Portal</button>
           <button class="action-btn view"    onclick="viewLicense('${l.licenseId}')">👁 Ver</button>
           <button class="action-btn renew"   onclick="renewLicense('${l.licenseId}')">↻ Renovar</button>
           ${l.status === 'suspended'
@@ -337,8 +338,10 @@ async function viewLicense(id) {
     <h4>👑 Números Master</h4>
     ${mastersHtml}
 
-    <div class="modal-actions">
+    <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
       <button class="btn-primary" onclick="renewLicense('${l.licenseId}');closeModal()">↻ Renovar</button>
+      <button class="btn-secondary" style="border-color:var(--accent);color:var(--accent2)" onclick="openClientPortal('${l.masterToken}')">👤 Aceder ao Portal</button>
+      <button class="btn-secondary" onclick="copyClientMessage('${l.licenseId}', '${l.ownerName}', '${l.masterToken}', '${l.expiryDate}')">📋 Copiar Mensagem WhatsApp</button>
       ${l.status === 'suspended'
         ? `<button class="btn-secondary" onclick="activateLicense('${l.licenseId}');closeModal()">✅ Activar</button>`
         : `<button class="btn-secondary" onclick="suspendLicense('${l.licenseId}');closeModal()">⏸ Suspender</button>`
@@ -347,6 +350,20 @@ async function viewLicense(id) {
     </div>
   `;
   openModal();
+}
+
+function openClientPortal(token) {
+  window.open(`/licensing/portal/?token=${encodeURIComponent(token)}`, '_blank');
+}
+
+function copyClientMessage(id, name, token, expiry) {
+  const url = `${window.location.origin}/licensing/portal/?token=${token}`;
+  const text = `✅ *SUA LICENÇA KA-NET FOI ATIVADA!*\n━━━━━━━━━━━━━━━━━━━\n👤 *Titular:* ${name}\n🔑 *Código:* ${id}\n📅 *Expiração:* ${new Date(expiry).toLocaleDateString('pt')}\n\n🌐 *Portal de Gestão do Licenciado:*\n${url}\n\n🔐 *Sua Chave de Acesso:* \`${token}\`\n\n_Guarde esta mensagem para acessar ao seu painel e configurar seus números master._`;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('✅ Mensagem copiada com sucesso! Pode colar e enviar ao cliente via WhatsApp.');
+  }).catch(() => {
+    prompt('Copie a mensagem abaixo:', text);
+  });
 }
 
 // ─── CRIAR LICENÇA ────────────────────────────────────────────────────────────

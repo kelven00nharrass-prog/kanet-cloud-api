@@ -12,7 +12,13 @@ let currentLicense = null;
 
 // ─── INICIALIZAÇÃO ───────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  if (currentToken) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const tokenFromUrl = urlParams.get('token');
+
+  if (tokenFromUrl) {
+    document.getElementById('tokenInput').value = tokenFromUrl;
+    validateAndEnter(tokenFromUrl);
+  } else if (currentToken) {
     validateAndEnter(currentToken);
   } else {
     showLogin();
