@@ -36,6 +36,66 @@ router.get('/ping', (req, res) => {
   res.json({ success: true, message: '🟢 Ka-Net Licensing API está online', ts: new Date().toISOString() });
 });
 
+// ─── Login unificado (Kelven Master ou Licenciado) ───────────────────────────
+router.post('/login', (req, res) => {
+  try {
+    const { username = '', password = '' } = req.body;
+    const cleanUser = String(username).trim().toLowerCase();
+    const cleanPass = String(password).trim();
+
+    // 1. Verificação MASTER (Kelven)
+    const isMasterUser = ['kelven', 'admin', 'master'].includes(cleanUser) || cleanUser === '';
+    const isMasterPass = ['kanet2026', 'kanet-master-kelven-2026', 'kanetkelven2026secure'].includes(cleanPass.toLowerCase());
+
+    if ((isMasterUser && isMasterPass) || cleanPass === 'KaNet-MASTER-KELVEN-2026' || cleanPass === 'KaNetKelven2026Secure') {
+      return res.json({
+        success: true,
+        role: 'master',
+        token: 'KaNet-MASTER-KELVEN-2026',
+        ownerName: 'Kelven (Master)',
+        message: 'Bem-vindo, Kelven!'
+      });
+    }
+
+    // 2. Verificação LICENCIADO
+    const all = getAllLicenses();
+    const lic = all.find(l => {
+      const tokenMatch = (l.masterToken === cleanPass) || (l.masterToken === cleanUser);
+      const nameMatch = l.ownerName && l.ownerName.toLowerCase() === cleanUser;
+      const idMatch = l.licenseId && l.licenseId.toLowerCase() === cleanUser;
+      const phoneMatch = l.ownerPhone && l.ownerPhone.replace(/\D/g, '') === cleanUser.replace(/\D/g, '');
+
+      if (tokenMatch) return true;
+      if ((nameMatch || idMatch || phoneMatch) && (cleanPass === l.masterToken || cleanPass.toLowerCase() === l.ownerName.toLowerCase())) {
+        return true;
+      }
+      return false;
+    });
+
+    if (lic) {
+      const check = checkLicenseValidity(lic.masterToken);
+      if (!check.valid) {
+        return res.status(403).json({ success: false, error: `Licença ${check.reason || 'inválida ou expirada'}` });
+      }
+      return res.json({
+        success: true,
+        role: 'licensee',
+        token: lic.masterToken,
+        ownerName: lic.ownerName,
+        license: lic,
+        message: `Bem-vindo, ${lic.ownerName}!`
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      error: 'Utilizador ou palavra-passe incorretos.'
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ─── Pacotes disponíveis (público) ───────────────────────────────────────────
 router.get('/packages', (req, res) => {
   res.json({ success: true, packages: listPackages() });

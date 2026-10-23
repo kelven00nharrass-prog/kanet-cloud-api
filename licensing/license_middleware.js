@@ -14,7 +14,15 @@
 const { checkLicenseValidity } = require('./license_manager');
 
 // Token do Kelven (dono do sistema) — lê do .env
-const MASTER_ADMIN_TOKEN = process.env.MASTER_LICENSE_TOKEN || 'KaNet-MASTER-KELVEN-2026';
+const VALID_MASTER_TOKENS = [
+  process.env.MASTER_LICENSE_TOKEN,
+  'KaNet-MASTER-KELVEN-2026',
+  'KaNetKelven2026Secure'
+].filter(Boolean);
+
+function isMasterToken(token) {
+  return VALID_MASTER_TOKENS.includes(token);
+}
 
 /**
  * Middleware: exige token de licença válido
@@ -31,7 +39,7 @@ function requireLicense(req, res, next) {
   }
 
   if (!token) {
-    token = req.headers['x-kanet-token'] || req.query.token || null;
+    token = req.headers['x-kanet-token'] || req.headers['x-license-token'] || req.query.token || null;
   }
 
   if (!token) {
@@ -43,7 +51,7 @@ function requireLicense(req, res, next) {
   }
 
   // Token mestre do Kelven tem acesso total
-  if (token === MASTER_ADMIN_TOKEN) {
+  if (isMasterToken(token)) {
     req.isMaster = true;
     req.license  = { licenseId: 'MASTER', ownerName: 'Kelven', packageId: 'full' };
     return next();
@@ -78,10 +86,10 @@ function requireMaster(req, res, next) {
     token = authHeader.slice(7).trim();
   }
   if (!token) {
-    token = req.headers['x-kanet-token'] || req.query.token || null;
+    token = req.headers['x-kanet-token'] || req.headers['x-license-token'] || req.query.token || null;
   }
 
-  if (token !== MASTER_ADMIN_TOKEN) {
+  if (!isMasterToken(token)) {
     return res.status(403).json({
       success: false,
       error:   'Acesso negado — apenas o administrador principal pode fazer isto'
