@@ -188,12 +188,13 @@ async function restaurarDoFirestore() {
     try {
         const snap = await firestoreDb.collection('client_default_recipients').get();
         if (!snap.empty) {
+            defaultRecipients.clear();
             snap.docs.forEach(doc => {
                 const d = doc.data();
                 const key = normalizarTelefone(d.payerPhone || doc.id);
                 if (key) defaultRecipients.set(key, { ...d, payerPhone: key });
             });
-            console.log(`📲 [FIRESTORE] ${snap.size} configurações de receptor padrão carregadas.`);
+            console.log(`📲 [FIRESTORE] ${defaultRecipients.size} configurações de receptor padrão ativas e sincronizadas.`);
         }
     } catch (e) {
         console.warn('⚠️ [FIRESTORE] Erro ao carregar client_default_recipients:', e.message);
@@ -887,7 +888,11 @@ function removerReceptorPadrao(targetIdentifier, ownerIdentifier = null) {
     } catch (_) {}
 
     if (removidos === 0) {
-        return { success: false, mensagem: 'ℹ️ Você não possui nenhum receptor padrão ativo configurado no momento.' };
+        return {
+            success: false,
+            mensagem: 'ℹ️ Você não possui nenhum receptor padrão ativo vinculado a este contato no momento.\n\n' +
+                      '💡 _Se configurou outro número M-Pesa/e-Mola, envie:_ *.desconfigurar <numero_pagador>*'
+        };
     }
 
     console.log(`🗑️ [RECEPTOR PADRÃO] ${removidos} receptor(es) removido(s)`);
