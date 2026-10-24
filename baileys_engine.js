@@ -1306,6 +1306,17 @@ function buscarPacotePorValor(valor, jid = null) {
 // Igual ao bot original - identifica qualquer formato M-Pesa/e-Mola
 // ══════════════════════════════════════════════════
 const pendingPayments = new Map(); // chave: jid + ":" + senderNumber
+// Sincronizar LIDs persistentes do customerServices
+try {
+    if (customerServices && typeof customerServices.obterTodosLids === 'function') {
+        const storedLids = customerServices.obterTodosLids();
+        for (const [l, p] of storedLids.entries()) {
+            lidToPhoneMap.set(l, p);
+                                try { customerServices.vincularLidTelefone(l, p); } catch (_) {}
+        }
+    }
+} catch (_) {}
+
 const lidToPhoneMap = new Map([
     ['216054655656152', '258850401416'],
     ['167894566592572', '258850401416']
@@ -2400,6 +2411,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     console.log(`👑 [MASTER LID VINCULADO] Novo LID de Admin registado: ${lidClean}`);
                                 }
                                 lidToPhoneMap.set(lidClean, '258850401416');
+                                try { customerServices.vincularLidTelefone(lidClean, '258850401416'); } catch (_) {}
                             }
                         }
                     }
@@ -3020,6 +3032,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
                             if (rawLidClean) {
                                 lidToPhoneMap.set(rawLidClean, '258' + receptor);
+                                try { customerServices.vincularLidTelefone(rawLidClean, '258' + receptor); } catch (_) {}
                             }
 
                         } else {
@@ -3050,6 +3063,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
                             if (rawLidClean) {
                                 lidToPhoneMap.set(rawLidClean, '258' + receptor);
+                                try { customerServices.vincularLidTelefone(rawLidClean, '258' + receptor); } catch (_) {}
                             }
                         }
 
@@ -4424,8 +4438,9 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 11. SISTEMA DE FIDELIDADE E INDICAÇÃO (OPÇÃO 4) ───────────────
                     if (opcaoMenuNum === '4' || ['4', '4️⃣', '!convite', 'convite', '!fidelidade', 'fidelidade', 'indicar', 'indicacao', 'indicação', 'indica e ganha'].includes(cleanCmd)) {
-                        const statusInd = customerServices.obterStatusIndicacao(senderNumber);
-                        const meuCodigo = (statusInd && statusInd.codigo) ? statusInd.codigo : customerServices.gerarCodigoConviteUnico(senderNumber);
+                        const userIdentifier = (rawLidClean && !/^8[2-7]\d{7}$/.test(senderNumber)) ? rawLidClean : senderNumber;
+                        const statusInd = customerServices.obterStatusIndicacao(userIdentifier);
+                        const meuCodigo = (statusInd && statusInd.codigo) ? statusInd.codigo : customerServices.gerarCodigoConviteUnico(userIdentifier);
                         const amigosNaRodada = statusInd ? statusInd.amigosAtuais : 0;
                         const faltam = statusInd ? statusInd.faltam : 3;
                         const totalBonus = statusInd ? statusInd.totalBonusMegas : 0;

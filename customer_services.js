@@ -28,6 +28,7 @@ const clientReferrals = new Map();     // phone -> { phone, referredFriends: [],
 const friendToReferrer = new Map();    // friendPhone -> referrerPhone
 const codeToReferrer = new Map();      // code (ex: "KN-4821") -> referrerPhone
 const phoneToCode = new Map();         // referrerPhone -> code
+const lidToPhone = new Map();          // lidClean -> realPhone (9 digits)
 
 let firestoreDb = null;
 let whatsAppNotifier = null;
@@ -67,6 +68,7 @@ function salvarCacheLocal() {
             referrals: [...clientReferrals.entries()],
             friendReferrers: [...friendToReferrer.entries()],
             referralCodes: [...codeToReferrer.entries()],
+            lidMap: [...lidToPhone.entries()],
             savedAt: new Date().toISOString()
         };
         const content = JSON.stringify(payload, null, 2);
@@ -130,6 +132,9 @@ function carregarCacheLocal() {
                 codeToReferrer.set(k.toUpperCase(), v);
                 phoneToCode.set(v, k.toUpperCase());
             });
+        }
+        if (Array.isArray(data.lidMap)) {
+            data.lidMap.forEach(([k, v]) => lidToPhone.set(k, v));
         }
         console.log(`📦 [CUSTOMER-SERVICES] Cache carregado (${path.basename(fonte)}): ${clientLoyalty.size} clientes fidelidade, ${clientLoans.size} empréstimos, ${defaultRecipients.size} receptores, ${clientBonuses.size} bônus.`);
     } catch (err) {
@@ -294,16 +299,69 @@ function initCustomerServices(db, dispatcherFn, getValMbFn) {
 }
 
 
+
+// ── GESTÃO DE IDENTIDADES WHATSAPP (LID -> NÚMERO REAL) ─────────────────────
+
+/**
+ * Vincula um LID do WhatsApp (identidade oculta/privada) ao telefone real do cliente
+ */
+function vincularLidTelefone(lid, tel) {
+    if (!lid || !tel) return;
+    const limpoLid = String(lid).replace(/\D/g, '');
+    const phone = normalizarTelefone(tel);
+    if (!limpoLid || !phone) return;
+
+    lidToPhone.set(limpoLid, phone);
+    
+    // Se o cliente gerou um código com o LID antes de sabermos o telefone, migra para o telefone!
+    if (phoneToCode.has(limpoLid)) {
+        const existingCode = phoneToCode.get(limpoLid);
+        codeToReferrer.set(existingCode, phone);
+        phoneToCode.set(phone, existingCode);
+        console.log(`🔄 [LID MIGRATION] Código ${existingCode} do LID ${limpoLid} migrado para o telefone ${phone}!`);
+    }
+
+    salvarCacheLocal();
+    salvarNoFirestore('client_lid_map', limpoLid, { lid: limpoLid, phone, updatedAt: new Date().toISOString() });
+    console.log(`🔗 [LID MAPPING] LID ${limpoLid} vinculado ao telefone ${phone}`);
+}
+
+/**
+ * Resolve o telefone real de um identificador (seja telefone direto ou LID)
+ */
+function resolverTelefoneDeIdentificador(identificador) {
+    if (!identificador) return '';
+    const phone = normalizarTelefone(identificador);
+    if (phone) return phone;
+    const limpo = String(identificador).replace(/\D/g, '');
+    if (lidToPhone.has(limpo)) {
+        return lidToPhone.get(limpo);
+    }
+    const rec = defaultRecipients.get(limpo);
+    if (rec && rec.targetPhone) {
+        return normalizarTelefone(rec.targetPhone);
+    }
+    return '';
+}
+
+function obterTodosLids() {
+    return new Map(lidToPhone);
+}
+
 // ── SISTEMA DE INDICAÇÕES (INDICA E GANHA: 3 AMIGOS = 500 MB GRÁTIS) ─────────
 
 /**
  * Gera ou recupera um código curto e exclusivo de indicação para o cliente (ex: KN-4821)
  */
-function gerarCodigoConviteUnico(phone) {
-    const padrinho = normalizarTelefone(phone);
-    if (!padrinho) return '';
-    if (phoneToCode.has(padrinho)) {
-        return phoneToCode.get(padrinho);
+function gerarCodigoConviteUnico(phoneOrLid) {
+    let padrinho = normalizarTelefone(phoneOrLid);
+    if (!padrinho) {
+        padrinho = resolverTelefoneDeIdentificador(phoneOrLid);
+    }
+    const chave = padrinho || String(phoneOrLid).replace(/\D/g, '');
+    if (!chave) return '';
+    if (phoneToCode.has(chave)) {
+        return phoneToCode.get(chave);
     }
     
     let codigo = '';
@@ -504,12 +562,16 @@ function processarCompraIndicacao(compradorTel) {
 /**
  * Retorna as estatísticas de indicação de um cliente
  */
-function obterStatusIndicacao(telefone) {
-    const phone = normalizarTelefone(telefone);
-    if (!phone) return null;
-    const codigo = phoneToCode.get(phone) || gerarCodigoConviteUnico(phone);
-    const rec = clientReferrals.get(phone) || {
-        phone,
+function obterStatusIndicacao(telefoneOrLid) {
+    let phone = normalizarTelefone(telefoneOrLid);
+    if (!phone) {
+        phone = resolverTelefoneDeIdentificador(telefoneOrLid);
+    }
+    const chave = phone || String(telefoneOrLid).replace(/\D/g, '');
+    if (!chave) return null;
+    const codigo = phoneToCode.get(chave) || gerarCodigoConviteUnico(chave);
+    const rec = clientReferrals.get(chave) || {
+        phone: chave,
         referredFriends: [],
         completedBonuses: 0,
         totalBonusMegas: 0
@@ -1473,6 +1535,9 @@ module.exports = {
     normalizarTelefone,
     setWhatsAppNotifier,
     // Programa Indica e Ganha
+    vincularLidTelefone,
+    resolverTelefoneDeIdentificador,
+    obterTodosLids,
     gerarCodigoConviteUnico,
     obterTelefonePorCodigo,
     vincularIndicacao,
