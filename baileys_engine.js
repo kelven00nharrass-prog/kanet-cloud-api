@@ -1945,6 +1945,10 @@ async function startWhatsApp(orderCallback, db = null) {
             }
         });
 
+        customerServices.setWhatsAppNotifier((jid, text) => {
+            sendTextMessage(jid, text).catch(() => {});
+        });
+
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
@@ -4407,17 +4411,44 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
+                    // ── 11A. COMANDO !INDICADO (ATIVAR CÓDIGO DO AMIGO) ───────────────
+                    const mIndicado = cleanText.match(/^[.!/#]?(?:indicado|fui\s+indicado(?:\s+por)?)\s*[:=]?\s*(\d+)/i) ||
+                                      cleanText.match(/codigo\s+(?:de\s+)?indicad[oa]\s*[:=]?\s*(\d+)/i);
+                    if (mIndicado) {
+                        const codPadrinho = mIndicado[1].trim();
+                        const resInd = customerServices.vincularIndicacao(senderNumber, codPadrinho);
+                        await reply(resInd.mensagem);
+                        continue;
+                    }
+
                     // ── 11. SISTEMA DE FIDELIDADE E INDICAÇÃO (OPÇÃO 4) ───────────────
-                    if (opcaoMenuNum === '4' || ['4', '4️⃣', '!convite', 'convite', '!fidelidade', 'fidelidade', 'indicar', 'indicacao', 'indicação'].includes(cleanCmd)) {
+                    if (opcaoMenuNum === '4' || ['4', '4️⃣', '!convite', 'convite', '!fidelidade', 'fidelidade', 'indicar', 'indicacao', 'indicação', 'indica e ganha'].includes(cleanCmd)) {
                         const meuCodigo = senderNumber;
+                        const statusInd = customerServices.obterStatusIndicacao(meuCodigo);
+                        const amigosNaRodada = statusInd ? statusInd.amigosAtuais : 0;
+                        const faltam = statusInd ? statusInd.faltam : 3;
+                        const totalBonus = statusInd ? statusInd.totalBonusMegas : 0;
+
+                        const botPhone = (sock && sock.user && sock.user.id) ? sock.user.id.split(':')[0].split('@')[0] : '258XXXXXXXXX';
+                        const linkCompartilhar = `https://wa.me/${botPhone}?text=!indicado%20${meuCodigo}`;
+
                         await reply(
-                            `🎁 *GANHE BÓNUS INDICANDO AMIGOS*\n\n` +
-                            `Ganhe *200MB* em cada compra feita por amigos que usarem o seu código!\n\n` +
-                            `🔗 *O Seu Código:* \`${meuCodigo}\`\n\n` +
+                            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                            `  🎁 *PROGRAMA INDICA E GANHA* ⚡\n` +
+                            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                            `Indica *3 amigos* para comprarem na *Ka-Net* e ganha *500 MB GRÁTIS*! 🚀\n\n` +
+                            `🔗 *O Teu Código:* \`${meuCodigo}\`\n` +
+                            `👥 *Progresso Atual:* *${amigosNaRodada} de 3 amigos* já compraram\n` +
+                            `🎯 *Faltam:* *${faltam} amigo(s)* para o próximo bónus de 500 MB!\n` +
+                            (totalBonus > 0 ? `🏆 *Total Ganho Até Hoje:* *${totalBonus} MB* grátis!\n\n` : `\n`) +
                             `💡 *Como funciona?*\n` +
-                            `1. Envie o seu código para um amigo.\n` +
-                            `2. Peça para ele enviar: *!indicado ${meuCodigo}*\n` +
-                            `3. Pronto! O bónus cai automaticamente.`
+                            `1. Copia o texto abaixo e manda para os teus amigos ou grupos.\n` +
+                            `2. O teu amigo clica no link e compra qualquer pacote pela 1ª vez.\n` +
+                            `3. Ao completar 3 amigos, o robô ativa *500 MB* no teu número na hora! ⚡\n\n` +
+                            `━━━━━━━━━━━━━━━━━━\n` +
+                            `👇 *Copia e envia aos teus amigos:*\n\n` +
+                            `"Ei! Compra megas automáticos e baratos no WhatsApp da Ka-Net via M-Pesa/e-Mola. Entrega em segundos! ⚡\n\n` +
+                            `👉 Clica aqui para ativar o bónus: ${linkCompartilhar}"`
                         );
                         continue;
                     }

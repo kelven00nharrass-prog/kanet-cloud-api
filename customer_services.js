@@ -24,8 +24,15 @@ const clientLoyalty = new Map();       // phone -> { phone, totalCompras: number
 const clientLoans = new Map();         // phone -> { phone, activeDebtMb: number, totalDevidoMt: number, valorPagoMt: number, restanteMt: number, status: 'pago'|'pendente', historico: [] }
 const defaultRecipients = new Map();   // payerPhone -> { payerPhone, targetPhone, ownerJid, registeredAt: string }
 const clientBonuses = new Map();       // phone -> { phone, bonusMb: number, historico: [] }
+const clientReferrals = new Map();     // phone -> { phone, referredFriends: [], completedBonuses: number, totalBonusMegas: number, history: [] }
+const friendToReferrer = new Map();    // friendPhone -> referrerPhone
 
 let firestoreDb = null;
+let whatsAppNotifier = null;
+
+function setWhatsAppNotifier(fn) {
+    whatsAppNotifier = fn;
+}
 let orderDispatcher = null;
 let valorFromMbHelper = null;
 
@@ -55,6 +62,8 @@ function salvarCacheLocal() {
             loans: [...clientLoans.entries()],
             defaultRecipients: [...defaultRecipients.entries()],
             bonuses: [...clientBonuses.entries()],
+            referrals: [...clientReferrals.entries()],
+            friendReferrers: [...friendToReferrer.entries()],
             savedAt: new Date().toISOString()
         };
         const content = JSON.stringify(payload, null, 2);
@@ -107,6 +116,12 @@ function carregarCacheLocal() {
         if (Array.isArray(data.bonuses)) {
             data.bonuses.forEach(([k, v]) => clientBonuses.set(k, v));
         }
+        if (Array.isArray(data.referrals)) {
+            data.referrals.forEach(([k, v]) => clientReferrals.set(k, v));
+        }
+        if (Array.isArray(data.friendReferrers)) {
+            data.friendReferrers.forEach(([k, v]) => friendToReferrer.set(k, v));
+        }
         console.log(`📦 [CUSTOMER-SERVICES] Cache carregado (${path.basename(fonte)}): ${clientLoyalty.size} clientes fidelidade, ${clientLoans.size} empréstimos, ${defaultRecipients.size} receptores, ${clientBonuses.size} bônus.`);
     } catch (err) {
         console.warn('⚠️ [CUSTOMER-SERVICES] Falha ao ler cache principal, tentando backup:', err.message);
@@ -118,6 +133,8 @@ function carregarCacheLocal() {
                 if (Array.isArray(bakData.loans)) bakData.loans.forEach(([k, v]) => clientLoans.set(k, v));
                 if (Array.isArray(bakData.defaultRecipients)) bakData.defaultRecipients.forEach(([k, v]) => defaultRecipients.set(k, v));
                 if (Array.isArray(bakData.bonuses)) bakData.bonuses.forEach(([k, v]) => clientBonuses.set(k, v));
+                if (Array.isArray(bakData.referrals)) bakData.referrals.forEach(([k, v]) => clientReferrals.set(k, v));
+                if (Array.isArray(bakData.friendReferrers)) bakData.friendReferrers.forEach(([k, v]) => friendToReferrer.set(k, v));
                 console.log('✅ [CUSTOMER-SERVICES] Restaurado com sucesso a partir do backup!');
             }
         } catch (e2) {
@@ -266,6 +283,179 @@ function initCustomerServices(db, dispatcherFn, getValMbFn) {
     }
 }
 
+
+// ── SISTEMA DE INDICAÇÕES (INDICA E GANHA: 3 AMIGOS = 500 MB GRÁTIS) ─────────
+
+/**
+ * Vincula um amigo ao padrinho que o indicou
+ */
+function vincularIndicacao(amigoTel, padrinhoTel) {
+    const amigo = normalizarTelefone(amigoTel);
+    const padrinho = normalizarTelefone(padrinhoTel);
+
+    if (!amigo || amigo.length !== 9) {
+        return { success: false, mensagem: '❌ Número de telefone do amigo inválido.' };
+    }
+    if (!padrinho || padrinho.length !== 9) {
+        return { success: false, mensagem: '❌ Código de indicação inválido. O código deve ser o número de telefone de quem te indicou (ex: 84XXXXXXX).' };
+    }
+    if (amigo === padrinho) {
+        return { success: false, mensagem: '❌ Você não pode usar o seu próprio número como código de indicação!' };
+    }
+
+    // Se o amigo já é cliente com compras anteriores, indicação não se aplica
+    const comprasAmigo = getComprasCount(amigo);
+    if (comprasAmigo > 0) {
+        return { success: false, mensagem: '⚠️ O programa "Indica e Ganha" é válido para a *primeira compra* de novos clientes. Você já possui compras registradas na Ka-Net! Mas você pode gerar o seu próprio código com *!convite* para indicar amigos e ganhar 500 MB!' };
+    }
+
+    // Se o amigo já foi indicado por alguém
+    if (friendToReferrer.has(amigo)) {
+        const jaPadrinho = friendToReferrer.get(amigo);
+        return { success: false, mensagem: `⚠️ Você já foi indicado anteriormente pelo número *${jaPadrinho}*.` };
+    }
+
+    // Gravar vínculo
+    friendToReferrer.set(amigo, padrinho);
+    salvarCacheLocal();
+    salvarNoFirestore('client_friend_referrers', amigo, { amigo, padrinho, data: new Date().toISOString() });
+
+    console.log(`🤝 [INDICAÇÃO] Amigo ${amigo} vinculado ao padrinho ${padrinho}`);
+    return {
+        success: true,
+        padrinho,
+        mensagem: `🎉 *CÓDIGO DE INDICAÇÃO ATIVADO!*
+
+Você foi indicado pelo amigo *${padrinho}*.
+
+Ao concluir a sua primeira compra de Megas na Ka-Net, a sua indicação será confirmada com sucesso! 🚀`
+    };
+}
+
+/**
+ * Processa a compra de um cliente e pontua o padrinho (se houver)
+ */
+function processarCompraIndicacao(compradorTel) {
+    const comprador = normalizarTelefone(compradorTel);
+    if (!comprador || !friendToReferrer.has(comprador)) return null;
+
+    const padrinho = friendToReferrer.get(comprador);
+    if (!padrinho) return null;
+
+    const rec = clientReferrals.get(padrinho) || {
+        phone: padrinho,
+        referredFriends: [],
+        completedBonuses: 0,
+        totalBonusMegas: 0,
+        history: []
+    };
+
+    if (!Array.isArray(rec.referredFriends)) rec.referredFriends = [];
+    if (!Array.isArray(rec.history)) rec.history = [];
+
+    // Se este amigo já pontuou para este padrinho, não duplica
+    if (rec.referredFriends.includes(comprador)) return null;
+
+    rec.referredFriends.push(comprador);
+    const totalNaRodada = rec.referredFriends.length;
+    console.log(`🎁 [INDICA E GANHA] Padrinho ${padrinho} recebeu indicação do amigo ${comprador} (${totalNaRodada}/3)`);
+
+    const padrinhoJid = `258${padrinho}@s.whatsapp.net`;
+
+    if (totalNaRodada < 3) {
+        salvarCacheLocal();
+        salvarNoFirestore('client_referrals', padrinho, rec);
+
+        // Notificar padrinho do progresso
+        if (whatsAppNotifier) {
+            const faltam = 3 - totalNaRodada;
+            const msgAviso = 
+                `🎉 *NOVO AMIGO COMPROU COM O TEU CÓDIGO!* ⚡\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `O teu amigo *${comprador}* acabou de comprar na Ka-Net!\n\n` +
+                `👥 *Progresso Atual:* *${totalNaRodada} de 3 amigos*\n` +
+                `🎁 *Faltam apenas:* *${faltam} amigo(s)* para ganhares *500 MB GRÁTIS*!\n\n` +
+                `_Continua a partilhar o teu código: `${padrinho}`_`;
+            try { whatsAppNotifier(padrinhoJid, msgAviso); } catch (_) {}
+        }
+        return { status: 'progress', padrinho, totalNaRodada };
+    }
+
+    // 🎉 ATINGIU 3 AMIGOS! DISPARAR 500 MB GRÁTIS!
+    rec.completedBonuses = (rec.completedBonuses || 0) + 1;
+    rec.totalBonusMegas = (rec.totalBonusMegas || 0) + 500;
+    const amigosRodadaConcluida = [...rec.referredFriends];
+    rec.history.unshift({
+        amigos: amigosRodadaConcluida,
+        data: new Date().toISOString(),
+        mb: 500
+    });
+    rec.referredFriends = []; // Reseta rodada para poder ganhar de novo!
+
+    salvarCacheLocal();
+    salvarNoFirestore('client_referrals', padrinho, rec);
+
+    // 🚀 Disparar Ordem de 500 MB no Gateway
+    const bonusOrderId = `BONUS-INDICA-${Date.now()}`;
+    if (orderDispatcher) {
+        orderDispatcher({
+            orderId: bonusOrderId,
+            numero: padrinho,
+            quantidade: 500,
+            modo: 'diario',
+            jid: padrinhoJid,
+            sender: padrinho,
+            senderPhone: padrinho,
+            senderName: 'Bónus Indica e Ganha (3 Amigos)',
+            txn_id: bonusOrderId,
+            valor: 0
+        });
+        console.log(`🚀 [BONUS 500MB DISPARADO] Ordem ${bonusOrderId} de 500 MB enviada para o padrinho ${padrinho}!`);
+    }
+
+    // Notificar padrinho com celebração
+    if (whatsAppNotifier) {
+        const msgPremio = 
+            `🏆 *PARABÉNS! VOCÊ GANHOU 500 MB GRÁTIS!* ⚡\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `3 amigos que usaram o teu código já compraram na Ka-Net!\n\n` +
+            `🎁 *Bónus:* *500 MB (Diário)*\n` +
+            `📲 *Destino:* *${padrinho}*\n` +
+            `🚀 *Status:* A entrar no teu celular automaticamente agora mesmo!\n\n` +
+            `🔄 *A promoção continua!* A cada mais 3 amigos que comprarem, ganhas outros *500 MB*!\n` +
+            `🔗 Teu código: `${padrinho}``;
+        try { whatsAppNotifier(padrinhoJid, msgPremio); } catch (_) {}
+    }
+
+    return { status: 'rewarded', padrinho, totalNaRodada: 3, mb: 500 };
+}
+
+/**
+ * Retorna as estatísticas de indicação de um cliente
+ */
+function obterStatusIndicacao(telefone) {
+    const phone = normalizarTelefone(telefone);
+    if (!phone) return null;
+
+    const rec = clientReferrals.get(phone) || {
+        phone,
+        referredFriends: [],
+        completedBonuses: 0,
+        totalBonusMegas: 0
+    };
+
+    const amigosAtuais = Array.isArray(rec.referredFriends) ? rec.referredFriends.length : 0;
+    const faltam = Math.max(0, 3 - amigosAtuais);
+
+    return {
+        phone,
+        amigosAtuais,
+        faltam,
+        completedBonuses: rec.completedBonuses || 0,
+        totalBonusMegas: rec.totalBonusMegas || 0
+    };
+}
+
 // ── 1. GESTÃO DE FIDELIDADE (CONTAGEM DE COMPRAS) ──────────────────────────────
 
 function gerarMensagemDesbloqueioVip(totalCompras) {
@@ -360,6 +550,10 @@ function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
     salvarNoFirestore('client_loyalty', phone, record);
 
     console.log(`🌟 [FIDELIDADE] Compra registrada para ${phone}. Total de compras: ${record.totalCompras}`);
+    // Se foi a 1ª compra deste cliente e ele foi indicado por um amigo, pontua o amigo
+    if (record.totalCompras === 1) {
+        try { processarCompraIndicacao(phone); } catch (e) { console.warn('⚠️ Erro ao processar bônus indicação:', e.message); }
+    }
     const milestoneMsg = gerarMensagemDesbloqueioVip(record.totalCompras);
     return {
         totalCompras: record.totalCompras,
@@ -1206,6 +1400,11 @@ function registrarLembreteEnviado(phone, slotId) {
 module.exports = {
     initCustomerServices,
     normalizarTelefone,
+    setWhatsAppNotifier,
+    // Programa Indica e Ganha
+    vincularIndicacao,
+    processarCompraIndicacao,
+    obterStatusIndicacao,
     // Fidelidade
     registrarCompra,
     getComprasCount,
