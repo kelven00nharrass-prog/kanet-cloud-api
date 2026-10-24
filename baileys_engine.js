@@ -2364,7 +2364,9 @@ async function startWhatsApp(orderCallback, db = null) {
                     const isSenderPhone = (senderClean.length === 12 && senderClean.startsWith('258') && /^2588[2-7]\d{7}$/.test(senderClean)) ||
                                           (senderClean.length === 9 && /^8[2-7]\d{7}$/.test(senderClean));
                     if (isSenderPhone && rawLidClean) {
-                        lidToPhoneMap.set(rawLidClean, senderClean.startsWith('258') ? senderClean : '258' + senderClean);
+                        const fullPhone = senderClean.startsWith('258') ? senderClean : '258' + senderClean;
+                        lidToPhoneMap.set(rawLidClean, fullPhone);
+                        try { customerServices.vincularLidTelefone(rawLidClean, senderClean); } catch (_) {}
                     } else if (!isSenderPhone && rawLidClean && lidToPhoneMap.has(rawLidClean)) {
                         // Se o senderClean é um LID, resgatar o telefone real previamente associado
                         senderClean = lidToPhoneMap.get(rawLidClean);
@@ -4442,26 +4444,45 @@ async function startWhatsApp(orderCallback, db = null) {
                         const userIdentifier = (rawLidClean && !/^8[2-7]\d{7}$/.test(senderNumber)) ? rawLidClean : senderNumber;
                         const statusInd = customerServices.obterStatusIndicacao(userIdentifier);
                         const meuCodigo = (statusInd && statusInd.codigo) ? statusInd.codigo : customerServices.gerarCodigoConviteUnico(userIdentifier);
-                        const amigosNaRodada = statusInd ? statusInd.amigosAtuais : 0;
+                        const amigosCadastrados = statusInd ? (statusInd.amigosCadastrados || 0) : 0;
+                        const amigosCompraram = statusInd ? (statusInd.amigosAtuais || 0) : 0;
                         const faltam = statusInd ? statusInd.faltam : 3;
                         const totalBonus = statusInd ? statusInd.totalBonusMegas : 0;
 
                         const botPhone = (sock && sock.user && sock.user.id) ? sock.user.id.split(':')[0].split('@')[0] : '258XXXXXXXXX';
                         const linkCompartilhar = `https://wa.me/${botPhone}?text=!indicado%20${meuCodigo}`;
 
+                        let statusProgressoTexto = '';
+                        if (amigosCadastrados > 0 && amigosCompraram === 0) {
+                            statusProgressoTexto = 
+                                `👥 *Amigos Indicados:* *${amigosCadastrados} amigo(s)* já ativaram o teu código! ⏳\n` +
+                                `🛒 *Compras Confirmadas:* *0 de 3 amigos*\n` +
+                                `🎯 *Faltam:* *3 compras* para ganhares *500 MB GRÁTIS*!\n` +
+                                `💡 _Assim que eles comprarem o 1º pacote, a pontuação sobe aqui na hora!_`;
+                        } else if (amigosCadastrados > 0) {
+                            statusProgressoTexto = 
+                                `👥 *Amigos Indicados:* *${amigosCadastrados} amigo(s)* com o teu código\n` +
+                                `🛒 *Compras Confirmadas:* *${amigosCompraram} de 3 amigos* já compraram! ✅\n` +
+                                `🎯 *Faltam apenas:* *${faltam} compra(s)* para ganhares *500 MB GRÁTIS*! 🚀`;
+                        } else {
+                            statusProgressoTexto = 
+                                `👥 *Amigos Indicados:* *0 amigos*\n` +
+                                `🛒 *Compras Confirmadas:* *0 de 3 amigos*\n` +
+                                `🎯 *Faltam:* *3 amigos* para o próximo bónus de 500 MB!`;
+                        }
+
                         await reply(
                             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                             `  🎁 *PROGRAMA INDICA E GANHA* ⚡\n` +
                             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                             `Indica *3 amigos* para comprarem na *Ka-Net* e ganha *500 MB GRÁTIS*! 🚀\n\n` +
-                            `🔗 *O Teu Código:* \`${meuCodigo}\`\n` +
-                            `👥 *Progresso Atual:* *${amigosNaRodada} de 3 amigos* já compraram\n` +
-                            `🎯 *Faltam:* *${faltam} amigo(s)* para o próximo bónus de 500 MB!\n` +
+                            `🔗 *O Teu Código:* \`${meuCodigo}\`\n\n` +
+                            `${statusProgressoTexto}\n` +
                             (totalBonus > 0 ? `🏆 *Total Ganho Até Hoje:* *${totalBonus} MB* grátis!\n\n` : `\n`) +
                             `💡 *Como funciona?*\n` +
                             `1. Copia o texto abaixo e manda para os teus amigos ou grupos.\n` +
                             `2. O teu amigo clica no link e compra qualquer pacote pela 1ª vez.\n` +
-                            `3. Ao completar 3 amigos, o robô ativa *500 MB* no teu número na hora! ⚡\n\n` +
+                            `3. Ao completar 3 amigos com compras confirmadas, o robô ativa *500 MB* no teu número na hora! ⚡\n\n` +
                             `━━━━━━━━━━━━━━━━━━\n` +
                             `👇 *Copia e envia aos teus amigos:*\n\n` +
                             `"Ei! Compra megas automáticos e baratos no WhatsApp da Ka-Net via M-Pesa/e-Mola. Entrega em segundos! ⚡\n\n` +

@@ -582,21 +582,47 @@ function vincularIndicacao(amigoTelOrLid, codigoOuTel) {
  */
 function processarCompraIndicacao(compradorTel) {
     const comprador = normalizarTelefone(compradorTel);
-    if (!comprador || !friendToReferrer.has(comprador)) return null;
+    if (!comprador) return null;
 
-    const padrinho = friendToReferrer.get(comprador);
+    // 1. Procurar padrinho pelo telefone direto do comprador
+    let padrinho = friendToReferrer.get(comprador);
+
+    // 2. Se não achou, procurar por qualquer LID associado a este comprador
+    if (!padrinho) {
+        for (const [lid, phone] of lidToPhone.entries()) {
+            if (phone === comprador && friendToReferrer.has(lid)) {
+                padrinho = friendToReferrer.get(lid);
+                friendToReferrer.set(comprador, padrinho); // Fixar vínculo no telefone direto
+                break;
+            }
+        }
+    }
+
+    // 3. Se ainda não achou, procurar em defaultRecipients
+    if (!padrinho) {
+        for (const [lid, rec] of defaultRecipients.entries()) {
+            if (rec && normalizarTelefone(rec.targetPhone) === comprador && friendToReferrer.has(lid)) {
+                padrinho = friendToReferrer.get(lid);
+                friendToReferrer.set(comprador, padrinho);
+                break;
+            }
+        }
+    }
+
     if (!padrinho) return null;
 
-    let rec = clientReferrals.get(padrinho);
+    // Resolver telefone real do padrinho se for LID
+    const padrinhoTel = resolverTelefoneDeIdentificador(padrinho) || (normalizarTelefone(padrinho) || padrinho);
+
+    let rec = clientReferrals.get(padrinhoTel) || clientReferrals.get(padrinho);
     if (!rec) {
         rec = {
-            phone: padrinho,
+            phone: padrinhoTel,
             referredFriends: [],
             completedBonuses: 0,
             totalBonusMegas: 0,
             history: []
         };
-        clientReferrals.set(padrinho, rec);
     }
 
     if (!Array.isArray(rec.referredFriends)) rec.referredFriends = [];
@@ -606,15 +632,24 @@ function processarCompraIndicacao(compradorTel) {
     if (rec.referredFriends.includes(comprador)) return null;
 
     rec.referredFriends.push(comprador);
-    const totalNaRodada = rec.referredFriends.length;
-    const codPadrinho = phoneToCode.get(padrinho) || padrinho;
-    console.log(`🎁 [INDICA E GANHA] Padrinho ${padrinho} (${codPadrinho}) recebeu indicação do amigo ${comprador} (${totalNaRodada}/3)`);
+    // Salvar em ambas as chaves para sincronização perfeita
+    clientReferrals.set(padrinhoTel, rec);
+    if (padrinho !== padrinhoTel) {
+        clientReferrals.set(padrinho, rec);
+    }
 
-    const padrinhoJid = `258${padrinho}@s.whatsapp.net`;
+    const totalNaRodada = rec.referredFriends.length;
+    const codPadrinho = phoneToCode.get(padrinhoTel) || phoneToCode.get(padrinho) || padrinhoTel;
+    console.log(`🎁 [INDICA E GANHA] Padrinho ${padrinhoTel} (${codPadrinho}) recebeu indicação do amigo ${comprador} (${totalNaRodada}/3)`);
+
+    const padrinhoJid = `258${padrinhoTel}@s.whatsapp.net`;
 
     if (totalNaRodada < 3) {
         salvarCacheLocal();
-        salvarNoFirestore('client_referrals', padrinho, rec);
+        salvarNoFirestore('client_referrals', padrinhoTel, rec);
+        if (padrinho !== padrinhoTel) {
+            salvarNoFirestore('client_referrals', padrinho, rec);
+        }
 
         // Notificar padrinho do progresso
         if (whatsAppNotifier) {
@@ -628,7 +663,7 @@ function processarCompraIndicacao(compradorTel) {
                 `_Continua a partilhar o teu código: *${codPadrinho}*_`;
             try { whatsAppNotifier(padrinhoJid, msgAviso); } catch (_) {}
         }
-        return { status: 'progress', padrinho, totalNaRodada };
+        return { status: 'progress', padrinho: padrinhoTel, totalNaRodada };
     }
 
     // 🎉 ATINGIU 3 AMIGOS! DISPARAR 500 MB GRÁTIS!
@@ -643,11 +678,14 @@ function processarCompraIndicacao(compradorTel) {
     rec.referredFriends = []; // Reseta rodada para poder ganhar de novo!
 
     salvarCacheLocal();
-    salvarNoFirestore('client_referrals', padrinho, rec);
+    salvarNoFirestore('client_referrals', padrinhoTel, rec);
+    if (padrinho !== padrinhoTel) {
+        salvarNoFirestore('client_referrals', padrinho, rec);
+    }
 
     // 🚀 Disparar Ordem de 500 MB no Gateway
-    const defRec = (typeof obterReceptorPadrao === 'function') ? obterReceptorPadrao(padrinho) : null;
-    const destinoFinal = (defRec && defRec.targetPhone) ? defRec.targetPhone : padrinho;
+    const defRec = (typeof obterReceptorPadrao === 'function') ? obterReceptorPadrao(padrinhoTel) : null;
+    const destinoFinal = (defRec && defRec.targetPhone) ? defRec.targetPhone : padrinhoTel;
 
     const bonusOrderId = `BONUS-INDICA-${Date.now()}`;
     if (orderDispatcher) {
@@ -657,13 +695,13 @@ function processarCompraIndicacao(compradorTel) {
             quantidade: 500,
             modo: 'diario',
             jid: padrinhoJid,
-            sender: padrinho,
-            senderPhone: padrinho,
+            sender: padrinhoTel,
+            senderPhone: padrinhoTel,
             senderName: 'Bónus Indica e Ganha (3 Amigos)',
             txn_id: bonusOrderId,
             valor: 0
         });
-        console.log(`🚀 [BONUS 500MB DISPARADO] Ordem ${bonusOrderId} de 500 MB enviada para ${destinoFinal} (Padrinho: ${padrinho} / Código: ${codPadrinho})!`);
+        console.log(`🚀 [BONUS 500MB DISPARADO] Ordem ${bonusOrderId} de 500 MB enviada para ${destinoFinal} (Padrinho: ${padrinhoTel} / Código: ${codPadrinho})!`);
     }
 
     // Notificar padrinho com celebração
@@ -673,14 +711,14 @@ function processarCompraIndicacao(compradorTel) {
             `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `3 amigos que usaram o teu código já compraram na Ka-Net!\n\n` +
             `🎁 *Bónus:* *500 MB (Diário)*\n` +
-            `📲 *Destino:* *${padrinho}*\n` +
+            `📲 *Destino:* *${destinoFinal}*\n` +
             `🚀 *Status:* A entrar no teu celular automaticamente agora mesmo!\n\n` +
             `🔄 *A promoção continua!* A cada mais 3 amigos que comprarem, ganhas outros *500 MB*!\n` +
             `🔗 Teu código de convite: *${codPadrinho}*`;
         try { whatsAppNotifier(padrinhoJid, msgPremio); } catch (_) {}
     }
 
-    return { status: 'rewarded', padrinho, totalNaRodada: 3, mb: 500 };
+    return { status: 'rewarded', padrinho: padrinhoTel, totalNaRodada: 3, mb: 500 };
 }
 
 /**
@@ -693,20 +731,54 @@ function obterStatusIndicacao(telefoneOrLid) {
     }
     const chave = phone || String(telefoneOrLid).split('@')[0].split(':')[0].replace(/\D/g, '');
     if (!chave) return null;
+    
     const codigo = phoneToCode.get(chave) || (phone ? phoneToCode.get(phone) : null) || gerarCodigoConviteUnico(chave);
-    const rec = clientReferrals.get(chave) || (phone ? clientReferrals.get(phone) : null) || {
-        phone: chave,
-        referredFriends: [],
-        completedBonuses: 0,
-        totalBonusMegas: 0
-    };
 
-    const amigosAtuais = Array.isArray(rec.referredFriends) ? rec.referredFriends.length : 0;
+    // Identificadores válidos do padrinho (LID, telefone, etc.)
+    const padrinhoKeys = new Set([chave]);
+    if (phone) padrinhoKeys.add(phone);
+    for (const [l, p] of lidToPhone.entries()) {
+        if (p === chave || p === phone || l === chave) {
+            padrinhoKeys.add(l);
+            if (p) padrinhoKeys.add(p);
+        }
+    }
+
+    // Buscar carteira de compras dos amigos indicados
+    let rec = null;
+    for (const pk of padrinhoKeys) {
+        if (clientReferrals.has(pk)) {
+            rec = clientReferrals.get(pk);
+            break;
+        }
+    }
+    if (!rec) {
+        rec = {
+            phone: phone || chave,
+            referredFriends: [],
+            completedBonuses: 0,
+            totalBonusMegas: 0
+        };
+    }
+
+    // Contar amigos cadastrados que ativaram o código deste padrinho
+    const amigosCadastradosSet = new Set();
+    for (const [amigoKey, pad] of friendToReferrer.entries()) {
+        if (padrinhoKeys.has(pad)) {
+            const amigoReal = resolverTelefoneDeIdentificador(amigoKey) || normalizarTelefone(amigoKey) || amigoKey;
+            amigosCadastradosSet.add(amigoReal);
+        }
+    }
+
+    const amigosCadastrados = amigosCadastradosSet.size;
+    const amigosCompraram = Array.isArray(rec.referredFriends) ? rec.referredFriends.length : 0;
+
     return {
         phone: phone || chave,
         codigo,
-        amigosAtuais,
-        faltam: Math.max(0, 3 - amigosAtuais),
+        amigosCadastrados,
+        amigosAtuais: amigosCompraram,
+        faltam: Math.max(0, 3 - amigosCompraram),
         completedBonuses: rec.completedBonuses || 0,
         totalBonusMegas: rec.totalBonusMegas || 0,
         amigosNaRodada: rec.referredFriends || []
@@ -807,10 +879,8 @@ function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
     salvarNoFirestore('client_loyalty', phone, record);
 
     console.log(`🌟 [FIDELIDADE] Compra registrada para ${phone}. Total de compras: ${record.totalCompras}`);
-    // Se foi a 1ª compra deste cliente e ele foi indicado por um amigo, pontua o amigo
-    if (record.totalCompras === 1) {
-        try { processarCompraIndicacao(phone); } catch (e) { console.warn('⚠️ Erro ao processar bônus indicação:', e.message); }
-    }
+    // Se o cliente foi indicado por um amigo e ainda não pontuou a indicação, pontua o amigo
+    try { processarCompraIndicacao(phone); } catch (e) { console.warn('⚠️ Erro ao processar bônus indicação:', e.message); }
     const milestoneMsg = gerarMensagemDesbloqueioVip(record.totalCompras);
     return {
         totalCompras: record.totalCompras,
