@@ -217,7 +217,16 @@ async function restaurarDoFirestore() {
             if (!ordersSnap.empty) {
                 ordersSnap.docs.forEach(d => {
                     const o = d.data();
-                    const phone = normalizarTelefone(o.senderPhone || o.sender || o.cliente_solicitante || o.numero);
+                    let candidates = [o.senderPhone, o.cliente_solicitante, o.pagador, o.sender, o.numero];
+                    let phone = '';
+                    for (const c of candidates) {
+                        if (!c) continue;
+                        const norm = normalizarTelefone(c);
+                        if (norm && norm.length === 9) {
+                            phone = norm;
+                            break;
+                        }
+                    }
                     if (phone && phone.length === 9) {
                         const rec = clientLoyalty.get(phone) || { phone, totalCompras: 0, historico: [] };
                         rec.totalCompras += 1;

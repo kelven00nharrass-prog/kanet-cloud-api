@@ -573,7 +573,7 @@ const DEFAULT_PLANOS_ESPECIAIS = {
 function gerarInfoTxenecoCompleta(senderNumber) {
     const totalCompras = customerServices.getComprasCount(senderNumber);
     const tetoMb = customerServices.calcularTetoTxeneco(totalCompras);
-    const divida = customerServices.getClienteDivida(senderNumber);
+    const divida = customerServices.getClienteDivida(targetPhone);
     const divMb = divida ? (divida.activeDebtMb || 0) : 0;
     const dispMb = Math.max(0, tetoMb - divMb);
     const dispF = dispMb >= 1024 ? `${(dispMb / 1024).toFixed(0)}GB` : `${dispMb}MB`;
@@ -1306,7 +1306,10 @@ function buscarPacotePorValor(valor, jid = null) {
 // Igual ao bot original - identifica qualquer formato M-Pesa/e-Mola
 // ══════════════════════════════════════════════════
 const pendingPayments = new Map(); // chave: jid + ":" + senderNumber
-const lidToPhoneMap = new Map(); // chave: cleanLid -> cleanPhone
+const lidToPhoneMap = new Map([
+    ['216054655656152', '258850401416'],
+    ['167894566592572', '258850401416']
+]); // chave: cleanLid -> cleanPhone
 
 function extrairValorMT(texto) {
     if (!texto) return null;
@@ -2906,7 +2909,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (ehCmdPagar) {
                         const rawComprovativo = text.replace(/^[.!/#]?(pagardivida|pagar)\s*/i, '').trim();
                         if (!rawComprovativo) {
-                            const divida = customerServices.getClienteDivida(senderNumber);
+                            const divida = customerServices.getClienteDivida(targetPhone);
                             if (!divida || !divida.restanteMt || divida.restanteMt <= 0) {
                                 await reply(
                                     `ℹ️ *SEM DÍVIDAS DE TXENECO*\n━━━━━━━━━━━━━━━━━━\n` +
@@ -3073,11 +3076,21 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
 
                     // ── 1.5 CONSULTA DE STATUS DE COMPRAS & FIDELIDADE VIP ──
-                    const ehConsultaCompras = ['minhascompras', 'compras', 'meustatus', 'vip', 'statusvip'].includes(cleanCmd);
+                    const cmdWords = cleanCmd.split(/\s+/);
+                    const ehConsultaCompras = ['minhascompras', 'compras', 'meustatus', 'vip', 'statusvip'].includes(cmdWords[0]);
                     if (ehConsultaCompras) {
-                        const total = customerServices.getComprasCount(senderNumber);
+                        let targetPhone = senderNumber;
+                        if (cmdWords.length > 1) {
+                            const spec = customerServices.normalizarTelefone(cmdWords[1]);
+                            if (spec) targetPhone = spec;
+                        }
+                        // Se o senderNumber ainda for LID, verificar lidToPhoneMap
+                        if (lidToPhoneMap.has(targetPhone)) {
+                            targetPhone = lidToPhoneMap.get(targetPhone);
+                        }
+                        const total = customerServices.getComprasCount(targetPhone);
                         const teto = customerServices.calcularTetoTxeneco(total);
-                        const divida = customerServices.getClienteDivida(senderNumber);
+                        const divida = customerServices.getClienteDivida(targetPhone);
                         const divMb = divida ? (divida.activeDebtMb || 0) : 0;
                         const dispMb = Math.max(0, teto - divMb);
                         const tetoF = teto >= 1024 ? `${(teto/1024).toFixed(1)}GB` : `${teto}MB`;

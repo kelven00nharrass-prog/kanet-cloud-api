@@ -1743,18 +1743,27 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
     // 🌟 REGISTAR COMPRA NO SISTEMA DE FIDELIDADE & TXENECO
     // REGRA FUNDAMENTAL: O cliente é EXCLUSIVAMENTE quem compra (envia comprovativo / paga), NUNCA o destinatário que apenas recebe os Megas!
-    if (success) {
-      let buyerCandidate = order && (order.senderPhone || order.sender || order.senderNumber || order.cliente_solicitante || order.pagador);
-      
-      let clientTel = customerServices && typeof customerServices.normalizarTelefone === 'function'
-        ? customerServices.normalizarTelefone(buyerCandidate)
-        : String(buyerCandidate || '').replace(/\D/g, '');
-
-      // Se o buyerCandidate estiver vazio e for uma ordem direta sem remetente externo
-      if (!clientTel && order && !order.sender && !order.senderPhone) {
-        clientTel = customerServices && typeof customerServices.normalizarTelefone === 'function'
-          ? customerServices.normalizarTelefone(order.numero)
-          : String(order.numero || '').replace(/\D/g, '');
+    // Evitar registrar 2x se for a Parte 2 de um pedido dividido (split)
+    const isSplitPart2 = !!(order && order.isSplit && order.splitPart === 2);
+    if (success && !isSplitPart2) {
+      let candidates = [
+        order && order.senderPhone,
+        order && order.cliente_solicitante,
+        order && order.pagador,
+        order && order.senderNumber,
+        order && order.sender,
+        order && order.numero
+      ];
+      let clientTel = '';
+      for (const c of candidates) {
+        if (!c) continue;
+        const norm = customerServices && typeof customerServices.normalizarTelefone === 'function'
+          ? customerServices.normalizarTelefone(c)
+          : String(c || '').replace(/\D/g, '').slice(-9);
+        if (norm && norm.length === 9 && /^8[2-7]\d{7}$/.test(norm)) {
+          clientTel = norm;
+          break;
+        }
       }
 
       if (clientTel && clientTel.length === 9 && /^8[2-7]\d{7}$/.test(clientTel) && customerServices && typeof customerServices.registrarCompra === 'function') {
