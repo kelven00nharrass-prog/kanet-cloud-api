@@ -46,6 +46,7 @@ function normalizarTelefone(tel) {
 
 // ── PERSISTÊNCIA REFORÇADA: CACHE LOCAL EM JSON + BACKUP AUTOMÁTICO ───────────
 const CACHE_BACKUP_FILE = path.resolve(__dirname, 'customer_services_cache.bak.json');
+const CACHE_SEED_FILE = path.resolve(__dirname, 'customer_services_seed.json');
 
 function salvarCacheLocal() {
     try {
@@ -85,6 +86,10 @@ function carregarCacheLocal() {
             console.log('🔄 [CUSTOMER-SERVICES] Cache principal ausente, restaurando cópia de segurança (.bak)...');
             raw = fs.readFileSync(CACHE_BACKUP_FILE, 'utf8');
             fonte = CACHE_BACKUP_FILE;
+        } else if (fs.existsSync(CACHE_SEED_FILE)) {
+            console.log('🌱 [CUSTOMER-SERVICES] Cache ausente, carregando semente inicial (customer_services_seed.json)...');
+            raw = fs.readFileSync(CACHE_SEED_FILE, 'utf8');
+            fonte = CACHE_SEED_FILE;
         }
 
         if (!raw) return;

@@ -3334,7 +3334,14 @@ app.get('/api/client/compras/:phone', async (req, res) => {
     } else if (customerServices && typeof customerServices.getComprasCount === 'function') {
       info = { totalCompras: customerServices.getComprasCount(norm || raw) };
     }
-    return res.json({ success: true, phone: raw, normalized: norm, ...info });
+    return res.json({
+      success: true,
+      phone: raw,
+      normalized: norm,
+      hasDb: !!db,
+      stats: customerServices && typeof customerServices.getStats === 'function' ? customerServices.getStats() : null,
+      ...info
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
