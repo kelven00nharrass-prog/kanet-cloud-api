@@ -1424,7 +1424,18 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   if (req.body.last_result && req.body.last_result.id) {
     const resId = req.body.last_result.id;
     const order = inMemoryOrders.get(resId);
-    const success = !!req.body.last_result.success;
+    let success = !!req.body.last_result.success;
+    const resMsg = String(req.body.last_result.result || req.body.last_result.mensagem || req.body.last_result.error || '').toLowerCase();
+    const isSuccessText = resMsg.includes('transferencia') || resMsg.includes('transferência') ||
+                          resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
+                          resMsg.includes('transferiste') || resMsg.includes('transferiu');
+    const isErrorText = resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
+                        resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido');
+    if (!success && isSuccessText && !isErrorText) {
+      console.log(`✅ [USSD AUTO-OVERRIDE] Resposta contém palavra de conclusão ('${resMsg}'). Marcando como SUCESSO!`);
+      success = true;
+      req.body.last_result.success = true;
+    }
     const targetNum = (order && order.numero) || req.body.last_result.numero || 'N/A';
     const rawQty = (order && (order.splitTotalMb || order.quantidade)) || req.body.last_result.quantidade || 1024;
     const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
@@ -1892,7 +1903,18 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
 // Endpoint para o Aplicativo Android confirmar conclusão de USSD
 app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   const { port, orderId } = req.params;
-  const { success, mensagem, saldo_mb } = req.body;
+  let { success, mensagem, saldo_mb } = req.body;
+
+  const resMsg = String(mensagem || '').toLowerCase();
+  const isSuccessText = resMsg.includes('transferencia') || resMsg.includes('transferência') ||
+                        resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
+                        resMsg.includes('transferiste') || resMsg.includes('transferiu');
+  const isErrorText = resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
+                      resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido');
+  if (!success && isSuccessText && !isErrorText) {
+    console.log(`✅ [TASKS AUTO-OVERRIDE] Mensagem contém transferência/mmi ('${resMsg}'). Marcando como SUCESSO!`);
+    success = true;
+  }
 
   const order = inMemoryOrders.get(orderId);
   if (order) {
@@ -1902,6 +1924,20 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       order.completedAt = new Date().toISOString();
       order.lastError = null;
       decrementDeviceSaldo(port, order);
+
+      if (db) {
+        db.collection('orders').doc(orderId).set({
+          ...order,
+          status: 'completed',
+          resultMessage: mensagem || '',
+          completedAt: order.completedAt,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(() => {});
+      }
+      if (customerServices && typeof customerServices.registrarCompra === 'function') {
+        const clientPhone = order.cliente_solicitante || order.senderPhone || order.sender || order.numero;
+        customerServices.registrarCompra(clientPhone, orderId, order.valor || order.valor_pago || 0, order.quantidade || 0);
+      }
 
       // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
       if (order.isSplit && order.splitPart === 1 && order.part2Id) {
@@ -2374,6 +2410,11 @@ app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (re
       lastError: null,
       updatedAt: new Date().toISOString()
     }, { merge: true }).catch(() => {});
+  }
+
+  if (customerServices && typeof customerServices.registrarCompra === 'function') {
+    const clientPhone = order.cliente_solicitante || order.senderPhone || order.sender || order.numero;
+    customerServices.registrarCompra(clientPhone, orderId, order.valor || order.valor_pago || 0, order.quantidade || 0);
   }
 
   console.log(`✅ [PAINEL] Pedido ${orderId} marcado manualmente como CONCLUÍDO pelo operador.`);

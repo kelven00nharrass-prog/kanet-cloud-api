@@ -497,6 +497,12 @@
         "updatedAt": "2026-10-24T08:51:17.994Z",
         "historico": [
           {
+            "orderId": "HUB-DJ40LTFA-2292",
+            "valor": 22,
+            "mb": 1024,
+            "data": "2026-10-24T10:21:35.671Z"
+          },
+          {
             "orderId": "MANUAL-1791021208800",
             "valor": 150,
             "mb": 5900,
@@ -605,8 +611,8 @@
             "data": "2026-09-19T09:44:23.032Z"
           }
         ],
-        "ultimaCompra": "2026-10-03T09:54:08.596Z",
-        "totalCompras": 18
+        "ultimaCompra": "2026-10-24T10:21:35.671Z",
+        "totalCompras": 19
       }
     ],
     [
@@ -955,5 +961,5 @@
   "loans": [],
   "defaultRecipients": [],
   "bonuses": [],
-  "savedAt": "2026-10-24T09:48:11.212Z"
+  "savedAt": "2026-10-24T10:21:35.671Z"
 }
