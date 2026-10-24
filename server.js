@@ -5668,6 +5668,34 @@ app.post('/api/client/support/process-proof', async (req, res) => {
   }
 });
 
+// ── ENDPOINT: Listar Números Configurados pelos Clientes (Receptores Padrão) ──
+app.get(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
+  const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;
+  const cleanTok = String(token || '').replace('Bearer ', '').trim();
+  if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'KaNetKelven2026Secure') {
+    return res.status(403).json({ error: 'Não autorizado' });
+  }
+
+  let receptores = customerServices && typeof customerServices.listarTodosReceptores === 'function'
+    ? customerServices.listarTodosReceptores()
+    : [];
+
+  if (receptores.length === 0 && db) {
+    try {
+      const snap = await db.collection('client_default_recipients').get();
+      if (!snap.empty) {
+        snap.docs.forEach(doc => {
+          receptores.push({ id: doc.id, ...doc.data() });
+        });
+      }
+    } catch (e) {
+      console.warn('⚠️ [API RECIPIENTS] Erro ao consultar Firestore:', e.message);
+    }
+  }
+
+  return res.json({ success: true, count: receptores.length, receptores });
+});
+
 // ── 20.7 CRM & Suporte no Ka-Net Admin Master ──
 app.get('/api/admin/crm/stats', (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;

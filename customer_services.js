@@ -719,6 +719,10 @@ function obterReceptorPadrao(payerPhone) {
     return defaultRecipients.get(pagador) || null;
 }
 
+function listarTodosReceptores() {
+    return Array.from(defaultRecipients.values());
+}
+
 function obterReceptoresPorOwner(ownerIdentifier) {
     const clean = normalizarTelefone(ownerIdentifier);
     const results = [];
@@ -1088,6 +1092,7 @@ module.exports = {
     definirReceptorPadrao,
     obterReceptorPadrao,
     obterReceptoresPorOwner,
+    listarTodosReceptores,
     removerReceptorPadrao,
     // Bônus
     atribuirBonusAdmin,
