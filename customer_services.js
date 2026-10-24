@@ -375,7 +375,7 @@ function processarCompraIndicacao(compradorTel) {
                 `O teu amigo *${comprador}* acabou de comprar na Ka-Net!\n\n` +
                 `👥 *Progresso Atual:* *${totalNaRodada} de 3 amigos*\n` +
                 `🎁 *Faltam apenas:* *${faltam} amigo(s)* para ganhares *500 MB GRÁTIS*!\n\n` +
-                `_Continua a partilhar o teu código: `${padrinho}`_`;
+                `_Continua a partilhar o teu código: *${padrinho}*_`;
             try { whatsAppNotifier(padrinhoJid, msgAviso); } catch (_) {}
         }
         return { status: 'progress', padrinho, totalNaRodada };
@@ -423,7 +423,7 @@ function processarCompraIndicacao(compradorTel) {
             `📲 *Destino:* *${padrinho}*\n` +
             `🚀 *Status:* A entrar no teu celular automaticamente agora mesmo!\n\n` +
             `🔄 *A promoção continua!* A cada mais 3 amigos que comprarem, ganhas outros *500 MB*!\n` +
-            `🔗 Teu código: `${padrinho}``;
+            `🔗 Teu código: *${padrinho}*`;
         try { whatsAppNotifier(padrinhoJid, msgPremio); } catch (_) {}
     }
 
