@@ -369,6 +369,82 @@ function getComprasCount(telefone) {
     return record ? (record.totalCompras || 0) : 0;
 }
 
+/**
+ * Consulta de fidelidade garantida com fallbacks automáticos:
+ * 1. Cache em memória (ultra-rápido)
+ * 2. Coleção client_loyalty no Firestore
+ * 3. Varredura direta na coleção orders (pedidos com status completed)
+ */
+async function obterComprasCliente(telefone) {
+    const phone = normalizarTelefone(telefone);
+    if (!phone) return { phone: '', totalCompras: 0, existe: false };
+
+    // 1. Verificar cache em memória
+    let record = clientLoyalty.get(phone);
+    if (record && typeof record.totalCompras === 'number' && record.totalCompras > 0) {
+        return { phone, totalCompras: record.totalCompras, record, existe: true };
+    }
+
+    // 2. Fallback ao Firestore se em memória estiver zerado ou ausente
+    if (firestoreDb) {
+        try {
+            const doc = await firestoreDb.collection('client_loyalty').doc(phone).get();
+            if (doc.exists) {
+                const data = doc.data();
+                const total = Math.max(record?.totalCompras || 0, data.totalCompras || 0);
+                record = { ...record, ...data, phone, totalCompras: total };
+                clientLoyalty.set(phone, record);
+                salvarCacheLocal();
+                return { phone, totalCompras: total, record, existe: true };
+            }
+
+            // 3. Se nem no client_loyalty existir, buscar directamente em orders completed
+            console.log(`🔍 [LOYALTY FALLBACK] Buscando compras históricas de ${phone} em orders...`);
+            const ordersSnap = await firestoreDb.collection('orders')
+                .where('status', '==', 'completed')
+                .limit(1000)
+                .get();
+
+            if (!ordersSnap.empty) {
+                let count = 0;
+                let historico = [];
+                ordersSnap.docs.forEach(d => {
+                    const o = d.data();
+                    const candidates = [o.senderPhone, o.cliente_solicitante, o.pagador, o.sender, o.numero];
+                    const match = candidates.some(c => normalizarTelefone(c) === phone);
+                    if (match) {
+                        count++;
+                        historico.push({
+                            orderId: o.orderId || d.id,
+                            valor: Number(o.valor || o.valor_pago) || 0,
+                            mb: Number(o.quantidade) || 0,
+                            data: o.createdAt || new Date().toISOString()
+                        });
+                    }
+                });
+
+                if (count > 0) {
+                    record = {
+                        phone,
+                        totalCompras: count,
+                        ultimaCompra: historico[0]?.data || new Date().toISOString(),
+                        historico: historico.slice(0, 20)
+                    };
+                    clientLoyalty.set(phone, record);
+                    salvarCacheLocal();
+                    salvarNoFirestore('client_loyalty', phone, record);
+                    console.log(`✅ [LOYALTY FALLBACK] ${phone}: encontradas ${count} compras passadas em orders.`);
+                    return { phone, totalCompras: count, record, existe: true };
+                }
+            }
+        } catch (e) {
+            console.warn(`⚠️ [CUSTOMER-SERVICES] Erro ao buscar compras de ${phone} no Firestore:`, e.message);
+        }
+    }
+
+    return { phone, totalCompras: record?.totalCompras || 0, record, existe: !!record };
+}
+
 // ── 2. SISTEMA DE TXENECO (CRÉDITO DE INTERNET) ───────────────────────────────
 
 /**
@@ -1090,6 +1166,7 @@ module.exports = {
     // Fidelidade
     registrarCompra,
     getComprasCount,
+    obterComprasCliente,
     // Txeneco
     calcularTetoTxeneco,
     solicitarTxeneco,

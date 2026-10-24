@@ -3323,6 +3323,23 @@ app.get('/api/whatsapp/recent-logs', (req, res) => {
   }
 });
 
+// ── Consulta e Diagnóstico de Compras e Fidelidade do Cliente ──
+app.get('/api/client/compras/:phone', async (req, res) => {
+  try {
+    const raw = req.params.phone;
+    const norm = customerServices ? customerServices.normalizarTelefone(raw) : '';
+    let info = { totalCompras: 0 };
+    if (customerServices && typeof customerServices.obterComprasCliente === 'function') {
+      info = await customerServices.obterComprasCliente(norm || raw);
+    } else if (customerServices && typeof customerServices.getComprasCount === 'function') {
+      info = { totalCompras: customerServices.getComprasCount(norm || raw) };
+    }
+    return res.json({ success: true, phone: raw, normalized: norm, ...info });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/groups', async (req, res) => {
   try {
     // 1. Carregar config do bot para metadados

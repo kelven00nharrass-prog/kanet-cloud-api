@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ==============================================================================
  * KA-NET CLOUD WHATSAPP ENGINE (POWERED BY BAILEYS) - 100% BOT ORIGINAL
  * ==============================================================================
@@ -573,7 +573,7 @@ const DEFAULT_PLANOS_ESPECIAIS = {
 function gerarInfoTxenecoCompleta(senderNumber) {
     const totalCompras = customerServices.getComprasCount(senderNumber);
     const tetoMb = customerServices.calcularTetoTxeneco(totalCompras);
-    const divida = customerServices.getClienteDivida(targetPhone);
+    const divida = customerServices.getClienteDivida(senderNumber);
     const divMb = divida ? (divida.activeDebtMb || 0) : 0;
     const dispMb = Math.max(0, tetoMb - divMb);
     const dispF = dispMb >= 1024 ? `${(dispMb / 1024).toFixed(0)}GB` : `${dispMb}MB`;
@@ -2395,6 +2395,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     salvarBotConfig();
                                     console.log(`👑 [MASTER LID VINCULADO] Novo LID de Admin registado: ${lidClean}`);
                                 }
+                                lidToPhoneMap.set(lidClean, '258850401416');
                             }
                         }
                     }
@@ -3079,16 +3080,49 @@ async function startWhatsApp(orderCallback, db = null) {
                     const cmdWords = cleanCmd.split(/\s+/);
                     const ehConsultaCompras = ['minhascompras', 'compras', 'meustatus', 'vip', 'statusvip'].includes(cmdWords[0]);
                     if (ehConsultaCompras) {
-                        let targetPhone = senderNumber;
+                        let targetPhone = null;
+
+                        // 1. Se o cliente indicou um número explícito (.compras 841234567)
                         if (cmdWords.length > 1) {
                             const spec = customerServices.normalizarTelefone(cmdWords[1]);
-                            if (spec) targetPhone = spec;
+                            if (spec && spec.length === 9) targetPhone = spec;
                         }
-                        // Se o senderNumber ainda for LID, verificar lidToPhoneMap
-                        if (lidToPhoneMap.has(targetPhone)) {
-                            targetPhone = lidToPhoneMap.get(targetPhone);
+
+                        // 2. Se o remetente for Master Kelven e não passou outro número
+                        if (!targetPhone && senderIsMaster) {
+                            targetPhone = '850401416';
                         }
-                        const total = customerServices.getComprasCount(targetPhone);
+
+                        // 3. Se tiver LID mapeado previamente para número de telefone
+                        if (!targetPhone && rawLidClean && lidToPhoneMap.has(rawLidClean)) {
+                            const mapped = lidToPhoneMap.get(rawLidClean);
+                            const norm = customerServices.normalizarTelefone(mapped);
+                            if (norm && norm.length === 9) targetPhone = norm;
+                        }
+
+                        // 4. Se o senderNumber for um telefone válido de Moçambique
+                        if (!targetPhone) {
+                            const norm = customerServices.normalizarTelefone(senderNumber);
+                            if (norm && norm.length === 9) targetPhone = norm;
+                        }
+
+                        // 5. Se ainda for anônimo (ex: participante de grupo com LID oculto pelo WhatsApp)
+                        if (!targetPhone || targetPhone.length !== 9) {
+                            await reply(
+                                `⚠️ *NÚMERO NÃO IDENTIFICADO NO GRUPO*\n` +
+                                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                `Devido à privacidade do WhatsApp, o seu número está oculto neste grupo.\n\n` +
+                                `👉 *Para consultar as suas compras, envie:*\n` +
+                                `*.compras <seu_número>*\n` +
+                                `_Exemplo:_ *.compras 841234567*\n\n` +
+                                `💡 _Ou envie *.compras* em privado com este bot!_ 📲`
+                            );
+                            continue;
+                        }
+
+                        // Buscar compras de forma garantida (memória -> Firestore client_loyalty -> Firestore orders)
+                        const info = await customerServices.obterComprasCliente(targetPhone);
+                        const total = info.totalCompras || 0;
                         const teto = customerServices.calcularTetoTxeneco(total);
                         const divida = customerServices.getClienteDivida(targetPhone);
                         const divMb = divida ? (divida.activeDebtMb || 0) : 0;
@@ -3113,11 +3147,13 @@ async function startWhatsApp(orderCallback, db = null) {
                             dicaProgresso = `🔓 *Txeneco Máximo Liberado:* até *${tetoF}* (Disponível agora: *${dispF}*)`;
                         }
 
+                        addLog(`🛒 [.compras] Solicitante: ${senderNumber} | Destino: ${targetPhone} | Total: ${total}`);
+
                         await reply(
                             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                             `  📊 *SEU HISTÓRICO DE COMPRAS* 🏆\n` +
                             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                            `📱 *Cliente:* *${senderNumber}*\n` +
+                            `📱 *Cliente:* *${targetPhone}*\n` +
                             `🏷️ *Nível Atual:* ${statusNivel}\n` +
                             `🛒 *Total de Compras:* *${total} compras*\n\n` +
                             dicaProgresso + `\n\n` +
