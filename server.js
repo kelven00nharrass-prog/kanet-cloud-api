@@ -1470,9 +1470,13 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       resMsg.includes('recebeu') && (
         resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
         resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
-        resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote')
+        resMsg.includes('validas') || resMsg.includes('válidas') ||
+        resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote') ||
+        resMsg.includes('dados') || resMsg.includes('mensal') || resMsg.includes('semanal')
       )
-    ) || resMsg.includes('tudo top') || resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
+    ) || resMsg.includes('tudo top') || resMsg.includes('oferta de dados') ||
+    resMsg.includes('dados mensal') || resMsg.includes('dados semanal') ||
+    resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
     const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
                           resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                           resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
@@ -1959,12 +1963,16 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
                           (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
   const isTudoTopOrOffer = (
-    resMsg.includes('recebeu') && (
-      resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
-      resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
-      resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote')
-    )
-  ) || resMsg.includes('tudo top') || resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
+      resMsg.includes('recebeu') && (
+        resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
+        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
+        resMsg.includes('validas') || resMsg.includes('válidas') ||
+        resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote') ||
+        resMsg.includes('dados') || resMsg.includes('mensal') || resMsg.includes('semanal')
+      )
+    ) || resMsg.includes('tudo top') || resMsg.includes('oferta de dados') ||
+    resMsg.includes('dados mensal') || resMsg.includes('dados semanal') ||
+    resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
   const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
                         resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                         resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
