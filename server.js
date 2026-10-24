@@ -1426,13 +1426,18 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const order = inMemoryOrders.get(resId);
     let success = !!req.body.last_result.success;
     const resMsg = String(req.body.last_result.result || req.body.last_result.mensagem || req.body.last_result.error || '').toLowerCase();
-    const isSuccessText = resMsg.includes('transferencia') || resMsg.includes('transferência') ||
+    const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
+                            (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
+    const isSuccessText = isVodacomZeroMb ||
+                          resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                           resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
                           resMsg.includes('transferiste') || resMsg.includes('transferiu');
-    const isErrorText = resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
-                        resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido');
+    const isErrorText = !isVodacomZeroMb && (
+      resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
+      resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
+    );
     if (!success && isSuccessText && !isErrorText) {
-      console.log(`✅ [USSD AUTO-OVERRIDE] Resposta contém palavra de conclusão ('${resMsg}'). Marcando como SUCESSO!`);
+      console.log(`✅ [USSD AUTO-OVERRIDE] Resposta contém confirmação/0MB ('${resMsg}'). Marcando como SUCESSO!`);
       success = true;
       req.body.last_result.success = true;
     }
@@ -1906,13 +1911,18 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   let { success, mensagem, saldo_mb } = req.body;
 
   const resMsg = String(mensagem || '').toLowerCase();
-  const isSuccessText = resMsg.includes('transferencia') || resMsg.includes('transferência') ||
+  const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
+                          (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
+  const isSuccessText = isVodacomZeroMb ||
+                        resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                         resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
                         resMsg.includes('transferiste') || resMsg.includes('transferiu');
-  const isErrorText = resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
-                      resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido');
+  const isErrorText = !isVodacomZeroMb && (
+    resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
+    resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
+  );
   if (!success && isSuccessText && !isErrorText) {
-    console.log(`✅ [TASKS AUTO-OVERRIDE] Mensagem contém transferência/mmi ('${resMsg}'). Marcando como SUCESSO!`);
+    console.log(`✅ [TASKS AUTO-OVERRIDE] Mensagem contém confirmação/0MB ('${resMsg}'). Marcando como SUCESSO!`);
     success = true;
   }
 
