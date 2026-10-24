@@ -342,13 +342,17 @@ function processarCompraIndicacao(compradorTel) {
     const padrinho = friendToReferrer.get(comprador);
     if (!padrinho) return null;
 
-    const rec = clientReferrals.get(padrinho) || {
-        phone: padrinho,
-        referredFriends: [],
-        completedBonuses: 0,
-        totalBonusMegas: 0,
-        history: []
-    };
+    let rec = clientReferrals.get(padrinho);
+    if (!rec) {
+        rec = {
+            phone: padrinho,
+            referredFriends: [],
+            completedBonuses: 0,
+            totalBonusMegas: 0,
+            history: []
+        };
+        clientReferrals.set(padrinho, rec);
+    }
 
     if (!Array.isArray(rec.referredFriends)) rec.referredFriends = [];
     if (!Array.isArray(rec.history)) rec.history = [];
@@ -396,11 +400,15 @@ function processarCompraIndicacao(compradorTel) {
     salvarNoFirestore('client_referrals', padrinho, rec);
 
     // 🚀 Disparar Ordem de 500 MB no Gateway
+    // Se o padrinho tiver um receptor padrão configurado (ex: número Vodacom), usa o receptor!
+    const defRec = (typeof obterReceptorPadrao === 'function') ? obterReceptorPadrao(padrinho) : null;
+    const destinoFinal = (defRec && defRec.targetPhone) ? defRec.targetPhone : padrinho;
+
     const bonusOrderId = `BONUS-INDICA-${Date.now()}`;
     if (orderDispatcher) {
         orderDispatcher({
             orderId: bonusOrderId,
-            numero: padrinho,
+            numero: destinoFinal,
             quantidade: 500,
             modo: 'diario',
             jid: padrinhoJid,
@@ -410,7 +418,7 @@ function processarCompraIndicacao(compradorTel) {
             txn_id: bonusOrderId,
             valor: 0
         });
-        console.log(`🚀 [BONUS 500MB DISPARADO] Ordem ${bonusOrderId} de 500 MB enviada para o padrinho ${padrinho}!`);
+        console.log(`🚀 [BONUS 500MB DISPARADO] Ordem ${bonusOrderId} de 500 MB enviada para ${destinoFinal} (Padrinho: ${padrinho})!`);
     }
 
     // Notificar padrinho com celebração
