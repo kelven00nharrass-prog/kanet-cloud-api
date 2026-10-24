@@ -1020,13 +1020,23 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
         // ── FILTRO RIGOROSO DE MODO DE OPERAÇÃO (REVENDA vs FORNECIMENTO) ──
         const devMode = (dev.operationMode || (port === 8777 ? 'fornecimento' : 'revenda')).toLowerCase().trim();
-        const isFornecOrder = !!(order.isFornecimento || order.tipo === 'saldo' || order.origem === 'fornecimento' || port === 8777);
+        const m = String(order.modo || '').toLowerCase().trim();
+        const isEspecial = m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top');
+        const isSaldo = m === 'saldo' || m === 'credito' || order.tipo === 'saldo';
+        const isFornecOrder = !!(order.isFornecimento || isSaldo || order.origem === 'fornecimento');
 
-        if (devMode === 'fornecimento' && !isFornecOrder) {
-          continue; // Celular de fornecimento NÃO processa pacotes normais de revenda
-        }
-        if (devMode === 'revenda' && isFornecOrder) {
-          continue; // Celular de revenda NÃO processa saldo ou atacado
+        // Se for pacote especial (semanal, mensal, tudo top) e este celular for a porta 8077, aceita diretamente!
+        if (port === 8077 && isEspecial) {
+          // Totalmente compatível: celular de ofertas especiais processa pacotes semanais/mensais/top
+        } else if (port === 8777 && isSaldo) {
+          // Totalmente compatível: celular de saldo processa transferências de saldo
+        } else {
+          if (devMode === 'fornecimento' && !isFornecOrder) {
+            continue; // Celular de fornecimento NÃO processa pacotes normais de revenda
+          }
+          if (devMode === 'revenda' && isFornecOrder) {
+            continue; // Celular de revenda NÃO processa saldo ou atacado
+          }
         }
 
         // TTL / Validade máxima do pedido: 45 minutos (evita que pedidos velhos repitam horas depois)
