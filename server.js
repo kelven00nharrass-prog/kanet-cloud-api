@@ -332,6 +332,14 @@ app.post('/api/devices/:port/reset', (req, res) => {
   if (req.body && req.body.saldo_mb !== undefined) dev.saldo_mb = Number(req.body.saldo_mb);
   if (req.body && req.body.saldo_mt !== undefined) dev.saldo_mt = Number(req.body.saldo_mt);
 
+  // Desbloquear esta porta de pedidos que estavam aguardando saldo
+  for (const [_, ord] of inMemoryOrders.entries()) {
+    if (ord.status === 'pending' && ord.failedPorts && ord.failedPorts.includes(Number(port))) {
+      ord.failedPorts = ord.failedPorts.filter(p => p !== Number(port));
+      console.log(`🔓 [FILA DESBLOQUEADA] Pedido ${ord.id} desbloqueado para tentativa na Porta ${port} (saldo restaurado)!`);
+    }
+  }
+
   console.log(`🔓 [MANUSEIO PAINEL] Porta ${port} libertada manualmente pelo operador.`);
   return res.json({ success: true, mensagem: `Porta ${port} libertada e desbloqueada com sucesso!`, device: dev });
 });
@@ -418,6 +426,15 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
   } else {
     dev.sem_saldo = true;
     dev.is_apto = false;
+  }
+
+  if (dev.is_apto) {
+    for (const [_, ord] of inMemoryOrders.entries()) {
+      if (ord.status === 'pending' && ord.failedPorts && ord.failedPorts.includes(Number(port))) {
+        ord.failedPorts = ord.failedPorts.filter(p => p !== Number(port));
+        console.log(`🔓 [FILA DESBLOQUEADA] Pedido ${ord.id} desbloqueado para Porta ${port} (saldo atualizado no painel)!`);
+      }
+    }
   }
 
   console.log(`💰 [MANUSEIO PAINEL] Saldo da Porta ${port} ajustado para: SIM1=${dev.sim1_saldo_mb}MB | SIM2=${dev.sim2_saldo_mb}MB | Saldo=${dev.saldo_mb}MB / ${dev.saldo_mt}MT`);
