@@ -846,28 +846,45 @@ function removerReceptorPadrao(targetIdentifier, ownerIdentifier = null) {
     const cleanOwner = normalizarTelefone(ownerIdentifier || targetIdentifier);
 
     let removidos = 0;
-    // Se informou um pagador específico existente:
-    if (cleanTarget && defaultRecipients.has(cleanTarget)) {
-        defaultRecipients.delete(cleanTarget);
-        deletarNoFirestore('client_default_recipients', cleanTarget);
-        removidos++;
-    } else {
-        // Remover todos vinculados a este cliente/WhatsApp
-        const paraRemover = [];
+    const paraRemover = [];
+
+    if (cleanTarget) {
+        // Remover tanto se informou o número pagador quanto se informou o número receptor
         for (const [payer, rec] of defaultRecipients.entries()) {
-            const ownerClean = normalizarTelefone(rec.ownerJid || '');
-            if (payer === cleanOwner || ownerClean === cleanOwner || (rec.ownerJid && rec.ownerJid.includes(cleanOwner))) {
+            if (payer === cleanTarget || rec.targetPhone === cleanTarget) {
                 paraRemover.push(payer);
             }
         }
-        paraRemover.forEach(payer => {
-            defaultRecipients.delete(payer);
-            deletarNoFirestore('client_default_recipients', payer);
-            removidos++;
-        });
+    } else {
+        // Remover todos vinculados a este cliente/WhatsApp
+        for (const [payer, rec] of defaultRecipients.entries()) {
+            const ownerClean = normalizarTelefone(rec.ownerJid || '');
+            if (
+                (cleanOwner && (payer === cleanOwner || ownerClean === cleanOwner || rec.targetPhone === cleanOwner)) ||
+                (ownerIdentifier && rec.ownerJid && rec.ownerJid.includes(String(ownerIdentifier)))
+            ) {
+                paraRemover.push(payer);
+            }
+        }
     }
 
+    [...new Set(paraRemover)].forEach(payer => {
+        defaultRecipients.delete(payer);
+        deletarNoFirestore('client_default_recipients', payer);
+        removidos++;
+    });
+
     salvarCacheLocal();
+
+    // Sincronizar também no seed caso exista no disco
+    try {
+        if (fs.existsSync(CACHE_SEED_FILE)) {
+            const seedRaw = fs.readFileSync(CACHE_SEED_FILE, 'utf8');
+            const seedObj = JSON.parse(seedRaw);
+            seedObj.defaultRecipients = [...defaultRecipients.entries()];
+            fs.writeFileSync(CACHE_SEED_FILE, JSON.stringify(seedObj, null, 2), 'utf8');
+        }
+    } catch (_) {}
 
     if (removidos === 0) {
         return { success: false, mensagem: 'ℹ️ Você não possui nenhum receptor padrão ativo configurado no momento.' };

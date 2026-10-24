@@ -3064,7 +3064,11 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (ehCmdRemoverReceptor) {
                         const rawTarget = text.replace(/^[.!/#]?(removerreceptor|limparreceptor|delreceptor|desconfigurar|removernumero|limparnumero)\s*/i, '').trim();
                         const pagador = extrairNumeroDestino(rawTarget);
-                        const resRem = customerServices.removerReceptorPadrao(pagador, senderNumber);
+                        let ownerRef = senderNumber;
+                        if (rawLidClean && lidToPhoneMap.has(rawLidClean)) {
+                            ownerRef = lidToPhoneMap.get(rawLidClean);
+                        }
+                        const resRem = customerServices.removerReceptorPadrao(pagador, ownerRef);
                         await reply(resRem.mensagem);
                         continue;
                     }
