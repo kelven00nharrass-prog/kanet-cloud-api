@@ -959,7 +959,53 @@
     ]
   ],
   "loans": [],
-  "defaultRecipients": [],
+  "defaultRecipients": [
+    [
+      "855899872",
+      {
+        "payerPhone": "855899872",
+        "targetPhone": "853163475",
+        "ownerJid": "258855899872@s.whatsapp.net",
+        "registeredAt": "2026-10-24T16:48:38.254Z"
+      }
+    ],
+    [
+      "863331739",
+      {
+        "payerPhone": "863331739",
+        "targetPhone": "841710174",
+        "ownerJid": "258863331739@s.whatsapp.net",
+        "registeredAt": "2026-10-24T16:48:38.680Z"
+      }
+    ],
+    [
+      "862842413",
+      {
+        "payerPhone": "862842413",
+        "targetPhone": "857642413",
+        "ownerJid": "258862842413@s.whatsapp.net",
+        "registeredAt": "2026-10-24T16:48:39.054Z"
+      }
+    ],
+    [
+      "857693697",
+      {
+        "payerPhone": "857693697",
+        "targetPhone": "857693697",
+        "ownerJid": "258857693697@s.whatsapp.net",
+        "registeredAt": "2026-10-24T16:48:39.528Z"
+      }
+    ],
+    [
+      "851296048",
+      {
+        "payerPhone": "851296048",
+        "targetPhone": "851296048",
+        "ownerJid": "258851296048@s.whatsapp.net",
+        "registeredAt": "2026-10-24T16:48:39.917Z"
+      }
+    ]
+  ],
   "bonuses": [],
   "savedAt": "2026-10-24T10:21:35.671Z"
 }
