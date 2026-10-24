@@ -29,6 +29,33 @@ const friendToReferrer = new Map();    // friendPhone -> referrerPhone
 const codeToReferrer = new Map();      // code (ex: "KN-4821") -> referrerPhone
 const phoneToCode = new Map();         // referrerPhone -> code
 const lidToPhone = new Map();          // lidClean -> realPhone (9 digits)
+const aguardandoDestinoBonus = new Map(); // identifier -> { padrinhoTel, padrinhoJid, mb: 500, timestamp }
+
+function temAguardandoDestinoBonus(identificador) {
+    if (!identificador) return false;
+    const clean = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
+    return aguardandoDestinoBonus.has(clean) || aguardandoDestinoBonus.has(identificador);
+}
+
+function obterAguardandoDestinoBonus(identificador) {
+    if (!identificador) return null;
+    const clean = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
+    return aguardandoDestinoBonus.get(clean) || aguardandoDestinoBonus.get(identificador) || null;
+}
+
+function removerAguardandoDestinoBonus(identificador) {
+    if (!identificador) return;
+    const clean = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
+    aguardandoDestinoBonus.delete(clean);
+    aguardandoDestinoBonus.delete(identificador);
+}
+
+function registrarAguardandoDestinoBonus(identificador, dados) {
+    if (!identificador) return;
+    const clean = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (clean) aguardandoDestinoBonus.set(clean, dados);
+    aguardandoDestinoBonus.set(identificador, dados);
+}
 
 let firestoreDb = null;
 let whatsAppNotifier = null;
@@ -666,7 +693,7 @@ function processarCompraIndicacao(compradorTel) {
         return { status: 'progress', padrinho: padrinhoTel, totalNaRodada };
     }
 
-    // 🎉 ATINGIU 3 AMIGOS! DISPARAR 500 MB GRÁTIS!
+    // 🎉 ATINGIU 3 AMIGOS! BÓNUS DE 500 MB CONQUISTADO!
     rec.completedBonuses = (rec.completedBonuses || 0) + 1;
     rec.totalBonusMegas = (rec.totalBonusMegas || 0) + 500;
     const amigosRodadaConcluida = [...rec.referredFriends];
@@ -677,48 +704,57 @@ function processarCompraIndicacao(compradorTel) {
     });
     rec.referredFriends = []; // Reseta rodada para poder ganhar de novo!
 
+    // Creditar os 500 MB na carteira de bónus do padrinho (clientBonuses)
+    let bRecord = clientBonuses.get(padrinhoTel) || { phone: padrinhoTel, bonusMb: 0, historico: [] };
+    bRecord.bonusMb = (bRecord.bonusMb || 0) + 500;
+    if (!Array.isArray(bRecord.historico)) bRecord.historico = [];
+    bRecord.historico.unshift({
+        tipo: 'bonus_indica_3_amigos',
+        mb: 500,
+        amigos: amigosRodadaConcluida,
+        data: new Date().toISOString()
+    });
+    clientBonuses.set(padrinhoTel, bRecord);
+    if (padrinho && padrinho !== padrinhoTel) {
+        clientBonuses.set(padrinho, bRecord);
+    }
+    salvarNoFirestore('client_bonuses', padrinhoTel, bRecord);
+
     salvarCacheLocal();
     salvarNoFirestore('client_referrals', padrinhoTel, rec);
     if (padrinho !== padrinhoTel) {
         salvarNoFirestore('client_referrals', padrinho, rec);
     }
 
-    // 🚀 Disparar Ordem de 500 MB no Gateway
-    const defRec = (typeof obterReceptorPadrao === 'function') ? obterReceptorPadrao(padrinhoTel) : null;
-    const destinoFinal = (defRec && defRec.targetPhone) ? defRec.targetPhone : padrinhoTel;
-
-    const bonusOrderId = `BONUS-INDICA-${Date.now()}`;
-    if (orderDispatcher) {
-        orderDispatcher({
-            orderId: bonusOrderId,
-            numero: destinoFinal,
-            quantidade: 500,
-            modo: 'diario',
-            jid: padrinhoJid,
-            sender: padrinhoTel,
-            senderPhone: padrinhoTel,
-            senderName: 'Bónus Indica e Ganha (3 Amigos)',
-            txn_id: bonusOrderId,
-            valor: 0
-        });
-        console.log(`🚀 [BONUS 500MB DISPARADO] Ordem ${bonusOrderId} de 500 MB enviada para ${destinoFinal} (Padrinho: ${padrinhoTel} / Código: ${codPadrinho})!`);
+    // Registar no estado "Aguardando Destino do Bónus"
+    const pendBonusData = {
+        padrinhoTel,
+        padrinhoJid,
+        mb: 500,
+        timestamp: Date.now()
+    };
+    registrarAguardandoDestinoBonus(padrinhoTel, pendBonusData);
+    if (padrinho && padrinho !== padrinhoTel) {
+        registrarAguardandoDestinoBonus(padrinho, pendBonusData);
     }
 
-    // Notificar padrinho com celebração
+    console.log(`🎁 [BONUS 500MB CONQUISTADO] Padrinho ${padrinhoTel} completou 3 amigos! Perguntando onde deseja receber o bónus via WhatsApp.`);
+
+    // Perguntar ao padrinho para onde quer enviar os 500 MB
     if (whatsAppNotifier) {
         const msgPremio = 
             `🏆 *PARABÉNS! VOCÊ GANHOU 500 MB GRÁTIS!* ⚡\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `3 amigos que usaram o teu código já compraram na Ka-Net!\n\n` +
-            `🎁 *Bónus:* *500 MB (Diário)*\n` +
-            `📲 *Destino:* *${destinoFinal}*\n` +
-            `🚀 *Status:* A entrar no teu celular automaticamente agora mesmo!\n\n` +
-            `🔄 *A promoção continua!* A cada mais 3 amigos que comprarem, ganhas outros *500 MB*!\n` +
-            `🔗 Teu código de convite: *${codPadrinho}*`;
+            `🎉 *3 amigos* que usaram o teu código já compraram na *Ka-Net*!\n\n` +
+            `🎁 *Bónus Conquistado:* *500 MB (Diário)*\n\n` +
+            `📲 *Onde deseja receber os seus 500 MB?*\n` +
+            `1️⃣ Digite *1* para receber neste número (*${padrinhoTel}*)\n` +
+            `2️⃣ Ou responda com o *número de destino* (ex: *84XXXXXXX* ou *85XXXXXXX*) para enviar para outro celular!\n\n` +
+            `💾 _Os teus 500 MB já estão guardados no teu saldo. Se preferir usar outro dia, pode responder mais tarde ou consultar com *.meubonus*!_`;
         try { whatsAppNotifier(padrinhoJid, msgPremio); } catch (_) {}
     }
 
-    return { status: 'rewarded', padrinho: padrinhoTel, totalNaRodada: 3, mb: 500 };
+    return { status: 'rewarded_pending_choice', padrinho: padrinhoTel, totalNaRodada: 3, mb: 500 };
 }
 
 /**
@@ -1737,6 +1773,10 @@ module.exports = {
     vincularIndicacao,
     processarCompraIndicacao,
     obterStatusIndicacao,
+    temAguardandoDestinoBonus,
+    obterAguardandoDestinoBonus,
+    removerAguardandoDestinoBonus,
+    registrarAguardandoDestinoBonus,
     // Fidelidade
     registrarCompra,
     getComprasCount,

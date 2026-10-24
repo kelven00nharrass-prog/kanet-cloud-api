@@ -2541,6 +2541,51 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
                     // ── FIM DOS COMANDOS DO FASEADO MENSAL ───────────────────────────────────
 
+                    // ── RESPOSTA À ESCOLHA DO DESTINO DO BÓNUS DE 500 MB (INDICA E GANHA) ──
+                    const bonusKey = [senderNumber, rawLidClean, jid.split('@')[0]].find(k => k && customerServices.temAguardandoDestinoBonus(k));
+                    if (bonusKey) {
+                        const pendBonus = customerServices.obterAguardandoDestinoBonus(bonusKey);
+                        let destFinal = null;
+
+                        if (cleanCmd === '1' || ['meu', 'este', 'aqui', 'proprio', 'próprio', 'sim'].includes(cleanCmd)) {
+                            destFinal = pendBonus.padrinhoTel || customerServices.normalizarTelefone(senderNumber);
+                        } else {
+                            const destExtraido = extrairNumeroDestino(text) || customerServices.normalizarTelefone(text);
+                            if (destExtraido && destExtraido.length === 9) {
+                                destFinal = destExtraido;
+                            }
+                        }
+
+                        if (destFinal && /^8[2-7]\d{7}$/.test(destFinal)) {
+                            customerServices.removerAguardandoDestinoBonus(bonusKey);
+                            [senderNumber, rawLidClean, jid.split('@')[0]].forEach(k => {
+                                if (k) customerServices.removerAguardandoDestinoBonus(k);
+                            });
+
+                            // Disparar o saque imediato de 500 MB para o destino selecionado!
+                            const resSaque = await customerServices.sacarBonus({
+                                senderPhone: pendBonus.padrinhoTel || senderNumber,
+                                mbSolicitado: 500,
+                                numDestino: destFinal,
+                                jid
+                            });
+                            await reply(resSaque.mensagem);
+                            continue;
+                        } else if (['guardar', 'depois', 'mais tarde', 'cancelar', 'sair', 'menu'].includes(cleanCmd)) {
+                            customerServices.removerAguardandoDestinoBonus(bonusKey);
+                            [senderNumber, rawLidClean, jid.split('@')[0]].forEach(k => {
+                                if (k) customerServices.removerAguardandoDestinoBonus(k);
+                            });
+                            await reply(
+                                `💾 *BÓNUS GUARDADO COM SUCESSO!* ⚡\n\n` +
+                                `Os teus *500 MB* estão seguros no teu saldo Ka-Net.\n\n` +
+                                `Podes consultar o teu saldo com *.meubonus* ou sacar quando quiseres usando:\n` +
+                                `👉 *.sacarbonus 500 [número]*`
+                            );
+                            continue;
+                        }
+                    }
+
                     // ── 1. AGUARDANDO NÚMERO DE DESTINO APÓS COMPROVATIVO ──
 
                     // Caso o cliente esteja aguardando validação da operadora e tenha enviado o número agora:
