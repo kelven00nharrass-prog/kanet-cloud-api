@@ -4411,9 +4411,10 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
-                    // ── 11A. COMANDO !INDICADO (ATIVAR CÓDIGO DO AMIGO) ───────────────
-                    const mIndicado = cleanText.match(/^[.!/#]?(?:indicado|fui\s+indicado(?:\s+por)?)\s*[:=]?\s*(\d+)/i) ||
-                                      cleanText.match(/codigo\s+(?:de\s+)?indicad[oa]\s*[:=]?\s*(\d+)/i);
+                    // ── 11A. COMANDO !INDICADO / CÓDIGO DE CONVITE (KN-XXXX) ───────────────
+                    const mIndicado = cleanText.match(/^[.!/#]?(?:indicado|fui\s+indicado(?:\s+por)?|convite)\s*[:=]?\s*([a-zA-Z0-9\-_]+)/i) ||
+                                      cleanText.match(/codigo\s+(?:de\s+)?(?:indicad[oa]|convite)\s*[:=]?\s*([a-zA-Z0-9\-_]+)/i) ||
+                                      cleanText.match(/^(kn[-_]?[0-9]{3,6})$/i);
                     if (mIndicado) {
                         const codPadrinho = mIndicado[1].trim();
                         const resInd = customerServices.vincularIndicacao(senderNumber, codPadrinho);
@@ -4423,8 +4424,8 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 11. SISTEMA DE FIDELIDADE E INDICAÇÃO (OPÇÃO 4) ───────────────
                     if (opcaoMenuNum === '4' || ['4', '4️⃣', '!convite', 'convite', '!fidelidade', 'fidelidade', 'indicar', 'indicacao', 'indicação', 'indica e ganha'].includes(cleanCmd)) {
-                        const meuCodigo = senderNumber;
-                        const statusInd = customerServices.obterStatusIndicacao(meuCodigo);
+                        const statusInd = customerServices.obterStatusIndicacao(senderNumber);
+                        const meuCodigo = (statusInd && statusInd.codigo) ? statusInd.codigo : customerServices.gerarCodigoConviteUnico(senderNumber);
                         const amigosNaRodada = statusInd ? statusInd.amigosAtuais : 0;
                         const faltam = statusInd ? statusInd.faltam : 3;
                         const totalBonus = statusInd ? statusInd.totalBonusMegas : 0;
@@ -4448,7 +4449,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             `━━━━━━━━━━━━━━━━━━\n` +
                             `👇 *Copia e envia aos teus amigos:*\n\n` +
                             `"Ei! Compra megas automáticos e baratos no WhatsApp da Ka-Net via M-Pesa/e-Mola. Entrega em segundos! ⚡\n\n` +
-                            `👉 Clica aqui para ativar o bónus: ${linkCompartilhar}"`
+                            `👉 Clica aqui para ativar com o meu código: ${linkCompartilhar}"`
                         );
                         continue;
                     }
