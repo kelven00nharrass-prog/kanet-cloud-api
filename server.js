@@ -1438,16 +1438,23 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const resMsg = String(req.body.last_result.result || req.body.last_result.mensagem || req.body.last_result.error || '').toLowerCase();
     const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
                             (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
-    const isSuccessText = isVodacomZeroMb ||
+    const isTudoTopOrOffer = (
+      resMsg.includes('recebeu') && (
+        resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
+        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
+        resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote')
+      )
+    ) || resMsg.includes('tudo top') || resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
+    const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
                           resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                           resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
                           resMsg.includes('transferiste') || resMsg.includes('transferiu');
-    const isErrorText = !isVodacomZeroMb && (
+    const isErrorText = !isVodacomZeroMb && !isTudoTopOrOffer && (
       resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
       resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
     );
     if (!success && isSuccessText && !isErrorText) {
-      console.log(`✅ [USSD AUTO-OVERRIDE] Resposta contém confirmação/0MB ('${resMsg}'). Marcando como SUCESSO!`);
+      console.log(`✅ [USSD AUTO-OVERRIDE] Resposta contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
       success = true;
       req.body.last_result.success = true;
     }
@@ -1923,16 +1930,23 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   const resMsg = String(mensagem || '').toLowerCase();
   const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
                           (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
-  const isSuccessText = isVodacomZeroMb ||
+  const isTudoTopOrOffer = (
+    resMsg.includes('recebeu') && (
+      resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
+      resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
+      resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote')
+    )
+  ) || resMsg.includes('tudo top') || resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
+  const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
                         resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                         resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
                         resMsg.includes('transferiste') || resMsg.includes('transferiu');
-  const isErrorText = !isVodacomZeroMb && (
+  const isErrorText = !isVodacomZeroMb && !isTudoTopOrOffer && (
     resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
     resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
   );
   if (!success && isSuccessText && !isErrorText) {
-    console.log(`✅ [TASKS AUTO-OVERRIDE] Mensagem contém confirmação/0MB ('${resMsg}'). Marcando como SUCESSO!`);
+    console.log(`✅ [TASKS AUTO-OVERRIDE] Mensagem contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
     success = true;
   }
 
