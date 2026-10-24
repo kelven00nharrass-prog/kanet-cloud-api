@@ -4431,7 +4431,8 @@ async function startWhatsApp(orderCallback, db = null) {
                                       cleanText.match(/^(kn[-_]?[0-9]{3,6})$/i);
                     if (mIndicado) {
                         const codPadrinho = mIndicado[1].trim();
-                        const resInd = customerServices.vincularIndicacao(senderNumber, codPadrinho);
+                        const friendIdentifier = (rawLidClean && !/^8[2-7]\d{7}$/.test(senderNumber)) ? rawLidClean : senderNumber;
+                        const resInd = customerServices.vincularIndicacao(friendIdentifier, codPadrinho);
                         await reply(resInd.mensagem);
                         continue;
                     }

@@ -247,6 +247,74 @@ async function restaurarDoFirestore() {
         console.warn('⚠️ [FIRESTORE] Erro ao carregar client_bonuses:', e.message);
     }
 
+    // 5. Mapeamento LID -> Telefone
+    try {
+        const snap = await firestoreDb.collection('client_lid_map').get();
+        if (!snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const lid = String(d.lid || doc.id).replace(/\D/g, '');
+                const phone = normalizarTelefone(d.phone);
+                if (lid && phone) lidToPhone.set(lid, phone);
+            });
+            console.log(`🔗 [FIRESTORE] ${snap.size} mapeamentos LID -> Telefone carregados.`);
+        }
+    } catch (e) {
+        console.warn('⚠️ [FIRESTORE] Erro ao carregar client_lid_map:', e.message);
+    }
+
+    // 6. Códigos de Convite (Referral Codes)
+    try {
+        const snap = await firestoreDb.collection('referral_codes').get();
+        if (!snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const code = String(d.code || doc.id).trim().toUpperCase();
+                const phone = String(d.phone || '').trim();
+                if (code && phone) {
+                    codeToReferrer.set(code, phone);
+                    phoneToCode.set(phone, code);
+                }
+            });
+            console.log(`🎟️ [FIRESTORE] ${snap.size} códigos de convite carregados.`);
+        }
+    } catch (e) {
+        console.warn('⚠️ [FIRESTORE] Erro ao carregar referral_codes:', e.message);
+    }
+
+    // 7. Vínculos de Indicação (Amigo -> Padrinho)
+    try {
+        const snap = await firestoreDb.collection('client_friend_referrers').get();
+        if (!snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const amigo = String(d.amigo || doc.id).trim();
+                const padrinho = String(d.padrinho || '').trim();
+                if (amigo && padrinho) {
+                    friendToReferrer.set(amigo, padrinho);
+                }
+            });
+            console.log(`🤝 [FIRESTORE] ${snap.size} vínculos amigo -> padrinho carregados.`);
+        }
+    } catch (e) {
+        console.warn('⚠️ [FIRESTORE] Erro ao carregar client_friend_referrers:', e.message);
+    }
+
+    // 8. Histórico de Indicações (Client Referrals)
+    try {
+        const snap = await firestoreDb.collection('client_referrals').get();
+        if (!snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const phone = String(d.phone || doc.id).trim();
+                if (phone) clientReferrals.set(phone, d);
+            });
+            console.log(`👥 [FIRESTORE] ${snap.size} históricos de indicação carregados.`);
+        }
+    } catch (e) {
+        console.warn('⚠️ [FIRESTORE] Erro ao carregar client_referrals:', e.message);
+    }
+
     // 5. Inicialização automática do histórico a partir das ordens concluídas se clientLoyalty estiver vazio
     if (clientLoyalty.size === 0) {
         try {
@@ -307,7 +375,7 @@ function initCustomerServices(db, dispatcherFn, getValMbFn) {
  */
 function vincularLidTelefone(lid, tel) {
     if (!lid || !tel) return;
-    const limpoLid = String(lid).replace(/\D/g, '');
+    const limpoLid = String(lid).split('@')[0].split(':')[0].replace(/\D/g, '');
     const phone = normalizarTelefone(tel);
     if (!limpoLid || !phone) return;
 
@@ -319,6 +387,35 @@ function vincularLidTelefone(lid, tel) {
         codeToReferrer.set(existingCode, phone);
         phoneToCode.set(phone, existingCode);
         console.log(`🔄 [LID MIGRATION] Código ${existingCode} do LID ${limpoLid} migrado para o telefone ${phone}!`);
+    } else if (phoneToCode.has(phone)) {
+        const existingCode = phoneToCode.get(phone);
+        phoneToCode.set(limpoLid, existingCode);
+    }
+
+    // Se o amigo foi indicado via LID, migrar vínculo para o telefone
+    if (friendToReferrer.has(limpoLid)) {
+        const padr = friendToReferrer.get(limpoLid);
+        friendToReferrer.set(phone, padr);
+    }
+
+    // Se há registro de indicações no LID, fundir com o registro do telefone
+    if (clientReferrals.has(limpoLid)) {
+        const lidRec = clientReferrals.get(limpoLid);
+        const phoneRec = clientReferrals.get(phone) || {
+            phone,
+            referredFriends: [],
+            completedBonuses: 0,
+            totalBonusMegas: 0,
+            history: []
+        };
+        for (const am of (lidRec.referredFriends || [])) {
+            if (!phoneRec.referredFriends.includes(am)) {
+                phoneRec.referredFriends.push(am);
+            }
+        }
+        phoneRec.completedBonuses = Math.max(phoneRec.completedBonuses || 0, lidRec.completedBonuses || 0);
+        phoneRec.totalBonusMegas = Math.max(phoneRec.totalBonusMegas || 0, lidRec.totalBonusMegas || 0);
+        clientReferrals.set(phone, phoneRec);
     }
 
     salvarCacheLocal();
@@ -358,10 +455,18 @@ function gerarCodigoConviteUnico(phoneOrLid) {
     if (!padrinho) {
         padrinho = resolverTelefoneDeIdentificador(phoneOrLid);
     }
-    const chave = padrinho || String(phoneOrLid).replace(/\D/g, '');
+    const chave = padrinho || String(phoneOrLid).split('@')[0].split(':')[0].replace(/\D/g, '');
     if (!chave) return '';
+    
+    // 1. Já existe código para a chave direta (LID ou Telefone)?
     if (phoneToCode.has(chave)) {
         return phoneToCode.get(chave);
+    }
+    // 2. Se a chave era LID mas temos o telefone, e o telefone já tem código?
+    if (padrinho && phoneToCode.has(padrinho)) {
+        const cod = phoneToCode.get(padrinho);
+        phoneToCode.set(chave, cod);
+        return cod;
     }
     
     let codigo = '';
@@ -376,30 +481,42 @@ function gerarCodigoConviteUnico(phoneOrLid) {
         tentativas++;
     }
     if (!codigo) {
-        codigo = `KN-${padrinho.slice(-4)}`;
+        codigo = `KN-${chave.slice(-4)}`;
     }
 
-    codeToReferrer.set(codigo, padrinho);
-    phoneToCode.set(padrinho, codigo);
+    codeToReferrer.set(codigo, chave);
+    phoneToCode.set(chave, codigo);
+    if (padrinho && padrinho !== chave) {
+        phoneToCode.set(padrinho, codigo);
+        codeToReferrer.set(codigo, padrinho); // Padrinho com telefone 9 dígitos tem precedência
+    }
     salvarCacheLocal();
-    salvarNoFirestore('referral_codes', codigo, { code: codigo, phone: padrinho, createdAt: new Date().toISOString() });
+    salvarNoFirestore('referral_codes', codigo, { code: codigo, phone: padrinho || chave, createdAt: new Date().toISOString() });
     return codigo;
 }
 
 /**
- * Traduz um código de convite (ex: KN-4821) ou número para o telefone do padrinho
+ * Traduz um código de convite (ex: KN-4821) ou número para o telefone ou identificador do padrinho
  */
 function obterTelefonePorCodigo(inputCodigo) {
     if (!inputCodigo) return '';
     const clean = String(inputCodigo).trim().toUpperCase();
+    let ref = '';
     if (codeToReferrer.has(clean)) {
-        return codeToReferrer.get(clean);
-    }
-    const semHifen = clean.replace(/[^A-Z0-9]/g, '');
-    for (const [code, phone] of codeToReferrer.entries()) {
-        if (code.replace(/[^A-Z0-9]/g, '') === semHifen) {
-            return phone;
+        ref = codeToReferrer.get(clean);
+    } else {
+        const semHifen = clean.replace(/[^A-Z0-9]/g, '');
+        for (const [code, target] of codeToReferrer.entries()) {
+            if (code.replace(/[^A-Z0-9]/g, '') === semHifen) {
+                ref = target;
+                break;
+            }
         }
+    }
+    if (ref) {
+        const telReal = resolverTelefoneDeIdentificador(ref) || normalizarTelefone(ref);
+        if (telReal) return telReal;
+        return ref; // Pode ser LID se ainda não vinculado a telefone
     }
     const tel = normalizarTelefone(inputCodigo);
     if (tel && tel.length === 9) {
@@ -411,40 +528,47 @@ function obterTelefonePorCodigo(inputCodigo) {
 /**
  * Vincula um amigo ao código de convite do padrinho
  */
-function vincularIndicacao(amigoTel, codigoOuTel) {
-    const amigo = normalizarTelefone(amigoTel);
+function vincularIndicacao(amigoTelOrLid, codigoOuTel) {
+    let amigo = normalizarTelefone(amigoTelOrLid);
+    if (!amigo) {
+        amigo = resolverTelefoneDeIdentificador(amigoTelOrLid);
+    }
+    const amigoChave = amigo || String(amigoTelOrLid).split('@')[0].split(':')[0].replace(/\D/g, '');
     const padrinho = obterTelefonePorCodigo(codigoOuTel);
 
-    if (!amigo || amigo.length !== 9) {
-        return { success: false, mensagem: '❌ Número de telefone do amigo inválido.' };
+    if (!amigoChave) {
+        return { success: false, mensagem: '❌ Identificador do amigo inválido.' };
     }
-    if (!padrinho || padrinho.length !== 9) {
+    if (!padrinho) {
         return { success: false, mensagem: '❌ Código de convite inválido ou não encontrado. Verifique o código (ex: *KN-4821*) e tente novamente!' };
     }
-    if (amigo === padrinho) {
+    if (amigoChave === padrinho || (amigo && amigo === padrinho)) {
         return { success: false, mensagem: '❌ Você não pode usar o seu próprio código de convite!' };
     }
 
     // Se o amigo já é cliente com compras anteriores, indicação não se aplica
-    const comprasAmigo = getComprasCount(amigo);
+    const comprasAmigo = amigo ? getComprasCount(amigo) : 0;
     if (comprasAmigo > 0) {
         return { success: false, mensagem: '⚠️ O programa "Indica e Ganha" é válido para a *primeira compra* de novos clientes. Você já possui compras registradas na Ka-Net! Mas você pode gerar o seu próprio código com *!convite* para indicar amigos e ganhar 500 MB!' };
     }
 
     // Se o amigo já foi indicado por alguém
-    if (friendToReferrer.has(amigo)) {
-        const jaPadrinho = friendToReferrer.get(amigo);
+    if (friendToReferrer.has(amigoChave) || (amigo && friendToReferrer.has(amigo))) {
+        const jaPadrinho = friendToReferrer.get(amigoChave) || (amigo ? friendToReferrer.get(amigo) : null);
         const codExib = phoneToCode.get(jaPadrinho) || jaPadrinho;
         return { success: false, mensagem: `⚠️ Você já foi indicado anteriormente pelo código *${codExib}*.` };
     }
 
     // Gravar vínculo
-    friendToReferrer.set(amigo, padrinho);
+    friendToReferrer.set(amigoChave, padrinho);
+    if (amigo && amigo !== amigoChave) {
+        friendToReferrer.set(amigo, padrinho);
+    }
     salvarCacheLocal();
-    salvarNoFirestore('client_friend_referrers', amigo, { amigo, padrinho, data: new Date().toISOString() });
+    salvarNoFirestore('client_friend_referrers', amigoChave, { amigo: amigoChave, padrinho, data: new Date().toISOString() });
 
     const codPadrinhoExib = phoneToCode.get(padrinho) || padrinho;
-    console.log(`🤝 [INDICAÇÃO] Amigo ${amigo} vinculado ao padrinho ${padrinho} (Código: ${codPadrinhoExib})`);
+    console.log(`🤝 [INDICAÇÃO] Amigo ${amigoChave} vinculado ao padrinho ${padrinho} (Código: ${codPadrinhoExib})`);
     return {
         success: true,
         padrinho,
@@ -567,10 +691,10 @@ function obterStatusIndicacao(telefoneOrLid) {
     if (!phone) {
         phone = resolverTelefoneDeIdentificador(telefoneOrLid);
     }
-    const chave = phone || String(telefoneOrLid).replace(/\D/g, '');
+    const chave = phone || String(telefoneOrLid).split('@')[0].split(':')[0].replace(/\D/g, '');
     if (!chave) return null;
-    const codigo = phoneToCode.get(chave) || gerarCodigoConviteUnico(chave);
-    const rec = clientReferrals.get(chave) || {
+    const codigo = phoneToCode.get(chave) || (phone ? phoneToCode.get(phone) : null) || gerarCodigoConviteUnico(chave);
+    const rec = clientReferrals.get(chave) || (phone ? clientReferrals.get(phone) : null) || {
         phone: chave,
         referredFriends: [],
         completedBonuses: 0,
@@ -579,7 +703,7 @@ function obterStatusIndicacao(telefoneOrLid) {
 
     const amigosAtuais = Array.isArray(rec.referredFriends) ? rec.referredFriends.length : 0;
     return {
-        phone,
+        phone: phone || chave,
         codigo,
         amigosAtuais,
         faltam: Math.max(0, 3 - amigosAtuais),
