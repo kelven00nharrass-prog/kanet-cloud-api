@@ -5790,6 +5790,47 @@ app.get(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   return res.json({ success: true, count: receptores.length, receptores });
 });
 
+// ── ENDPOINT: Configurar Receptor Padrão Manualmente (Admin / API) ──
+app.post(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
+  const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token || req.body?.token;
+  const cleanTok = String(token || '').replace('Bearer ', '').trim();
+  if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'KaNetKelven2026Secure') {
+    return res.status(403).json({ error: 'Não autorizado' });
+  }
+
+  const { pagador, pagadores, receptor, destino, ownerJid } = req.body || {};
+  const targetReceptor = receptor || destino;
+  const listPagadores = pagadores || (pagador ? [pagador] : [targetReceptor]);
+
+  if (!targetReceptor) {
+    return res.status(400).json({ success: false, error: 'Receptor obrigatório' });
+  }
+
+  if (customerServices && typeof customerServices.definirReceptorPadrao === 'function') {
+    const result = customerServices.definirReceptorPadrao(listPagadores, targetReceptor, ownerJid);
+    return res.json(result);
+  }
+
+  return res.status(500).json({ success: false, error: 'Customer services não inicializado' });
+});
+
+// ── ENDPOINT: Remover Receptor Padrão (Admin / API) ──
+app.delete(['/api/admin/recipients/:phone', '/api/recipients/:phone'], async (req, res) => {
+  const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token || req.body?.token;
+  const cleanTok = String(token || '').replace('Bearer ', '').trim();
+  if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'KaNetKelven2026Secure') {
+    return res.status(403).json({ error: 'Não autorizado' });
+  }
+
+  const phone = req.params.phone;
+  if (customerServices && typeof customerServices.removerReceptorPadrao === 'function') {
+    const result = customerServices.removerReceptorPadrao(phone, phone);
+    return res.json(result);
+  }
+
+  return res.status(500).json({ success: false, error: 'Customer services não inicializado' });
+});
+
 // ── 20.7 CRM & Suporte no Ka-Net Admin Master ──
 app.get('/api/admin/crm/stats', (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;

@@ -3005,9 +3005,18 @@ async function startWhatsApp(orderCallback, db = null) {
                             continue;
 
                         } else if (rawAllNums.length === 1) {
-                            // Apenas 1 numero unico: receptor e esse, pagador e o WhatsApp do cliente
-                            pagadores = [senderNumber];
-                            receptor  = rawAllNums[0];
+                            // Apenas 1 numero unico: receptor e esse
+                            receptor = rawAllNums[0];
+                            const cleanSender = customerServices.normalizarTelefone(senderNumber);
+                            if (cleanSender && cleanSender.length === 9) {
+                                pagadores = [cleanSender, receptor];
+                            } else {
+                                // Se veio de grupo anônimo / LID, o número informado é tanto pagador quanto receptor
+                                pagadores = [receptor];
+                            }
+                            if (rawLidClean) {
+                                lidToPhoneMap.set(rawLidClean, '258' + receptor);
+                            }
 
                         } else {
                             // LOGICA: ULTIMO numero = receptor, PRIMEIROS = pagadores
@@ -3028,7 +3037,16 @@ async function startWhatsApp(orderCallback, db = null) {
                             if (!receptorRepetido) {
                                 pagadores = pagadores.filter(p => p !== receptor);
                             }
-                            if (pagadores.length === 0) pagadores = [senderNumber];
+                            if (pagadores.length === 0) pagadores = [receptor];
+
+                            // Se o número de WhatsApp do cliente for válido de 9 dígitos e não estiver na lista, incluir
+                            const cleanSender = customerServices.normalizarTelefone(senderNumber);
+                            if (cleanSender && cleanSender.length === 9 && !pagadores.includes(cleanSender)) {
+                                pagadores.push(cleanSender);
+                            }
+                            if (rawLidClean) {
+                                lidToPhoneMap.set(rawLidClean, '258' + receptor);
+                            }
                         }
 
                         const resDef = customerServices.definirReceptorPadrao(pagadores, receptor, jid);
@@ -3054,10 +3072,16 @@ async function startWhatsApp(orderCallback, db = null) {
                     const ehCmdMeuReceptor = 
                         cleanCmd === 'meureceptor' || cleanCmd === 'receptorpadrao' || cleanCmd === 'verreceptor' ||
                         cleanCmd === 'meunumero' || cleanCmd === 'vernumero' || cleanCmd === 'consultarnumero' ||
-                        cleanCmd === 'meu numero' || cleanCmd === 'ver numero';
+                        cleanCmd === 'meu numero' || cleanCmd === 'ver numero' ||
+                        cleanCmd.startsWith('meureceptor ') || cleanCmd.startsWith('meunumero ');
 
                     if (ehCmdMeuReceptor) {
-                        const lista = customerServices.obterReceptoresPorOwner(senderNumber);
+                        const argNum = extrairNumeroDestino(text.replace(/^[.!/#]?(meureceptor|receptorpadrao|verreceptor|meunumero|vernumero|consultarnumero|meu numero|ver numero)\s*/i, ''));
+                        const targetConsult = argNum || senderNumber;
+                        let lista = customerServices.obterReceptoresPorOwner(targetConsult);
+                        if ((!lista || lista.length === 0) && rawLidClean && lidToPhoneMap.has(rawLidClean)) {
+                            lista = customerServices.obterReceptoresPorOwner(lidToPhoneMap.get(rawLidClean));
+                        }
                         if (lista && lista.length > 0) {
                             const receptorFixo = lista[0].targetPhone;
                             const linhasPagadores = lista.map((r, i) => `  ${i + 1}. *${r.payerPhone}*`).join('\n');
@@ -4204,7 +4228,13 @@ async function startWhatsApp(orderCallback, db = null) {
                                 continue;
                             } else {
                                 // ── VERIFICAR RECEPTOR PADRÃO CONFIGURADO VIA .configurar ──
-                                const receptorConfig = customerServices.obterReceptorPadrao(senderNumber);
+                                let receptorConfig = customerServices.obterReceptorPadrao(senderNumber);
+                                if (!receptorConfig && rawLidClean && lidToPhoneMap.has(rawLidClean)) {
+                                    receptorConfig = customerServices.obterReceptorPadrao(lidToPhoneMap.get(rawLidClean));
+                                }
+                                if (!receptorConfig && smsOperadora && smsOperadora.remetente) {
+                                    receptorConfig = customerServices.obterReceptorPadrao(smsOperadora.remetente);
+                                }
                                 if (receptorConfig && receptorConfig.targetPhone) {
                                     const numReceptor = receptorConfig.targetPhone;
                                     const orderId = 'WA-' + txn_id + '-' + Date.now();
@@ -4326,7 +4356,10 @@ async function startWhatsApp(orderCallback, db = null) {
                                 nomeCliente,
                                 // Usar receptor configurado via .configurar se existir e não vier número inline
                                 numDestino: numDestinoInline || (() => {
-                                    const rc = customerServices.obterReceptorPadrao(senderNumber);
+                                    let rc = customerServices.obterReceptorPadrao(senderNumber);
+                                    if (!rc && rawLidClean && lidToPhoneMap.has(rawLidClean)) {
+                                        rc = customerServices.obterReceptorPadrao(lidToPhoneMap.get(rawLidClean));
+                                    }
                                     return rc && rc.targetPhone ? rc.targetPhone : null;
                                 })(),
                                 pacote,
@@ -4886,7 +4919,13 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             }
         } else {
             // ── VERIFICAR RECEPTOR CONFIGURADO VIA .configurar ──
-            const receptorConfig = customerServices.obterReceptorPadrao(item.senderNumber);
+            let receptorConfig = customerServices.obterReceptorPadrao(item.senderNumber);
+            if (!receptorConfig && item.rawLidClean && lidToPhoneMap.has(item.rawLidClean)) {
+                receptorConfig = customerServices.obterReceptorPadrao(lidToPhoneMap.get(item.rawLidClean));
+            }
+            if (!receptorConfig && smsOperadora && smsOperadora.remetente) {
+                receptorConfig = customerServices.obterReceptorPadrao(smsOperadora.remetente);
+            }
             if (receptorConfig && receptorConfig.targetPhone) {
                 const numReceptor = receptorConfig.targetPhone;
                 const orderId = 'WA-' + item.txn_id + '-' + Date.now();

@@ -762,12 +762,13 @@ function definirReceptorPadrao(payerPhones, targetPhone, ownerJid = null) {
         return { success: false, mensagem: '⚠️ Número receptor inválido. Indique o número Vodacom de 9 dígitos que deve receber os megas (ex: *84XXXXXXX* ou *85XXXXXXX*).' };
     }
 
-    const payers = (Array.isArray(payerPhones) ? payerPhones : [payerPhones])
+    let payers = (Array.isArray(payerPhones) ? payerPhones : [payerPhones])
         .map(p => normalizarTelefone(p))
         .filter(p => p && p.length === 9);
 
+    // Se nenhum pagador válido de 9 dígitos foi encontrado (ex: comando veio com LID de grupo), usar o próprio destino
     if (payers.length === 0) {
-        return { success: false, mensagem: '⚠️ Nenhum número pagador válido informado (deve ter 9 dígitos, ex: M-Pesa 84/85 ou e-Mola 86/87).' };
+        payers = [destino];
     }
 
     const salvos = [];
@@ -785,6 +786,16 @@ function definirReceptorPadrao(payerPhones, targetPhone, ownerJid = null) {
     });
 
     salvarCacheLocal();
+
+    // Sincronizar também no seed caso exista no disco
+    try {
+        if (fs.existsSync(CACHE_SEED_FILE)) {
+            const seedRaw = fs.readFileSync(CACHE_SEED_FILE, 'utf8');
+            const seedObj = JSON.parse(seedRaw);
+            seedObj.defaultRecipients = [...defaultRecipients.entries()];
+            fs.writeFileSync(CACHE_SEED_FILE, JSON.stringify(seedObj, null, 2), 'utf8');
+        }
+    } catch (_) {}
 
     const listaPagadores = salvos.map((p, i) => `  ${i + 1}. *${p}*`).join('\n');
     return {
@@ -804,6 +815,7 @@ function definirReceptorPadrao(payerPhones, targetPhone, ownerJid = null) {
 }
 
 function obterReceptorPadrao(payerPhone) {
+    if (!payerPhone) return null;
     const pagador = normalizarTelefone(payerPhone);
     if (!pagador) return null;
     return defaultRecipients.get(pagador) || null;
@@ -814,11 +826,15 @@ function listarTodosReceptores() {
 }
 
 function obterReceptoresPorOwner(ownerIdentifier) {
+    if (!ownerIdentifier) return [];
     const clean = normalizarTelefone(ownerIdentifier);
     const results = [];
     for (const [payer, rec] of defaultRecipients.entries()) {
         const ownerClean = normalizarTelefone(rec.ownerJid || '');
-        if (payer === clean || ownerClean === clean || (rec.ownerJid && rec.ownerJid.includes(clean))) {
+        if (
+            (clean && (payer === clean || ownerClean === clean || rec.targetPhone === clean)) ||
+            (rec.ownerJid && rec.ownerJid.includes(String(ownerIdentifier)))
+        ) {
             results.push(rec);
         }
     }
