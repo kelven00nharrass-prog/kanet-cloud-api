@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿﻿﻿﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
@@ -1112,8 +1112,10 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           // Se for modo diário e o celular atual NÃO tiver saldo suficiente para cobrir o pedido inteiro:
           if (isDiarioMode && orderMb > availableMb) {
             // Tentar divisão inteligente se este celular tiver pelo menos MIN_TRANSFER_MB (100MB) e sobra >= 100MB:
-            const canSplit = !order.isSplit &&
-                             availableMb >= MIN_TRANSFER_MB &&
+            // FIX: Permitir re-split mesmo em pedidos isSplit=true (ex: camada diaria do mensal/tudo-top)
+            //    A flag isSplit indica apenas que eh uma fatia de um pedido maior; ela mesma pode ser
+            //    subdividida entre multiplos celulares se nenhum tiver saldo suficiente para cobri-la inteira.
+            const canSplit = availableMb >= MIN_TRANSFER_MB &&
                              (orderMb - availableMb) >= MIN_TRANSFER_MB;
 
             if (canSplit) {
@@ -1237,8 +1239,13 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           // → Para pacotes diários (8023) → fallback: outra porta vodacom disponível  
           // → Para semanais/mensais (8077) → fallback: outra porta vodacom disponível
           // → Para saldo (8777) → sem fallback (porta específica)
-          if (candidateDesignated === candidatePort) {
-            // porta perfeita para o modo
+          // FIX: Verificar saldo do candidato antes de aceitar como fallback (evitar deadlock)
+          const cIsOrderDaily = modoOrder === 'diario' || modoOrder === '24hrs' || modoOrder === '24h';
+          const cCandBalance = getDeviceAvailableMb(candidateDev);
+          const cHasSaldo = cIsOrderDaily ? (cCandBalance >= (order.quantidade || 0)) : true;
+
+          if (candidateDesignated === candidatePort && cHasSaldo) {
+            // Porta perfeita para o modo E com saldo suficiente
             fallbackDev = candidateDev;
             fallbackPort = candidatePort;
             break;
@@ -1257,7 +1264,8 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             if (!isOrderDaily && candidateIsDaily && candidatePort !== port) {
               // aceitar só se não houver opção 8077 apta (já verificado acima)
             }
-            if (!fallbackDev) {
+            // FIX: So aceitar fallback com saldo suficiente
+            if (!fallbackDev && cHasSaldo) {
               fallbackDev = candidateDev;
               fallbackPort = candidatePort;
             }
@@ -1311,6 +1319,12 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           break; // só redirecionar 1 por vez
         } else {
           // Nenhuma porta disponível para este modo — avisar grupo (1x por pedido)
+          // FIX DEADLOCK: Garantir que o pedido fica em 'pending' com targetPort=null
+          // para que qualquer porta que recarregue saldo possa pega-lo imediatamente.
+          order.status = 'pending';
+          order.targetPort = null;
+          order.assignedToPort = null;
+          order.processingAt = null;
           if (!order._noFallbackNotified) {
             order._noFallbackNotified = true;
             const rawQty = order.quantidade || 0;
