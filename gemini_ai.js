@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ╔══════════════════════════════════════════════════════════════╗
  * ║  Ka-Net Gemini AI Module                                     ║
  * ║  - Feature 2: Vision — leitura de prints M-Pesa / e-Mola    ║
@@ -93,25 +93,38 @@ async function analisarPrintPagamento(imageBuffer, mimeType = 'image/jpeg') {
 
     const base64 = imageBuffer.toString('base64');
 
-    const prompt = `Analisa esta imagem de SMS ou screenshot de Moçambique.
-REGRA OBRIGATÓRIA: APENAS comprovativos legítimos de M-Pesa (Vodacom) ou e-Mola (Movitel) são válidos!
-Bancos (BIM, BCI, etc.), transferências de saldo de recarga/voz/crédito, Txuna ou mensagens normais NÃO SÃO VÁLIDOS (devem ter "valido": false).
+    const prompt = `Analisa esta imagem. Pode ser um SMS, screenshot de conversa WhatsApp ou print de ecra de Mocambique.
 
-Extrai os seguintes dados SE for M-Pesa ou e-Mola (responde APENAS com JSON válido, sem markdown):
+OBJETIVO: Identificar se contem um comprovativo legitimo de transferencia de dinheiro (meticais) via M-Pesa (Vodacom) ou e-Mola (Movitel).
+
+VALIDO - aceitar (valido: true):
+- SMS da M-Pesa com texto como: "Confirmado XXXXX. Transferiste X.00MT e a taxa foi de X.00MT para XXXXXXXX"
+- SMS da e-Mola com texto de transferencia de meticais
+- Screenshot de conversa WhatsApp onde o cliente encaminhou (forward) o SMS da operadora (o SMS aparece dentro de uma bolha de mensagem)
+- Qualquer valor e valido (1MT, 29MT, 500MT, etc.)
+- DICA CHAVE: Se o texto contiver "Confirmado" + codigo alfanumerico + "Transferiste" + valor MT, e SEMPRE M-Pesa valida!
+
+NAO VALIDO - rejeitar (valido: false):
+- Transferencias de saldo de voz/credito telefonico (nao meticais)
+- Comprovantes bancarios (BIM, BCI, Standard Bank, etc.)
+- Txuna, Mkesh ou outros sistemas que nao sejam M-Pesa/e-Mola
+- Imagens sem texto de pagamento
+
+Responde APENAS com JSON valido, sem markdown:
 {
-  "valido": true/false,
+  "valido": true ou false,
   "servico": "M-Pesa" ou "e-Mola",
-  "txnId": "ID da transação (ex: ABC12345678 ou PP...)",
-  "valor": número em meticais (ex: 150),
-  "remetente": "nome ou número de quem enviou",
-  "para": "nome ou número de quem recebeu",
-  "data": "data/hora da transação se visível",
-  "tipo": "Transferência M-Pesa" ou "Transferência e-Mola",
-  "raw_text": "todo o texto que consegues ler na imagem",
+  "txnId": "codigo da transacao (ex: DJL0M0XM8GO, ABC12345678)",
+  "valor": numero em meticais sem unidade (ex: 29 ou 150),
+  "remetente": "nome ou numero de quem enviou",
+  "para": "nome ou numero de quem recebeu",
+  "data": "data/hora se visivel",
+  "tipo": "Transferencia M-Pesa" ou "Transferencia e-Mola",
+  "raw_text": "todo o texto legivel na imagem",
   "confianca": "alta" ou "media" ou "baixa"
 }
 
-Se não for M-Pesa ou e-Mola, retorna: {"valido": false, "motivo": "apenas comprovativos M-Pesa e e-Mola são aceitos"}`;
+Se nao for pagamento M-Pesa/e-Mola valido, retorna: {"valido": false, "motivo": "descricao breve"}`;
 
     const cleanMime = sanitizeMimeType(mimeType, 'image/jpeg');
 
