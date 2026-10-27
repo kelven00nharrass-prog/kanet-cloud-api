@@ -172,7 +172,7 @@ function carregarConfigs() {
     if (DYN_CFG.CUSTO_GB_MT === undefined || DYN_CFG.CUSTO_GB_MT === null) DYN_CFG.CUSTO_GB_MT = 20;
     // Restaurar modo manutenção persistido
     if (DYN_CFG.MODO_MANUTENCAO !== undefined) modoManutencao = !!DYN_CFG.MODO_MANUTENCAO;
-    
+
     carregarTransacoes();
     carregarSmsPayments();
     carregarAguardandoOperadora();
@@ -285,7 +285,7 @@ function getMasterNumbers() {
                 }
             }
         }
-    } catch (_) {}
+    } catch (_) { }
     return Array.from(list);
 }
 
@@ -553,17 +553,17 @@ function _fmtSize(mb) {
 }
 
 const DEFAULT_PLANOS_ESPECIAIS = {
-    "76":  { nome: "♻️ 3GB+700 (Renovação)",   tipo: "renovavel",      total: 3772,  inicial: 3072, diaria: 100  },
-    "120": { nome: "♻️ 5GB+700 (Renovação)",   tipo: "renovavel",      total: 5820,  inicial: 5120, diaria: 100  },
-    "130": { nome: "📉 5GB Faseado (1GB/dia)",  tipo: "faseado",        total: 5120,  inicial: 1024, diaria: 1024 },
-    "195": { nome: "♻️ 8GB+700 (Renovação)",   tipo: "renovavel",      total: 8892,  inicial: 8192, diaria: 100  },
-    "240": { nome: "♻️ 10GB+700 (Renovação)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100 },
-    "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado",        total: 10240, inicial: 1024, diaria: 1024 },
-    "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024, diaria: 1024 },
-    "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado",        total: 20480, inicial: 1024, diaria: 1024 },
-    "232": { nome: "📆 10GB Faseado Mensal",    tipo: "faseado_mensal", total: 10240, inicial: 1024, diaria: 1024 },
-    "461": { nome: "📆 20GB Faseado Mensal",    tipo: "faseado_mensal", total: 20480, inicial: 1024, diaria: 1024 },
-    "700": { nome: "📆 30GB Faseado Mensal",    tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
+    "76": { nome: "♻️ 3GB+700 (Renovação)", tipo: "renovavel", total: 3772, inicial: 3072, diaria: 100 },
+    "120": { nome: "♻️ 5GB+700 (Renovação)", tipo: "renovavel", total: 5820, inicial: 5120, diaria: 100 },
+    "130": { nome: "📉 5GB Faseado (1GB/dia)", tipo: "faseado", total: 5120, inicial: 1024, diaria: 1024 },
+    "195": { nome: "♻️ 8GB+700 (Renovação)", tipo: "renovavel", total: 8892, inicial: 8192, diaria: 100 },
+    "240": { nome: "♻️ 10GB+700 (Renovação)", tipo: "renovavel", total: 10940, inicial: 10240, diaria: 100 },
+    "255": { nome: "📉 10GB Faseado (1GB/dia)", tipo: "faseado", total: 10240, inicial: 1024, diaria: 1024 },
+    "381": { nome: "📉 15GB Faseado (1GB/dia)", tipo: "faseado", total: 15360, inicial: 1024, diaria: 1024 },
+    "510": { nome: "📉 20GB Faseado (1GB/dia)", tipo: "faseado", total: 20480, inicial: 1024, diaria: 1024 },
+    "232": { nome: "📆 10GB Faseado Mensal", tipo: "faseado_mensal", total: 10240, inicial: 1024, diaria: 1024 },
+    "461": { nome: "📆 20GB Faseado Mensal", tipo: "faseado_mensal", total: 20480, inicial: 1024, diaria: 1024 },
+    "700": { nome: "📆 30GB Faseado Mensal", tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
 };
 
 
@@ -584,86 +584,86 @@ function gerarInfoTxenecoCompleta(senderNumber) {
     if (totalCompras < 100) {
         const faltam = 100 - totalCompras;
         statusBox = `📊 *O SEU STATUS DE FIDELIDADE:*\n` +
-                    `• Compras realizadas: *${totalCompras}*\n` +
-                    `• Status: *Em Progresso* ⏳\n` +
-                    `🎯 *Faltam apenas ${faltam} compras* para desbloquear o seu crédito de até *3 GB*!\n` +
-                    `_Continue a comprar recargas na Ka-Net para liberar o benefício._\n`;
+            `• Compras realizadas: *${totalCompras}*\n` +
+            `• Status: *Em Progresso* ⏳\n` +
+            `🎯 *Faltam apenas ${faltam} compras* para desbloquear o seu crédito de até *3 GB*!\n` +
+            `_Continue a comprar recargas na Ka-Net para liberar o benefício._\n`;
     } else if (totalCompras < 200) {
         const faltam = 200 - totalCompras;
         statusBox = `📊 *O SEU STATUS VIP DE CRÉDITO:*\n` +
-                    `• Nível: *Bronze 🥉* (100+ compras)\n` +
-                    `• Compras realizadas: *${totalCompras}*\n` +
-                    `• Teto total de crédito: *3 GB* (${tetoF})\n` +
-                    `• Limite disponível agora: *${dispF}*\n` +
-                    `🆙 _Faltam ${faltam} compras para subir para 5 GB!_\n` +
-                    (divida && divida.restanteMt > 0
-                        ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
-                        : `• Situação atual: *Sem dívidas (Crédito 100% Livre!)* ✅\n`);
+            `• Nível: *Bronze 🥉* (100+ compras)\n` +
+            `• Compras realizadas: *${totalCompras}*\n` +
+            `• Teto total de crédito: *3 GB* (${tetoF})\n` +
+            `• Limite disponível agora: *${dispF}*\n` +
+            `🆙 _Faltam ${faltam} compras para subir para 5 GB!_\n` +
+            (divida && divida.restanteMt > 0
+                ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
+                : `• Situação atual: *Sem dívidas (Crédito 100% Livre!)* ✅\n`);
     } else if (totalCompras < 800) {
         const faltam = 800 - totalCompras;
         statusBox = `📊 *O SEU STATUS VIP DE CRÉDITO:*\n` +
-                    `• Nível: *Prata 🥈* (200+ compras)\n` +
-                    `• Compras realizadas: *${totalCompras}*\n` +
-                    `• Teto total de crédito: *5 GB* (${tetoF})\n` +
-                    `• Limite disponível agora: *${dispF}*\n` +
-                    `👑 _Faltam ${faltam} compras para o Nível Ouro (até 10 GB)!_\n` +
-                    (divida && divida.restanteMt > 0
-                        ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
-                        : `• Situação atual: *Sem dívidas (Crédito 100% Livre!)* ✅\n`);
+            `• Nível: *Prata 🥈* (200+ compras)\n` +
+            `• Compras realizadas: *${totalCompras}*\n` +
+            `• Teto total de crédito: *5 GB* (${tetoF})\n` +
+            `• Limite disponível agora: *${dispF}*\n` +
+            `👑 _Faltam ${faltam} compras para o Nível Ouro (até 10 GB)!_\n` +
+            (divida && divida.restanteMt > 0
+                ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
+                : `• Situação atual: *Sem dívidas (Crédito 100% Livre!)* ✅\n`);
     } else {
         statusBox = `📊 *O SEU STATUS VIP DE CRÉDITO:*\n` +
-                    `• Nível: *Ouro VIP 👑* (800+ compras)\n` +
-                    `• Compras realizadas: *${totalCompras}*\n` +
-                    `• Teto total de crédito: *10 GB* (Escolha livre até 10 GB!)\n` +
-                    `• Limite disponível agora: *${dispF}*\n` +
-                    (divida && divida.restanteMt > 0
-                        ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
-                        : `• Situação atual: *Sem dívidas (Crédito VIP Livre!)* ✅\n`);
+            `• Nível: *Ouro VIP 👑* (800+ compras)\n` +
+            `• Compras realizadas: *${totalCompras}*\n` +
+            `• Teto total de crédito: *10 GB* (Escolha livre até 10 GB!)\n` +
+            `• Limite disponível agora: *${dispF}*\n` +
+            (divida && divida.restanteMt > 0
+                ? `• Txeneco ativo: *${divF}* | Dívida pendente: *${divida.restanteMt} MT*\n`
+                : `• Situação atual: *Sem dívidas (Crédito VIP Livre!)* ✅\n`);
     }
 
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
 
     return `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-           `  ⚡ *GUIA OFICIAL: TXENECO KA-NET* 📶\n` +
-           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-           `O *Txeneco* é o serviço exclusivo de *Internet a Crédito* da Ka-Net: você recebe os seus Megabytes adiantados no celular e paga depois! 🚀\n\n` +
-           statusBox + `\n` +
-           `━━━━━━━━━━━━━━━━━━\n` +
-           `📋 *COMO FUNCIONA? (NOVOS LIMITES)*\n` +
-           `1️⃣ *Escalões de Fidelidade:*
+        `  ⚡ *GUIA OFICIAL: TXENECO KA-NET* 📶\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `O *Txeneco* é o serviço exclusivo de *Internet a Crédito* da Ka-Net: você recebe os seus Megabytes adiantados no celular e paga depois! 🚀\n\n` +
+        statusBox + `\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `📋 *COMO FUNCIONA? (NOVOS LIMITES)*\n` +
+        `1️⃣ *Escalões de Fidelidade:*
 ` +
-           `   🥉 *A partir de 100 compras:* até *3 GB* no máximo\n` +
-           `   🥈 *A partir de 200 compras:* até *5 GB* no máximo\n` +
-           `   👑 *A partir de 800 compras:* Você escolhe a quantidade até *10 GB*!\n\n` +
-           `2️⃣ *Faixa por pedido:*
+        `   🥉 *A partir de 100 compras:* até *3 GB* no máximo\n` +
+        `   🥈 *A partir de 200 compras:* até *5 GB* no máximo\n` +
+        `   👑 *A partir de 800 compras:* Você escolhe a quantidade até *10 GB*!\n\n` +
+        `2️⃣ *Faixa por pedido:*
 ` +
-           `   Solicite a partir de *350 MB* até o teto do seu nível (3GB, 5GB ou 10GB).\n\n` +
-           `3️⃣ *Qual é a taxa?*
+        `   Solicite a partir de *350 MB* até o teto do seu nível (3GB, 5GB ou 10GB).\n\n` +
+        `3️⃣ *Qual é a taxa?*
 ` +
-           `   Apenas *10% de taxa de serviço* sobre o valor do pacote!\n` +
-           `   💡 _Exemplo transparente:_\n` +
-           `   1 GB diário custa 23 MT ➔ taxa 10% = 3 MT ➔ *Total a reembolsar: 26 MT*.\n` +
-           `   _Sem juros diários ou taxas abusivas!_\n\n` +
-           `4️⃣ *Quando pagar?*
+        `   Apenas *10% de taxa de serviço* sobre o valor do pacote!\n` +
+        `   💡 _Exemplo transparente:_\n` +
+        `   1 GB diário custa 23 MT ➔ taxa 10% = 3 MT ➔ *Total a reembolsar: 26 MT*.\n` +
+        `   _Sem juros diários ou taxas abusivas!_\n\n` +
+        `4️⃣ *Quando pagar?*
 ` +
-           `   • Pague assim que recarregar o celular ou puder transferir.\n` +
-           `   • ⚠️ _Regra:_ Enquanto tiver uma dívida pendente, não pode pedir novo crédito.\n` +
-           `   • Pagou, o seu teto é liberado e restaurado automaticamente!\n\n` +
-           `5️⃣ *Como pagar a dívida?*
+        `   • Pague assim que recarregar o celular ou puder transferir.\n` +
+        `   • ⚠️ _Regra:_ Enquanto tiver uma dívida pendente, não pode pedir novo crédito.\n` +
+        `   • Pagou, o seu teto é liberado e restaurado automaticamente!\n\n` +
+        `5️⃣ *Como pagar a dívida?*
 ` +
-           `   Transfira para as nossas contas oficiais:\n` +
-           `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
-           `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
-           `   E envie aqui no WhatsApp:\n` +
-           `   👉 *.pagar <comprovativo>\n\n` +
-           `━━━━━━━━━━━━━━━━━━\n` +
-           `📲 *COMANDOS RÁPIDOS:*\n` +
-           `🔹 *.txenecar* ➔ Consultar seu nível e regras\n` +
-           `🔹 *.txenecar <quantidade> <número>* ➔ Pedir crédito\n` +
-           `   _Exemplos: .txenecar 1gb 841234567 | .txenecar 3gb 841234567_\n` +
-           `🔹 *.pagar* ➔ Ver sua dívida atual\n` +
-           `🔹 *.pagar <comprovativo>* ➔ Quitar e restaurar crédito\n` +
-           `━━━━━━━━━━━━━━━━━━`;
+        `   Transfira para as nossas contas oficiais:\n` +
+        `   🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+        `   🟡 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+        `   E envie aqui no WhatsApp:\n` +
+        `   👉 *.pagar <comprovativo>\n\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `📲 *COMANDOS RÁPIDOS:*\n` +
+        `🔹 *.txenecar* ➔ Consultar seu nível e regras\n` +
+        `🔹 *.txenecar <quantidade> <número>* ➔ Pedir crédito\n` +
+        `   _Exemplos: .txenecar 1gb 841234567 | .txenecar 3gb 841234567_\n` +
+        `🔹 *.pagar* ➔ Ver sua dívida atual\n` +
+        `🔹 *.pagar <comprovativo>* ➔ Quitar e restaurar crédito\n` +
+        `━━━━━━━━━━━━━━━━━━`;
 }
 
 // ══════════════════════════════════════════════════
@@ -677,61 +677,61 @@ function gerarGuiaConfigurarNumero(senderNumber) {
         const receptorFixo = lista[0].targetPhone;
         const linhasPagadores = lista.map((r, i) => `   ${i + 1}. *${r.payerPhone}*`).join('\n');
         statusBox = `╭─────────────────────────────╮\n` +
-                    `  📱 *SEU NÚMERO ATUALMENTE CONFIGURADO:*\n` +
-                    `  🎯 *Destino Fixo:* *${receptorFixo}*\n` +
-                    `  💳 *Carteiras Vinculadas:*\n${linhasPagadores}\n` +
-                    `  ⚡ *Status:* Ativo e Pronto (100% Automático) ✅\n` +
-                    `╰─────────────────────────────╯\n\n` +
-                    `💡 _Sempre que pagar por essas contas, os Megas caem direto em *${receptorFixo}* sem você precisar enviar comprovativo!_\n`;
+            `  📱 *SEU NÚMERO ATUALMENTE CONFIGURADO:*\n` +
+            `  🎯 *Destino Fixo:* *${receptorFixo}*\n` +
+            `  💳 *Carteiras Vinculadas:*\n${linhasPagadores}\n` +
+            `  ⚡ *Status:* Ativo e Pronto (100% Automático) ✅\n` +
+            `╰─────────────────────────────╯\n\n` +
+            `💡 _Sempre que pagar por essas contas, os Megas caem direto em *${receptorFixo}* sem você precisar enviar comprovativo!_\n`;
     } else {
         statusBox = `╭─────────────────────────────╮\n` +
-                    `  📱 *STATUS:* Nenhum número configurado ainda ⏳\n` +
-                    `  Configure abaixo para ativar a recarga automática!\n` +
-                    `╰─────────────────────────────╯\n\n`;
+            `  📱 *STATUS:* Nenhum número configurado ainda ⏳\n` +
+            `  Configure abaixo para ativar a recarga automática!\n` +
+            `╰─────────────────────────────╯\n\n`;
     }
 
     return `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-           `  ⚡ *CONFIGURAR NÚMERO FIXO* 📶\n` +
-           `  _(Recarga Automática Sem Comprovativo)_\n` +
-           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-           `Cansado de ter que enviar o SMS de comprovativo toda vez que compra internet? 🤯\n` +
-           `Com o *Receptor Padrão Ka-Net*, o sistema vincula o seu M-Pesa / e-Mola ao seu número Vodacom!\n\n` +
-           statusBox +
-           `━━━━━━━━━━━━━━━━━━\n` +
-           `🚀 *COMO FUNCIONA?\n` +
-           `1️⃣ Você configura o seu número uma única vez aqui no WhatsApp.\n` +
-           `2️⃣ Quando fizer um pagamento no *M-Pesa* ou *e-Mola*, o nosso sistema identifica a transferência na hora.\n` +
-           `3️⃣ Os Megabytes correspondentes ao valor pago são recarregados *imediatamente* no seu celular, *sem precisar abrir o WhatsApp nem colar comprovativo*! ⚡\n\n` +
-           `━━━━━━━━━━━━━━━━━━\n` +
-           `🛠️ *COMO CONFIGURAR (PASSO A PASSO):\n\n` +
-           `🔹 *Caso 1: Você paga com o mesmo número deste WhatsApp:*\n` +
-           `   Basta enviar o número Vodacom que deve receber os Megas:\n` +
-           `   👉 *.configurar 84XXXXXXX*\n\n` +
-           `🔹 *Caso 2: Voce paga por outra carteira (M-Pesa ou e-Mola):*\n` +
-           `   Formato: *.configurar <numero_pagador> <numero_receptor>*\n` +
-           `   O *ULTIMO numero* e sempre o receptor que recebe os Megas:\n` +
-           `   👉 *.configurar 851234567 849998888*\n` +
-           `   _Paga pelo 851234567, recebe no 849998888_\n\n` +
-           `🔹 *Caso 3: Tem 2 ou mais carteiras pagadoras:*\n` +
-           `   Os primeiros sao pagadores, o ULTIMO e o receptor:\n` +
-           `   👉 *.configurar 856268811 840401416 840401414*\n` +
-           `   👉 *.configurar 856268811 840401416 para 840401414*\n` +
-           `   _Pagadores: 856268811 e 840401416 | Receptor: 840401414_\n\n` +
-           `🔹 *Caso especial: o numero pagador e o mesmo que recebe:*\n` +
-           `   Repita o numero duas vezes (pagador e receptor ao mesmo tempo):\n` +
-           `   👉 *.configurar 856268811 840401416 para 840401416*\n` +
-           `   _Pagadores: 856268811 e 840401416 | Receptor: 840401416_\n\n` +
-           `━━━━━━━━━━━━━━━━━━\n` +
-           `📋 *COMANDOS ÚTEIS:\n` +
-           `▫️ *.configurar* ➔ Ver este guia e o seu status actual\n` +
-           `▫️ *.meunumero* ➔ Consultar o número receptor cadastrado\n` +
-           `▫️ *.desconfigurar* ➔ Desativar o envio automático\n` +
-           `━━━━━━━━━━━━━━━━━━`;
+        `  ⚡ *CONFIGURAR NÚMERO FIXO* 📶\n` +
+        `  _(Recarga Automática Sem Comprovativo)_\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+        `Cansado de ter que enviar o SMS de comprovativo toda vez que compra internet? 🤯\n` +
+        `Com o *Receptor Padrão Ka-Net*, o sistema vincula o seu M-Pesa / e-Mola ao seu número Vodacom!\n\n` +
+        statusBox +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `🚀 *COMO FUNCIONA?\n` +
+        `1️⃣ Você configura o seu número uma única vez aqui no WhatsApp.\n` +
+        `2️⃣ Quando fizer um pagamento no *M-Pesa* ou *e-Mola*, o nosso sistema identifica a transferência na hora.\n` +
+        `3️⃣ Os Megabytes correspondentes ao valor pago são recarregados *imediatamente* no seu celular, *sem precisar abrir o WhatsApp nem colar comprovativo*! ⚡\n\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `🛠️ *COMO CONFIGURAR (PASSO A PASSO):\n\n` +
+        `🔹 *Caso 1: Você paga com o mesmo número deste WhatsApp:*\n` +
+        `   Basta enviar o número Vodacom que deve receber os Megas:\n` +
+        `   👉 *.configurar 84XXXXXXX*\n\n` +
+        `🔹 *Caso 2: Voce paga por outra carteira (M-Pesa ou e-Mola):*\n` +
+        `   Formato: *.configurar <numero_pagador> <numero_receptor>*\n` +
+        `   O *ULTIMO numero* e sempre o receptor que recebe os Megas:\n` +
+        `   👉 *.configurar 851234567 849998888*\n` +
+        `   _Paga pelo 851234567, recebe no 849998888_\n\n` +
+        `🔹 *Caso 3: Tem 2 ou mais carteiras pagadoras:*\n` +
+        `   Os primeiros sao pagadores, o ULTIMO e o receptor:\n` +
+        `   👉 *.configurar 856268811 840401416 840401414*\n` +
+        `   👉 *.configurar 856268811 840401416 para 840401414*\n` +
+        `   _Pagadores: 856268811 e 840401416 | Receptor: 840401414_\n\n` +
+        `🔹 *Caso especial: o numero pagador e o mesmo que recebe:*\n` +
+        `   Repita o numero duas vezes (pagador e receptor ao mesmo tempo):\n` +
+        `   👉 *.configurar 856268811 840401416 para 840401416*\n` +
+        `   _Pagadores: 856268811 e 840401416 | Receptor: 840401416_\n\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `📋 *COMANDOS ÚTEIS:\n` +
+        `▫️ *.configurar* ➔ Ver este guia e o seu status actual\n` +
+        `▫️ *.meunumero* ➔ Consultar o número receptor cadastrado\n` +
+        `▫️ *.desconfigurar* ➔ Desativar o envio automático\n` +
+        `━━━━━━━━━━━━━━━━━━`;
 }
 
 function gerarMenuOriginal(jid = null) {
     const { supportNum, sysName } = getSuporteDetails();
-    
+
     // Se a mensagem veio de um grupo e esse grupo tiver uma tabela customizada, exibi-la
     let _tabelas = DYN_CFG.TABELAS || {};
     let _especiais = (DYN_CFG.PLANOS_ESPECIAIS && Object.keys(DYN_CFG.PLANOS_ESPECIAIS).length > 0)
@@ -812,7 +812,7 @@ function gerarMenuOriginal(jid = null) {
     }
 
     // PLANOS ESPECIAIS — separar renovavel/faseado de faseado_mensal
-    const especiaisVip    = Object.entries(_especiais).filter(([, v]) => v.tipo !== 'faseado_mensal');
+    const especiaisVip = Object.entries(_especiais).filter(([, v]) => v.tipo !== 'faseado_mensal');
     const especiaisMensal = Object.entries(_especiais).filter(([, v]) => v.tipo === 'faseado_mensal');
 
     if (especiaisVip.length > 0) {
@@ -858,11 +858,11 @@ function gerarMenuOriginal(jid = null) {
             out += `╭─────────────────────────────╮\n`;
             for (const [p, info] of voda) {
                 const mb = info.ativacao_mb || info.quantidade_mb || info.quantidade || 0;
-                out += `│ 🔴 *Voda ${Math.round(mb/1024)}GB + Min* ➔ *${p} MT*\n`;
+                out += `│ 🔴 *Voda ${Math.round(mb / 1024)}GB + Min* ➔ *${p} MT*\n`;
             }
             for (const [p, info] of movi) {
                 const mb = info.ativacao_mb || info.quantidade_mb || info.quantidade || 0;
-                out += `│ 🟢 *Movi ${Math.round(mb/1024)}GB + Min* ➔ *${p} MT*\n`;
+                out += `│ 🟢 *Movi ${Math.round(mb / 1024)}GB + Min* ➔ *${p} MT*\n`;
             }
             out += `╰─────────────────────────────╯\n\n`;
         }
@@ -1004,7 +1004,7 @@ function gerarMenuEstudante() {
         "35": { nome: "2.5GB Estudante", quantidade_mb: 2560 },
         "50": { nome: "4GB Estudante", quantidade_mb: 4096 }
     };
-    const entries = Object.entries(itens).sort((a,b) => parseInt(a[0]) - parseInt(b[0]));
+    const entries = Object.entries(itens).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
     const linhas = entries.map(([preco, p]) => `│ 🎓 *${p.nome}* ➔ *${preco} MT*`).join('\n');
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
 
@@ -1251,12 +1251,12 @@ function buscarPacotePorValor(valor, jid = null) {
         const tipoFinal = isFaseado ? 'faseado' : 'renovavel';
         const mbInicial = p.inicial || (isFaseado ? 1024 : 3072);
         const mbTotal = p.total || (mbInicial + (p.diaria || (isFaseado ? 1024 : 100)) * (isFaseado ? 4 : 7));
-        return { 
-            nome: p.nome, 
-            mb: mbTotal, 
+        return {
+            nome: p.nome,
+            mb: mbTotal,
             mb_inicial: mbInicial,
-            tipo: tipoFinal, 
-            preco: vNum 
+            tipo: tipoFinal,
+            preco: vNum
         };
     }
     if (DYN_CFG.TABELAS_FORNECIMENTO && DYN_CFG.TABELAS_FORNECIMENTO[vStr]) {
@@ -1278,16 +1278,21 @@ function buscarPacotePorValor(valor, jid = null) {
         }
     }
 
-    // 4. Tolerância ±1 MT (arredondamento)
-    for (const delta of [1, -1]) {
-        const nearStr = String(vNum + delta);
+    // 4. Tolerância ±1 MT (arredondamento) — PROTECÇÃO DE LUCRO:
+    //    Só é válido se o cliente pagou >= preço do pacote (delta negativo = cliente pagou a mais = OK)
+    //    NUNCA entregar pacote cujo preço é MAIOR que o valor pago (delta positivo BLOQUEADO)
+    for (const delta of [-1, 1]) {
+        const precoReal = vNum + delta;
+        // ⛔ Bloquear: cliente pagou menos que o preço do pacote (prejuízo)
+        if (vNum < precoReal) continue;
+        const nearStr = String(precoReal);
         if (DYN_CFG.TABELAS['24hrs'] && DYN_CFG.TABELAS['24hrs'][nearStr]) {
             const p = DYN_CFG.TABELAS['24hrs'][nearStr];
-            return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: '24hrs', preco: vNum + delta };
+            return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: '24hrs', preco: precoReal };
         }
         if (DYN_CFG.TABELAS['semanal'] && DYN_CFG.TABELAS['semanal'][nearStr]) {
             const p = DYN_CFG.TABELAS['semanal'][nearStr];
-            return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: 'semanal', preco: vNum + delta };
+            return { nome: p.nome, mb: p.quantidade_mb || p.quantidade, tipo: 'semanal', preco: precoReal };
         }
     }
 
@@ -1312,10 +1317,10 @@ try {
         const storedLids = customerServices.obterTodosLids();
         for (const [l, p] of storedLids.entries()) {
             lidToPhoneMap.set(l, p);
-                                try { customerServices.vincularLidTelefone(l, p); } catch (_) {}
+            try { customerServices.vincularLidTelefone(l, p); } catch (_) { }
         }
     }
-} catch (_) {}
+} catch (_) { }
 
 const lidToPhoneMap = new Map([
     ['216054655656152', '258850401416'],
@@ -1386,26 +1391,26 @@ function extrairTxId(texto) {
     const regex = /\b([A-Z0-9]{6,25}(?:\.[A-Z0-9]{2,15})*)\b/gi;
     let match;
     let results = [];
-    
+
     while ((match = regex.exec(texto)) !== null) {
         let ref = match[1].toUpperCase().trim();
         if (ref.endsWith('.')) ref = ref.slice(0, -1);
         if (commonWords.includes(ref)) continue;
         if (/^(258)?(8[2-7]\d{7})$/.test(ref)) continue; // telefone, ignora
         if (/^8[2-7]X+$/i.test(ref)) continue; // exemplo de máscara como 84XXXXXXX
-        
+
         const temLetra = /[A-Z]/.test(ref);
         const temNumero = /[0-9]/.test(ref);
-        
+
         if (temLetra && temNumero) {
             results.push({ val: ref, score: 100 });
         } else if (ref.length >= 8 && temNumero) {
             results.push({ val: ref, score: 50 });
         }
     }
-    
+
     if (results.length === 0) return 'TXN-' + Date.now();
-    return results.sort((a,b) => b.score - a.score || b.val.length - a.val.length)[0].val;
+    return results.sort((a, b) => b.score - a.score || b.val.length - a.val.length)[0].val;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1435,7 +1440,7 @@ function isMpesaReceipt(texto) {
 
     // 4. Ação de transação em dinheiro
     const hasAction = /(?:recebeu|recebeste|depositou|creditou|transferiste|transferiu|pagou|enviou)\s+(?:de\s+)?[\d.,]+\s*(?:mt|mzn|mts?)/i.test(cleanLower) ||
-                      /[\d.,]+\s*(?:mt|mzn|mts?)\s+(?:de|para)\s+/i.test(cleanLower);
+        /[\d.,]+\s*(?:mt|mzn|mts?)\s+(?:de|para)\s+/i.test(cleanLower);
 
     // 5. Valor monetário em MT/MZN
     const hasValor = /[\d.,]+\s*(?:mt|mzn|mts?)\b/i.test(cleanLower);
@@ -1584,16 +1589,16 @@ function isPerguntaOnlineBot(texto) {
     if (!texto) return false;
     const s = String(texto).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     return /\b(?:estao|esta|estas|tao|ta|tas)\s+(?:on|online|ativo|ativos|activos?|ativas?|funcionar|funcionando|operacional|a\s+trabalhar|pronto|prontos)\b/i.test(s) ||
-           /\b(?:online|ta\s+on|tao\s+on|estas?\s+ai|alguem\s+ai|voce\s+esta\s+ativo|vc\s+esta\s+ativo|estao\s+ativos?)\b/i.test(s) ||
-           /^(?:on|online|ativo|activos?)\??$/i.test(s);
+        /\b(?:online|ta\s+on|tao\s+on|estas?\s+ai|alguem\s+ai|voce\s+esta\s+ativo|vc\s+esta\s+ativo|estao\s+ativos?)\b/i.test(s) ||
+        /^(?:on|online|ativo|activos?)\??$/i.test(s);
 }
 
 function isPerguntaComprarBot(texto) {
     if (!texto) return false;
     const s = String(texto).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     return /\b(?:posso\s+(?:comprar|pagar|transferir|mandar|pedir|fazer\s+pedido|recarregar))\b/i.test(s) ||
-           /\b(?:tem\s+(?:megas?|dados?|net|saldo|recarga))\b/i.test(s) ||
-           /\b(?:estao\s+a\s+vender|ainda\s+tem\s+(?:megas?|net)|quero\s+comprar)\b/i.test(s);
+        /\b(?:tem\s+(?:megas?|dados?|net|saldo|recarga))\b/i.test(s) ||
+        /\b(?:estao\s+a\s+vender|ainda\s+tem\s+(?:megas?|net)|quero\s+comprar)\b/i.test(s);
 }
 
 function gerarRespostaStatusOnline() {
@@ -1700,7 +1705,7 @@ function processarAddTabelaCompleta(corpo, targetJid = null) {
     if (contador > 0) {
         const resumo = [];
         const catNomes = { '24hrs': '📦 24hrs', 'semanal': '📅 Semanal', 'mensal': '📆 Mensal', 'ilimitado': '🌐 Ilimitado', 'saldo': '💳 Saldo' };
-        
+
         // Se foi especificado um grupo, salvar como tabela exclusiva do grupo
         if (targetJid && String(targetJid).endsWith('@g.us')) {
             if (!DYN_CFG.TABELAS_GRUPO) DYN_CFG.TABELAS_GRUPO = {};
@@ -1957,7 +1962,7 @@ async function startWhatsApp(orderCallback, db = null) {
         });
 
         customerServices.setWhatsAppNotifier((jid, text) => {
-            sendTextMessage(jid, text).catch(() => {});
+            sendTextMessage(jid, text).catch(() => { });
         });
 
         sock.ev.on('connection.update', async (update) => {
@@ -1983,7 +1988,7 @@ async function startWhatsApp(orderCallback, db = null) {
                 currentQrBase64 = null;
                 addLog(`🔌 [DESCONEXÃO] Código: ${statusCode} | Motivo: ${errMsg} | Reconectar: ${shouldReconnect}`);
                 console.log(`🔌 [BAILEYS] Conexão fechada (${statusCode} - ${errMsg}). Reconectar: ${shouldReconnect}`);
-                
+
                 try {
                     sock.ws?.close();
                 } catch (e) {
@@ -2101,7 +2106,7 @@ async function startWhatsApp(orderCallback, db = null) {
                 try {
                     const meta = await getCachedGroupMetadata(groupJid);
                     if (meta && meta.subject) groupName = meta.subject;
-                } catch (_) {}
+                } catch (_) { }
 
                 const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
                 const { supportNum, sysName } = getSuporteDetails();
@@ -2134,7 +2139,7 @@ async function startWhatsApp(orderCallback, db = null) {
             try {
                 const meta = await getCachedGroupMetadata(groupJid);
                 if (meta && meta.subject) groupName = meta.subject;
-            } catch (_) {}
+            } catch (_) { }
 
             const welcomeObj = gerarMensagemBoasVindasGrupo(groupName, validParticipants);
             await sock.sendMessage(groupJid, {
@@ -2194,9 +2199,9 @@ async function startWhatsApp(orderCallback, db = null) {
                     const docMime = msg.message?.documentMessage?.mimetype || '';
                     const isPdf = isDocument && docMime.toLowerCase().includes('pdf');
                     let text = msg.message?.conversation ||
-                                 msg.message?.extendedTextMessage?.text ||
-                                 msg.message?.imageMessage?.caption ||
-                                 msg.message?.documentMessage?.caption || '';
+                        msg.message?.extendedTextMessage?.text ||
+                        msg.message?.imageMessage?.caption ||
+                        msg.message?.documentMessage?.caption || '';
 
                     // ── 📸 GEMINI VISION: Analisa print de M-Pesa/e-Mola ──────────────────────
                     if (isImage && !isComprovativo(text) && geminiAI.isConfigured()) {
@@ -2222,10 +2227,10 @@ async function startWhatsApp(orderCallback, db = null) {
                                 addLog(`🖼️ [GEMINI VISION] Print válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
                                 await sock.sendMessage(jid, {
                                     text: `📸 *Comprovativo detetado pela IA!*\n\n` +
-                                          `🏦 Serviço: *${analise.servico || 'M-Pesa/e-Mola'}*\n` +
-                                          `💰 Valor: *${analise.valor} MT*\n` +
-                                          `🔑 Referência: *${analise.txnId}*\n\n` +
-                                          `⏳ A validar com a operadora...`
+                                        `🏦 Serviço: *${analise.servico || 'M-Pesa/e-Mola'}*\n` +
+                                        `💰 Valor: *${analise.valor} MT*\n` +
+                                        `🔑 Referência: *${analise.txnId}*\n\n` +
+                                        `⏳ A validar com a operadora...`
                                 });
                             } else if (analise && !analise.valido) {
                                 // Não é comprovativo — acionar aviso visual amigável
@@ -2263,15 +2268,15 @@ async function startWhatsApp(orderCallback, db = null) {
                                 addLog(`📄 [GEMINI PDF] Documento válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
                                 await sock.sendMessage(jid, {
                                     text: `📄 *Comprovativo PDF lido pela IA!*\n\n` +
-                                          `🏦 Serviço: *${analise.servico || 'M-Pesa/e-Mola/Banco'}*\n` +
-                                          `💰 Valor: *${analise.valor} MT*\n` +
-                                          `🔑 Referência: *${analise.txnId}*\n\n` +
-                                          `⏳ A validar com a operadora...`
+                                        `🏦 Serviço: *${analise.servico || 'M-Pesa/e-Mola/Banco'}*\n` +
+                                        `💰 Valor: *${analise.valor} MT*\n` +
+                                        `🔑 Referência: *${analise.txnId}*\n\n` +
+                                        `⏳ A validar com a operadora...`
                                 });
                             } else if (analise && !analise.valido) {
                                 await sock.sendMessage(jid, {
                                     text: `📄 Recebi o teu PDF, mas não encontrei dados de pagamento nele.\n\n` +
-                                          `Por favor, envia o *SMS de confirmação* (texto) do M-Pesa ou e-Mola, ou um *print/screenshot* do comprovativo.`
+                                        `Por favor, envia o *SMS de confirmação* (texto) do M-Pesa ou e-Mola, ou um *print/screenshot* do comprovativo.`
                                 });
                                 continue;
                             } else {
@@ -2308,15 +2313,15 @@ async function startWhatsApp(orderCallback, db = null) {
                                     const payDetails = getPaymentDetails();
                                     await sock.sendMessage(jid, {
                                         text: `🎙️ *Ouvi o teu áudio com clareza!*\n\n` +
-                                              `_"${transcricao.transcricao}"_\n\n` +
-                                              `📱 *Número a Ativar:* ${transcricao.numero_destino}\n` +
-                                              `💵 *Valor do Pacote:* ${transcricao.valor_pedido} MT\n` +
-                                              `━━━━━━━━━━━━━━━━━━\n` +
-                                              `⚠️ *ATENÇÃO:* Para a ativação ser concluída com sucesso, *envie aqui o SMS de confirmação (comprovativo)* do M-Pesa ou e-Mola!\n\n` +
-                                              `📌 *Contas de Pagamento:*\n` +
-                                              `🔴 *M-Pesa:* \`${payDetails.mpesa_num}\` (${payDetails.mpesa_name})\n` +
-                                              `🟡 *e-Mola:* \`${payDetails.emola_num}\` (${payDetails.emola_name})\n\n` +
-                                              `Assim que colares o texto do comprovativo ou enviares o print, os teus megas caem no mesmo segundo!`
+                                            `_"${transcricao.transcricao}"_\n\n` +
+                                            `📱 *Número a Ativar:* ${transcricao.numero_destino}\n` +
+                                            `💵 *Valor do Pacote:* ${transcricao.valor_pedido} MT\n` +
+                                            `━━━━━━━━━━━━━━━━━━\n` +
+                                            `⚠️ *ATENÇÃO:* Para a ativação ser concluída com sucesso, *envie aqui o SMS de confirmação (comprovativo)* do M-Pesa ou e-Mola!\n\n` +
+                                            `📌 *Contas de Pagamento:*\n` +
+                                            `🔴 *M-Pesa:* \`${payDetails.mpesa_num}\` (${payDetails.mpesa_name})\n` +
+                                            `🟡 *e-Mola:* \`${payDetails.emola_num}\` (${payDetails.emola_name})\n\n` +
+                                            `Assim que colares o texto do comprovativo ou enviares o print, os teus megas caem no mesmo segundo!`
                                     });
                                     continue;
                                 } else {
@@ -2362,11 +2367,11 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // Se senderClean parece número real de Moçambique, registrar no mapa se houver LID
                     const isSenderPhone = (senderClean.length === 12 && senderClean.startsWith('258') && /^2588[2-7]\d{7}$/.test(senderClean)) ||
-                                          (senderClean.length === 9 && /^8[2-7]\d{7}$/.test(senderClean));
+                        (senderClean.length === 9 && /^8[2-7]\d{7}$/.test(senderClean));
                     if (isSenderPhone && rawLidClean) {
                         const fullPhone = senderClean.startsWith('258') ? senderClean : '258' + senderClean;
                         lidToPhoneMap.set(rawLidClean, fullPhone);
-                        try { customerServices.vincularLidTelefone(rawLidClean, senderClean); } catch (_) {}
+                        try { customerServices.vincularLidTelefone(rawLidClean, senderClean); } catch (_) { }
                     } else if (!isSenderPhone && rawLidClean && lidToPhoneMap.has(rawLidClean)) {
                         // Se o senderClean é um LID, resgatar o telefone real previamente associado
                         senderClean = lidToPhoneMap.get(rawLidClean);
@@ -2381,7 +2386,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     // Normalizador de opções numéricas (1, 1., 1), [1], opção 1, opcao 1, numero 1, 1 - menu, etc.)
                     const sLimpoOpcao = cleanCmd.replace(/^[\[(]/, '').replace(/[\])]$/, '').trim();
                     const matchOpcaoMenu = sLimpoOpcao.match(/^(?:op[cç][aã]o|opt|n[uú]mero|n[oº]|n)?\s*([1-7])(?:\s*[.):\-—]|\s+.*|$)/i) ||
-                                           cleanCmd.match(/^([1-7])\uFE0F?\u20E3?$/);
+                        cleanCmd.match(/^([1-7])\uFE0F?\u20E3?$/);
                     const opcaoMenuNum = matchOpcaoMenu ? matchOpcaoMenu[1] : null;
 
                     // Lista de todos os identificadores possíveis que o Baileys nos dá
@@ -2413,7 +2418,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     console.log(`👑 [MASTER LID VINCULADO] Novo LID de Admin registado: ${lidClean}`);
                                 }
                                 lidToPhoneMap.set(lidClean, '258850401416');
-                                try { customerServices.vincularLidTelefone(lidClean, '258850401416'); } catch (_) {}
+                                try { customerServices.vincularLidTelefone(lidClean, '258850401416'); } catch (_) { }
                             }
                         }
                     }
@@ -2520,7 +2525,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                 const p = resp.data.planos[0];
                                 const tipoLabel = p.tipo === 'faseado_mensal' ? 'Faseado Mensal' : p.tipo === 'faseado' ? 'Faseado' : 'Renovável';
                                 const proxData = p.proxima_entrega ? new Date(p.proxima_entrega).toLocaleString('pt-PT', { timeZone: 'Africa/Maputo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A';
-                                const mbDiarF = p.mb_diaria >= 1024 ? `${(p.mb_diaria/1024).toFixed(1)}GB` : `${p.mb_diaria}MB`;
+                                const mbDiarF = p.mb_diaria >= 1024 ? `${(p.mb_diaria / 1024).toFixed(1)}GB` : `${p.mb_diaria}MB`;
                                 const confMsg = p.aguardando_confirmacao ? `\n\n❓ *Entrega pendente de confirmação!* Responda *SIM* para receber ou *NÃO* para adiar.` : '';
                                 await reply(
                                     `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
@@ -2589,7 +2594,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     // ── 1. AGUARDANDO NÚMERO DE DESTINO APÓS COMPROVATIVO ──
 
                     // Caso o cliente esteja aguardando validação da operadora e tenha enviado o número agora:
-                    const itemAguardandoOp = [...aguardandoOperadora.values()].find(it => 
+                    const itemAguardandoOp = [...aguardandoOperadora.values()].find(it =>
                         (it.senderNumber === senderNumber || (rawLidClean && it.rawLidClean === rawLidClean) || it.jid === jid) && !it.numDestino
                     );
                     if (itemAguardandoOp) {
@@ -2617,112 +2622,112 @@ async function startWhatsApp(orderCallback, db = null) {
                             if (opcaoMenuNum === '1' || ['menu', 'tabela', 'cancelar', 'sair', 'voltar', 'tabelas'].includes(cleanCmd)) {
                                 pendingPayments.delete(targetKey);
                             } else
-                            // ── NOVO: PAGAMENTO COMBINADO / SOMA DE COMPROVATIVOS SEQUENCIAIS ──
-                            if (isComprovativo(text)) {
-                                const novoValor = extrairValorMT(text);
-                                const novoTxnId = extrairTxId(text);
-                                const isEmolaPattern = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(text.trim());
-                                const isMpesaPattern = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(text.trim());
-                                const novoMetodo = isEmolaPattern ? 'emola' : isMpesaPattern ? 'mpesa' : /e-?mola|emola|movitel|864882152/i.test(text) ? 'emola' : 'mpesa';
-                                const novoMetodoNome = novoMetodo === 'emola' ? 'e-Mola' : 'M-Pesa';
+                                // ── NOVO: PAGAMENTO COMBINADO / SOMA DE COMPROVATIVOS SEQUENCIAIS ──
+                                if (isComprovativo(text)) {
+                                    const novoValor = extrairValorMT(text);
+                                    const novoTxnId = extrairTxId(text);
+                                    const isEmolaPattern = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(text.trim());
+                                    const isMpesaPattern = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(text.trim());
+                                    const novoMetodo = isEmolaPattern ? 'emola' : isMpesaPattern ? 'mpesa' : /e-?mola|emola|movitel|864882152/i.test(text) ? 'emola' : 'mpesa';
+                                    const novoMetodoNome = novoMetodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
-                                // 1. Verificar se é repetição da mesma sessão
-                                if (novoTxnId && (pay.txn_id === novoTxnId || (Array.isArray(pay.txn_ids) && pay.txn_ids.includes(novoTxnId)))) {
-                                    const vTotal = pay.valor_total || pay.valor;
-                                    await reply(
-                                        `⚠️ *COMPROVATIVO JÁ ADICIONADO!*\n━━━━━━━━━━━━━━━━━━\n` +
-                                        `A transação (\`${novoTxnId}\`) já foi registrada no seu pagamento pendente.\n\n` +
-                                        `💰 *Total Acumulado:* *${vTotal} MT*\n` +
-                                        `📲 Por favor, envie agora o seu *número Vodacom* que deve receber os megas.`
-                                    );
-                                    continue;
-                                }
+                                    // 1. Verificar se é repetição da mesma sessão
+                                    if (novoTxnId && (pay.txn_id === novoTxnId || (Array.isArray(pay.txn_ids) && pay.txn_ids.includes(novoTxnId)))) {
+                                        const vTotal = pay.valor_total || pay.valor;
+                                        await reply(
+                                            `⚠️ *COMPROVATIVO JÁ ADICIONADO!*\n━━━━━━━━━━━━━━━━━━\n` +
+                                            `A transação (\`${novoTxnId}\`) já foi registrada no seu pagamento pendente.\n\n` +
+                                            `💰 *Total Acumulado:* *${vTotal} MT*\n` +
+                                            `📲 Por favor, envie agora o seu *número Vodacom* que deve receber os megas.`
+                                        );
+                                        continue;
+                                    }
 
-                                // 2. Verificar se a transação é falsa ou já utilizada no sistema
-                                let jaUsada = false;
-                                if (novoTxnId) {
-                                    if (transacoesProcessadas.has(novoTxnId)) jaUsada = true;
-                                    const reg = transacoesProcessadasMap.get(novoTxnId);
-                                    if (reg && (reg.status === 'completed' || (reg.sender && reg.sender !== senderNumber))) {
-                                        jaUsada = true;
+                                    // 2. Verificar se a transação é falsa ou já utilizada no sistema
+                                    let jaUsada = false;
+                                    if (novoTxnId) {
+                                        if (transacoesProcessadas.has(novoTxnId)) jaUsada = true;
+                                        const reg = transacoesProcessadasMap.get(novoTxnId);
+                                        if (reg && (reg.status === 'completed' || (reg.sender && reg.sender !== senderNumber))) {
+                                            jaUsada = true;
+                                        }
+                                    }
+
+                                    if (jaUsada || !novoValor) {
+                                        const valorValido = pay.valor_total || pay.valor;
+                                        const pacValido = buscarPacotePorValor(valorValido, jid);
+                                        await reply(
+                                            `⚠️ *SEGUNDO COMPROVATIVO INVÁLIDO OU JÁ UTILIZADO* ❌\n━━━━━━━━━━━━━━━━━━\n` +
+                                            `A transação (\`${novoTxnId || 'N/D'}\`) é inválida ou já foi utilizada anteriormente no sistema.\n\n` +
+                                            `💰 *Saldo Válido Mantido:* *${valorValido} MT*\n` +
+                                            `📦 *Pacote Correspondente:* *${pacValido ? pacValido.nome : valorValido + ' MT'}*\n\n` +
+                                            `📲 *O que fazer agora:*\n` +
+                                            `• Envie agora o seu *número Vodacom* para receber o pacote referente aos *${valorValido} MT* já confirmados.\n` +
+                                            `• Ou envie outro comprovativo válido caso deseje somar mais valor!`
+                                        );
+                                        continue;
+                                    }
+
+                                    // 3. Transação válida! Acumular saldo
+                                    if (!Array.isArray(pay.txn_ids)) pay.txn_ids = [pay.txn_id];
+                                    if (!Array.isArray(pay.transacoes)) pay.transacoes = [{ txn_id: pay.txn_id, valor: parseFloat(pay.valor), metodo: pay.metodo || 'mpesa', metodoNome: pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa', validado: true }];
+
+                                    pay.txn_ids.push(novoTxnId);
+                                    pay.transacoes.push({
+                                        txn_id: novoTxnId,
+                                        valor: parseFloat(novoValor),
+                                        metodo: novoMetodo,
+                                        metodoNome: novoMetodoNome,
+                                        validado: true
+                                    });
+                                    pay.valor_total = (pay.valor_total || parseFloat(pay.valor)) + parseFloat(novoValor);
+                                    pay.valor = pay.valor_total;
+                                    pay.pacote = buscarPacotePorValor(pay.valor_total, jid);
+
+                                    // Lock no banco de transações
+                                    transacoesProcessadas.add(novoTxnId);
+                                    transacoesProcessadasMap.set(novoTxnId, {
+                                        sender: senderNumber,
+                                        jid,
+                                        valor: parseFloat(novoValor),
+                                        status: 'locked',
+                                        timestamp: Date.now()
+                                    });
+                                    salvarTransacoes();
+
+                                    // Marcar SMS da operadora como usado se já tiver chegado
+                                    const smsOp = findSmsPayment(novoTxnId);
+                                    if (smsOp) {
+                                        smsOp.usado = true;
+                                        smsOp.usadoPor = senderNumber;
+                                        smsOp.usadoEm = Date.now();
+                                        salvarSmsPayments();
+                                    }
+
+                                    // Verificar se o cliente já enviou o número na linha abaixo do 2º comprovativo
+                                    const numDestinoInline2 = extrairNumeroDestinoAbaixoDoComprovativo(text);
+                                    if (!numDestinoInline2) {
+                                        const listaTxns = pay.transacoes.map((t, idx) => `  ${idx + 1}. *${t.valor} MT* (${t.metodoNome || t.metodo} - \`${t.txn_id}\`)`).join('\n');
+                                        const pacoteAtual = pay.pacote;
+                                        const volStr = pacoteAtual && pacoteAtual.mb ? (pacoteAtual.mb >= 1024 ? `${(pacoteAtual.mb / 1024).toFixed(1)}GB` : `${pacoteAtual.mb}MB`) : '';
+
+                                        await reply(
+                                            `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                                            `  🎉 *PAGAMENTO COMBINADO ADICIONADO!* ➕\n` +
+                                            `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                                            `Mais *${novoValor} MT* (${novoMetodoNome}) adicionados à sua compra!\n\n` +
+                                            `📋 *Comprovativos Juntos:*\n` +
+                                            listaTxns + `\n` +
+                                            `━━━━━━━━━━━━━━━━━━\n` +
+                                            `💰 *TOTAL ACUMULADO:* *${pay.valor_total} MT*\n` +
+                                            `📦 *Pacote Resultante:* *${pacoteAtual ? pacoteAtual.nome : pay.valor_total + ' MT'}*${volStr ? ' (' + volStr + ')' : ''}\n\n` +
+                                            `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?\n` +
+                                            `Por favor, envie agora o seu *número Vodacom* (ex: *84XXXXXXX* ou *85XXXXXXX*).\n` +
+                                            `_(Ou envie mais um comprovativo se desejar somar mais valor)_`
+                                        );
+                                        continue;
                                     }
                                 }
-
-                                if (jaUsada || !novoValor) {
-                                    const valorValido = pay.valor_total || pay.valor;
-                                    const pacValido = buscarPacotePorValor(valorValido, jid);
-                                    await reply(
-                                        `⚠️ *SEGUNDO COMPROVATIVO INVÁLIDO OU JÁ UTILIZADO* ❌\n━━━━━━━━━━━━━━━━━━\n` +
-                                        `A transação (\`${novoTxnId || 'N/D'}\`) é inválida ou já foi utilizada anteriormente no sistema.\n\n` +
-                                        `💰 *Saldo Válido Mantido:* *${valorValido} MT*\n` +
-                                        `📦 *Pacote Correspondente:* *${pacValido ? pacValido.nome : valorValido + ' MT'}*\n\n` +
-                                        `📲 *O que fazer agora:*\n` +
-                                        `• Envie agora o seu *número Vodacom* para receber o pacote referente aos *${valorValido} MT* já confirmados.\n` +
-                                        `• Ou envie outro comprovativo válido caso deseje somar mais valor!`
-                                    );
-                                    continue;
-                                }
-
-                                // 3. Transação válida! Acumular saldo
-                                if (!Array.isArray(pay.txn_ids)) pay.txn_ids = [pay.txn_id];
-                                if (!Array.isArray(pay.transacoes)) pay.transacoes = [{ txn_id: pay.txn_id, valor: parseFloat(pay.valor), metodo: pay.metodo || 'mpesa', metodoNome: pay.metodo === 'emola' ? 'e-Mola' : 'M-Pesa', validado: true }];
-
-                                pay.txn_ids.push(novoTxnId);
-                                pay.transacoes.push({
-                                    txn_id: novoTxnId,
-                                    valor: parseFloat(novoValor),
-                                    metodo: novoMetodo,
-                                    metodoNome: novoMetodoNome,
-                                    validado: true
-                                });
-                                pay.valor_total = (pay.valor_total || parseFloat(pay.valor)) + parseFloat(novoValor);
-                                pay.valor = pay.valor_total;
-                                pay.pacote = buscarPacotePorValor(pay.valor_total, jid);
-
-                                // Lock no banco de transações
-                                transacoesProcessadas.add(novoTxnId);
-                                transacoesProcessadasMap.set(novoTxnId, {
-                                    sender: senderNumber,
-                                    jid,
-                                    valor: parseFloat(novoValor),
-                                    status: 'locked',
-                                    timestamp: Date.now()
-                                });
-                                salvarTransacoes();
-
-                                // Marcar SMS da operadora como usado se já tiver chegado
-                                const smsOp = findSmsPayment(novoTxnId);
-                                if (smsOp) {
-                                    smsOp.usado = true;
-                                    smsOp.usadoPor = senderNumber;
-                                    smsOp.usadoEm = Date.now();
-                                    salvarSmsPayments();
-                                }
-
-                                // Verificar se o cliente já enviou o número na linha abaixo do 2º comprovativo
-                                const numDestinoInline2 = extrairNumeroDestinoAbaixoDoComprovativo(text);
-                                if (!numDestinoInline2) {
-                                    const listaTxns = pay.transacoes.map((t, idx) => `  ${idx + 1}. *${t.valor} MT* (${t.metodoNome || t.metodo} - \`${t.txn_id}\`)`).join('\n');
-                                    const pacoteAtual = pay.pacote;
-                                    const volStr = pacoteAtual && pacoteAtual.mb ? (pacoteAtual.mb >= 1024 ? `${(pacoteAtual.mb/1024).toFixed(1)}GB` : `${pacoteAtual.mb}MB`) : '';
-
-                                    await reply(
-                                        `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                        `  🎉 *PAGAMENTO COMBINADO ADICIONADO!* ➕\n` +
-                                        `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                                        `Mais *${novoValor} MT* (${novoMetodoNome}) adicionados à sua compra!\n\n` +
-                                        `📋 *Comprovativos Juntos:*\n` +
-                                        listaTxns + `\n` +
-                                        `━━━━━━━━━━━━━━━━━━\n` +
-                                        `💰 *TOTAL ACUMULADO:* *${pay.valor_total} MT*\n` +
-                                        `📦 *Pacote Resultante:* *${pacoteAtual ? pacoteAtual.nome : pay.valor_total + ' MT'}*${volStr ? ' (' + volStr + ')' : ''}\n\n` +
-                                        `📲 *PARA QUAL NÚMERO DEVEMOS ENVIAR?\n` +
-                                        `Por favor, envie agora o seu *número Vodacom* (ex: *84XXXXXXX* ou *85XXXXXXX*).\n` +
-                                        `_(Ou envie mais um comprovativo se desejar somar mais valor)_`
-                                    );
-                                    continue;
-                                }
-                            }
                             // ── MULTI-DESTINO QUANDO O CLIENTE ENVIA MÚLTIPLOS NÚMEROS APÓS O COMPROVATIVO ──
                             const textoAbaixo2 = extrairTextoAbaixoDoComprovativo(text);
                             const multiDest = customerServices.parseMultiDestino(textoAbaixo2 || text, parseFloat(pay.valor), (v) => buscarPacotePorValor(v, jid));
@@ -2767,7 +2772,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                                 const { supportNum } = getSuporteDetails();
                                 const resumo = multiDest.map((d, i) => {
-                                    const vol = d.mb >= 1024 ? `${(d.mb/1024).toFixed(1)}GB` : `${d.mb}MB`;
+                                    const vol = d.mb >= 1024 ? `${(d.mb / 1024).toFixed(1)}GB` : `${d.mb}MB`;
                                     return `  ${i + 1}. *${d.phone}* ➔ *${vol}*`;
                                 }).join('\n');
 
@@ -2908,7 +2913,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             try {
                                 const meta = await getCachedGroupMetadata(jid);
                                 if (meta && meta.subject) gName = meta.subject;
-                            } catch (_) {}
+                            } catch (_) { }
                             const welcomeObj = gerarMensagemBoasVindasGrupo(gName, [senderNumber + '@s.whatsapp.net']);
                             await sock.sendMessage(jid, {
                                 text: welcomeObj.text,
@@ -2924,8 +2929,8 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 1.1 COMANDO .txenecar / .txenekar (CRÉDITO DE INTERNET DIÁRIO) ──
                     const ehCmdTxenecar = cleanCmd === 'txenecar' || cleanCmd.startsWith('txenecar ') ||
-                                          cleanCmd === 'txenekar' || cleanCmd.startsWith('txenekar ') ||
-                                          cleanCmd === 'txeneco' || cleanCmd.startsWith('txeneco ');
+                        cleanCmd === 'txenekar' || cleanCmd.startsWith('txenekar ') ||
+                        cleanCmd === 'txeneco' || cleanCmd.startsWith('txeneco ');
                     if (ehCmdTxenecar) {
                         const rawArgs = text.replace(/^[.!/#]?(txenecar|txenekar|txeneco)\s*/i, '').trim();
                         if (!rawArgs) {
@@ -2969,7 +2974,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 1.2 COMANDO .pagar (LIQUIDAÇÃO OU AMORTIZAÇÃO DE DÍVIDA DE TXENECO) ──
                     const ehCmdPagar = cleanCmd === 'pagar' || cleanCmd.startsWith('pagar ') ||
-                                       cleanCmd === 'pagardivida' || cleanCmd.startsWith('pagardivida ');
+                        cleanCmd === 'pagardivida' || cleanCmd.startsWith('pagardivida ');
                     if (ehCmdPagar) {
                         const rawComprovativo = text.replace(/^[.!/#]?(pagardivida|pagar)\s*/i, '').trim();
                         if (!rawComprovativo) {
@@ -3036,10 +3041,10 @@ async function startWhatsApp(orderCallback, db = null) {
                                 const mentionUser = `258${senderNumber}@s.whatsapp.net`;
                                 sock.sendMessage(grupoAgradecimento, {
                                     text: `🎉 *TXENECO REGULARIZADO COM SUCESSO!* 👏\n` +
-                                          `━━━━━━━━━━━━━━━━━━\n` +
-                                          `O cliente @${senderNumber} acabou de quitar 100% da sua dívida de Txeneco!\n\n` +
-                                          `🔓 *Status:* Crédito totalmente restaurado!\n` +
-                                          `🙏 *MUITO OBRIGADO PELA SUA PREFERÊNCIA E HONESTIDADE!* 🌟✨`,
+                                        `━━━━━━━━━━━━━━━━━━\n` +
+                                        `O cliente @${senderNumber} acabou de quitar 100% da sua dívida de Txeneco!\n\n` +
+                                        `🔓 *Status:* Crédito totalmente restaurado!\n` +
+                                        `🙏 *MUITO OBRIGADO PELA SUA PREFERÊNCIA E HONESTIDADE!* 🌟✨`,
                                     mentions: [mentionUser]
                                 }).catch(e => console.warn('⚠️ Erro ao postar agradecimento no grupo:', e.message));
                             }
@@ -3049,7 +3054,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
 
                     // ── 1.3 COMANDOS DE CONFIGURAR NÚMERO / RECEPTOR PADRÃO ──
-                    const ehCmdConfigurar = 
+                    const ehCmdConfigurar =
                         cleanCmd.startsWith('configurar') || cleanCmd.startsWith('configurarnumero') ||
                         cleanCmd.startsWith('definirreceptor') || cleanCmd.startsWith('setreceptor') || cleanCmd.startsWith('receptor') ||
                         cleanCmd.startsWith('definirnumero') || cleanCmd.startsWith('setnumero');
@@ -3079,7 +3084,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
                             if (rawLidClean) {
                                 lidToPhoneMap.set(rawLidClean, '258' + receptor);
-                                try { customerServices.vincularLidTelefone(rawLidClean, '258' + receptor); } catch (_) {}
+                                try { customerServices.vincularLidTelefone(rawLidClean, '258' + receptor); } catch (_) { }
                             }
 
                         } else {
@@ -3094,7 +3099,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             //   .configurar 840401416 840401416 -> receptor=840401416, pagadores=[840401416]
 
                             receptor = rawAllNums[rawAllNums.length - 1];
-                            const pagadoresRaw    = rawAllNums.slice(0, -1);
+                            const pagadoresRaw = rawAllNums.slice(0, -1);
                             const receptorRepetido = pagadoresRaw.includes(receptor);
 
                             pagadores = [...new Set(pagadoresRaw)];
@@ -3110,7 +3115,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
                             if (rawLidClean) {
                                 lidToPhoneMap.set(rawLidClean, '258' + receptor);
-                                try { customerServices.vincularLidTelefone(rawLidClean, '258' + receptor); } catch (_) {}
+                                try { customerServices.vincularLidTelefone(rawLidClean, '258' + receptor); } catch (_) { }
                             }
                         }
 
@@ -3119,7 +3124,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    const ehCmdRemoverReceptor = 
+                    const ehCmdRemoverReceptor =
                         cleanCmd === 'removerreceptor' || cleanCmd.startsWith('removerreceptor ') ||
                         cleanCmd === 'limparreceptor' || cleanCmd === 'delreceptor' ||
                         cleanCmd === 'desconfigurar' || cleanCmd.startsWith('desconfigurar ') ||
@@ -3138,7 +3143,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    const ehCmdMeuReceptor = 
+                    const ehCmdMeuReceptor =
                         cleanCmd === 'meureceptor' || cleanCmd === 'receptorpadrao' || cleanCmd === 'verreceptor' ||
                         cleanCmd === 'meunumero' || cleanCmd === 'vernumero' || cleanCmd === 'consultarnumero' ||
                         cleanCmd === 'meu numero' || cleanCmd === 'ver numero' ||
@@ -3220,8 +3225,8 @@ async function startWhatsApp(orderCallback, db = null) {
                         const divida = customerServices.getClienteDivida(targetPhone);
                         const divMb = divida ? (divida.activeDebtMb || 0) : 0;
                         const dispMb = Math.max(0, teto - divMb);
-                        const tetoF = teto >= 1024 ? `${(teto/1024).toFixed(1)}GB` : `${teto}MB`;
-                        const dispF = dispMb >= 1024 ? `${(dispMb/1024).toFixed(1)}GB` : `${dispMb}MB`;
+                        const tetoF = teto >= 1024 ? `${(teto / 1024).toFixed(1)}GB` : `${teto}MB`;
+                        const dispF = dispMb >= 1024 ? `${(dispMb / 1024).toFixed(1)}GB` : `${dispMb}MB`;
 
                         let statusNivel = '';
                         let dicaProgresso = '';
@@ -3234,7 +3239,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             const faltam500 = 500 - total;
                             statusNivel = '🌟 *CLIENTE VIP (Nível 1)*';
                             dicaProgresso = `🔓 *Txeneco Liberado:* até *${tetoF}* (Disponível agora: *${dispF}*)\n` +
-                                            `🎯 *Faltam ${faltam500} compras* para subir para o *Nível Mestre VIP (4.0 GB)*!`;
+                                `🎯 *Faltam ${faltam500} compras* para subir para o *Nível Mestre VIP (4.0 GB)*!`;
                         } else {
                             statusNivel = '👑 *MESTRE VIP (Nível Máximo)*';
                             dicaProgresso = `🔓 *Txeneco Máximo Liberado:* até *${tetoF}* (Disponível agora: *${dispF}*)`;
@@ -3287,7 +3292,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         try {
                             const clientJid = `258${targetTel.slice(-9)}@s.whatsapp.net`;
                             await sock.sendMessage(clientJid, { text: resBonus.mensagemCliente });
-                        } catch (_) {}
+                        } catch (_) { }
                         continue;
                     }
 
@@ -3300,7 +3305,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         const rawBody = text.replace(/^[.!/#]?(consultarbonus|verbonus)\s*/i, '').trim();
                         const targetTel = extrairNumeroDestino(rawBody) || rawBody;
                         const saldoMb = customerServices.consultarBonus(targetTel);
-                        const sldF = saldoMb >= 1024 ? `${(saldoMb/1024).toFixed(1)}GB (${saldoMb}MB)` : `${saldoMb}MB`;
+                        const sldF = saldoMb >= 1024 ? `${(saldoMb / 1024).toFixed(1)}GB (${saldoMb}MB)` : `${saldoMb}MB`;
                         await reply(`🎁 *SALDO DE BÔNUS DO CLIENTE ${targetTel}:* *${sldF}*`);
                         continue;
                     }
@@ -3315,7 +3320,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                 `Fique atento às nossas promoções e sorteios no grupo!`
                             );
                         } else {
-                            const sldF = saldoMb >= 1024 ? `${(saldoMb/1024).toFixed(1)}GB (${saldoMb}MB)` : `${saldoMb}MB`;
+                            const sldF = saldoMb >= 1024 ? `${(saldoMb / 1024).toFixed(1)}GB (${saldoMb}MB)` : `${saldoMb}MB`;
                             await reply(
                                 `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                                 `  🎁 *SEU SALDO DE BÔNUS KA-NET* 🎁\n` +
@@ -3364,7 +3369,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 2. COMANDO .addtabela e .addtabelagrupo (ADMIN MASTER) ──
                     const ehCmdAddTabela = cleanText.startsWith('.addtabela') || cleanText.startsWith('!addtabela') ||
-                                           cleanText.startsWith('.addtabelagrupo') || cleanText.startsWith('!addtabelagrupo');
+                        cleanText.startsWith('.addtabelagrupo') || cleanText.startsWith('!addtabelagrupo');
                     if (ehCmdAddTabela) {
                         if (!senderIsMaster) {
                             await reply('🚫 *ACESSO NEGADO*\n━━━━━━━━━━━━━━━━━━━\n⚠️ Comando restrito ao Administrador Master.');
@@ -4106,7 +4111,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                 `Porém, não encontramos um pacote correspondente a este valor na tabela.\n` +
                                 `Digite *Menu* para verificar os preços disponíveis.`
                             );
-                            
+
                             // Avisar o Grupo de Notificações para o admin não perder o dinheiro!
                             const origemMsg = jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
                             enviarNotificacaoGrupo(
@@ -4179,7 +4184,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
 
                             const resumo = multiDestinos.map((d, i) => {
-                                const vol = d.mb >= 1024 ? `${(d.mb/1024).toFixed(1)}GB` : `${d.mb}MB`;
+                                const vol = d.mb >= 1024 ? `${(d.mb / 1024).toFixed(1)}GB` : `${d.mb}MB`;
                                 return `  ${i + 1}. *${d.phone}* ➔ *${vol}*`;
                             }).join('\n');
 
@@ -4474,8 +4479,8 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     // ── 11A. COMANDO !INDICADO / CÓDIGO DE CONVITE (KN-XXXX) ───────────────
                     const mIndicado = cleanText.match(/^[.!/#]?(?:indicado|fui\s+indicado(?:\s+por)?|convite)\s*[:=]?\s*([a-zA-Z0-9\-_]+)/i) ||
-                                      cleanText.match(/codigo\s+(?:de\s+)?(?:indicad[oa]|convite)\s*[:=]?\s*([a-zA-Z0-9\-_]+)/i) ||
-                                      cleanText.match(/^(kn[-_]?[0-9]{3,6})$/i);
+                        cleanText.match(/codigo\s+(?:de\s+)?(?:indicad[oa]|convite)\s*[:=]?\s*([a-zA-Z0-9\-_]+)/i) ||
+                        cleanText.match(/^(kn[-_]?[0-9]{3,6})$/i);
                     if (mIndicado) {
                         const codPadrinho = mIndicado[1].trim();
                         const friendIdentifier = (rawLidClean && !/^8[2-7]\d{7}$/.test(senderNumber)) ? rawLidClean : senderNumber;
@@ -4499,18 +4504,18 @@ async function startWhatsApp(orderCallback, db = null) {
 
                         let statusProgressoTexto = '';
                         if (amigosCadastrados > 0 && amigosCompraram === 0) {
-                            statusProgressoTexto = 
+                            statusProgressoTexto =
                                 `👥 *Amigos Indicados:* *${amigosCadastrados} amigo(s)* já ativaram o teu código! ⏳\n` +
                                 `🛒 *Compras Confirmadas:* *0 de 3 amigos*\n` +
                                 `🎯 *Faltam:* *3 compras* para ganhares *500 MB GRÁTIS*!\n` +
                                 `💡 _Assim que eles comprarem o 1º pacote, a pontuação sobe aqui na hora!_`;
                         } else if (amigosCadastrados > 0) {
-                            statusProgressoTexto = 
+                            statusProgressoTexto =
                                 `👥 *Amigos Indicados:* *${amigosCadastrados} amigo(s)* com o teu código\n` +
                                 `🛒 *Compras Confirmadas:* *${amigosCompraram} de 3 amigos* já compraram! ✅\n` +
                                 `🎯 *Faltam apenas:* *${faltam} compra(s)* para ganhares *500 MB GRÁTIS*! 🚀`;
                         } else {
-                            statusProgressoTexto = 
+                            statusProgressoTexto =
                                 `👥 *Amigos Indicados:* *0 amigos*\n` +
                                 `🛒 *Compras Confirmadas:* *0 de 3 amigos*\n` +
                                 `🎯 *Faltam:* *3 amigos* para o próximo bónus de 500 MB!`;
@@ -4615,20 +4620,20 @@ async function startWhatsApp(orderCallback, db = null) {
                     const ehPedidoMenu = (opcaoMenuNum === '1') || [
                         '1', '1️⃣', 'menu', 'tabela', 'tabelas', 'pacote', 'pacotes', 'plano', 'planos',
                         'preco', 'precos', 'preço', 'preços', 'valores', 'megas', 'gigas', 'comprar'
-                    ].includes(cleanCmd) || 
-                    cleanCmd === 'menu' || cleanCmd.startsWith('menu ') || 
-                    cleanCmd.startsWith('tabela ') || cleanCmd.startsWith('preço') || cleanCmd.startsWith('preco') ||
-                    cleanText.includes('tabela') || 
-                    cleanText.includes('preco') || 
-                    cleanText.includes('preço') || 
-                    cleanText.includes('pacote') || 
-                    cleanText.includes('valores') ||
-                    cleanText.includes('como comprar') ||
-                    cleanText.includes('quero comprar') ||
-                    cleanText.includes('manda a tabela') ||
-                    cleanText.includes('manda tabela') ||
-                    cleanText.includes('quero megas') ||
-                    cleanText.includes('tem megas');
+                    ].includes(cleanCmd) ||
+                        cleanCmd === 'menu' || cleanCmd.startsWith('menu ') ||
+                        cleanCmd.startsWith('tabela ') || cleanCmd.startsWith('preço') || cleanCmd.startsWith('preco') ||
+                        cleanText.includes('tabela') ||
+                        cleanText.includes('preco') ||
+                        cleanText.includes('preço') ||
+                        cleanText.includes('pacote') ||
+                        cleanText.includes('valores') ||
+                        cleanText.includes('como comprar') ||
+                        cleanText.includes('quero comprar') ||
+                        cleanText.includes('manda a tabela') ||
+                        cleanText.includes('manda tabela') ||
+                        cleanText.includes('quero megas') ||
+                        cleanText.includes('tem megas');
 
                     if (ehPedidoMenu) {
                         addLog(`📋 [RESPONDENDO] Menu/Tabela enviado para ${jid}`);
@@ -4639,14 +4644,14 @@ async function startWhatsApp(orderCallback, db = null) {
                     // ── 14. PAGAMENTO ORIGINAL (OPÇÃO 2) ──────────────────────────────
                     const ehPedidoPagamento = (opcaoMenuNum === '2') || [
                         '2', '2️⃣', 'pagamento', 'pagar', 'conta', 'contas', 'mpesa', 'emola', 'dados de pagamento'
-                    ].includes(cleanCmd) || 
-                    cleanCmd.startsWith('pagamento') ||
-                    cleanText.includes('pagamento') ||
-                    cleanText.includes('como pagar') ||
-                    cleanText.includes('formas de pagamento') ||
-                    cleanText.includes('dados de pagamento') ||
-                    cleanText.includes('numero de pagamento') ||
-                    cleanText.includes('número de pagamento');
+                    ].includes(cleanCmd) ||
+                        cleanCmd.startsWith('pagamento') ||
+                        cleanText.includes('pagamento') ||
+                        cleanText.includes('como pagar') ||
+                        cleanText.includes('formas de pagamento') ||
+                        cleanText.includes('dados de pagamento') ||
+                        cleanText.includes('numero de pagamento') ||
+                        cleanText.includes('número de pagamento');
 
                     if (ehPedidoPagamento) {
                         addLog(`💳 [RESPONDENDO] Formas de Pagamento enviadas para ${jid}`);
@@ -4673,11 +4678,11 @@ async function startWhatsApp(orderCallback, db = null) {
                         'como configurar meu numero', 'ajuda configurar', 'guia configurar', 'recarga automatica', 'sem comprovativo',
                         'recarga direta', 'envio automatico'
                     ].includes(cleanCmd) ||
-                    cleanText.includes('como configurar numero') ||
-                    cleanText.includes('como configurar o numero') ||
-                    cleanText.includes('como configurar meu numero') ||
-                    cleanText.includes('configurar meu numero') ||
-                    cleanText.includes('recarga automatica sem comprovativo');
+                        cleanText.includes('como configurar numero') ||
+                        cleanText.includes('como configurar o numero') ||
+                        cleanText.includes('como configurar meu numero') ||
+                        cleanText.includes('configurar meu numero') ||
+                        cleanText.includes('recarga automatica sem comprovativo');
 
                     if (ehConsultaConfigurarNumero) {
                         await reply(gerarGuiaConfigurarNumero(senderNumber));
@@ -4689,23 +4694,23 @@ async function startWhatsApp(orderCallback, db = null) {
                         '6', '6️⃣', 'txeneca', 'txeneco', 'txenecar', 'txenekar', 'tcheneca', 'tcheneco', 'tchenecar',
                         'emprestimo', 'emprestimos', 'empréstimo', 'empréstimos', 'credito', 'crédito', 'adiantamento'
                     ].includes(cleanCmd) ||
-                    cleanText.includes('como funciona o txeneca') ||
-                    cleanText.includes('como funciona txeneca') ||
-                    cleanText.includes('o que e txeneca') ||
-                    cleanText.includes('o que é txeneca') ||
-                    cleanText.includes('o que e o txeneca') ||
-                    cleanText.includes('o que é o txeneca') ||
-                    cleanText.includes('taxa do txeneca') ||
-                    cleanText.includes('taxa txeneca') ||
-                    cleanText.includes('quando pagar txeneca') ||
-                    cleanText.includes('como pagar txeneca') ||
-                    cleanText.includes('quando pagar') ||
-                    cleanText.includes('regras txeneca') ||
-                    cleanText.includes('como txenecar') ||
-                    cleanText.includes('quero txenecar') ||
-                    cleanText.includes('quero credito') ||
-                    cleanText.includes('quero crédito') ||
-                    cleanText.includes('posso txenecar');
+                        cleanText.includes('como funciona o txeneca') ||
+                        cleanText.includes('como funciona txeneca') ||
+                        cleanText.includes('o que e txeneca') ||
+                        cleanText.includes('o que é txeneca') ||
+                        cleanText.includes('o que e o txeneca') ||
+                        cleanText.includes('o que é o txeneca') ||
+                        cleanText.includes('taxa do txeneca') ||
+                        cleanText.includes('taxa txeneca') ||
+                        cleanText.includes('quando pagar txeneca') ||
+                        cleanText.includes('como pagar txeneca') ||
+                        cleanText.includes('quando pagar') ||
+                        cleanText.includes('regras txeneca') ||
+                        cleanText.includes('como txenecar') ||
+                        cleanText.includes('quero txenecar') ||
+                        cleanText.includes('quero credito') ||
+                        cleanText.includes('quero crédito') ||
+                        cleanText.includes('posso txenecar');
 
                     if (ehConsultaTxeneco) {
                         addLog(`⚡ [RESPONDENDO] Guia e Info de Txeneco enviado para ${jid}`);
@@ -4740,14 +4745,14 @@ async function startWhatsApp(orderCallback, db = null) {
                         const myJidNumber = sock?.user?.id ? sock.user.id.split(':')[0].replace(/\D/g, '') : '258876692062';
                         const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
                         const mentionedJids = (contextInfo?.mentionedJid || []).map(j => String(j).replace(/\D/g, ''));
-                        
-                        const isCallToBot = mentionedJids.some(m => m.includes(myJidNumber)) || 
-                                           text.includes(myJidNumber) || 
-                                           /^(?:@?bot|kanet|ka-net)[,:\s]/i.test(cleanCmd) ||
-                                           /^(?:@?bot|kanet|ka-net)$/i.test(cleanCmd) ||
-                                           cleanText.startsWith('@bot') ||
-                                           cleanText.startsWith('bot ') ||
-                                           cleanText === 'bot';
+
+                        const isCallToBot = mentionedJids.some(m => m.includes(myJidNumber)) ||
+                            text.includes(myJidNumber) ||
+                            /^(?:@?bot|kanet|ka-net)[,:\s]/i.test(cleanCmd) ||
+                            /^(?:@?bot|kanet|ka-net)$/i.test(cleanCmd) ||
+                            cleanText.startsWith('@bot') ||
+                            cleanText.startsWith('bot ') ||
+                            cleanText === 'bot';
 
                         const queryGroup = cleanCmd.replace(/^(?:@?bot|kanet|ka-net)[,:\s]*/i, '').trim();
 
@@ -4886,7 +4891,7 @@ async function getGroups() {
                 creation: g.creation,
                 owner: g.owner || g.subjectOwner
             }));
-        } catch(e) {
+        } catch (e) {
             console.error('⚠️ [BAILEYS] Erro ao buscar grupos participantes:', e.message);
         }
     }
@@ -4970,14 +4975,14 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             if (sock) {
                 await sock.sendMessage(item.jid, {
                     text: `✅ *PEDIDO RECEBIDO* ⚡\n` +
-                          `━━━━━━━━━━━━━━━━━━\n` +
-                          `📦 *Pacote:* *${item.pacote.nome}*\n` +
-                          `📲 *Destino:* *${item.numDestino}*\n` +
-                          `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
-                          `🔖 *Ref:* \`${item.txn_id}\`\n` +
-                          `━━━━━━━━━━━━━━━━━━\n` +
-                          `🚀 *Ativação em andamento...*\n` +
-                          `_Receberá a confirmação em instantes._`
+                        `━━━━━━━━━━━━━━━━━━\n` +
+                        `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                        `📲 *Destino:* *${item.numDestino}*\n` +
+                        `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                        `🔖 *Ref:* \`${item.txn_id}\`\n` +
+                        `━━━━━━━━━━━━━━━━━━\n` +
+                        `🚀 *Ativação em andamento...*\n` +
+                        `_Receberá a confirmação em instantes._`
                 });
             }
 
@@ -5077,14 +5082,14 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 if (sock) {
                     await sock.sendMessage(item.jid, {
                         text: `✅ *PEDIDO AUTOMÁTICO CONFIRMADO* ⚡\n` +
-                              `━━━━━━━━━━━━━━━━━━\n` +
-                              `📦 *Pacote:* *${item.pacote.nome}*\n` +
-                              `📲 *Receptor Fixo:* *${numReceptor}*\n` +
-                              `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
-                              `🔖 *Ref:* \`${item.txn_id}\`\n` +
-                              `━━━━━━━━━━━━━━━━━━\n` +
-                              `🚀 *Ativação automática em andamento!*\n` +
-                              `_Receptor fixo ativo — sem necessidade de enviar número!_`
+                            `━━━━━━━━━━━━━━━━━━\n` +
+                            `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                            `📲 *Receptor Fixo:* *${numReceptor}*\n` +
+                            `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                            `🔖 *Ref:* \`${item.txn_id}\`\n` +
+                            `━━━━━━━━━━━━━━━━━━\n` +
+                            `🚀 *Ativação automática em andamento!*\n` +
+                            `_Receptor fixo ativo — sem necessidade de enviar número!_`
                     });
                 }
 
@@ -5131,14 +5136,14 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             if (sock) {
                 await sock.sendMessage(item.jid, {
                     text: `✅ *COMPROVATIVO VALIDADO* ⚡\n` +
-                          `━━━━━━━━━━━━━━━━━━\n`
- +
-                          `📦 *Pacote:* *${item.pacote.nome}* (${item.pacote.mb} MB)\n` +
-                          `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
-                          `🔖 *Ref:* \`${item.txn_id}\`\n` +
-                          `━━━━━━━━━━━━━━━━━━\n` +
-                          `📲 *Para qual número enviar?*\n` +
-                          `_Responda com o número Vodacom (ex: 84XXXXXXX)_`
+                        `━━━━━━━━━━━━━━━━━━\n`
+                        +
+                        `📦 *Pacote:* *${item.pacote.nome}* (${item.pacote.mb} MB)\n` +
+                        `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
+                        `🔖 *Ref:* \`${item.txn_id}\`\n` +
+                        `━━━━━━━━━━━━━━━━━━\n` +
+                        `📲 *Para qual número enviar?*\n` +
+                        `_Responda com o número Vodacom (ex: 84XXXXXXX)_`
                 });
             }
         }
@@ -5219,7 +5224,7 @@ async function resetSession(db) {
                 sock.ev.removeAllListeners();
                 sock.ws?.close();
                 sock.end?.(undefined);
-            } catch(e) {
+            } catch (e) {
                 console.warn('⚠️ [BAILEYS] Erro ao fechar socket no resetSession:', e.message);
             }
             sock = null;
@@ -5234,7 +5239,7 @@ async function resetSession(db) {
                 const b = db.batch();
                 snap.docs.forEach(d => b.delete(d.ref));
                 await b.commit();
-            } catch(e) {
+            } catch (e) {
                 console.warn('⚠️ [FIRESTORE] Erro ao deletar whatsapp_cloud_auth no resetSession:', e.message);
             }
         }
@@ -5244,7 +5249,7 @@ async function resetSession(db) {
         reconnectAttempts = 0;
         setTimeout(() => startWhatsApp(orderDispatchCallback, db), 1500);
         return { success: true, message: 'Sessão limpa. Novo QR Code a ser gerado...' };
-    } catch(e) {
+    } catch (e) {
         return { success: false, error: e.message };
     }
 }
@@ -5264,7 +5269,7 @@ async function closeGroupsWithReason(motivo, targetJids = null) {
 
     if (!DYN_CFG.GRUPOS_FECHADOS) DYN_CFG.GRUPOS_FECHADOS = [];
     const results = [];
-    const msgTexto = 
+    const msgTexto =
         `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
         `  🛑 *GRUPO TEMPORARIAMENTE FECHADO* 🛑\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
@@ -5277,7 +5282,7 @@ async function closeGroupsWithReason(motivo, targetJids = null) {
         try {
             // 1. Alterar definições do grupo no WhatsApp (apenas admins podem enviar mensagens)
             await sock.groupSettingUpdate(jid, 'announcement');
-            
+
             // 2. Enviar mensagem explicativa no grupo
             await sock.sendMessage(jid, { text: msgTexto });
 
@@ -5286,7 +5291,7 @@ async function closeGroupsWithReason(motivo, targetJids = null) {
                 DYN_CFG.GRUPOS_FECHADOS.push(jid);
             }
             results.push({ jid, ok: true });
-        } catch(e) {
+        } catch (e) {
             console.error(`⚠️ [FECHAR GRUPO ERRO] ${jid}: ${e.message}`);
             results.push({ jid, ok: false, error: e.message });
         }
@@ -5314,7 +5319,7 @@ async function openAllGroups(targetJids = null) {
         : allGroups.map(g => g.jid);
 
     const results = [];
-    const msgTexto = 
+    const msgTexto =
         `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
         `  🟢 *GRUPO REABERTO COM SUCESSO!* 🎉\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
@@ -5335,7 +5340,7 @@ async function openAllGroups(targetJids = null) {
                 if (idx !== -1) DYN_CFG.GRUPOS_FECHADOS.splice(idx, 1);
             }
             results.push({ jid, ok: true });
-        } catch(e) {
+        } catch (e) {
             console.error(`⚠️ [ABRIR GRUPO ERRO] ${jid}: ${e.message}`);
             results.push({ jid, ok: false, error: e.message });
         }
@@ -5358,7 +5363,7 @@ async function sendAnnouncementToGroups(mensagem, targetJids = null) {
         : allGroups.map(g => g.jid);
 
     const results = [];
-    const msgTexto = 
+    const msgTexto =
         `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
         `  📢 *COMUNICADO KA-NET* 📢\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
@@ -5369,7 +5374,7 @@ async function sendAnnouncementToGroups(mensagem, targetJids = null) {
         try {
             await sock.sendMessage(jid, { text: msgTexto });
             results.push({ jid, ok: true });
-        } catch(e) {
+        } catch (e) {
             console.error(`⚠️ [COMUNICADO GRUPO ERRO] ${jid}: ${e.message}`);
             results.push({ jid, ok: false, error: e.message });
         }
@@ -5473,16 +5478,16 @@ setInterval(executarLembretesDividas, 15 * 60 * 1000);
 // E agendar primeira verificação 1 minuto após início
 setTimeout(executarLembretesDividas, 60 * 1000);
 
-module.exports = { 
-    startWhatsApp, 
-    getStatus, 
+module.exports = {
+    startWhatsApp,
+    getStatus,
     getConnectionStatus: getStatus,
     resetSession,
-    sendTextMessage, 
+    sendTextMessage,
     enviarMensagemTexto: sendTextMessage,
-    enviarNotificacaoGrupo, 
-    enviarErroGrupo, 
-    getGrupoNotificacoes, 
+    enviarNotificacaoGrupo,
+    enviarErroGrupo,
+    getGrupoNotificacoes,
     getGrupoErros,
     getGroups,
     setModoManutencao,
