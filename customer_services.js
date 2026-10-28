@@ -1101,33 +1101,36 @@ function getComprasCount(identificador) {
  * 3. Varredura direta na coleção orders (pedidos com status completed)
  */
 async function obterComprasCliente(telefone) {
-    const phone = normalizarTelefone(telefone);
-    if (!phone) return { phone: '', totalCompras: 0, existe: false };
+    const phone = resolverTelefoneDeIdentificador(telefone) || normalizarTelefone(telefone);
+    const rawDigits = String(telefone || '').split('@')[0].split(':')[0].replace(/\D/g, '');
+    const searchKey = phone || rawDigits;
+    if (!searchKey) return { phone: '', totalCompras: 0, existe: false };
 
     // 1. Verificar cache em memória
-    let record = clientLoyalty.get(phone);
+    let record = (phone && clientLoyalty.get(phone)) || (rawDigits && clientLoyalty.get(rawDigits));
     if (record && typeof record.totalCompras === 'number' && record.totalCompras > 0) {
-        return { phone, totalCompras: record.totalCompras, record, existe: true };
+        return { phone: record.phone || phone || searchKey, totalCompras: record.totalCompras, record, existe: true };
     }
 
     // 2. Fallback ao Firestore se em memória estiver zerado ou ausente
     if (firestoreDb) {
         try {
-            const doc = await firestoreDb.collection('client_loyalty').doc(phone).get();
+            const docId = phone || searchKey;
+            const doc = await firestoreDb.collection('client_loyalty').doc(docId).get();
             if (doc.exists) {
                 const data = doc.data();
                 const total = Math.max(record?.totalCompras || 0, data.totalCompras || 0);
-                record = { ...record, ...data, phone, totalCompras: total };
-                clientLoyalty.set(phone, record);
+                record = { ...record, ...data, phone: docId, totalCompras: total };
+                clientLoyalty.set(docId, record);
                 salvarCacheLocal();
-                return { phone, totalCompras: total, record, existe: true };
+                return { phone: docId, totalCompras: total, record, existe: true };
             }
 
             // 3. Se nem no client_loyalty existir, buscar directamente em orders completed
-            console.log(`🔍 [LOYALTY FALLBACK] Buscando compras históricas de ${phone} em orders...`);
+            console.log(`🔍 [LOYALTY FALLBACK] Buscando compras históricas de ${searchKey} em orders...`);
             const ordersSnap = await firestoreDb.collection('orders')
                 .where('status', '==', 'completed')
-                .limit(1000)
+                .limit(2000)
                 .get();
 
             if (!ordersSnap.empty) {
@@ -1135,39 +1138,45 @@ async function obterComprasCliente(telefone) {
                 let historico = [];
                 ordersSnap.docs.forEach(d => {
                     const o = d.data();
-                    const candidates = [o.senderPhone, o.cliente_solicitante, o.pagador, o.sender, o.numero];
-                    const match = candidates.some(c => normalizarTelefone(c) === phone);
+                    const candidates = [o.senderPhone, o.cliente_solicitante, o.pagador, o.senderNumber, o.sender, o.numero];
+                    const match = candidates.some(c => {
+                        if (!c) return false;
+                        const res = resolverTelefoneDeIdentificador(c) || normalizarTelefone(c);
+                        if (phone && res === phone) return true;
+                        const dClean = String(c).split('@')[0].split(':')[0].replace(/\D/g, '');
+                        return dClean === searchKey;
+                    });
                     if (match) {
                         count++;
                         historico.push({
                             orderId: o.orderId || d.id,
                             valor: Number(o.valor || o.valor_pago) || 0,
                             mb: Number(o.quantidade) || 0,
-                            data: o.createdAt || new Date().toISOString()
+                            data: o.completedAt || o.createdAt || new Date().toISOString()
                         });
                     }
                 });
 
                 if (count > 0) {
                     record = {
-                        phone,
+                        phone: phone || searchKey,
                         totalCompras: count,
                         ultimaCompra: historico[0]?.data || new Date().toISOString(),
-                        historico: historico.slice(0, 20)
+                        historico: historico.slice(0, 30)
                     };
-                    clientLoyalty.set(phone, record);
+                    clientLoyalty.set(phone || searchKey, record);
                     salvarCacheLocal();
-                    salvarNoFirestore('client_loyalty', phone, record);
-                    console.log(`✅ [LOYALTY FALLBACK] ${phone}: encontradas ${count} compras passadas em orders.`);
-                    return { phone, totalCompras: count, record, existe: true };
+                    salvarNoFirestore('client_loyalty', phone || searchKey, record);
+                    console.log(`✅ [LOYALTY FALLBACK] ${phone || searchKey}: encontradas ${count} compras passadas em orders.`);
+                    return { phone: phone || searchKey, totalCompras: count, record, existe: true };
                 }
             }
         } catch (e) {
-            console.warn(`⚠️ [CUSTOMER-SERVICES] Erro ao buscar compras de ${phone} no Firestore:`, e.message);
+            console.warn(`⚠️ [CUSTOMER-SERVICES] Erro ao buscar compras de ${searchKey} no Firestore:`, e.message);
         }
     }
 
-    return { phone, totalCompras: record?.totalCompras || 0, record, existe: !!record };
+    return { phone: phone || searchKey, totalCompras: record?.totalCompras || 0, record, existe: !!record };
 }
 
 // ── 2. SISTEMA DE TXENECO (CRÉDITO DE INTERNET) ───────────────────────────────
