@@ -63,6 +63,56 @@
 <body>
 
 <!-- Toast -->
+<!-- Modal Nova Assinatura Ilimitada -->
+<div id="modal-add-ilimitado" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem;">
+  <div class="card" style="width:100%;max-width:440px;background:#0d131f;border:1px solid rgba(255,255,255,.1);">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-bold text-base text-emerald-400">Cadastrar Pacote Ilimitado</h3>
+      <button onclick="closeAddIlimitadoModal()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+    <form onsubmit="salvarNovaAssinaturaIlimitada(event)" class="space-y-3 text-xs">
+      <div>
+        <label class="block text-gray-400 mb-1">Telefone do Cliente (9 dígitos):</label>
+        <input type="text" id="add-sub-phone" placeholder="Ex: 841234567" required class="w-full p-2.5 rounded bg-gray-900 border border-gray-700 text-white focus:border-emerald-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-gray-400 mb-1">Nome do Cliente (opcional):</label>
+        <input type="text" id="add-sub-nome" placeholder="Ex: João Machel" class="w-full p-2.5 rounded bg-gray-900 border border-gray-700 text-white focus:border-emerald-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-gray-400 mb-1">Pacote Ilimitado / Plano:</label>
+        <select id="add-sub-plano" class="w-full p-2.5 rounded bg-gray-900 border border-gray-700 text-white focus:border-emerald-500 outline-none" onchange="atualizarPrecoPlanoSugestao(this.value)">
+          <option value="Vodacom 11GB + Minutos|450">Vodacom 11GB + Minutos (450 MT)</option>
+          <option value="Vodacom 15GB + Minutos|570">Vodacom 15GB + Minutos (570 MT)</option>
+          <option value="Vodacom 25GB + Minutos|850">Vodacom 25GB + Minutos (850 MT)</option>
+          <option value="Movitel 9GB + Minutos|469">Movitel 9GB + Minutos (469 MT)</option>
+          <option value="Movitel 23GB + Minutos|950">Movitel 23GB + Minutos (950 MT)</option>
+          <option value="Movitel 38GB + Minutos|1450">Movitel 38GB + Minutos (1450 MT)</option>
+          <option value="Personalizado|0">Outro Pacote (Personalizado)</option>
+        </select>
+      </div>
+      <div id="custom-plano-div" style="display:none;">
+        <label class="block text-gray-400 mb-1">Nome Personalizado:</label>
+        <input type="text" id="add-sub-custom-nome" placeholder="Nome do plano" class="w-full p-2.5 rounded bg-gray-900 border border-gray-700 text-white focus:border-emerald-500 outline-none">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-gray-400 mb-1">Valor (MT):</label>
+          <input type="number" id="add-sub-valor" value="450" required class="w-full p-2.5 rounded bg-gray-900 border border-gray-700 text-white focus:border-emerald-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-gray-400 mb-1">Validade (Dias):</label>
+          <input type="number" id="add-sub-dias" value="30" required class="w-full p-2.5 rounded bg-gray-900 border border-gray-700 text-white focus:border-emerald-500 outline-none">
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeAddIlimitadoModal()" class="btn btn-amber">Cancelar</button>
+        <button type="submit" id="btn-save-sub" class="btn btn-green">Ativar Assinatura</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="toast" class="toast glass"></div>
 
 <!-- ═══ SIDEBAR (Desktop) ═════════════════════════════════════ -->
@@ -93,6 +143,10 @@
   <button class="sidebar-btn" onclick="showTab('groups',this)">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
     Grupos
+  </button>
+  <button class="sidebar-btn" onclick="showTab('ilimitados',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    Pacotes Ilimitados
   </button>
   <button class="sidebar-btn" onclick="showTab('packages',this)">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -240,6 +294,45 @@
   </div>
 
   <!-- ─── PACOTES ESPECIAIS ────────────────────────────────── -->
+  <!-- ════ PACOTES ILIMITADOS (30 DIAS) ════ -->
+  <div id="tab-ilimitados" class="section">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <div>
+        <h2 class="text-lg font-bold" style="color:#e2e8f0;">Pacotes Ilimitados (30 Dias)</h2>
+        <p class="text-xs text-gray-400">Controlo de assinaturas ativas e lembretes de renovação (3 dias, 12h e 30m)</p>
+      </div>
+      <button class="btn btn-green text-xs" onclick="openAddIlimitadoModal()">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:16px;height:16px;"><path d="M12 4v16m8-8H4"/></svg>
+        Nova Assinatura
+      </button>
+    </div>
+
+    <!-- Métricas Ilimitados -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div class="stat-card card">
+        <div class="text-xs text-gray-400">Total Ativos</div>
+        <div id="ilimitados-total-ativos" class="text-xl font-bold mt-1 text-emerald-400">0</div>
+      </div>
+      <div class="stat-card card">
+        <div class="text-xs text-gray-400">Vencem em ≤ 3 Dias</div>
+        <div id="ilimitados-vencem-3dias" class="text-xl font-bold mt-1 text-amber-400">0</div>
+      </div>
+      <div class="stat-card card">
+        <div class="text-xs text-gray-400">Vão Renovar (SIM)</div>
+        <div id="ilimitados-confirmados" class="text-xl font-bold mt-1 text-blue-400">0</div>
+      </div>
+      <div class="stat-card card">
+        <div class="text-xs text-gray-400">Recusaram (NÃO)</div>
+        <div id="ilimitados-recusados" class="text-xl font-bold mt-1 text-red-400">0</div>
+      </div>
+    </div>
+
+    <!-- Lista de Assinaturas -->
+    <div id="ilimitados-list" class="space-y-3">
+      <div class="card skeleton" style="height:100px;"></div>
+    </div>
+  </div>
+
   <div id="tab-packages" class="section">
     <h2 class="text-lg font-bold mb-3" style="color:#e2e8f0;">Pacotes Especiais Activos</h2>
     <div id="packages-list" class="space-y-3">
@@ -267,6 +360,10 @@
     <button class="tab-btn" id="mob-tab-bot" onclick="showTab('bot',this,'mob')">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2z"/><path d="M6 8h12l2 4-1 7H5L4 12l2-4z"/></svg>
       Bot
+    </button>
+    <button class="tab-btn" id="mob-tab-ilimitados" onclick="showTab('ilimitados',this,'mob')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Ilimitados
     </button>
     <button class="tab-btn" id="mob-tab-packages" onclick="showTab('packages',this,'mob')">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>

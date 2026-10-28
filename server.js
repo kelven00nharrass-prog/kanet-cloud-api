@@ -7067,8 +7067,35 @@ app.post('/api/subscribe/plan', async (req, res) => {
 
 // ── API: Listar planos activos (Admin) ────────────────────────────────────────
 app.get('/api/admin/plans', (req, res) => {
-  const all = [...scheduledPlans.values()].sort((a, b) =>
-    new Date(b.createdAt) - new Date(a.createdAt));
+  const all = [...scheduledPlans.values()];
+
+  // Incluir também assinaturas ilimitadas ativas/recentes para visualização no App Admin e Painel
+  if (customerServices && typeof customerServices.listarAssinaturasIlimitadas === 'function') {
+    try {
+      const subs = customerServices.listarAssinaturasIlimitadas('todas');
+      subs.forEach(s => {
+        all.push({
+          id: s.id,
+          tipo: 'ILIMITADO (30D)',
+          planoNome: s.planoNome,
+          numero: s.numeroDestino || s.phone,
+          clientPhone: s.phone,
+          nomeCliente: s.nomeCliente,
+          total_mb: s.valor ? (s.valor * 1024) : 10240,
+          entregas_feitas: s.notificado_3dias ? 1 : 0,
+          entregas_diarias_total: 1,
+          proxima_entrega: s.dataExpiracao,
+          status: s.status,
+          intencaoRenovacao: s.intencaoRenovacao,
+          valor: s.valor,
+          createdAt: s.createdAt,
+          isIlimitadoSub: true
+        });
+      });
+    } catch (_) { }
+  }
+
+  all.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   return res.json({ success: true, count: all.length, plans: all });
 });
 
@@ -7076,11 +7103,17 @@ app.get('/api/admin/plans', (req, res) => {
 app.delete('/api/admin/plans/:planId', (req, res) => {
   const { planId } = req.params;
   const plan = scheduledPlans.get(planId);
-  if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
+  if (!plan) {
+    if (customerServices && typeof customerServices.cancelarAssinaturaIlimitada === 'function') {
+      const ok = customerServices.cancelarAssinaturaIlimitada(planId);
+      if (ok) return res.json({ success: true, mensagem: `Assinatura ilimitada ${planId} cancelada.` });
+    }
+    return res.status(404).json({ success: false, error: 'Plano ou assinatura não encontrado.' });
+  }
   plan.status = 'cancelado';
   plan.cancelado_em = new Date().toISOString();
   saveScheduledPlans();
-  console.log(`🚫 [PLANO] Cancelado pelo admin: ${planId}`);
+  console.log(`📦 [PLANO] Cancelado pelo admin: ${planId}`);
   return res.json({ success: true, mensagem: `Plano ${planId} cancelado.` });
 });
 
