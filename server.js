@@ -1870,6 +1870,31 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           }, 2500);
         }
       }
+
+      // 📡 Auto-registo de Assinatura Ilimitada / Mensal (30 Dias)
+      const valPagoNum = Number((order && (order.valor || order.valor_pago)) || 0);
+      const ehIlimitado = (order && (
+        (order.modo && (order.modo === 'ilimitado' || order.modo === 'mensal' || order.modo === 'faseado_mensal')) ||
+        (order.pacoteNome && /ilimitad|mensal|30\s*dias/i.test(order.pacoteNome)) ||
+        [450, 469, 570, 850, 950, 1450, 232, 461, 700].includes(valPagoNum)
+      ));
+      if (ehIlimitado && customerServices && typeof customerServices.cadastrarOuRenovarAssinaturaIlimitada === 'function') {
+        try {
+          customerServices.cadastrarOuRenovarAssinaturaIlimitada({
+            phone: clientTel || (order && (order.senderPhone || order.cliente_solicitante || order.sender)),
+            lid: orderLid,
+            jid: clientJid || (order && order.jid),
+            nomeCliente: (order && (order.senderName || order.nomeCliente)) || null,
+            planoNome: (order && (order.pacoteNome || order.planoNome)) || `Pacote Ilimitado (${valPagoNum} MT)`,
+            tipoPlano: (order && order.modo) || 'ilimitado',
+            valor: valPagoNum,
+            numeroDestino: targetNum || (order && order.numero),
+            dias: 30
+          });
+        } catch (errSub) {
+          console.warn('[ILIMITADOS] Erro ao auto-cadastrar assinatura ilimitada:', errSub.message);
+        }
+      }
     }
 
     const jaNotificadoGrupo = !!(order && order.groupNotified);
@@ -6887,6 +6912,45 @@ setTimeout(checkScheduledPlans, 5000);        // Primeira checagem 5s após boot
 
 
 // ── ENDPOINT: Listar Planos Agendados Activos ────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// 📡 API: GESTÃO DE PACOTES ILIMITADOS (30 DIAS)
+// ══════════════════════════════════════════════════════════════════
+app.get('/api/ilimitados', (req, res) => {
+  const filtro = req.query.filtro || 'todas';
+  const list = customerServices && typeof customerServices.listarAssinaturasIlimitadas === 'function'
+    ? customerServices.listarAssinaturasIlimitadas(filtro)
+    : [];
+  res.json({ success: true, count: list.length, assinaturas: list });
+});
+
+app.post('/api/ilimitados', (req, res) => {
+  if (!customerServices || typeof customerServices.cadastrarOuRenovarAssinaturaIlimitada !== 'function') {
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+  }
+  const sub = customerServices.cadastrarOuRenovarAssinaturaIlimitada(req.body);
+  if (!sub) return res.status(400).json({ success: false, erro: 'Dados inválidos' });
+  res.json({ success: true, mensagem: 'Assinatura ilimitada registada com sucesso!', assinatura: sub });
+});
+
+app.post('/api/ilimitados/:id/renovar', (req, res) => {
+  if (!customerServices || typeof customerServices.renovarAssinaturaIlimitadaManual !== 'function') {
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+  }
+  const dias = parseInt(req.body.dias, 10) || 30;
+  const sub = customerServices.renovarAssinaturaIlimitadaManual(req.params.id, dias);
+  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
+  res.json({ success: true, mensagem: `Assinatura renovada por mais ${dias} dias!`, assinatura: sub });
+});
+
+app.post('/api/ilimitados/:id/cancelar', (req, res) => {
+  if (!customerServices || typeof customerServices.cancelarAssinaturaIlimitada !== 'function') {
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+  }
+  const ok = customerServices.cancelarAssinaturaIlimitada(req.params.id);
+  if (!ok) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
+  res.json({ success: true, mensagem: 'Assinatura cancelada com sucesso.' });
+});
+
 app.get('/api/plans/scheduled', (req, res) => {
   const plans = Array.from(scheduledPlans.values());
   res.json({ success: true, count: plans.length, plans });

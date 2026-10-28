@@ -2500,8 +2500,79 @@ async function startWhatsApp(orderCallback, db = null) {
                                 addLog(`✅ [PLANO MENSAL] ${senderNumber} → ${isSim ? 'SIM' : 'NÃO'} | ${resp.data.acao}`);
                                 continue;
                             }
-                            // Se não houver plano pendente, deixar cair para processamento normal
+                                                        // Se não houver plano pendente, deixar cair para processamento normal
                         } catch (e) { /* continuar processamento normal se erro */ }
+
+                        // ══════════════════════════════════════════════════════════════════
+                        // RESPOSTA DO CLIENTE À RENOVAÇÃO DO PACOTE ILIMITADO (SIM / NÃO)
+                        // ══════════════════════════════════════════════════════════════════
+                        if (!isGroupMsg && customerServices && typeof customerServices.obterAssinaturaPendenteConfirmacao === 'function') {
+                            const pendRenovacao = customerServices.obterAssinaturaPendenteConfirmacao(senderNumber) ||
+                                (rawLidClean ? customerServices.obterAssinaturaPendenteConfirmacao(rawLidClean) : null);
+
+                            if (pendRenovacao) {
+                                if (isSim) {
+                                    customerServices.registrarRespostaRenovacao(pendRenovacao.phone, true);
+                                    await reply(
+                                        `✅ *RENOVAÇÃO CONFIRMADA COM SUCESSO!* 🚀\n` +
+                                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                        `Perfeito, *${pendRenovacao.nomeCliente || 'estimado(a) cliente'}*!\n\n` +
+                                        `Registamos com sucesso o seu interesse em renovar o pacote *${pendRenovacao.planoNome}*.\n\n` +
+                                        `📅 *O que acontece agora:*\n` +
+                                        `No dia do vencimento, vamos enviar-lhe um lembrete com 12 horas e outro com 30 minutos de antecedência com as instruções de pagamento para manter a sua internet 100% ativa sem interrupções! 💙📶\n` +
+                                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                        `A Ka-Net agradece pela sua confiança e preferência!`
+                                    );
+
+                                    // NOTIFICAR O MASTER KELVEN (ADMIN)
+                                    const masterJid = '258850401416@s.whatsapp.net';
+                                    const dataVenc = new Date(pendRenovacao.dataExpiracao).toLocaleString('pt-PT', {
+                                        timeZone: 'Africa/Maputo',
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    });
+
+                                    const avisoAdmin =
+                                        `🔔 *[RENOVAÇÃO CONFIRMADA - PACOTE ILIMITADO]* 🔔\n` +
+                                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                        `👤 *Cliente:* *${pendRenovacao.nomeCliente || 'Cliente'}*\n` +
+                                        `📞 *Contacto:* \`${pendRenovacao.phone}\`\n` +
+                                        `📱 *Nº Destino:* \`${pendRenovacao.numeroDestino || pendRenovacao.phone}\`\n` +
+                                        `📦 *Plano:* *${pendRenovacao.planoNome}* (${pendRenovacao.valor} MT)\n` +
+                                        `📅 *Vencimento:* ${dataVenc}\n` +
+                                        `✅ *Decisão:* Confirmou que *VAI RENOVAR* para o próximo mês!\n` +
+                                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+                                    try {
+                                        await sendTextMessage(masterJid, avisoAdmin);
+                                        if (lidToPhoneMap.has('216054655656152')) {
+                                            await sendTextMessage('216054655656152@lid', avisoAdmin);
+                                        }
+                                    } catch (_) { }
+
+                                    addLog(`🔔 [ADMIN NOTIFICADO] Cliente ${pendRenovacao.phone} confirmou renovação de ${pendRenovacao.planoNome}`);
+                                    continue;
+                                } else {
+                                    customerServices.registrarRespostaRenovacao(pendRenovacao.phone, false);
+                                    await reply(
+                                        `Entendido, *${pendRenovacao.nomeCliente || 'estimado(a) cliente'}*. 👍\n\n` +
+                                        `A sua decisão foi registada: o pacote *${pendRenovacao.planoNome}* permanecerá ativo até ao término dos 30 dias e *não será renovado*.\n\n` +
+                                        `Se mudar de ideias até lá, basta entrar em contacto connosco a qualquer momento. A Ka-Net agradece pela sua preferência! 🙏`
+                                    );
+
+                                    const masterJid = '258850401416@s.whatsapp.net';
+                                    const avisoAdminNao =
+                                        `ℹ️ *[RENOVAÇÃO RECUSADA - PACOTE ILIMITADO]*\n` +
+                                        `👤 *Cliente:* *${pendRenovacao.nomeCliente || 'Cliente'}* (\`${pendRenovacao.phone}\`)\n` +
+                                        `📦 *Pacote:* *${pendRenovacao.planoNome}*\n` +
+                                        `❌ O cliente informou que *NÃO* vai renovar para o próximo mês.`;
+                                    try { await sendTextMessage(masterJid, avisoAdminNao); } catch (_) { }
+                                    continue;
+                                }
+                            }
+                        }
                     }
 
                     if (isSaque) {
@@ -2845,6 +2916,24 @@ async function startWhatsApp(orderCallback, db = null) {
                                     valor: parseFloat(pay.valor),
                                     timestamp: Date.now()
                                 });
+
+                                // Auto-cadastro se for pacote ilimitado ou mensal de 30 dias
+                                const ehIlimitadoTipo = (pacote && (pacote.tipo === 'ilimitado' || pacote.tipo === 'mensal' || pacote.periodo === 'ilimitado')) ||
+                                    [450, 469, 570, 850, 950, 1450, 232, 461, 700].includes(Number(valorFinal)) ||
+                                    /ilimitad|mensal|30\s*dias/i.test(pacote ? pacote.nome : '');
+                                if (ehIlimitadoTipo && customerServices && typeof customerServices.cadastrarOuRenovarAssinaturaIlimitada === 'function') {
+                                    customerServices.cadastrarOuRenovarAssinaturaIlimitada({
+                                        phone: senderNumber,
+                                        lid: rawLidClean,
+                                        jid,
+                                        nomeCliente,
+                                        planoNome: pacote ? pacote.nome : `Pacote ${valorFinal} MT (30 Dias)`,
+                                        tipoPlano: (pacote && pacote.tipo) || 'ilimitado',
+                                        valor: valorFinal,
+                                        numeroDestino: numDestino,
+                                        dias: 30
+                                    });
+                                }
                                 if (isCombined && Array.isArray(pay.transacoes)) {
                                     for (const t of pay.transacoes) {
                                         transacoesProcessadas.add(t.txn_id);
@@ -2925,6 +3014,165 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
 
                     // ── 1.0 COMANDO PARA TESTAR BOAS-VINDAS NO GRUPO ──
+                                        // ══════════════════════════════════════════════════════════════════
+                    // 📡 COMANDOS DE GESTÃO DE PACOTES ILIMITADOS (MASTER KELVEN)
+                    // ══════════════════════════════════════════════════════════════════
+                    if (cleanCmd === 'ilimitados' || cleanCmd === '.ilimitados' || cleanCmd === '!ilimitados' || cleanCmd === '#ilimitados') {
+                        if (!senderIsMaster) {
+                            await reply('❌ Apenas administradores do sistema têm acesso à gestão de pacotes ilimitados.');
+                            continue;
+                        }
+
+                        const assinaturas = customerServices && typeof customerServices.listarAssinaturasIlimitadas === 'function'
+                            ? customerServices.listarAssinaturasIlimitadas('todas')
+                            : [];
+
+                        if (!assinaturas || assinaturas.length === 0) {
+                            await reply(
+                                `📡 *GESTÃO DE PACOTES ILIMITADOS (30 DIAS)*\n` +
+                                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                `Nenhuma assinatura de pacote ilimitado ativa no momento.\n\n` +
+                                `💡 *Para cadastrar manualmente um cliente:*\n` +
+                                `*.addilimitado <numero> <plano> [dias]*\n` +
+                                `_Exemplo:_ *.addilimitado 841234567 11GB 30*`
+                            );
+                            continue;
+                        }
+
+                        const agora = Date.now();
+                        let msg = `📡 *PACOTES ILIMITADOS ATIVOS (${assinaturas.length})*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+                        assinaturas.forEach((sub, idx) => {
+                            const expiraMs = new Date(sub.dataExpiracao).getTime();
+                            const diffDias = Math.ceil((expiraMs - agora) / (1000 * 60 * 60 * 24));
+                            const dataVenc = new Date(sub.dataExpiracao).toLocaleDateString('pt-PT');
+
+                            let statusEmoji = '🟢';
+                            let statusTexto = `${diffDias} dia(s) restante(s)`;
+                            if (diffDias <= 0) {
+                                statusEmoji = '🔴';
+                                statusTexto = 'Expirado';
+                            } else if (diffDias <= 3) {
+                                statusEmoji = '🟡';
+                                statusTexto = `Vence em ${diffDias}d!`;
+                            }
+
+                            let renovacao = '⏳ Aguardando 3 dias';
+                            if (sub.intencaoRenovacao === 'confirmou_sim') {
+                                renovacao = '✅ Confirmou que VAI renovar';
+                            } else if (sub.intencaoRenovacao === 'recusou_nao') {
+                                renovacao = '❌ Recusou renovação';
+                            } else if (sub.notificado_3dias) {
+                                renovacao = '📩 Notificado (aguarda resposta)';
+                            }
+
+                            msg += `${idx + 1}. ${statusEmoji} *${sub.nomeCliente || sub.phone}* (\`${sub.phone}\`)\n` +
+                                   `   📦 *Plano:* ${sub.planoNome} (${sub.valor} MT)\n` +
+                                   `   📅 *Vence:* ${dataVenc} (${statusTexto})\n` +
+                                   `   🔄 *Renovação:* ${renovacao}\n\n`;
+                        });
+
+                        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                               `💡 *Comandos do Administrador:*\n` +
+                               `▫️ *.addilimitado <numero> <plano> [dias]*\n` +
+                               `▫️ *.renovarilimitado <numero> [dias]*\n` +
+                               `▫️ *.cancelarilimitado <numero>*`;
+
+                        await reply(msg);
+                        continue;
+                    }
+
+                    // .addilimitado <numero> <plano> [dias]
+                    if (cleanCmd.startsWith('addilimitado') || cleanCmd.startsWith('.addilimitado') || cleanCmd.startsWith('!addilimitado')) {
+                        if (!senderIsMaster) {
+                            await reply('❌ Apenas administradores podem cadastrar assinaturas.');
+                            continue;
+                        }
+
+                        const rawArgs = text.replace(/^[.!/#]?addilimitado\s*/i, '').trim();
+                        const parts = rawArgs.split(/\s+/);
+                        const telRaw = parts[0];
+                        const planoRaw = parts.slice(1, -1).join(' ') || parts[1] || 'Pacote Ilimitado 30 Dias';
+                        const lastPart = parts[parts.length - 1];
+                        const diasRaw = (/^\d+$/.test(lastPart) && parts.length > 2) ? parseInt(lastPart, 10) : 30;
+
+                        const telNorm = customerServices.normalizarTelefone(telRaw);
+                        if (!telNorm) {
+                            await reply('❌ Número inválido. Formato: *.addilimitado <84XXXXXXX> <nome_plano> [dias]*');
+                            continue;
+                        }
+
+                        const novaSub = customerServices.cadastrarOuRenovarAssinaturaIlimitada({
+                            phone: telNorm,
+                            planoNome: planoRaw,
+                            tipoPlano: 'ilimitado',
+                            dias: diasRaw,
+                            numeroDestino: telNorm,
+                            nomeCliente: `Cliente ${telNorm}`
+                        });
+
+                        const dataVenc = new Date(novaSub.dataExpiracao).toLocaleDateString('pt-PT');
+                        await reply(
+                            `✅ *ASSINATURA ILIMITADA REGISTADA COM SUCESSO!*\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                            `📱 *Cliente:* \`${telNorm}\`\n` +
+                            `📦 *Plano:* *${novaSub.planoNome}*\n` +
+                            `📅 *Válido até:* *${dataVenc}* (${diasRaw} dias)\n` +
+                            `🔔 O cliente será avisado automaticamente 3 dias antes do término!`
+                        );
+                        continue;
+                    }
+
+                    // .renovarilimitado <numero> [dias]
+                    if (cleanCmd.startsWith('renovarilimitado') || cleanCmd.startsWith('.renovarilimitado') || cleanCmd.startsWith('!renovarilimitado')) {
+                        if (!senderIsMaster) {
+                            await reply('❌ Apenas administradores podem renovar assinaturas.');
+                            continue;
+                        }
+
+                        const rawArgs = text.replace(/^[.!/#]?renovarilimitado\s*/i, '').trim();
+                        const parts = rawArgs.split(/\s+/);
+                        const telRaw = parts[0];
+                        const diasRaw = parseInt(parts[1], 10) || 30;
+
+                        const telNorm = customerServices.normalizarTelefone(telRaw);
+                        const renovada = customerServices.renovarAssinaturaIlimitadaManual(telNorm || telRaw, diasRaw);
+
+                        if (!renovada) {
+                            await reply(`❌ Nenhuma assinatura encontrada para o número ${telRaw}.`);
+                            continue;
+                        }
+
+                        const dataVenc = new Date(renovada.dataExpiracao).toLocaleDateString('pt-PT');
+                        await reply(
+                            `✅ *ASSINATURA RENOVADA COM SUCESSO!*\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                            `📱 *Cliente:* \`${renovada.phone}\`\n` +
+                            `📦 *Plano:* *${renovada.planoNome}*\n` +
+                            `📅 *Nova Data de Vencimento:* *${dataVenc}* (+${diasRaw} dias)\n` +
+                            `🔄 As notificações de 3 dias, 12h e 30min foram rearmadas!`
+                        );
+                        continue;
+                    }
+
+                    // .cancelarilimitado <numero>
+                    if (cleanCmd.startsWith('cancelarilimitado') || cleanCmd.startsWith('.cancelarilimitado') || cleanCmd.startsWith('!cancelarilimitado')) {
+                        if (!senderIsMaster) {
+                            await reply('❌ Apenas administradores podem cancelar assinaturas.');
+                            continue;
+                        }
+
+                        const rawArgs = text.replace(/^[.!/#]?cancelarilimitado\s*/i, '').trim();
+                        const cancelada = customerServices.cancelarAssinaturaIlimitada(rawArgs);
+
+                        if (cancelada) {
+                            await reply(`✅ Assinatura de \`${rawArgs}\` cancelada com sucesso.`);
+                        } else {
+                            await reply(`❌ Assinatura não encontrada para \`${rawArgs}\`.`);
+                        }
+                        continue;
+                    }
+
                     if (cleanCmd === 'testarboasvindas' || cleanCmd === '.testarboasvindas' || cleanCmd === 'boasvindas' || cleanCmd === '.boasvindas') {
                         if (jid.endsWith('@g.us')) {
                             let gName = 'Grupo Ka-Net';
@@ -5409,6 +5657,147 @@ async function sendAnnouncementToGroups(mensagem, targetJids = null) {
 // ────────────────────────────────────────────────────────────────
 // MOTOR AUTOMÁTICO DE LEMBRETES DE TXENECO (3X AO DIA)
 // ────────────────────────────────────────────────────────────────
+
+/**
+ * Monitoramento contínuo e envio de alertas para assinaturas de pacotes ilimitados:
+ * - 3 dias antes: pergunta de renovação (SIM ou NÃO)
+ * - 12 horas antes: lembrete com M-Pesa / e-Mola caso tenha confirmado que vai renovar
+ * - 30 minutos antes: alerta urgente caso tenha confirmado que vai renovar
+ */
+async function executarLembretesIlimitados() {
+    if (!sock || connectionStatus !== 'connected') return;
+    if (!customerServices || typeof customerServices.listarAssinaturasIlimitadas !== 'function') return;
+
+    try {
+        const agora = Date.now();
+        const assinaturas = customerServices.listarAssinaturasIlimitadas('todas');
+        if (!assinaturas || assinaturas.length === 0) return;
+
+        for (const sub of assinaturas) {
+            if (sub.status !== 'ativo') continue;
+            const expiraMs = new Date(sub.dataExpiracao).getTime();
+            const diffMs = expiraMs - agora;
+
+            // Se o prazo expirou
+            if (diffMs <= 0) {
+                sub.status = 'expirado';
+                sub.updatedAt = new Date().toISOString();
+                customerServices.salvarAssinatura(sub);
+                console.log(`🔴 [ILIMITADO EXPIRADO] Assinatura de ${sub.phone} (${sub.planoNome}) expirou.`);
+                continue;
+            }
+
+            const jidAlvo = sub.jid || (sub.phone ? `258${sub.phone}@s.whatsapp.net` : null);
+            if (!jidAlvo) continue;
+
+            const dataFormatada = new Date(sub.dataExpiracao).toLocaleString('pt-PT', {
+                timeZone: 'Africa/Maputo',
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // 1. FALTANDO 3 DIAS (<= 72h) E NÃO NOTIFICADO
+            if (diffMs <= (3 * 24 * 3600 * 1000) && !sub.notificado_3dias) {
+                sub.notificado_3dias = true;
+                sub.updatedAt = new Date().toISOString();
+                customerServices.salvarAssinatura(sub);
+
+                const msg3Dias =
+                    `⏳ *LEMBRETE DE VENCIMENTO: PACOTE ILIMITADO KA-NET* ⏳\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                    `Olá, *${sub.nomeCliente || 'Estimado(a) Cliente'}*! 👋\n\n` +
+                    `Informamos que o seu pacote *${sub.planoNome}* expira em *3 dias*:\n` +
+                    `📅 *Data de Vencimento:* ${dataFormatada}\n` +
+                    `📱 *Número Beneficiário:* *${sub.numeroDestino || sub.phone}*\n\n` +
+                    `Deseja renovar para o próximo mês para garantir a continuidade da sua internet sem cortes?\n\n` +
+                    `👉 *Responda com:*\n` +
+                    `*SIM* — se vai renovar\n` +
+                    `*NÃO* — se não pretende renovar agora\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+                try {
+                    await sendTextMessage(jidAlvo, msg3Dias);
+                    addLog(`⏳ [ILIMITADO 3 DIAS] Notificação enviada para ${sub.phone} (${sub.planoNome})`);
+                } catch (err) {
+                    console.warn(`[ILIMITADO] Erro ao enviar aviso 3 dias para ${sub.phone}:`, err.message);
+                }
+                continue;
+            }
+
+            // AS NOTIFICAÇÕES SEGUINTES OCORREM APENAS SE O CLIENTE CONFIRMOU QUE VAI RENOVAR ("confirmou_sim")
+            if (sub.intencaoRenovacao === 'confirmou_sim') {
+
+                // 2. FALTANDO 12 HORAS (<= 12h) E NÃO NOTIFICADO
+                if (diffMs <= (12 * 3600 * 1000) && !sub.notificado_12h) {
+                    sub.notificado_12h = true;
+                    sub.updatedAt = new Date().toISOString();
+                    customerServices.salvarAssinatura(sub);
+
+                    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
+                    const horaExp = dataFormatada.includes(',') ? dataFormatada.split(',')[1].trim() : dataFormatada;
+
+                    const msg12h =
+                        `⏳ *LEMBRETE KA-NET: FALTAM 12 HORAS* ⏳\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `Olá, *${sub.nomeCliente || 'Cliente'}*! 👋\n\n` +
+                        `Faltam apenas *12 horas* para o término do seu pacote *${sub.planoNome}* (expira hoje às ${horaExp}).\n\n` +
+                        `Como você confirmou que *vai renovar*, já pode efetuar a transferência para manter a sua internet ativa sem interrupções:\n\n` +
+                        `💰 *CONTAS DE PAGAMENTO:*\n` +
+                        `🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+                        `🟠 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+                        `💵 *Valor do Pacote:* *${sub.valor || '—'} MT*\n\n` +
+                        `📥 *Como ativar:* Após transferir, cole o SMS do comprovativo aqui com o seu número Vodacom para a renovação automática imediata! 🚀\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+                    try {
+                        await sendTextMessage(jidAlvo, msg12h);
+                        addLog(`⏳ [ILIMITADO 12H] Lembrete de pagamento enviado para ${sub.phone}`);
+                    } catch (err) {
+                        console.warn(`[ILIMITADO] Erro ao enviar lembrete 12h para ${sub.phone}:`, err.message);
+                    }
+                    continue;
+                }
+
+                // 3. FALTANDO 30 MINUTOS (<= 30 min) E NÃO NOTIFICADO
+                if (diffMs <= (30 * 60 * 1000) && !sub.notificado_30min) {
+                    sub.notificado_30min = true;
+                    sub.updatedAt = new Date().toISOString();
+                    customerServices.salvarAssinatura(sub);
+
+                    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
+                    const msg30min =
+                        `🚨 *URGENTE: O SEU PACOTE ILIMITADO EXPIRA EM 30 MINUTOS!* 🚨\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `Olá, *${sub.nomeCliente || 'Cliente'}*!\n\n` +
+                        `O seu pacote *${sub.planoNome}* expira em exatamente *30 minutos*! ⏰\n\n` +
+                        `Para a sua conexão não cair, efetue a transferência e envie o comprovativo agora:\n\n` +
+                        `🔴 *M-Pesa:* \`${mpesa_num}\` (${mpesa_name})\n` +
+                        `🟠 *e-Mola:* \`${emola_num}\` (${emola_name})\n` +
+                        `💵 *Valor:* *${sub.valor || '—'} MT*\n\n` +
+                        `⚡ Cole o SMS aqui com o seu número Vodacom para renovar instantaneamente!\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+                    try {
+                        await sendTextMessage(jidAlvo, msg30min);
+                        addLog(`🚨 [ILIMITADO 30MIN] Alerta urgente enviado para ${sub.phone}`);
+                    } catch (err) {
+                        console.warn(`[ILIMITADO] Erro ao enviar alerta 30min para ${sub.phone}:`, err.message);
+                    }
+                    continue;
+                }
+            }
+        }
+    } catch (err) {
+        console.error('❌ [ERRO MONITORAMENTO ILIMITADOS]:', err.message);
+    }
+}
+
+// Iniciar verificação automática de pacotes ilimitados a cada 10 minutos
+setInterval(executarLembretesIlimitados, 10 * 60 * 1000);
+setTimeout(executarLembretesIlimitados, 90 * 1000);
+
 async function executarLembretesDividas() {
     try {
         if (!sock || connectionStatus !== 'connected') return;

@@ -29,6 +29,7 @@ const friendToReferrer = new Map();    // friendPhone -> referrerPhone
 const codeToReferrer = new Map();      // code (ex: "KN-4821") -> referrerPhone
 const phoneToCode = new Map();         // referrerPhone -> code
 const lidToPhone = new Map();          // lidClean -> realPhone (9 digits)
+const unlimitedSubscriptions = new Map(); // subId -> { id, phone, lid, jid, nomeCliente, planoNome, tipoPlano, valor, numeroDestino, dataInicio, dataExpiracao, diasValidade, status, intencaoRenovacao, dataConfirmacao, notificado_3dias, notificado_12h, notificado_30min, historicoRenovacoes, createdAt, updatedAt }
 const aguardandoDestinoBonus = new Map(); // identifier -> { padrinhoTel, padrinhoJid, mb: 500, timestamp }
 
 function temAguardandoDestinoBonus(identificador) {
@@ -96,6 +97,7 @@ function salvarCacheLocal() {
             friendReferrers: [...friendToReferrer.entries()],
             referralCodes: [...codeToReferrer.entries()],
             lidMap: [...lidToPhone.entries()],
+            subscriptions: [...unlimitedSubscriptions.entries()],
             savedAt: new Date().toISOString()
         };
         const content = JSON.stringify(payload, null, 2);
@@ -162,6 +164,9 @@ function carregarCacheLocal() {
         }
         if (Array.isArray(data.lidMap)) {
             data.lidMap.forEach(([k, v]) => lidToPhone.set(k, v));
+        }
+        if (Array.isArray(data.subscriptions)) {
+            data.subscriptions.forEach(([k, v]) => unlimitedSubscriptions.set(k, v));
         }
         console.log(`📦 [CUSTOMER-SERVICES] Cache carregado (${path.basename(fonte)}): ${clientLoyalty.size} clientes fidelidade, ${clientLoans.size} empréstimos, ${defaultRecipients.size} receptores, ${clientBonuses.size} bônus.`);
     } catch (err) {
@@ -344,6 +349,23 @@ async function restaurarDoFirestore() {
         }
     } catch (e) {
         console.warn('⚠️ [FIRESTORE] Erro ao carregar client_referrals:', e.message);
+    }
+
+    // 8.1 Assinaturas de Pacotes Ilimitados (30 Dias)
+    try {
+        const snap = await firestoreDb.collection('unlimited_subscriptions').get();
+        if (!snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const key = d.id || doc.id;
+                if (key) {
+                    unlimitedSubscriptions.set(key, { ...d, id: key });
+                }
+            });
+            console.log(`📡 [FIRESTORE] ${snap.size} assinaturas de pacotes ilimitados carregadas.`);
+        }
+    } catch (e) {
+        console.warn('⚠️ [FIRESTORE] Erro ao carregar unlimited_subscriptions:', e.message);
     }
 
         // 9. Reconciliação robusta de histórico de compras a partir de pedidos concluídos no Firestore
@@ -1931,6 +1953,253 @@ function registrarLembreteEnviado(phone, slotId) {
     }
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 6. GESTÃO DE PACOTES ILIMITADOS & LEMBRETES DE RENOVAÇÃO (30 DIAS)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Cadastra ou renova uma assinatura de pacote ilimitado / mensal
+ */
+function cadastrarOuRenovarAssinaturaIlimitada({
+    phone,
+    lid = null,
+    jid = null,
+    nomeCliente = null,
+    planoNome = 'Pacote Ilimitado 30 Dias',
+    tipoPlano = 'ilimitado',
+    valor = 0,
+    numeroDestino = null,
+    dias = 30
+}) {
+    const telReal = resolverTelefoneDeIdentificador(phone) || normalizarTelefone(phone) || String(phone || '').replace(/\D/g, '');
+    const numDest = normalizarTelefone(numeroDestino) || telReal;
+    if (!telReal && !numDest) return null;
+
+    const chaveTelefone = telReal || numDest;
+    const lidClean = lid ? String(lid).split('@')[0].split(':')[0].replace(/\D/g, '') : null;
+
+    // Buscar assinatura ativa existente deste cliente
+    let existingSub = null;
+    for (const sub of unlimitedSubscriptions.values()) {
+        if ((sub.phone === chaveTelefone || sub.numeroDestino === numDest || (lidClean && sub.lid === lidClean)) && sub.status === 'ativo') {
+            existingSub = sub;
+            break;
+        }
+    }
+
+    const agora = new Date();
+    let dataInicio = agora.toISOString();
+    let expiraEm = new Date(agora.getTime() + (dias * 24 * 60 * 60 * 1000));
+
+    // Se já tinha assinatura ativa e ainda não venceu, soma os dias à data de expiração restante!
+    if (existingSub && new Date(existingSub.dataExpiracao) > agora) {
+        const expAtual = new Date(existingSub.dataExpiracao);
+        expiraEm = new Date(expAtual.getTime() + (dias * 24 * 60 * 60 * 1000));
+        dataInicio = existingSub.dataInicio || dataInicio;
+    }
+
+    const subId = existingSub ? existingSub.id : `SUB_${chaveTelefone}_${Date.now()}`;
+    const jidFinal = jid || (chaveTelefone ? `258${chaveTelefone}@s.whatsapp.net` : null);
+
+    const subscription = {
+        id: subId,
+        phone: chaveTelefone,
+        lid: lidClean || (existingSub ? existingSub.lid : null),
+        jid: jidFinal,
+        nomeCliente: nomeCliente || (existingSub ? existingSub.nomeCliente : 'Cliente Ka-Net'),
+        planoNome: planoNome || (existingSub ? existingSub.planoNome : 'Pacote Ilimitado'),
+        tipoPlano: tipoPlano || 'ilimitado',
+        valor: Number(valor) || (existingSub ? existingSub.valor : 0),
+        numeroDestino: numDest,
+        dataInicio,
+        dataExpiracao: expiraEm.toISOString(),
+        diasValidade: dias,
+        status: 'ativo',
+        intencaoRenovacao: null, // null | 'confirmou_sim' | 'recusou_nao'
+        dataConfirmacao: null,
+        notificado_3dias: false,
+        notificado_12h: false,
+        notificado_30min: false,
+        historicoRenovacoes: [
+            ...(existingSub && Array.isArray(existingSub.historicoRenovacoes) ? existingSub.historicoRenovacoes : []),
+            { data: agora.toISOString(), valor: Number(valor) || 0, dias }
+        ],
+        updatedAt: agora.toISOString(),
+        createdAt: existingSub ? existingSub.createdAt : agora.toISOString()
+    };
+
+    unlimitedSubscriptions.set(subId, subscription);
+    salvarCacheLocal();
+    salvarNoFirestore('unlimited_subscriptions', subId, subscription);
+
+    console.log(`📡 [ASSINATURA ILIMITADA] ${subId} ativa para ${chaveTelefone} (${planoNome}) até ${expiraEm.toLocaleDateString('pt-PT')}`);
+    return subscription;
+}
+
+/**
+ * Retorna assinatura ativa pelo telefone ou LID
+ */
+function obterAssinaturaIlimitadaAtiva(identificador) {
+    if (!identificador) return null;
+    const phone = resolverTelefoneDeIdentificador(identificador) || normalizarTelefone(identificador);
+    const rawClean = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
+    const agora = Date.now();
+
+    for (const sub of unlimitedSubscriptions.values()) {
+        if (sub.status !== 'ativo') continue;
+        if (new Date(sub.dataExpiracao).getTime() <= agora) continue;
+        const bateTel = phone && (sub.phone === phone || sub.numeroDestino === phone);
+        const bateLid = rawClean && (sub.lid === rawClean || sub.phone === rawClean);
+        if (bateTel || bateLid) return sub;
+    }
+    return null;
+}
+
+/**
+ * Retorna assinatura que está no período de 3 dias de vencimento aguardando confirmação do cliente
+ */
+function obterAssinaturaPendenteConfirmacao(identificador) {
+    if (!identificador) return null;
+    const phone = resolverTelefoneDeIdentificador(identificador) || normalizarTelefone(identificador);
+    const rawClean = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
+
+    for (const sub of unlimitedSubscriptions.values()) {
+        if (sub.status !== 'ativo') continue;
+        const bateTel = phone && (sub.phone === phone || sub.numeroDestino === phone);
+        const bateLid = rawClean && (sub.lid === rawClean || sub.phone === rawClean);
+        const bateJid = sub.jid && (sub.jid.includes(rawClean) || (phone && sub.jid.includes(phone)));
+
+        if ((bateTel || bateLid || bateJid) && sub.notificado_3dias && sub.intencaoRenovacao === null) {
+            return sub;
+        }
+    }
+    return null;
+}
+
+/**
+ * Registra a resposta do cliente à pergunta de renovação (SIM ou NÃO)
+ */
+function registrarRespostaRenovacao(identificador, querRenovar) {
+    const sub = obterAssinaturaPendenteConfirmacao(identificador) || obterAssinaturaIlimitadaAtiva(identificador);
+    if (!sub) return { success: false, mensagem: 'Nenhuma assinatura ilimitada elegível encontrada para confirmação.' };
+
+    sub.intencaoRenovacao = querRenovar ? 'confirmou_sim' : 'recusou_nao';
+    sub.dataConfirmacao = new Date().toISOString();
+    sub.updatedAt = new Date().toISOString();
+
+    unlimitedSubscriptions.set(sub.id, sub);
+    salvarCacheLocal();
+    salvarNoFirestore('unlimited_subscriptions', sub.id, sub);
+
+    console.log(`📝 [RENOVAÇÃO ILIMITADO] Cliente ${sub.phone} respondeu: ${sub.intencaoRenovacao}`);
+    return { success: true, intencao: sub.intencaoRenovacao, assinatura: sub };
+}
+
+/**
+ * Salva atualizações diretas de uma assinatura (notificações enviadas, etc.)
+ */
+function salvarAssinatura(sub) {
+    if (!sub || !sub.id) return;
+    unlimitedSubscriptions.set(sub.id, sub);
+    salvarCacheLocal();
+    salvarNoFirestore('unlimited_subscriptions', sub.id, sub);
+}
+
+/**
+ * Lista todas as assinaturas ilimitadas por filtro
+ */
+function listarAssinaturasIlimitadas(filtro = 'todas') {
+    const list = Array.from(unlimitedSubscriptions.values());
+    const agora = Date.now();
+
+    if (filtro === 'ativas') {
+        return list.filter(s => s.status === 'ativo' && new Date(s.dataExpiracao).getTime() > agora);
+    }
+    if (filtro === 'expiradas') {
+        return list.filter(s => s.status === 'expirado' || new Date(s.dataExpiracao).getTime() <= agora);
+    }
+    if (filtro === 'confirmadas') {
+        return list.filter(s => s.status === 'ativo' && s.intencaoRenovacao === 'confirmou_sim');
+    }
+    if (filtro === 'a_vencer_3dias') {
+        return list.filter(s => {
+            if (s.status !== 'ativo') return false;
+            const diff = new Date(s.dataExpiracao).getTime() - agora;
+            return diff > 0 && diff <= 3 * 24 * 3600 * 1000;
+        });
+    }
+    return list;
+}
+
+/**
+ * Cancela manualmente uma assinatura ilimitada
+ */
+function cancelarAssinaturaIlimitada(idOuTelefone) {
+    if (!idOuTelefone) return false;
+    let found = null;
+    if (unlimitedSubscriptions.has(idOuTelefone)) {
+        found = unlimitedSubscriptions.get(idOuTelefone);
+    } else {
+        const phone = normalizarTelefone(idOuTelefone) || String(idOuTelefone).replace(/\D/g, '');
+        for (const sub of unlimitedSubscriptions.values()) {
+            if (sub.phone === phone || sub.numeroDestino === phone) {
+                found = sub;
+                break;
+            }
+        }
+    }
+    if (!found) return false;
+
+    found.status = 'cancelado';
+    found.updatedAt = new Date().toISOString();
+    salvarAssinatura(found);
+    return true;
+}
+
+/**
+ * Renova manualmente uma assinatura adicionando dias
+ */
+function renovarAssinaturaIlimitadaManual(idOuTelefone, dias = 30) {
+    if (!idOuTelefone) return null;
+    let sub = null;
+    if (unlimitedSubscriptions.has(idOuTelefone)) {
+        sub = unlimitedSubscriptions.get(idOuTelefone);
+    } else {
+        const phone = normalizarTelefone(idOuTelefone) || String(idOuTelefone).replace(/\D/g, '');
+        for (const s of unlimitedSubscriptions.values()) {
+            if (s.phone === phone || s.numeroDestino === phone) {
+                sub = s;
+                break;
+            }
+        }
+    }
+    if (!sub) return null;
+
+    const agora = new Date();
+    const expBase = (new Date(sub.dataExpiracao) > agora) ? new Date(sub.dataExpiracao) : agora;
+    const novaExpira = new Date(expBase.getTime() + (dias * 24 * 3600 * 1000));
+
+    sub.dataExpiracao = novaExpira.toISOString();
+    sub.status = 'ativo';
+    sub.notificado_3dias = false;
+    sub.notificado_12h = false;
+    sub.notificado_30min = false;
+    sub.intencaoRenovacao = null;
+    sub.dataConfirmacao = null;
+    sub.updatedAt = agora.toISOString();
+
+    if (!Array.isArray(sub.historicoRenovacoes)) sub.historicoRenovacoes = [];
+    sub.historicoRenovacoes.push({
+        data: agora.toISOString(),
+        manual: true,
+        dias
+    });
+
+    salvarAssinatura(sub);
+    return sub;
+}
+
 module.exports = {
     initCustomerServices,
     normalizarTelefone,
@@ -1971,6 +2240,15 @@ module.exports = {
     sacarBonus,
     // Multi-Destino
     parseMultiDestino,
+    // Pacotes Ilimitados & Notificações de Renovação (30 dias)
+    cadastrarOuRenovarAssinaturaIlimitada,
+    obterAssinaturaIlimitadaAtiva,
+    obterAssinaturaPendenteConfirmacao,
+    registrarRespostaRenovacao,
+    salvarAssinatura,
+    listarAssinaturasIlimitadas,
+    cancelarAssinaturaIlimitada,
+    renovarAssinaturaIlimitadaManual,
     // Status
     getStats: () => ({
         totalFidelizados: clientLoyalty.size,
