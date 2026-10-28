@@ -1601,8 +1601,8 @@ async function sacarBonus({ senderPhone, mbSolicitado, numDestino, jid }) {
 // ── 6. PARSER E DISTRIBUIÇÃO MULTI-DESTINO ────────────────────────────────────
 
 const DEPOSIT_NUMBERS = new Set([
-    '856268811', '864882152', '850401416', '856116039',
-    '258856268811', '258864882152', '258850401416', '258856116039'
+    '856268811', '879691565', '864882152', '850401416', '856116039',
+    '258856268811', '258879691565', '258864882152', '258850401416', '258856116039'
 ]);
 
 function isNumeroDepositoCS(num) {

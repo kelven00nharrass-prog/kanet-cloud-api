@@ -318,8 +318,8 @@ function getPaymentDetails() {
     return {
         mpesa_num: LOCAL_CFG.mpesa_number || DYN_CFG.MPESA_NUMBER || '856268811',
         mpesa_name: LOCAL_CFG.mpesa_name || DYN_CFG.MPESA_NAME || 'Kelven Junior Anabela Nharrava',
-        emola_num: LOCAL_CFG.emola_number || DYN_CFG.EMOLA_NUMBER || '864882152',
-        emola_name: LOCAL_CFG.emola_name || DYN_CFG.EMOLA_NAME || 'Catia Anabela Nharrava'
+        emola_num: LOCAL_CFG.emola_number || DYN_CFG.EMOLA_NUMBER || '879691565',
+        emola_name: LOCAL_CFG.emola_name || DYN_CFG.EMOLA_NAME || 'Kelven Junior Anabela Nharrava'
     };
 }
 
@@ -1529,6 +1529,7 @@ function getNumerosDeposito() {
         console.warn('⚠️ [PAGAMENTO] Erro ao obter números de depósito:', e.message);
     }
     list.add('856268811');
+    list.add('879691565');
     list.add('864882152');
     return list;
 }
@@ -1628,14 +1629,14 @@ function gerarRespostaPossoComprar() {
             `De momento não estamos a aceitar novos pedidos. Voltamos dentro de instantes!`
         );
     }
-    const { mpesa_num, emola_num } = getPagamentoDetails();
+    const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
     return (
         `🚀✨ *SIM, PODE COMPRAR À VONTADE!* 🛒\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
         `Temos todos os pacotes disponíveis para ativação imediata!\n\n` +
         `💳 *Contas Oficiais Ka-Net:*\n` +
-        `🇲🇿 *M-Pesa:* \`${mpesa_num}\` _(Kelven Junior)_\n` +
-        `🇲🇿 *e-Mola:* \`${emola_num}\` _(Catia Anabela)_\n\n` +
+        `🇲🇿 *M-Pesa:* \`${mpesa_num}\` _(${mpesa_name || 'Kelven Junior'})_\n` +
+        `🇲🇿 *e-Mola:* \`${emola_num}\` _(${emola_name || 'Kelven Junior Anabela Nharrava'})_\n\n` +
         `📝 _Basta transferir e enviar o comprovativo aqui com o seu número Vodacom._`
     );
 }
@@ -2628,7 +2629,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     const novoTxnId = extrairTxId(text);
                                     const isEmolaPattern = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(text.trim());
                                     const isMpesaPattern = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(text.trim());
-                                    const novoMetodo = isEmolaPattern ? 'emola' : isMpesaPattern ? 'mpesa' : /e-?mola|emola|movitel|864882152/i.test(text) ? 'emola' : 'mpesa';
+                                    const novoMetodo = isEmolaPattern ? 'emola' : isMpesaPattern ? 'mpesa' : /e-?mola|emola|movitel|879691565|864882152/i.test(text) ? 'emola' : 'mpesa';
                                     const novoMetodoNome = novoMetodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
                                     // 1. Verificar se é repetição da mesma sessão
@@ -4027,7 +4028,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             ? 'emola'
                             : isMpesaPattern
                                 ? 'mpesa'
-                                : /e-?mola|emola|movitel|864882152|catia/i.test(text) ? 'emola' : 'mpesa';
+                                : /e-?mola|emola|movitel|879691565|864882152|catia/i.test(text) ? 'emola' : 'mpesa';
                         const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
                         // ── REGRA 1: SEGURANÇA MÁXIMA ANTI-DUPLICAÇÃO E LOCK EXCLUSIVO ──

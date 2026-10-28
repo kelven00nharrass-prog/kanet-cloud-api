@@ -560,8 +560,8 @@ module.exports = {
     ],
     "MPESA_NUMBER": "856268811",
     "MPESA_NAME": "Kelven Junior Anabela Nharrava",
-    "EMOLA_NUMBER": "864882152",
-    "EMOLA_NAME": "Catia Anabela Nharrava",
+    "EMOLA_NUMBER": "879691565",
+    "EMOLA_NAME": "Kelven Junior Anabela Nharrava",
     "GRUPO_ERROS": "120363408450329444@g.us",
     "GRUPO_NOTIFICACOES": "120363409903708446@g.us",
     "TABELAS_GRUPO": {

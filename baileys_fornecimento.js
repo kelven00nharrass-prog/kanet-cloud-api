@@ -96,8 +96,8 @@ async function restoreAuthFromFirestore(db) {
 function getMenuFornecimento() {
     const mpesaNum = DYN_CFG.MPESA_NUMBER || '856268811';
     const mpesaName = DYN_CFG.MPESA_NAME || 'Kelven Junior Anabela Nharrava';
-    const emolaNum = DYN_CFG.EMOLA_NUMBER || '864882152';
-    const emolaName = DYN_CFG.EMOLA_NAME || 'Catia Anabela Nharrava';
+    const emolaNum = DYN_CFG.EMOLA_NUMBER || '879691565';
+    const emolaName = DYN_CFG.EMOLA_NAME || 'Kelven Junior Anabela Nharrava';
 
     return `📦 *KA-NET — ATENDIMENTO DE FORNECIMENTO (ATACADO)* 📦\n` +
            `_Linha exclusiva para fornecedores e revendedores de dados em grande escala._\n\n` +

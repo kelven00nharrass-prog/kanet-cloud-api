@@ -1,4 +1,4 @@
-﻿﻿﻿﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
@@ -5111,8 +5111,8 @@ app.get('/api/client/system-status', (req, res) => {
         titular: "Kelven Junior Anabela Nharrava"
       },
       emola: {
-        numero: "864882152",
-        titular: "Catia Anabela Nharrava"
+        numero: "879691565",
+        titular: "Kelven Junior Anabela Nharrava"
       }
     }
   });
@@ -5441,12 +5441,12 @@ app.post('/api/client/purchase', async (req, res) => {
     const preco    = Number(packagePrice);
 
     // ── 5. Verificar se o pagamento foi feito para os nossos números oficiais (M-Pesa 856268811 / e-Mola 864882152) ──
-    const NOSSOS_NUMEROS = ['856268811', '864882152'];
+    const NOSSOS_NUMEROS = ['856268811', '879691565', '864882152'];
     const destinoPagamento = NOSSOS_NUMEROS.find(n => smsClean.includes(n) || smsClean.includes('258' + n));
     if (!destinoPagamento) {
       return res.status(400).json({
         success: false,
-        mensagem: `❌ Pagamento não reconhecido. O comprovativo deve mostrar transferência para uma das contas oficiais Ka-Net:\n🔴 M-Pesa: 856268811 (Kelven Junior)\n🟡 e-Mola: 864882152 (Catia Anabela)\n\nCertifique-se de que transferiu para a nossa conta correta.`
+        mensagem: `❌ Pagamento não reconhecido. O comprovativo deve mostrar transferência para uma das contas oficiais Ka-Net:\n🔴 M-Pesa: 856268811 (Kelven Junior)\n🟡 e-Mola: 879691565 (Kelven Junior Anabela Nharrava)\n\nCertifique-se de que transferiu para a nossa conta correta.`
       });
     }
 
@@ -5484,7 +5484,7 @@ app.post('/api/client/purchase', async (req, res) => {
     const orderId = `HUB-${txnId.slice(0, 8)}-${Date.now().toString().slice(-4)}`;
     const modo    = packageModo || 'diario';
     const qtyMb   = Number(packageMb) || 1024;
-    const metodo  = destinoPagamento === '864882152' ? 'emola' : 'mpesa';
+    const metodo  = (destinoPagamento === '879691565' || destinoPagamento === '864882152') ? 'emola' : 'mpesa';
     const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
     // CASO A: OPERADORA JÁ CONFIRMOU O RECEBIMENTO NO NOSSO TELEFONE!
@@ -5757,7 +5757,7 @@ app.post('/api/client/support/process-proof', async (req, res) => {
     // Detecção fiável por prefixo: e-Mola começa com "ID da transacao", M-Pesa com "Confirmado DJDXXXXX"
     const isEmolaPrefix = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(smsClean.trim());
     const isMpesaPrefix = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(smsClean.trim());
-    const isEmola = isEmolaPrefix ? true : isMpesaPrefix ? false : /e-?mola|864882152/i.test(smsClean);
+    const isEmola = isEmolaPrefix ? true : isMpesaPrefix ? false : /e-?mola|879691565|864882152/i.test(smsClean);
     const metodo = isEmola ? 'e-Mola' : 'M-Pesa';
 
     // 4. Verificar se a operadora já confirmou no gateway

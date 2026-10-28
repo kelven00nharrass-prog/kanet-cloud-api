@@ -53,8 +53,8 @@ function getPaymentDetails() {
     return {
         mpesa_num: LOCAL_CFG.mpesa_number || DYN_CFG.MPESA_NUMBER || '856268811',
         mpesa_name: LOCAL_CFG.mpesa_name || DYN_CFG.MPESA_NAME || 'Kelven Junior Anabela Nharrava',
-        emola_num: LOCAL_CFG.emola_number || DYN_CFG.EMOLA_NUMBER || '864882152',
-        emola_name: LOCAL_CFG.emola_name || DYN_CFG.EMOLA_NAME || 'Catia Anabela Nharrava'
+        emola_num: LOCAL_CFG.emola_number || DYN_CFG.EMOLA_NUMBER || '879691565',
+        emola_name: LOCAL_CFG.emola_name || DYN_CFG.EMOLA_NAME || 'Kelven Junior Anabela Nharrava'
     };
 }
 
@@ -292,8 +292,8 @@ function buscarPacotePorValor(valorPago) {
  * NÚMEROS DE SISTEMA / CONTA QUE NUNCA DEVEM SER CONSIDERADOS COMO DESTINO DOS MEGAS
  */
 const SYSTEM_PAYMENT_NUMBERS = new Set([
-    '856268811', '864882152', '856116039', '84100', '86100', '82100', '87100', '4004',
-    '258856268811', '258864882152', '258856116039'
+    '856268811', '879691565', '864882152', '856116039', '84100', '86100', '82100', '87100', '4004',
+    '258856268811', '258879691565', '258864882152', '258856116039'
 ]);
 
 /**

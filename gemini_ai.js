@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ╔══════════════════════════════════════════════════════════════╗
  * ║  Ka-Net Gemini AI Module                                     ║
  * ║  - Feature 2: Vision — leitura de prints M-Pesa / e-Mola    ║
@@ -295,7 +295,7 @@ CONHECIMENTO:
 - Vendes dados Vodacom por M-Pesa e e-Mola
 - Contas Oficiais de Pagamento:
   * M-Pesa: 856268811 (Kelven Junior)
-  * e-Mola: 864882152 (Catia Anabela)
+  * e-Mola: 879691565 (Kelven Junior Anabela Nharrava)
 - Status do Sistema: 100% ONLINE e ATIVO 24/7 (nunca digas que estás fechado ou offline a não ser em manutenção expressa)
 - Pacotes: Diário (24h), Semanal (7 dias), Mensal (30 dias)
 - Para comprar: cliente transfere o valor para o M-Pesa/e-Mola e manda o comprovativo com o número de destino
