@@ -1836,6 +1836,13 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       let clientTel = '';
       for (const c of candidates) {
         if (!c) continue;
+        const res = (customerServices && typeof customerServices.resolverTelefoneDeIdentificador === 'function')
+          ? customerServices.resolverTelefoneDeIdentificador(c)
+          : null;
+        if (res && res.length === 9 && /^8[2-7]\d{7}$/.test(res)) {
+          clientTel = res;
+          break;
+        }
         const norm = customerServices && typeof customerServices.normalizarTelefone === 'function'
           ? customerServices.normalizarTelefone(c)
           : String(c || '').replace(/\D/g, '').slice(-9);
@@ -1845,8 +1852,17 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         }
       }
 
-      if (clientTel && clientTel.length === 9 && /^8[2-7]\d{7}$/.test(clientTel) && customerServices && typeof customerServices.registrarCompra === 'function') {
-        const vipAlert = customerServices.registrarCompra(clientTel, (order && order.orderId) || resId, (order && (order.valor || order.valor_pago)) || 0, (order && order.quantidade) || 0);
+      // Se temos o telefone e algum dos campos era um LID, vincular imediatamente!
+      const orderLid = (order && order.senderJid && String(order.senderJid).endsWith('@lid'))
+        ? String(order.senderJid).replace(/\D/g, '')
+        : (order && order.jid && String(order.jid).endsWith('@lid') ? String(order.jid).replace(/\D/g, '') : null);
+      if (orderLid && clientTel && customerServices && typeof customerServices.vincularLidTelefone === 'function') {
+        try { customerServices.vincularLidTelefone(orderLid, clientTel); } catch (_) { }
+      }
+
+      const idParaRegistro = clientTel || (order && (order.cliente_solicitante || order.senderPhone || order.sender || order.numero));
+      if (idParaRegistro && customerServices && typeof customerServices.registrarCompra === 'function') {
+        const vipAlert = customerServices.registrarCompra(idParaRegistro, (order && order.orderId) || resId, (order && (order.valor || order.valor_pago)) || 0, (order && order.quantidade) || 0);
         if (vipAlert && vipAlert.mensagemVip && clientJid && baileysEngine && typeof baileysEngine.sendTextMessage === 'function') {
           setTimeout(() => {
             baileysEngine.sendTextMessage(clientJid, vipAlert.mensagemVip)
@@ -2019,7 +2035,14 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
         }, { merge: true }).catch(() => {});
       }
       if (customerServices && typeof customerServices.registrarCompra === 'function') {
-        const clientPhone = order.cliente_solicitante || order.senderPhone || order.sender || order.numero;
+        const clientPhone = (customerServices.resolverTelefoneDeIdentificador && (customerServices.resolverTelefoneDeIdentificador(order.senderPhone) || customerServices.resolverTelefoneDeIdentificador(order.cliente_solicitante)))
+          || order.cliente_solicitante || order.senderPhone || order.pagador || order.sender || order.numero;
+        const oLid = (order.senderJid && String(order.senderJid).endsWith('@lid'))
+          ? String(order.senderJid).replace(/\D/g, '')
+          : (order.jid && String(order.jid).endsWith('@lid') ? String(order.jid).replace(/\D/g, '') : null);
+        if (oLid && clientPhone && typeof customerServices.vincularLidTelefone === 'function') {
+          try { customerServices.vincularLidTelefone(oLid, clientPhone); } catch (_) { }
+        }
         customerServices.registrarCompra(clientPhone, orderId, order.valor || order.valor_pago || 0, order.quantidade || 0);
       }
 

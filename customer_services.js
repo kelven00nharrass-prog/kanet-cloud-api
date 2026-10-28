@@ -215,7 +215,11 @@ async function restaurarDoFirestore() {
         if (!snap.empty) {
             snap.docs.forEach(doc => {
                 const d = doc.data();
-                const key = normalizarTelefone(d.phone || doc.id);
+                let key = normalizarTelefone(d.phone || doc.id);
+                if (!key) {
+                    const limpo = String(d.phone || doc.id).replace(/\D/g, '');
+                    if (limpo && limpo.length >= 8) key = limpo;
+                }
                 if (key) {
                     const existing = clientLoyalty.get(key) || {};
                     const total = Math.max(existing.totalCompras || 0, d.totalCompras || 0);
@@ -342,16 +346,38 @@ async function restaurarDoFirestore() {
         console.warn('⚠️ [FIRESTORE] Erro ao carregar client_referrals:', e.message);
     }
 
-    // 5. Inicialização automática do histórico a partir das ordens concluídas se clientLoyalty estiver vazio
-    if (clientLoyalty.size === 0) {
-        try {
-            console.log('🔍 [FIRESTORE] Calculando histórico de compras a partir de pedidos concluídos...');
-            const ordersSnap = await firestoreDb.collection('orders').where('status', '==', 'completed').limit(1000).get();
-            if (!ordersSnap.empty) {
-                ordersSnap.docs.forEach(d => {
-                    const o = d.data();
-                    let candidates = [o.senderPhone, o.cliente_solicitante, o.pagador, o.sender, o.numero];
-                    let phone = '';
+        // 9. Reconciliação robusta de histórico de compras a partir de pedidos concluídos no Firestore
+    try {
+        console.log('🔄 [FIRESTORE] Reconciliando histórico de compras a partir de pedidos concluídos...');
+        const ordersSnap = await firestoreDb.collection('orders')
+            .where('status', '==', 'completed')
+            .limit(2000)
+            .get();
+
+        if (!ordersSnap.empty) {
+            const ordersByPhone = new Map();
+            const orderHistoryByPhone = new Map();
+
+            ordersSnap.docs.forEach(d => {
+                const o = d.data();
+                const candidates = [
+                    o.cliente_solicitante,
+                    o.senderPhone,
+                    o.pagador,
+                    o.senderNumber,
+                    o.sender,
+                    o.numero
+                ];
+                let phone = '';
+                for (const c of candidates) {
+                    if (!c) continue;
+                    const res = resolverTelefoneDeIdentificador(c) || normalizarTelefone(c);
+                    if (res && res.length === 9 && /^8[2-7]\d{7}$/.test(res)) {
+                        phone = res;
+                        break;
+                    }
+                }
+                if (!phone) {
                     for (const c of candidates) {
                         if (!c) continue;
                         const norm = normalizarTelefone(c);
@@ -360,22 +386,56 @@ async function restaurarDoFirestore() {
                             break;
                         }
                     }
-                    if (phone && phone.length === 9) {
-                        const rec = clientLoyalty.get(phone) || { phone, totalCompras: 0, historico: [] };
-                        rec.totalCompras += 1;
-                        clientLoyalty.set(phone, rec);
-                    }
-                });
-                console.log(`✨ [FIRESTORE] Histórico inicial calculado: ${clientLoyalty.size} clientes com compras passadas.`);
-                // Salvar em lote
-                for (const [phone, data] of clientLoyalty.entries()) {
-                    salvarNoFirestore('client_loyalty', phone, data);
                 }
-                salvarCacheLocal();
+
+                // Se houver LID associado ao pedido e descobrimos o telefone do comprador, vincular!
+                const orderLid = (o.senderJid && String(o.senderJid).endsWith('@lid'))
+                    ? String(o.senderJid).replace(/\D/g, '')
+                    : ((o.jid && String(o.jid).endsWith('@lid')) ? String(o.jid).replace(/\D/g, '') : null);
+                if (orderLid && phone) {
+                    vincularLidTelefone(orderLid, phone);
+                }
+
+                if (phone && phone.length === 9) {
+                    ordersByPhone.set(phone, (ordersByPhone.get(phone) || 0) + 1);
+                    if (!orderHistoryByPhone.has(phone)) {
+                        orderHistoryByPhone.set(phone, []);
+                    }
+                    const histList = orderHistoryByPhone.get(phone);
+                    if (histList.length < 30) {
+                        histList.push({
+                            orderId: o.orderId || d.id,
+                            valor: Number(o.valor || o.valor_pago) || 0,
+                            mb: Number(o.quantidade) || 0,
+                            data: o.completedAt || o.createdAt || new Date().toISOString()
+                        });
+                    }
+                }
+            });
+
+            let atualizados = 0;
+            for (const [phone, count] of ordersByPhone.entries()) {
+                const existing = clientLoyalty.get(phone) || { phone, totalCompras: 0, historico: [] };
+                const maxCompras = Math.max(existing.totalCompras || 0, count);
+                const combinedHistory = (existing.historico && existing.historico.length > 0)
+                    ? existing.historico
+                    : (orderHistoryByPhone.get(phone) || []);
+
+                if (maxCompras > (existing.totalCompras || 0) || !clientLoyalty.has(phone)) {
+                    clientLoyalty.set(phone, {
+                        ...existing,
+                        phone,
+                        totalCompras: maxCompras,
+                        historico: combinedHistory
+                    });
+                    atualizados++;
+                }
             }
-        } catch (e) {
-            console.warn('⚠️ [FIRESTORE] Erro ao calcular compras históricas:', e.message);
+            console.log(`✅ [FIRESTORE] Reconciliação concluída: ${ordersByPhone.size} clientes com compras confirmadas (${atualizados} atualizados/restaurados).`);
+            salvarCacheLocal();
         }
+    } catch (e) {
+        console.warn('⚠️ [FIRESTORE] Erro ao reconciliar compras históricas:', e.message);
     }
 
     salvarCacheLocal();
@@ -404,7 +464,7 @@ function vincularLidTelefone(lid, tel) {
     if (!lid || !tel) return;
     const limpoLid = String(lid).split('@')[0].split(':')[0].replace(/\D/g, '');
     const phone = normalizarTelefone(tel);
-    if (!limpoLid || !phone) return;
+    if (!limpoLid || !phone || limpoLid === phone) return;
 
     lidToPhone.set(limpoLid, phone);
     
@@ -413,7 +473,7 @@ function vincularLidTelefone(lid, tel) {
         const existingCode = phoneToCode.get(limpoLid);
         codeToReferrer.set(existingCode, phone);
         phoneToCode.set(phone, existingCode);
-        console.log(`🔄 [LID MIGRATION] Código ${existingCode} do LID ${limpoLid} migrado para o telefone ${phone}!`);
+        console.log(`📦 [LID MIGRATION] Código ${existingCode} do LID ${limpoLid} migrado para o telefone ${phone}!`);
     } else if (phoneToCode.has(phone)) {
         const existingCode = phoneToCode.get(phone);
         phoneToCode.set(limpoLid, existingCode);
@@ -445,6 +505,37 @@ function vincularLidTelefone(lid, tel) {
         clientReferrals.set(phone, phoneRec);
     }
 
+    // Unificar fidelidade e histórico de compras (clientLoyalty)
+    if (clientLoyalty.has(limpoLid)) {
+        const lidLoyalty = clientLoyalty.get(limpoLid);
+        const phoneLoyalty = clientLoyalty.get(phone) || {
+            phone,
+            totalCompras: 0,
+            ultimaCompra: null,
+            historico: []
+        };
+        const comprasLid = lidLoyalty.totalCompras || 0;
+        const comprasPhone = phoneLoyalty.totalCompras || 0;
+        const histMap = new Map();
+        for (const h of (phoneLoyalty.historico || [])) {
+            if (h.orderId) histMap.set(String(h.orderId), h);
+        }
+        for (const h of (lidLoyalty.historico || [])) {
+            if (h.orderId && !histMap.has(String(h.orderId))) histMap.set(String(h.orderId), h);
+        }
+        phoneLoyalty.historico = Array.from(histMap.values()).slice(0, 30);
+        phoneLoyalty.totalCompras = Math.max(comprasPhone, comprasLid, histMap.size);
+        if (!phoneLoyalty.ultimaCompra || (lidLoyalty.ultimaCompra && lidLoyalty.ultimaCompra > phoneLoyalty.ultimaCompra)) {
+            phoneLoyalty.ultimaCompra = lidLoyalty.ultimaCompra;
+        }
+        clientLoyalty.set(phone, phoneLoyalty);
+        clientLoyalty.set(limpoLid, { ...phoneLoyalty, phone });
+        salvarNoFirestore('client_loyalty', phone, phoneLoyalty);
+        console.log(`💎 [FIDELIDADE UNIFICADA] LID ${limpoLid} e Telefone ${phone} unificados. Total compras: ${phoneLoyalty.totalCompras}`);
+    } else if (clientLoyalty.has(phone)) {
+        clientLoyalty.set(limpoLid, clientLoyalty.get(phone));
+    }
+
     salvarCacheLocal();
     salvarNoFirestore('client_lid_map', limpoLid, { lid: limpoLid, phone, updatedAt: new Date().toISOString() });
     console.log(`🔗 [LID MAPPING] LID ${limpoLid} vinculado ao telefone ${phone}`);
@@ -457,13 +548,19 @@ function resolverTelefoneDeIdentificador(identificador) {
     if (!identificador) return '';
     const phone = normalizarTelefone(identificador);
     if (phone) return phone;
-    const limpo = String(identificador).replace(/\D/g, '');
+    const limpo = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
     if (lidToPhone.has(limpo)) {
         return lidToPhone.get(limpo);
     }
     const rec = defaultRecipients.get(limpo);
     if (rec && rec.targetPhone) {
-        return normalizarTelefone(rec.targetPhone);
+        const t = normalizarTelefone(rec.targetPhone);
+        if (t) return t;
+    }
+    const loyaltyRec = clientLoyalty.get(limpo);
+    if (loyaltyRec && loyaltyRec.phone && loyaltyRec.phone !== limpo) {
+        const lp = normalizarTelefone(loyaltyRec.phone);
+        if (lp) return lp;
     }
     return '';
 }
@@ -886,9 +983,19 @@ function gerarMensagemDesbloqueioVip(totalCompras) {
 }
 
 
-function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
-    const phone = normalizarTelefone(telefone);
-    if (!phone || phone.length < 8) return;
+function registrarCompra(telefoneOuId, orderId, valor = 0, mb = 0) {
+    if (!telefoneOuId) return;
+    let phone = resolverTelefoneDeIdentificador(telefoneOuId) || normalizarTelefone(telefoneOuId);
+    const rawDigits = String(telefoneOuId).split('@')[0].split(':')[0].replace(/\D/g, '');
+    
+    if (!phone && rawDigits.length >= 8) {
+        phone = rawDigits;
+    }
+    if (!phone) return;
+
+    if (rawDigits && phone && rawDigits !== phone && !normalizarTelefone(rawDigits)) {
+        vincularLidTelefone(rawDigits, phone);
+    }
 
     const record = clientLoyalty.get(phone) || {
         phone,
@@ -897,25 +1004,38 @@ function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
         historico: []
     };
 
+    if (!Array.isArray(record.historico)) record.historico = [];
+
+    // Idempotência: não duplicar compras se o orderId já estiver registrado
+    if (orderId && record.historico.some(h => String(h.orderId) === String(orderId))) {
+        console.log(`ℹ️ [FIDELIDADE] Pedido ${orderId} já computado anteriormente para ${phone}. Total mantido: ${record.totalCompras}`);
+        return {
+            totalCompras: record.totalCompras,
+            milestone: null,
+            mensagemVip: null
+        };
+    }
+
     record.totalCompras = (record.totalCompras || 0) + 1;
     record.ultimaCompra = new Date().toISOString();
     
-    // Manter histórico das últimas 20 compras
-    if (!Array.isArray(record.historico)) record.historico = [];
+    // Manter histórico das últimas 30 compras
     record.historico.unshift({
-        orderId,
+        orderId: orderId || `ORD_${Date.now()}`,
         valor: Number(valor) || 0,
         mb: Number(mb) || 0,
         data: record.ultimaCompra
     });
-    if (record.historico.length > 20) record.historico.pop();
+    if (record.historico.length > 30) record.historico.pop();
 
     clientLoyalty.set(phone, record);
+    if (rawDigits && rawDigits !== phone) {
+        clientLoyalty.set(rawDigits, record);
+    }
     salvarCacheLocal();
     salvarNoFirestore('client_loyalty', phone, record);
 
-    console.log(`🌟 [FIDELIDADE] Compra registrada para ${phone}. Total de compras: ${record.totalCompras}`);
-    // Se o cliente foi indicado por um amigo e ainda não pontuou a indicação, pontua o amigo
+    console.log(`💳 [FIDELIDADE] Compra registrada para ${phone}. Total de compras: ${record.totalCompras}`);
     try { processarCompraIndicacao(phone); } catch (e) { console.warn('⚠️ Erro ao processar bônus indicação:', e.message); }
     const milestoneMsg = gerarMensagemDesbloqueioVip(record.totalCompras);
     return {
@@ -925,11 +1045,53 @@ function registrarCompra(telefone, orderId, valor = 0, mb = 0) {
     };
 }
 
-function getComprasCount(telefone) {
-    const phone = normalizarTelefone(telefone);
-    if (!phone) return 0;
-    const record = clientLoyalty.get(phone);
-    return record ? (record.totalCompras || 0) : 0;
+function getComprasCount(identificador) {
+    if (!identificador) return 0;
+    
+    // 1. Tenta resolver para telefone real
+    const phone = resolverTelefoneDeIdentificador(identificador) || normalizarTelefone(identificador);
+    if (phone && clientLoyalty.has(phone)) {
+        const rec = clientLoyalty.get(phone);
+        if (rec && typeof rec.totalCompras === 'number' && rec.totalCompras > 0) {
+            return rec.totalCompras;
+        }
+    }
+
+    // 2. Tenta por dígitos puros (pode ser chave de LID)
+    const rawDigits = String(identificador).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (rawDigits && clientLoyalty.has(rawDigits)) {
+        const rec = clientLoyalty.get(rawDigits);
+        if (rec && typeof rec.totalCompras === 'number' && rec.totalCompras > 0) {
+            return rec.totalCompras;
+        }
+    }
+
+    // 3. Tenta mapa LID -> Telefone
+    if (rawDigits && lidToPhone.has(rawDigits)) {
+        const mappedTel = lidToPhone.get(rawDigits);
+        if (mappedTel && clientLoyalty.has(mappedTel)) {
+            const rec = clientLoyalty.get(mappedTel);
+            if (rec && typeof rec.totalCompras === 'number' && rec.totalCompras > 0) {
+                return rec.totalCompras;
+            }
+        }
+    }
+
+    // 4. Tenta verificar por receptor padrão configurado
+    if (rawDigits && defaultRecipients.has(rawDigits)) {
+        const def = defaultRecipients.get(rawDigits);
+        if (def && def.targetPhone) {
+            const defNorm = normalizarTelefone(def.targetPhone);
+            if (defNorm && clientLoyalty.has(defNorm)) {
+                const rec = clientLoyalty.get(defNorm);
+                if (rec && typeof rec.totalCompras === 'number' && rec.totalCompras > 0) {
+                    return rec.totalCompras;
+                }
+            }
+        }
+    }
+
+    return 0;
 }
 
 /**

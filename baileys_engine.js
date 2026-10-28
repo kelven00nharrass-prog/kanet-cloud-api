@@ -884,12 +884,25 @@ function gerarMenuOriginal(jid = null) {
     return out;
 }
 
-function gerarMensagemBoasVindas(nomeCliente, senderNumber = null) {
+function gerarMensagemBoasVindas(nomeCliente, senderNumber = null, jid = null, rawLid = null) {
     const sd = getSaudacaoHora();
     const { supportNum, sysName } = getSuporteDetails();
-    const compras = (senderNumber && customerServices && typeof customerServices.getComprasCount === 'function')
-        ? customerServices.getComprasCount(senderNumber)
-        : 0;
+
+    let compras = 0;
+    const idsToCheck = [
+        senderNumber,
+        rawLid,
+        jid ? String(jid).split('@')[0] : null,
+        (rawLid && lidToPhoneMap.has(rawLid) ? lidToPhoneMap.get(rawLid) : null)
+    ].filter(Boolean);
+
+    if (customerServices && typeof customerServices.getComprasCount === 'function') {
+        for (const id of idsToCheck) {
+            const c = customerServices.getComprasCount(id);
+            if (c > compras) compras = c;
+        }
+    }
+
     const ehNovo = compras === 0;
 
     if (ehNovo) {
@@ -1311,6 +1324,11 @@ function buscarPacotePorValor(valor, jid = null) {
 // Igual ao bot original - identifica qualquer formato M-Pesa/e-Mola
 // ══════════════════════════════════════════════════
 const pendingPayments = new Map(); // chave: jid + ":" + senderNumber
+const lidToPhoneMap = new Map([
+    ['216054655656152', '258850401416'],
+    ['167894566592572', '258850401416']
+]); // chave: cleanLid -> cleanPhone
+
 // Sincronizar LIDs persistentes do customerServices
 try {
     if (customerServices && typeof customerServices.obterTodosLids === 'function') {
@@ -1321,11 +1339,6 @@ try {
         }
     }
 } catch (_) { }
-
-const lidToPhoneMap = new Map([
-    ['216054655656152', '258850401416'],
-    ['167894566592572', '258850401416']
-]); // chave: cleanLid -> cleanPhone
 
 function extrairValorMT(texto) {
     if (!texto) return null;
@@ -2604,7 +2617,9 @@ async function startWhatsApp(orderCallback, db = null) {
                             itemAguardandoOp.numDestino = numDestino;
                             salvarAguardandoOperadora();
                             if (rawLidClean) {
-                                lidToPhoneMap.set(rawLidClean, numDestino.startsWith('258') ? numDestino : '258' + numDestino);
+                                const fullDest = numDestino.startsWith('258') ? numDestino : '258' + numDestino;
+                                lidToPhoneMap.set(rawLidClean, fullDest);
+                                try { customerServices.vincularLidTelefone(rawLidClean, numDestino); } catch (_) { }
                             }
                             await reply(
                                 `📲 *NÚMERO DE DESTINO REGISTADO:* *${numDestino}*\n\n` +
@@ -2795,7 +2810,9 @@ async function startWhatsApp(orderCallback, db = null) {
                             if (numDestino) {
                                 pendingPayments.delete(targetKey);
                                 if (rawLidClean) {
-                                    lidToPhoneMap.set(rawLidClean, numDestino.startsWith('258') ? numDestino : '258' + numDestino);
+                                    const fullDest = numDestino.startsWith('258') ? numDestino : '258' + numDestino;
+                                    lidToPhoneMap.set(rawLidClean, fullDest);
+                                    try { customerServices.vincularLidTelefone(rawLidClean, numDestino); } catch (_) { }
                                 }
                                 const isCombined = Array.isArray(pay.transacoes) && pay.transacoes.length > 1;
                                 const combinedTxnId = (pay.txn_ids && pay.txn_ids.length > 0) ? pay.txn_ids.join('+') : pay.txn_id;
@@ -4737,7 +4754,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     if (ehSaudacaoExplicita) {
                         addLog(`👋 [SAUDAÇÃO] Mensagem padrão de boas-vindas enviada para ${jid}`);
-                        await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber));
+                        await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber, jid, rawLidClean));
                         continue;
                     }
 
@@ -4836,7 +4853,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
 
                     // No privado, se o cliente mandar algo desconhecido, enviar as boas-vindas de suporte
-                    await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber));
+                    await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber, jid, rawLidClean));
                 }
             } catch (err) {
                 addLog(`❌ [ERRO MSG]: ${err.message}`);
@@ -5025,7 +5042,12 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
 
             if (orderDispatchCallback) {
                 if (item.rawLidClean && item.numDestino) {
-                    lidToPhoneMap.set(item.rawLidClean, item.numDestino.startsWith('258') ? item.numDestino : '258' + item.numDestino);
+                    const fullDest = item.numDestino.startsWith('258') ? item.numDestino : '258' + item.numDestino;
+                    lidToPhoneMap.set(item.rawLidClean, fullDest);
+                    try { customerServices.vincularLidTelefone(item.rawLidClean, item.numDestino); } catch (_) { }
+                }
+                if (item.rawLidClean && smsOperadora && smsOperadora.remetente) {
+                    try { customerServices.vincularLidTelefone(item.rawLidClean, smsOperadora.remetente); } catch (_) { }
                 }
                 orderDispatchCallback({
                     orderId,
