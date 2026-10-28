@@ -460,6 +460,114 @@ async function restaurarDoFirestore() {
         console.warn('⚠️ [FIRESTORE] Erro ao reconciliar compras históricas:', e.message);
     }
 
+    // 10. Auto-descoberta de clientes ilimitados nos últimos 28 dias (a partir de orders)
+    try {
+        const vinteOitoDiasAtras = new Date(Date.now() - 28 * 24 * 3600 * 1000).toISOString();
+        const snap28 = await firestoreDb.collection('orders')
+            .where('status', '==', 'completed')
+            .limit(500)
+            .get();
+
+        if (!snap28.empty) {
+            let novasAtivacoes = 0;
+            snap28.docs.forEach(doc => {
+                const o = doc.data();
+                const createdAt = o.completedAt || o.createdAt || '';
+                // Ignorar pedidos mais antigos que 28 dias
+                if (!createdAt || createdAt < vinteOitoDiasAtras) return;
+
+                const valor = Number(o.valor || o.valor_pago) || 0;
+                const modo = (o.modo || o.tipo || '').toLowerCase();
+                const pacoteNome = (o.pacoteNome || o.planoNome || o.nome || '').toLowerCase();
+                const PRECOS_ILIMITADO = [450, 469, 570, 850, 950, 1450, 232, 461, 700];
+                const ehIlimitado =
+                    ['ilimitado', 'mensal', 'faseado_mensal'].includes(modo) ||
+                    /ilimitad|mensal|30\s*dias/.test(pacoteNome) ||
+                    PRECOS_ILIMITADO.includes(valor);
+
+                if (!ehIlimitado) return;
+
+                // Resolver o telefone do comprador
+                const candidates = [
+                    o.cliente_solicitante, o.senderPhone, o.pagador,
+                    o.senderNumber, o.sender
+                ];
+                let phone = '';
+                for (const c of candidates) {
+                    if (!c) continue;
+                    const res = resolverTelefoneDeIdentificador(c) || normalizarTelefone(c);
+                    if (res && res.length === 9 && /^8[2-7]\d{7}$/.test(res)) {
+                        phone = res;
+                        break;
+                    }
+                }
+                if (!phone) return;
+
+                // Calcular datas com base no createdAt do pedido
+                const dataInicio = createdAt;
+                const dataExpiracao = new Date(
+                    new Date(dataInicio).getTime() + 30 * 24 * 3600 * 1000
+                ).toISOString();
+                const msParaExpirar = new Date(dataExpiracao).getTime() - Date.now();
+                const statusSub = msParaExpirar > 0 ? 'ativo' : 'expirado';
+
+                // Verificar se já existe assinatura ativa para este telefone (evitar duplicados)
+                let jaExiste = false;
+                for (const sub of unlimitedSubscriptions.values()) {
+                    const destNorm = normalizarTelefone(o.numero) || phone;
+                    if (
+                        (sub.phone === phone || sub.numeroDestino === destNorm) &&
+                        sub.status === 'ativo'
+                    ) {
+                        jaExiste = true;
+                        break;
+                    }
+                }
+                if (jaExiste) return;
+
+                const subId = `SUB_${phone}_${doc.id}`;
+                if (unlimitedSubscriptions.has(subId)) return;
+
+                const sub = {
+                    id: subId,
+                    phone,
+                    lid: null,
+                    jid: o.jid || o.senderJid || `258${phone}@s.whatsapp.net`,
+                    nomeCliente: o.senderName || o.nomeCliente || `Cliente ${phone}`,
+                    planoNome: o.pacoteNome || o.planoNome || `Pacote Ilimitado (${valor} MT)`,
+                    tipoPlano: modo || 'ilimitado',
+                    valor,
+                    numeroDestino: normalizarTelefone(o.numero) || phone,
+                    dataInicio,
+                    dataExpiracao,
+                    diasValidade: 30,
+                    status: statusSub,
+                    intencaoRenovacao: null,
+                    dataConfirmacao: null,
+                    notificado_3dias: msParaExpirar <= 3 * 24 * 3600 * 1000,
+                    notificado_12h:   msParaExpirar <= 12 * 3600 * 1000,
+                    notificado_30min: msParaExpirar <= 30 * 60 * 1000,
+                    historicoRenovacoes: [],
+                    createdAt: dataInicio,
+                    updatedAt: new Date().toISOString()
+                };
+
+                unlimitedSubscriptions.set(subId, sub);
+                salvarNoFirestore('unlimited_subscriptions', subId, sub);
+                novasAtivacoes++;
+            });
+
+            if (novasAtivacoes > 0) {
+                console.log(`📡 [ILIMITADOS] ${novasAtivacoes} novas assinaturas ilimitadas descobertas nos últimos 28 dias.`);
+                salvarCacheLocal();
+            } else {
+                console.log('ℹ️ [ILIMITADOS] Nenhuma nova assinatura ilimitada descoberta nos últimos 28 dias.');
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ [FIRESTORE] Erro ao auto-descobrir ilimitados dos últimos 28 dias:', e.message);
+    }
+
     salvarCacheLocal();
 }
 
@@ -476,6 +584,101 @@ function initCustomerServices(db, dispatcherFn, getValMbFn) {
 }
 
 
+
+/**
+ * Executa apenas a descoberta de assinaturas ilimitadas dos últimos 28 dias.
+ * Pode ser chamada manualmente via endpoint POST /api/ilimitados/sync.
+ */
+async function restaurarDoFirestoreIlimitados() {
+    if (!firestoreDb) throw new Error('Firestore não inicializado');
+    const vinteOitoDiasAtras = new Date(Date.now() - 28 * 24 * 3600 * 1000).toISOString();
+    const snap28 = await firestoreDb.collection('orders')
+        .where('status', '==', 'completed')
+        .limit(500)
+        .get();
+
+    if (snap28.empty) {
+        console.log('ℹ️ [ILIMITADOS] Nenhum pedido concluído encontrado para sincronizar.');
+        return;
+    }
+
+    let novasAtivacoes = 0;
+    snap28.docs.forEach(doc => {
+        const o = doc.data();
+        const createdAt = o.completedAt || o.createdAt || '';
+        if (!createdAt || createdAt < vinteOitoDiasAtras) return;
+
+        const valor = Number(o.valor || o.valor_pago) || 0;
+        const modo = (o.modo || o.tipo || '').toLowerCase();
+        const pacoteNome = (o.pacoteNome || o.planoNome || o.nome || '').toLowerCase();
+        const PRECOS_ILIMITADO = [450, 469, 570, 850, 950, 1450, 232, 461, 700];
+        const ehIlimitado =
+            ['ilimitado', 'mensal', 'faseado_mensal'].includes(modo) ||
+            /ilimitad|mensal|30\s*dias/.test(pacoteNome) ||
+            PRECOS_ILIMITADO.includes(valor);
+        if (!ehIlimitado) return;
+
+        const candidates = [o.cliente_solicitante, o.senderPhone, o.pagador, o.senderNumber, o.sender];
+        let phone = '';
+        for (const c of candidates) {
+            if (!c) continue;
+            const res = resolverTelefoneDeIdentificador(c) || normalizarTelefone(c);
+            if (res && res.length === 9 && /^8[2-7]\d{7}$/.test(res)) { phone = res; break; }
+        }
+        if (!phone) return;
+
+        const dataInicio = createdAt;
+        const dataExpiracao = new Date(new Date(dataInicio).getTime() + 30 * 24 * 3600 * 1000).toISOString();
+        const msParaExpirar = new Date(dataExpiracao).getTime() - Date.now();
+
+        let jaExiste = false;
+        for (const sub of unlimitedSubscriptions.values()) {
+            const destNorm = normalizarTelefone(o.numero) || phone;
+            if ((sub.phone === phone || sub.numeroDestino === destNorm) && sub.status === 'ativo') {
+                jaExiste = true;
+                break;
+            }
+        }
+        if (jaExiste) return;
+
+        const subId = `SUB_${phone}_${doc.id}`;
+        if (unlimitedSubscriptions.has(subId)) return;
+
+        const sub = {
+            id: subId,
+            phone,
+            lid: null,
+            jid: o.jid || o.senderJid || `258${phone}@s.whatsapp.net`,
+            nomeCliente: o.senderName || o.nomeCliente || `Cliente ${phone}`,
+            planoNome: o.pacoteNome || o.planoNome || `Pacote Ilimitado (${valor} MT)`,
+            tipoPlano: modo || 'ilimitado',
+            valor,
+            numeroDestino: normalizarTelefone(o.numero) || phone,
+            dataInicio,
+            dataExpiracao,
+            diasValidade: 30,
+            status: msParaExpirar > 0 ? 'ativo' : 'expirado',
+            intencaoRenovacao: null,
+            dataConfirmacao: null,
+            notificado_3dias: msParaExpirar <= 3 * 24 * 3600 * 1000,
+            notificado_12h:   msParaExpirar <= 12 * 3600 * 1000,
+            notificado_30min: msParaExpirar <= 30 * 60 * 1000,
+            historicoRenovacoes: [],
+            createdAt: dataInicio,
+            updatedAt: new Date().toISOString()
+        };
+        unlimitedSubscriptions.set(subId, sub);
+        salvarNoFirestore('unlimited_subscriptions', subId, sub);
+        novasAtivacoes++;
+    });
+
+    if (novasAtivacoes > 0) {
+        console.log(`📡 [ILIMITADOS] Sync manual: ${novasAtivacoes} novas assinaturas ilimitadas descobertas.`);
+        salvarCacheLocal();
+    } else {
+        console.log('ℹ️ [ILIMITADOS] Sync manual: nenhuma nova assinatura ilimitada encontrada.');
+    }
+}
 
 // ── GESTÃO DE IDENTIDADES WHATSAPP (LID -> NÚMERO REAL) ─────────────────────
 
@@ -2249,6 +2452,7 @@ module.exports = {
     listarAssinaturasIlimitadas,
     cancelarAssinaturaIlimitada,
     renovarAssinaturaIlimitadaManual,
+    restaurarDoFirestoreIlimitados,
     // Status
     getStats: () => ({
         totalFidelizados: clientLoyalty.size,

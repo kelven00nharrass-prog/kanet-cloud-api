@@ -6951,6 +6951,22 @@ app.post('/api/ilimitados/:id/cancelar', (req, res) => {
   res.json({ success: true, mensagem: 'Assinatura cancelada com sucesso.' });
 });
 
+// Sincronização manual: redescobrir assinaturas ilimitadas dos últimos 28 dias a partir de orders
+app.post('/api/ilimitados/sync', async (req, res) => {
+  if (!customerServices || typeof customerServices.restaurarDoFirestoreIlimitados !== 'function') {
+    // Fallback: recarregar tudo via restaurarDoFirestore completa não é ideal em prod,
+    // então executamos a função específica se existir, senão retornamos ok simbólico
+    return res.json({ success: true, mensagem: 'Sincronização agendada no próximo reinício (função dedicada não disponível).' });
+  }
+  try {
+    await customerServices.restaurarDoFirestoreIlimitados();
+    const list = customerServices.listarAssinaturasIlimitadas('todas');
+    res.json({ success: true, mensagem: 'Sincronização concluída!', total: list.length });
+  } catch (e) {
+    res.status(500).json({ success: false, erro: e.message });
+  }
+});
+
 app.get('/api/plans/scheduled', (req, res) => {
   const plans = Array.from(scheduledPlans.values());
   res.json({ success: true, count: plans.length, plans });

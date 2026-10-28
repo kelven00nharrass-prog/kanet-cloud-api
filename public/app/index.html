@@ -305,6 +305,10 @@
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:16px;height:16px;"><path d="M12 4v16m8-8H4"/></svg>
         Nova Assinatura
       </button>
+      <button class="btn text-xs" style="background:#1e40af;color:#fff;" onclick="syncIlimitados(this)">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:16px;height:16px;"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Sincronizar Histórico
+      </button>
     </div>
 
     <!-- Métricas Ilimitados -->
@@ -667,6 +671,7 @@ function loadTabData(name) {
     case 'bot':       loadBotStatus(); break;
     case 'groups':    loadGroups();    break;
     case 'packages':  loadPackages();  break;
+    case 'ilimitados': loadIlimitados(); break;
   }
 }
 
@@ -677,6 +682,110 @@ setInterval(() => loadTabData(currentTab), 10000);
 setInterval(loadDevices, 10000); // refresh a cada 30s
 setInterval(loadBotStatus, 20000); // bot status a cada 20s
 
+
+// -- Pacotes Ilimitados -----------------------------------------
+async function loadIlimitados() {
+  try {
+    const d = await apiFetch('/api/ilimitados?filtro=todas');
+    const subs = d.assinaturas || [];
+    const ativos = subs.filter(s => s.status === 'ativo').length;
+    const v3 = subs.filter(s => {
+      if (s.status !== 'ativo') return false;
+      const ms = new Date(s.dataExpiracao).getTime() - Date.now();
+      return ms > 0 && ms <= 3 * 24 * 3600 * 1000;
+    }).length;
+    const confirmados = subs.filter(s => s.intencaoRenovacao === 'sim').length;
+    const recusados   = subs.filter(s => s.intencaoRenovacao === 'nao').length;
+    document.getElementById('ilimitados-total-ativos').textContent   = ativos;
+    document.getElementById('ilimitados-vencem-3dias').textContent   = v3;
+    document.getElementById('ilimitados-confirmados').textContent     = confirmados;
+    document.getElementById('ilimitados-recusados').textContent       = recusados;
+    const el = document.getElementById('ilimitados-list');
+    if (!subs.length) {
+      el.innerHTML = '<p class="text-gray-400 text-sm text-center py-6">Nenhuma assinatura ilimitada registada.</p>';
+      return;
+    }
+    el.innerHTML = subs.map(s => {
+      const exp = new Date(s.dataExpiracao);
+      const msLeft = exp.getTime() - Date.now();
+      const diasLeft = Math.ceil(msLeft / 86400000);
+      const badgeColor = s.status === 'ativo' ? (diasLeft <= 3 ? '#f59e0b' : '#10b981') : '#ef4444';
+      const intBadge = s.intencaoRenovacao === 'sim'
+        ? '<span style="background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;">Vai Renovar</span>'
+        : s.intencaoRenovacao === 'nao'
+          ? '<span style="background:#7f1d1d;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;">Nao Renova</span>'
+          : '';
+      return '<div class="card" style="border-left:3px solid ' + badgeColor + ';">'
+        + '<div class="flex items-start justify-between gap-2 flex-wrap"><div>'
+        + '<div class="font-semibold text-sm">' + (s.nomeCliente || s.phone) + ' <span style="color:' + badgeColor + ';font-size:11px;">(' + s.status + ')</span></div>'
+        + '<div class="text-xs text-gray-400">Tel: ' + s.phone + ' -> ' + (s.numeroDestino || '-') + '</div>'
+        + '<div class="text-xs text-gray-400">Plano: ' + (s.planoNome || 'Ilimitado') + ' - ' + (s.valor || 0) + ' MT</div>'
+        + '<div class="text-xs text-gray-400">Expira: ' + exp.toLocaleDateString('pt-MZ') + ' (' + (diasLeft > 0 ? diasLeft + ' dias' : 'Expirado') + ')</div>'
+        + intBadge + '</div>'
+        + '<div class="flex gap-2 flex-wrap">'
+        + '<button class="btn btn-green text-xs" style="padding:4px 10px;" onclick="renovarIlimitado(\'' + s.id + '\')">+30 Dias</button>'
+        + '<button class="btn btn-amber text-xs" style="padding:4px 10px;" onclick="cancelarIlimitado(\'' + s.id + '\')">Cancelar</button>'
+        + '</div></div></div>';
+    }).join('');
+  } catch(e) { console.error('loadIlimitados', e); }
+}
+
+async function renovarIlimitado(id) {
+  if (!confirm('Renovar esta assinatura por mais 30 dias?')) return;
+  try {
+    const r = await apiFetch('/api/ilimitados/' + id + '/renovar', { method: 'POST', body: JSON.stringify({ dias: 30 }) });
+    alert(r.mensagem || 'Renovado!');
+    loadIlimitados();
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function cancelarIlimitado(id) {
+  if (!confirm('Cancelar esta assinatura?')) return;
+  try {
+    const r = await apiFetch('/api/ilimitados/' + id + '/cancelar', { method: 'POST' });
+    alert(r.mensagem || 'Cancelado!');
+    loadIlimitados();
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function syncIlimitados(btn) {
+  btn.disabled = true;
+  btn.textContent = 'A sincronizar...';
+  try {
+    const r = await apiFetch('/api/ilimitados/sync', { method: 'POST' });
+    alert(r.mensagem || 'Sincronizacao concluida!');
+    loadIlimitados();
+  } catch(e) { alert('Erro: ' + e.message); }
+  finally {
+    btn.disabled = false;
+    btn.textContent = 'Sincronizar Historico';
+  }
+}
+
+function openAddIlimitadoModal() {
+  document.getElementById('modal-add-ilimitado').style.display = 'flex';
+}
+function closeAddIlimitadoModal() {
+  document.getElementById('modal-add-ilimitado').style.display = 'none';
+}
+
+async function salvarNovaAssinaturaIlimitada(e) {
+  e.preventDefault();
+  const form = e.target;
+  const body = {
+    phone:         form.phone.value.trim(),
+    nomeCliente:   form.nomeCliente.value.trim(),
+    planoNome:     form.planoNome.value.trim(),
+    valor:         Number(form.valor.value) || 0,
+    numeroDestino: form.numeroDestino.value.trim()
+  };
+  try {
+    const r = await apiFetch('/api/ilimitados', { method: 'POST', body: JSON.stringify(body) });
+    alert(r.mensagem || 'Assinatura criada!');
+    closeAddIlimitadoModal();
+    loadIlimitados();
+  } catch(e) { alert('Erro: ' + e.message); }
+}
 // Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/app/sw.js').catch(() => {});
