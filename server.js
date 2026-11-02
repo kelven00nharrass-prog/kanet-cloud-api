@@ -7342,6 +7342,24 @@ app.listen(PORT, '0.0.0.0', () => {
     }
   }, PING_INTERVAL_MS);
 
+  // ── RESTAURAR DADOS DO FIRESTORE AO ARRANCAR ────────────────────────
+  // Após o boot, aguarda 5s para o Firebase autenticar e restaura dados
+  if (db) {
+    setTimeout(async () => {
+      try {
+        if (customerServices && typeof customerServices.restaurarDoFirestore === 'function') {
+          console.log('[BOOT] A restaurar dados do Firestore...');
+          await customerServices.restaurarDoFirestore();
+          console.log('[BOOT] Dados do Firestore restaurados com sucesso!');
+        }
+      } catch (e) {
+        console.warn('[BOOT] Erro ao restaurar do Firestore:', e.message);
+      }
+    }, 5000); // 5 segundos apos o boot
+  } else {
+    console.warn('[BOOT] Firestore nao disponivel - dados do cache local apenas');
+  }
+
   console.log(`💓 [KEEP-ALIVE] Auto-ping activo a cada 14 min → ${SELF_URL}/health`);
 });
 
