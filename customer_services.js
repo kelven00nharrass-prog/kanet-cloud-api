@@ -574,12 +574,19 @@ async function restaurarDoFirestore() {
 // ── INICIALIZADOR DO MÓDULO ───────────────────────────────────────────────────
 
 function initCustomerServices(db, dispatcherFn, getValMbFn) {
-    firestoreDb = db;
-    orderDispatcher = dispatcherFn;
-    valorFromMbHelper = getValMbFn;
-    carregarCacheLocal();
-    if (firestoreDb) {
-        setTimeout(() => restaurarDoFirestore(), 2500);
+    const jaInicializado = !!firestoreDb;
+    firestoreDb = db || firestoreDb; // Aceitar reinjecção sem apagar db existente
+    if (dispatcherFn) orderDispatcher = dispatcherFn;
+    if (getValMbFn) valorFromMbHelper = getValMbFn;
+    if (!jaInicializado) {
+        // Primeira inicialização: carregar cache e restaurar do Firestore
+        carregarCacheLocal();
+        if (firestoreDb) {
+            setTimeout(() => restaurarDoFirestore(), 2500);
+        }
+    } else if (db && !jaInicializado) {
+        // db acabou de ficar disponível: restaurar
+        setTimeout(() => restaurarDoFirestore(), 1000);
     }
 }
 
@@ -2470,6 +2477,7 @@ module.exports = {
     initCustomerServices,
     normalizarTelefone,
     setWhatsAppNotifier,
+    _getFirestoreDb: () => firestoreDb,
     // Programa Indica e Ganha
     vincularLidTelefone,
     resolverTelefoneDeIdentificador,

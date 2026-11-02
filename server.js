@@ -119,7 +119,8 @@ app.get(['/health', '/', '/status'], (req, res) => {
     timestamp: new Date().toISOString(),
     devices_online: onlineCount,
     devices_total: Object.keys(inMemoryDevices).length,
-    gemini_ai_configured: geminiAI ? geminiAI.isConfigured() : false
+    gemini_ai_configured: geminiAI ? geminiAI.isConfigured() : false,
+    firestore_ok: !!db
   });
 });
 
@@ -6966,15 +6967,27 @@ app.put('/api/ilimitados/:id', authenticateAdmin, (req, res) => {
 // Sincronização manual: redescobrir assinaturas ilimitadas dos últimos 28 dias a partir de orders
 app.post('/api/ilimitados/sync', async (req, res) => {
   if (!customerServices || typeof customerServices.restaurarDoFirestoreIlimitados !== 'function') {
-    // Fallback: recarregar tudo via restaurarDoFirestore completa não é ideal em prod,
-    // então executamos a função específica se existir, senão retornamos ok simbólico
     return res.json({ success: true, mensagem: 'Sincronização agendada no próximo reinício (função dedicada não disponível).' });
+  }
+  // Reinjectar db se customerServices ainda não o tem (pode acontecer se Firebase demorou a inicializar)
+  if (db && typeof customerServices.initCustomerServices === 'function') {
+    try { customerServices.initCustomerServices(db, null, null); } catch(_) {}
   }
   try {
     await customerServices.restaurarDoFirestoreIlimitados();
     const list = customerServices.listarAssinaturasIlimitadas('todas');
     res.json({ success: true, mensagem: 'Sincronização concluída!', total: list.length });
   } catch (e) {
+    // Se Firestore ainda não init, tentar restaurarDoFirestore completo
+    if (e.message && e.message.includes('Firestore') && db) {
+      try {
+        await customerServices.restaurarDoFirestore();
+        const list = customerServices.listarAssinaturasIlimitadas('todas');
+        return res.json({ success: true, mensagem: 'Sincronização completa concluída!', total: list.length });
+      } catch (e2) {
+        return res.status(500).json({ success: false, erro: e2.message });
+      }
+    }
     res.status(500).json({ success: false, erro: e.message });
   }
 });
