@@ -1007,5 +1007,168 @@
     ]
   ],
   "bonuses": [],
-  "savedAt": "2026-10-24T10:21:35.671Z"
+  "savedAt": "2026-10-24T10:21:35.671Z",
+  "subscriptions": [
+    [
+      "SUB_821974196_1793378435235",
+      {
+        "id": "SUB_821974196_1793378435235",
+        "phone": "842294619",
+        "lid": "82197419663555",
+        "jid": "258842294619@s.whatsapp.net",
+        "nomeCliente": "Cilênia dos Santos",
+        "planoNome": "Pacote Ilimitado (95 MT)",
+        "tipoPlano": "mensal",
+        "valor": 95,
+        "numeroDestino": "842294619",
+        "dataInicio": "2026-10-30T16:40:35.235Z",
+        "dataExpiracao": "2026-11-29T16:40:35.235Z",
+        "diasValidade": 30,
+        "status": "ativo",
+        "intencaoRenovacao": null,
+        "dataConfirmacao": null,
+        "notificado_3dias": false,
+        "notificado_12h": false,
+        "notificado_30min": false,
+        "historicoRenovacoes": [
+          {
+            "data": "2026-10-30T16:40:35.235Z",
+            "valor": 285,
+            "dias": 30,
+            "orderId": "WA-PP261030.1839.I86809-1793378435036"
+          }
+        ],
+        "updatedAt": "2026-11-02T19:07:27.537Z",
+        "createdAt": "2026-10-30T16:40:35.235Z"
+      }
+    ],
+    [
+      "SUB_849011348_1793426991068",
+      {
+        "id": "SUB_849011348_1793426991068",
+        "phone": "849011348",
+        "lid": null,
+        "jid": "258849011348@s.whatsapp.net",
+        "nomeCliente": "Cliente Ka-Net",
+        "planoNome": "Pacote Ilimitado (450 MT)",
+        "tipoPlano": "ilimitado",
+        "valor": 450,
+        "numeroDestino": "849011348",
+        "dataInicio": "2026-10-31T06:09:51.068Z",
+        "dataExpiracao": "2026-11-30T06:09:51.068Z",
+        "diasValidade": 30,
+        "status": "ativo",
+        "intencaoRenovacao": null,
+        "dataConfirmacao": null,
+        "notificado_3dias": false,
+        "notificado_12h": false,
+        "notificado_30min": false,
+        "historicoRenovacoes": [
+          {
+            "data": "2026-10-31T06:09:51.068Z",
+            "valor": 450,
+            "dias": 30
+          }
+        ],
+        "updatedAt": "2026-10-31T06:09:51.068Z",
+        "createdAt": "2026-10-31T06:09:51.068Z"
+      }
+    ],
+    [
+      "SUB_855105710_1793442964740",
+      {
+        "id": "SUB_855105710_1793442964740",
+        "phone": "855105710",
+        "lid": null,
+        "jid": "258855105710@s.whatsapp.net",
+        "nomeCliente": "Cliente Ka-Net",
+        "planoNome": "Pacote Ilimitado (285 MT)",
+        "tipoPlano": "mensal",
+        "valor": 285,
+        "numeroDestino": "855105710",
+        "dataInicio": "2026-10-31T10:36:04.740Z",
+        "dataExpiracao": "2026-11-30T10:36:04.740Z",
+        "diasValidade": 30,
+        "status": "ativo",
+        "intencaoRenovacao": null,
+        "dataConfirmacao": null,
+        "notificado_3dias": false,
+        "notificado_12h": false,
+        "notificado_30min": false,
+        "historicoRenovacoes": [
+          {
+            "data": "2026-10-31T10:36:04.740Z",
+            "valor": 285,
+            "dias": 30
+          }
+        ],
+        "updatedAt": "2026-10-31T10:36:04.740Z",
+        "createdAt": "2026-10-31T10:36:04.740Z"
+      }
+    ],
+    [
+      "SUB_848107015_1793524895700",
+      {
+        "id": "SUB_848107015_1793524895700",
+        "phone": "848107015",
+        "lid": null,
+        "jid": "258848107015@s.whatsapp.net",
+        "nomeCliente": "Cliente Ka-Net",
+        "planoNome": "Pacote Ilimitado (250 MT)",
+        "tipoPlano": "mensal",
+        "valor": 250,
+        "numeroDestino": "848107015",
+        "dataInicio": "2026-11-01T09:21:35.700Z",
+        "dataExpiracao": "2026-12-01T09:21:35.700Z",
+        "diasValidade": 30,
+        "status": "ativo",
+        "intencaoRenovacao": null,
+        "dataConfirmacao": null,
+        "notificado_3dias": false,
+        "notificado_12h": false,
+        "notificado_30min": false,
+        "historicoRenovacoes": [
+          {
+            "data": "2026-11-01T09:21:35.700Z",
+            "valor": 250,
+            "dias": 30
+          }
+        ],
+        "updatedAt": "2026-11-01T09:21:35.700Z",
+        "createdAt": "2026-11-01T09:21:35.700Z"
+      }
+    ],
+    [
+      "SUB_848681464_1793631331160",
+      {
+        "id": "SUB_848681464_1793631331160",
+        "phone": "848681464",
+        "lid": null,
+        "jid": "258848681464@s.whatsapp.net",
+        "nomeCliente": "Cliente Ka-Net",
+        "planoNome": "Pacote Ilimitado (450 MT)",
+        "tipoPlano": "ilimitado",
+        "valor": 450,
+        "numeroDestino": "848681464",
+        "dataInicio": "2026-11-02T14:55:31.160Z",
+        "dataExpiracao": "2026-12-02T14:55:31.160Z",
+        "diasValidade": 30,
+        "status": "ativo",
+        "intencaoRenovacao": null,
+        "dataConfirmacao": null,
+        "notificado_3dias": false,
+        "notificado_12h": false,
+        "notificado_30min": false,
+        "historicoRenovacoes": [
+          {
+            "data": "2026-11-02T14:55:31.160Z",
+            "valor": 450,
+            "dias": 30
+          }
+        ],
+        "updatedAt": "2026-11-02T14:55:31.160Z",
+        "createdAt": "2026-11-02T14:55:31.160Z"
+      }
+    ]
+  ]
 }

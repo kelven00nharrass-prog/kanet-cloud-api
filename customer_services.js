@@ -168,6 +168,18 @@ function carregarCacheLocal() {
         if (Array.isArray(data.subscriptions)) {
             data.subscriptions.forEach(([k, v]) => unlimitedSubscriptions.set(k, v));
         }
+
+        // Se o cache carregado não tiver assinaturas, tenta complementar a partir da semente (seed)
+        if (unlimitedSubscriptions.size === 0 && fs.existsSync(CACHE_SEED_FILE) && fonte !== CACHE_SEED_FILE) {
+            try {
+                const seedRaw = fs.readFileSync(CACHE_SEED_FILE, 'utf8');
+                const seedData = JSON.parse(seedRaw);
+                if (Array.isArray(seedData.subscriptions)) {
+                    seedData.subscriptions.forEach(([k, v]) => unlimitedSubscriptions.set(k, v));
+                    console.log(`🌱 [CUSTOMER-SERVICES] Assinaturas ilimitadas recuperadas da semente: ${unlimitedSubscriptions.size}`);
+                }
+            } catch (_) {}
+        }
         console.log(`📦 [CUSTOMER-SERVICES] Cache carregado (${path.basename(fonte)}): ${clientLoyalty.size} clientes fidelidade, ${clientLoans.size} empréstimos, ${defaultRecipients.size} receptores, ${clientBonuses.size} bônus.`);
     } catch (err) {
         console.warn('⚠️ [CUSTOMER-SERVICES] Falha ao ler cache principal, tentando backup:', err.message);
