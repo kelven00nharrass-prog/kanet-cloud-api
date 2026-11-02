@@ -966,7 +966,7 @@
         "payerPhone": "855899872",
         "targetPhone": "853163475",
         "ownerJid": "258855899872@s.whatsapp.net",
-        "registeredAt": "2026-10-24T16:48:38.254Z"
+        "registeredAt": "2026-10-30T17:21:23.452Z"
       }
     ],
     [
@@ -975,7 +975,7 @@
         "payerPhone": "863331739",
         "targetPhone": "841710174",
         "ownerJid": "258863331739@s.whatsapp.net",
-        "registeredAt": "2026-10-24T16:48:38.680Z"
+        "registeredAt": "2026-10-30T18:40:05.163Z"
       }
     ],
     [
@@ -984,7 +984,7 @@
         "payerPhone": "862842413",
         "targetPhone": "857642413",
         "ownerJid": "258862842413@s.whatsapp.net",
-        "registeredAt": "2026-10-24T16:48:39.054Z"
+        "registeredAt": "2026-10-30T22:49:15.510Z"
       }
     ],
     [
@@ -993,7 +993,7 @@
         "payerPhone": "857693697",
         "targetPhone": "857693697",
         "ownerJid": "258857693697@s.whatsapp.net",
-        "registeredAt": "2026-10-24T16:48:39.528Z"
+        "registeredAt": "2026-10-28T23:34:28.881Z"
       }
     ],
     [
@@ -1002,7 +1002,70 @@
         "payerPhone": "851296048",
         "targetPhone": "851296048",
         "ownerJid": "258851296048@s.whatsapp.net",
-        "registeredAt": "2026-10-24T16:48:39.917Z"
+        "registeredAt": "2026-10-30T16:17:37.373Z"
+      }
+    ],
+    [
+      "845846406",
+      {
+        "payerPhone": "845846406",
+        "targetPhone": "845846406",
+        "ownerJid": "258845846406@s.whatsapp.net",
+        "registeredAt": "2026-10-28T18:51:03.556Z"
+      }
+    ],
+    [
+      "848948347",
+      {
+        "payerPhone": "848948347",
+        "targetPhone": "848948347",
+        "ownerJid": "258848948347@s.whatsapp.net",
+        "registeredAt": "2026-10-29T18:10:58.431Z"
+      }
+    ],
+    [
+      "878727440",
+      {
+        "payerPhone": "878727440",
+        "targetPhone": "841991496",
+        "ownerJid": "258878727440@s.whatsapp.net",
+        "registeredAt": "2026-10-29T15:36:40.730Z"
+      }
+    ],
+    [
+      "860722712",
+      {
+        "payerPhone": "860722712",
+        "targetPhone": "856387483",
+        "ownerJid": "258860722712@s.whatsapp.net",
+        "registeredAt": "2026-11-02T15:19:09.094Z"
+      }
+    ],
+    [
+      "856387483",
+      {
+        "payerPhone": "856387483",
+        "targetPhone": "856387483",
+        "ownerJid": "258856387483@s.whatsapp.net",
+        "registeredAt": "2026-11-01T14:51:54.326Z"
+      }
+    ],
+    [
+      "857642413",
+      {
+        "payerPhone": "857642413",
+        "targetPhone": "857642413",
+        "ownerJid": "258857642413@s.whatsapp.net",
+        "registeredAt": "2026-10-29T11:01:29.645Z"
+      }
+    ],
+    [
+      "869101227",
+      {
+        "payerPhone": "869101227",
+        "targetPhone": "842594734",
+        "ownerJid": "258869101227@s.whatsapp.net",
+        "registeredAt": "2026-10-30T16:26:32.438Z"
       }
     ]
   ],
