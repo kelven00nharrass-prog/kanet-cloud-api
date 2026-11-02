@@ -169,14 +169,22 @@ function carregarCacheLocal() {
             data.subscriptions.forEach(([k, v]) => unlimitedSubscriptions.set(k, v));
         }
 
-        // Se o cache carregado não tiver assinaturas, tenta complementar a partir da semente (seed)
-        if (unlimitedSubscriptions.size === 0 && fs.existsSync(CACHE_SEED_FILE) && fonte !== CACHE_SEED_FILE) {
+        // Se o cache carregado não tiver assinaturas, receptores ou fidelidade, complementa a partir da semente (seed)
+        if (fs.existsSync(CACHE_SEED_FILE) && fonte !== CACHE_SEED_FILE) {
             try {
                 const seedRaw = fs.readFileSync(CACHE_SEED_FILE, 'utf8');
                 const seedData = JSON.parse(seedRaw);
-                if (Array.isArray(seedData.subscriptions)) {
+                if (unlimitedSubscriptions.size === 0 && Array.isArray(seedData.subscriptions)) {
                     seedData.subscriptions.forEach(([k, v]) => unlimitedSubscriptions.set(k, v));
                     console.log(`🌱 [CUSTOMER-SERVICES] Assinaturas ilimitadas recuperadas da semente: ${unlimitedSubscriptions.size}`);
+                }
+                if (defaultRecipients.size === 0 && Array.isArray(seedData.defaultRecipients)) {
+                    seedData.defaultRecipients.forEach(([k, v]) => defaultRecipients.set(k, v));
+                    console.log(`🌱 [CUSTOMER-SERVICES] Receptores padrão recuperados da semente: ${defaultRecipients.size}`);
+                }
+                if (clientLoyalty.size === 0 && Array.isArray(seedData.loyalty)) {
+                    seedData.loyalty.forEach(([k, v]) => clientLoyalty.set(k, v));
+                    console.log(`🌱 [CUSTOMER-SERVICES] Clientes fidelidade recuperados da semente: ${clientLoyalty.size}`);
                 }
             } catch (_) {}
         }
