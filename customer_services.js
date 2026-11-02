@@ -2173,7 +2173,8 @@ function cadastrarOuRenovarAssinaturaIlimitada({
     tipoPlano = 'ilimitado',
     valor = 0,
     numeroDestino = null,
-    dias = 30
+    dias = 30,
+    orderId = null
 }) {
     const telReal = resolverTelefoneDeIdentificador(phone) || normalizarTelefone(phone) || String(phone || '').replace(/\D/g, '');
     const numDest = normalizarTelefone(numeroDestino) || telReal;
@@ -2195,8 +2196,31 @@ function cadastrarOuRenovarAssinaturaIlimitada({
     let dataInicio = agora.toISOString();
     let expiraEm = new Date(agora.getTime() + (dias * 24 * 60 * 60 * 1000));
 
-    // Se já tinha assinatura ativa e ainda não venceu, soma os dias à data de expiração restante!
+    // Se já tinha assinatura ativa e ainda não venceu:
+    // - Se é a MESMA transacção (orderId coincide ou entrada nos últimos 5 min), NÃO acumula dias (é split da mesma compra)
+    // - Se é uma NOVA renovação/compra, soma os dias à data de expiração restante
     if (existingSub && new Date(existingSub.dataExpiracao) > agora) {
+        const historicoRecente = Array.isArray(existingSub.historicoRenovacoes) ? existingSub.historicoRenovacoes : [];
+        const JANELA_SPLIT_MS = 10 * 60 * 1000; // 10 minutos — janela para considerar "mesmo pedido"
+        const ultimaRenovacao = historicoRecente.length > 0 ? historicoRecente[historicoRecente.length - 1] : null;
+        const mesmoPedidoPorId = orderId && ultimaRenovacao && ultimaRenovacao.orderId &&
+            (ultimaRenovacao.orderId === orderId || ultimaRenovacao.orderId.split('-P')[0] === String(orderId).split('-P')[0]);
+        const mesmoPedidoPorTempo = ultimaRenovacao &&
+            (agora.getTime() - new Date(ultimaRenovacao.data).getTime()) < JANELA_SPLIT_MS;
+
+        if (mesmoPedidoPorId || mesmoPedidoPorTempo) {
+            // É parte do mesmo pedido (split) — apenas actualiza metadados, NÃO acumula dias
+            console.log(`📡 [ASSINATURA ILIMITADA] Split detectado para ${chaveTelefone} (orderId=${orderId}) — sem acumulação de dias`);
+            existingSub.nomeCliente = nomeCliente || existingSub.nomeCliente;
+            existingSub.planoNome = planoNome || existingSub.planoNome;
+            existingSub.updatedAt = agora.toISOString();
+            unlimitedSubscriptions.set(existingSub.id, existingSub);
+            salvarCacheLocal();
+            salvarNoFirestore('unlimited_subscriptions', existingSub.id, existingSub);
+            return existingSub;
+        }
+
+        // Nova renovação legítima — soma os dias à expiração actual
         const expAtual = new Date(existingSub.dataExpiracao);
         expiraEm = new Date(expAtual.getTime() + (dias * 24 * 60 * 60 * 1000));
         dataInicio = existingSub.dataInicio || dataInicio;
@@ -2226,7 +2250,7 @@ function cadastrarOuRenovarAssinaturaIlimitada({
         notificado_30min: false,
         historicoRenovacoes: [
             ...(existingSub && Array.isArray(existingSub.historicoRenovacoes) ? existingSub.historicoRenovacoes : []),
-            { data: agora.toISOString(), valor: Number(valor) || 0, dias }
+            { data: agora.toISOString(), valor: Number(valor) || 0, dias, orderId: orderId || null }
         ],
         updatedAt: agora.toISOString(),
         createdAt: existingSub ? existingSub.createdAt : agora.toISOString()
@@ -2403,6 +2427,45 @@ function renovarAssinaturaIlimitadaManual(idOuTelefone, dias = 30) {
     return sub;
 }
 
+/**
+ * Actualiza campos específicos de uma assinatura ilimitada (para correcções manuais)
+ * @param {string} idOuTelefone - ID da assinatura ou número de telefone
+ * @param {object} campos - Campos a actualizar (dataExpiracao, status, planoNome, valor, nomeCliente, etc.)
+ * @returns {object|null} assinatura actualizada ou null
+ */
+function atualizarAssinaturaIlimitada(idOuTelefone, campos = {}) {
+    if (!idOuTelefone || !campos || typeof campos !== 'object') return null;
+
+    let sub = null;
+    if (unlimitedSubscriptions.has(idOuTelefone)) {
+        sub = unlimitedSubscriptions.get(idOuTelefone);
+    } else {
+        const phone = normalizarTelefone(idOuTelefone) || String(idOuTelefone).replace(/\D/g, '');
+        for (const s of unlimitedSubscriptions.values()) {
+            if (s.phone === phone || s.numeroDestino === phone) {
+                sub = s;
+                break;
+            }
+        }
+    }
+    if (!sub) return null;
+
+    const camposPermitidos = ['dataExpiracao', 'status', 'planoNome', 'tipoPlano', 'valor',
+        'nomeCliente', 'diasValidade', 'notificado_3dias', 'notificado_12h', 'notificado_30min',
+        'intencaoRenovacao', 'dataConfirmacao', 'historicoRenovacoes'];
+
+    for (const [k, v] of Object.entries(campos)) {
+        if (camposPermitidos.includes(k)) sub[k] = v;
+    }
+    sub.updatedAt = new Date().toISOString();
+
+    unlimitedSubscriptions.set(sub.id, sub);
+    salvarCacheLocal();
+    salvarNoFirestore('unlimited_subscriptions', sub.id, sub);
+    console.log(`✏️ [ASSINATURA ILIMITADA] ${sub.id} actualizada manualmente:`, Object.keys(campos).join(', '));
+    return sub;
+}
+
 module.exports = {
     initCustomerServices,
     normalizarTelefone,
@@ -2452,6 +2515,7 @@ module.exports = {
     listarAssinaturasIlimitadas,
     cancelarAssinaturaIlimitada,
     renovarAssinaturaIlimitadaManual,
+    atualizarAssinaturaIlimitada,
     restaurarDoFirestoreIlimitados,
     // Status
     getStats: () => ({

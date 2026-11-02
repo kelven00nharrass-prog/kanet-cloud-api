@@ -6951,6 +6951,18 @@ app.post('/api/ilimitados/:id/cancelar', (req, res) => {
   res.json({ success: true, mensagem: 'Assinatura cancelada com sucesso.' });
 });
 
+// Actualizar campos de uma assinatura (correcção manual de datas, etc.)
+app.put('/api/ilimitados/:id', authenticateAdmin, (req, res) => {
+  if (!customerServices || typeof customerServices.atualizarAssinaturaIlimitada !== 'function') {
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+  }
+  const campos = req.body || {};
+  delete campos.id; // Não deixar mudar o ID
+  const sub = customerServices.atualizarAssinaturaIlimitada(req.params.id, campos);
+  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
+  res.json({ success: true, mensagem: 'Assinatura actualizada com sucesso!', assinatura: sub });
+});
+
 // Sincronização manual: redescobrir assinaturas ilimitadas dos últimos 28 dias a partir de orders
 app.post('/api/ilimitados/sync', async (req, res) => {
   if (!customerServices || typeof customerServices.restaurarDoFirestoreIlimitados !== 'function') {
