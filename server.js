@@ -2029,10 +2029,20 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
     ) || resMsg.includes('tudo top') || resMsg.includes('oferta de dados') ||
     resMsg.includes('dados mensal') || resMsg.includes('dados semanal') ||
     resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
+  // Anti-falso positivo: 'mmi' aparece em dialogos de carregamento ("A executar codigo MMI...")
+  // 'concluid'/'sucesso' sozinhos podem estar em msgs de ERRO ("Operacao nao concluida com sucesso")
+  const hasNegationServer = resMsg.includes('nao ') || resMsg.includes('não ') ||
+                            resMsg.includes('sem sucesso') || resMsg.includes('sem saldo') ||
+                            resMsg.includes('nao foi') || resMsg.includes('não foi');
   const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
                         resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
-                        resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
-                        resMsg.includes('transferiste') || resMsg.includes('transferiu');
+                        resMsg.includes('transferiste') || resMsg.includes('transferiu') ||
+                        (!hasNegationServer && (resMsg.includes('codigo mmi concluido') || resMsg.includes('código mmi concluído') ||
+                          resMsg.includes('mmi concluido') || resMsg.includes('mmi concluído'))) ||
+                        (!hasNegationServer && resMsg.includes('concluid') &&
+                          (resMsg.includes('transferen') || resMsg.includes('envio') || resMsg.includes('pedido') || resMsg.includes('operac'))) ||
+                        (!hasNegationServer && resMsg.includes('com sucesso') &&
+                          (resMsg.includes('transferen') || resMsg.includes('pedido') || resMsg.includes('operac') || resMsg.includes('recarga')));
   const isErrorText = !isVodacomZeroMb && !isTudoTopOrOffer && (
     resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
     resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
