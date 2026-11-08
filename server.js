@@ -1049,8 +1049,12 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         } else if (port === 8777 && isSaldo) {
           // Totalmente compatível: celular de saldo processa transferências de saldo
         } else {
-          if (devMode === 'fornecimento' && !isFornecOrder) {
-            continue; // Celular de fornecimento NÃO processa pacotes normais de revenda
+          // Portas 8077 (especiais) e 8777 (saldo) respeitam estritamente seu modo.
+          // Para celulares diários (8021 a 8028), permitir atender pacotes de dados diários normais mesmo se configurados como fornecimento,
+          // garantindo que o failover entre portas funcione sempre!
+          const isDedicatedPort = port === 8077 || port === 8777 || port === 8090;
+          if (isDedicatedPort && devMode === 'fornecimento' && !isFornecOrder) {
+            continue;
           }
           if (devMode === 'revenda' && isFornecOrder) {
             continue; // Celular de revenda NÃO processa saldo ou atacado
