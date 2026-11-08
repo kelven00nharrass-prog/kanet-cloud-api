@@ -1095,11 +1095,14 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           const targetLastSeen = targetDev ? new Date(targetDev.lastSeen || 0).getTime() : 0;
           const targetOnline = targetDev && (nowMs - targetLastSeen < 90000);
           const targetApto = targetDev && isDeviceApto(targetDev);
-          if (targetOnline && targetApto && !targetDev.isBusy) {
-            // A porta alvo original está online, apta e livre -> dar prioridade à porta alvo
+          // O celular alvo só impede outros se estiver online, apto, livre E sem nenhuma tarefa pendente atribuída
+          const isTargetReallyFree = targetOnline && targetApto && !targetDev.isBusy && !targetDev.pending_order;
+          if (isTargetReallyFree) {
             isCompatible = false;
+          } else {
+            // Se o alvo não está livre ou ficou offline, limpar targetPort para liberar para qualquer porta apta
+            order.targetPort = null;
           }
-          // Caso contrário (porta alvo offline/ocupada/sem saldo), a porta atual apta assume o pedido imediatamente!
         }
         // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA diários)
         if (port === 8077) {
