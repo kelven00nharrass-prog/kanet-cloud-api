@@ -6588,6 +6588,10 @@ async function executarEntregaPlano(planId) {
 
   inMemoryOrders.set(orderId, orderDoc);
 
+  // Guardar referência da última entrega para monitorizar se foi bem sucedida
+  plan.ultima_entrega_orderId = orderId;
+  plan.ultima_entrega_tentativas = 0;
+
   saveOrdersToCache();
 
   if (db) {
@@ -6903,6 +6907,43 @@ function checkScheduledPlans() {
       continue; // Não verificar proxima_entrega enquanto aguarda/processou confirmação
     }
 
+    // ── RETRY: Verificar se a última entrega falhou e recolocar na fila ────────
+    if (plan.ultima_entrega_orderId) {
+      const ultOrdem = inMemoryOrders.get(plan.ultima_entrega_orderId);
+      const MAX_RETRY_PLAN = 3;
+      const RETRY_DELAY_MS = 10 * 60 * 1000; // 10 minutos entre tentativas
+      if (ultOrdem && ultOrdem.status === 'failed') {
+        const tentativas = plan.ultima_entrega_tentativas || 0;
+        if (tentativas < MAX_RETRY_PLAN) {
+          const ultimaTentativa = ultOrdem.updatedAt ? new Date(ultOrdem.updatedAt).getTime() : 0;
+          if (now - ultimaTentativa >= RETRY_DELAY_MS) {
+            // Recolocar na fila como pending
+            ultOrdem.status = 'pending';
+            ultOrdem.retryCount = (ultOrdem.retryCount || 0) + 1;
+            ultOrdem.updatedAt = new Date().toISOString();
+            ultOrdem.lastError = null;
+            plan.ultima_entrega_tentativas = tentativas + 1;
+            saveOrdersToCache();
+            saveScheduledPlans();
+            console.log(`🔄 [PLANO RETRY] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou → Tentativa ${tentativas + 1}/${MAX_RETRY_PLAN} re-enfileirada`);
+            continue;
+          }
+          continue; // Aguardar delay antes do próximo retry
+        } else {
+          // Esgotou tentativas → notificar admin e avançar
+          console.warn(`⚠️ [PLANO FALHA DEFINITIVA] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou após ${MAX_RETRY_PLAN} tentativas. Avançando plano.`);
+          plan.ultima_entrega_orderId = null;
+          plan.ultima_entrega_tentativas = 0;
+          saveScheduledPlans();
+        }
+      } else if (ultOrdem && (ultOrdem.status === 'pending' || ultOrdem.status === 'assigned' || ultOrdem.status === 'processing')) {
+        continue; // Entrega ainda em curso, aguardar
+      } else {
+        // Concluída (completed) ou não encontrada → limpar referência
+        plan.ultima_entrega_orderId = null;
+        plan.ultima_entrega_tentativas = 0;
+      }
+    }
     if (!plan.proxima_entrega) continue;
     const nextMs = new Date(plan.proxima_entrega).getTime();
     if (now >= nextMs) {
