@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * KA-NET SMS SALES ENGINE (BOT DE ATENDIMENTO E VENDAS AUTOMÁTICAS POR SMS)
  * ==============================================================================
@@ -344,7 +344,16 @@ function extrairNumeroDestino(texto, remetenteOrigem) {
         }
     }
 
-    // 4. NUNCA assumir o remetente automaticamente — retornar null para forçar o bot a pedir o número
+    // 4. Se o remetente for Vodacom (84/85), usar como destino automaticamente
+    if (remetenteOrigem) {
+        const remDigits = String(remetenteOrigem).replace(/\D/g, '').slice(-9);
+        if (remDigits.length === 9 && (remDigits.startsWith('84') || remDigits.startsWith('85')) && !SYSTEM_PAYMENT_NUMBERS.has(remDigits)) {
+            console.log('[SMS BOT] Usando numero remetente Vodacom como destino auto: ' + remDigits);
+            return remDigits;
+        }
+    }
+
+    // 5. Retornar null para forcar o bot a pedir o numero ao cliente
     return null;
 }
 
@@ -480,9 +489,9 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
                 if (smsAguardandoOperadora.has(txnId)) {
                     smsAguardandoOperadora.delete(txnId);
                     const { supportNum } = getSuporteDetails();
-                    await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} (${valor} MT) ainda nao foi confirmado pela operadora apos 2 minutos. Se o valor ja saiu da conta, envie o extrato ao suporte: ${supportNum}.`, simSlot, port);
+                    await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} (${valor} MT) ainda nao foi confirmado pela operadora apos 15 minutos. Se o valor ja saiu da conta, envie o extrato ao suporte: ${supportNum}.`, simSlot, port);
                 }
-            }, 120000);
+            }, 900000);
 
             // Avisar o cliente que estamos aguardando a rede
             await sendSms(cleanSender, `Ka-Net: Comprovativo ${txnId} (${valor} MT) recebido! A verificar com a rede para ativar ${pacote.nome} no numero ${numDestino}.`, simSlot, port);

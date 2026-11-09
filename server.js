@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
@@ -1061,14 +1061,14 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
         }
 
-        // TTL / Validade máxima do pedido: 45 minutos (evita que pedidos velhos repitam horas depois)
+        // TTL / Validade maxima do pedido: 24 horas (pedidos sem saldo ficam na fila ate haver saldo)
         if (order.createdAt) {
           const ageMs = Date.now() - new Date(order.createdAt).getTime();
-          if (ageMs > 45 * 60 * 1000) { // > 45 minutos
+          if (ageMs > 24 * 60 * 60 * 1000) { // > 24 horas
             order.status = 'expired';
-            order.lastError = 'Pedido expirado (mais de 45 minutos na fila)';
+            order.lastError = 'Pedido expirado (mais de 24 horas na fila sem saldo disponivel)';
             order.completedAt = new Date().toISOString();
-            console.warn(`⏰ [EXPIRAÇÃO] Pedido ${orderId} (${order.quantidade}MB -> ${order.numero}) expirou após 45m na fila.`);
+            console.warn(`⏰ [EXPIRAÇÃO] Pedido ${orderId} (${order.quantidade}MB -> ${order.numero}) expirou apos 24h na fila.`);
             continue;
           }
         }
