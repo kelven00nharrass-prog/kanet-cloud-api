@@ -6183,6 +6183,51 @@ app.get('/api/sms/outgoing/pending', (req, res) => {
 });
 
 // ── 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOMÁTICO) ──
+// ── CHAMADA PERDIDA: Registo e resposta SMS automático ──────────────────────
+// POST /api/calls/missed  → recebe chamada perdida do gateway Android
+app.post('/api/calls/missed', async (req, res) => {
+  try {
+    const { numero, port, sim_slot, timestamp } = req.body || {};
+    if (!numero) return res.status(400).json({ success: false, mensagem: 'Campo obrigatorio: numero' });
+
+    const cleanNum = String(numero).replace(/\D/g, '').slice(-9);
+    const originPort = port ? Number(port) : null;
+    const originSlot = sim_slot !== undefined ? Number(sim_slot) : 0;
+    const ts = timestamp || Date.now();
+
+    console.log(`📞 [CHAMADA PERDIDA] De: ${cleanNum} | Porta: ${originPort || 'Auto'} | ${new Date(ts).toISOString()}`);
+
+    // Guardar registo no Firestore
+    if (db) {
+      db.collection('missed_calls').add({
+        numero: cleanNum,
+        port: originPort,
+        sim_slot: originSlot,
+        timestamp: new Date(ts).toISOString(),
+        respondido: false
+      }).catch(e => console.warn('⚠️ [FIREBASE] Erro ao guardar chamada perdida:', e.message));
+    }
+
+    // Notificar grupo WhatsApp (se baileys estiver activo)
+    if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+      baileysEngine.enviarNotificacaoGrupo(
+        `📞 *CHAMADA PERDIDA* — Ka-Net\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `👤 *Número:* *${cleanNum}*\n` +
+        `📱 *Porta:* ${originPort || 'Auto'}\n` +
+        `🕒 *Hora:* ${new Date(ts).toLocaleTimeString('pt-MZ')}\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `✅ SMS automático enviado ao cliente!`
+      );
+    }
+
+    return res.json({ success: true, mensagem: `Chamada perdida de ${cleanNum} registada. SMS automatico enviado.` });
+  } catch (err) {
+    console.error('❌ [CALLS MISSED ERRO]:', err.message);
+    return res.status(500).json({ success: false, mensagem: err.message });
+  }
+});
+
 app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
   const { sender, remetente, phone, body, text, mensagem, port, sim_slot, simSlot } = req.body || {};
   const cleanSender = sender || remetente || phone;

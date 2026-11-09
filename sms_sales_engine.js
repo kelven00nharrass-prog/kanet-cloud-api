@@ -509,6 +509,19 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
         return;
     }
 
+    // ── 0. CHAMADA PERDIDA → SMS de resposta imediato ──
+    if (String(body).trim().toLowerCase() === 'chamada_perdida') {
+        const sd = getSaudacaoHoraSms();
+        const { supportNum } = getSuporteDetails();
+        const msg = sd + '! Vimos a sua chamada. Ka-Net responde por SMS!\n' +
+            'Responda com:\n' +
+            '1-Pagamento  2-Precos  3-Suporte\n' +
+            'Ou envie o comprovativo para comprar!';
+        console.log(`📞 [SMS BOT] Resposta a chamada perdida de ${cleanSender}`);
+        await sendSms(cleanSender, msg, simSlot, port);
+        return;
+    }
+
     const text = String(body).trim();
     const cleanText = text.toLowerCase();
 
