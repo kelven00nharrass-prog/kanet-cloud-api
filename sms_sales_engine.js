@@ -259,27 +259,23 @@ function getSaudacaoHoraSms() {
 function gerarRespostaSaudacaoSms(tipoMensagem) {
     const sd = getSaudacaoHoraSms();
     if (tipoMensagem === 'agradecimento') {
-        const respostas = [
-            'Ka-Net: De nada! E um prazer servir. Se precisar de megas, estamos aqui!',
-            'Ka-Net: Fico feliz que correu bem! Precisar de mais dados, so falar!',
-            'Ka-Net: Sempre as ordens! Boa navegacao!'
+        const r = [
+            'Ka-Net: De nada! Se precisar de megas, so falar.',
+            'Ka-Net: Com prazer! Boa navegacao!',
+            'Ka-Net: Sempre as ordens!'
         ];
-        return respostas[Math.floor(Math.random() * respostas.length)];
+        return r[Math.floor(Math.random() * r.length)];
     }
-    if (tipoMensagem === 'despedida') {
-        return 'Ka-Net: Ate logo! Quando precisar de megas, estamos aqui. Boa navegacao!';
-    }
-    if (tipoMensagem === 'positivo') {
-        return sd + '! Ka-Net a seu servico. Responda com:\n1 - Pagamento\n2 - Tabela de precos\n3 - Suporte\nOu envie o comprovativo para ativar megas!';
-    }
+    if (tipoMensagem === 'despedida') return 'Ka-Net: Ate logo! Volte sempre!';
+    if (tipoMensagem === 'positivo')  return sd + '! Ka-Net a seu servico.\n1-Pagamento 2-Precos 3-Suporte';
     // saudacao
-    const respostas = [
-        sd + '! Ka-Net a seu servico. Posso ajudar com:\n1 - Formas de pagamento\n2 - Tabela de precos\n3 - Suporte\nOu so enviar o comprovativo!',
-        sd + '! Bem-vindo a Ka-Net! Como posso ajudar?\n1 - Pagamento | 2 - Precos | 3 - Suporte',
-        sd + '! Ka-Net pronta a servir. O que pretende?\n1 - Pagar | 2 - Ver precos | 3 - Ajuda'
+    const r = [
+        sd + '! Ka-Net a seu servico.\n1-Pagamento 2-Precos 3-Suporte\nOu envie o comprovativo!',
+        sd + '! Como posso ajudar?\n1-Pagamento 2-Tabela 3-Suporte'
     ];
-    return respostas[Math.floor(Math.random() * respostas.length)];
+    return r[Math.floor(Math.random() * r.length)];
 }
+
 function gerarBoasVindasSms() {
     const { sysName } = getSuporteDetails();
     return `Ola! Bem-vindo ao atendimento automatico da ${sysName}.

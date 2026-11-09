@@ -889,40 +889,31 @@ function gerarMenuOriginal(jid = null) {
  * Resposta humana e simpatica a agradecimentos
  */
 function gerarRespostaAgradecimento(nomeCliente) {
-    const sd = getSaudacaoHora();
-    const respostas = [
-        `De nada, *${nomeCliente}*! 😊 E sempre um prazer servir! Se precisar de mais megas ou tiver alguma duvida, estamos aqui 24h!`,
-        `Fico feliz que correu bem, *${nomeCliente}*! 🙏 Obrigado pela confianca na Ka-Net! Qualquer coisa, so falar!`,
-        `Com prazer, *${nomeCliente}*! ✨ A Ka-Net esta sempre aqui para si. Boa navegacao!`,
-        `Sempre as ordens, *${nomeCliente}*! 💪 Se precisar de internet, ja sabe onde nos encontrar!`
+    const r = [
+        'De nada, *' + nomeCliente + '*! Se precisar de mais megas, estamos aqui. \u{1F60A}',
+        'Com prazer, *' + nomeCliente + '*! Boa navegacao! \u{1F64F}',
+        'Sempre as ordens, *' + nomeCliente + '*! \u{1F4AA}'
     ];
-    return respostas[Math.floor(Math.random() * respostas.length)];
+    return r[Math.floor(Math.random() * r.length)];
 }
 
-/**
- * Resposta humana a despedidas
- */
 function gerarRespostaDespedida(nomeCliente) {
-    const respostas = [
-        `Ate logo, *${nomeCliente}*! 👋 Boa navegacao e volte sempre!`,
-        `Cuide-se, *${nomeCliente}*! 🙏 Quando precisar de mais internet, estamos aqui!`,
-        `Ate breve, *${nomeCliente}*! ✨ Obrigado pela preferencia na Ka-Net!`
+    const r = [
+        'Ate logo, *' + nomeCliente + '*! Boa navegacao! \u{1F44B}',
+        'Cuide-se, *' + nomeCliente + '*! Volte sempre! \u{1F64F}'
     ];
-    return respostas[Math.floor(Math.random() * respostas.length)];
+    return r[Math.floor(Math.random() * r.length)];
 }
 
-/**
- * Resposta humana a confirmacoes positivas curtas (ok, certo, sim, beleza)
- */
 function gerarRespostaPositiva(nomeCliente) {
     const sd = getSaudacaoHora();
-    const respostas = [
-        `${sd}, *${nomeCliente}*! 😊 Como posso ajudar?\n\n1️⃣ Menu de precos\n2️⃣ Formas de pagamento\n3️⃣ Suporte`,
-        `Perfeito, *${nomeCliente}*! Diga-me o que precisa. 🙌\n\n1️⃣ Ver pacotes | 2️⃣ Pagar | 3️⃣ Ajuda`,
-        `Combinado, *${nomeCliente}*! 🤝 Pode falar — estou aqui para ajudar!`
+    const r = [
+        sd + ', *' + nomeCliente + '*! Como posso ajudar?\n1️⃣ Menu  2️⃣ Pagamento  3️⃣ Suporte',
+        'Diga-me o que precisa, *' + nomeCliente + '*. \u{1F60A}  1️⃣ Precos  2️⃣ Pagar  3️⃣ Ajuda'
     ];
-    return respostas[Math.floor(Math.random() * respostas.length)];
+    return r[Math.floor(Math.random() * r.length)];
 }
+
 function gerarMensagemBoasVindas(nomeCliente, senderNumber = null, jid = null, rawLid = null) {
     const sd = getSaudacaoHora();
     const { supportNum, sysName } = getSuporteDetails();
