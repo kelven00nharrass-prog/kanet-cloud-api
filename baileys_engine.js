@@ -884,6 +884,45 @@ function gerarMenuOriginal(jid = null) {
     return out;
 }
 
+
+/**
+ * Resposta humana e simpatica a agradecimentos
+ */
+function gerarRespostaAgradecimento(nomeCliente) {
+    const sd = getSaudacaoHora();
+    const respostas = [
+        `De nada, *${nomeCliente}*! 😊 E sempre um prazer servir! Se precisar de mais megas ou tiver alguma duvida, estamos aqui 24h!`,
+        `Fico feliz que correu bem, *${nomeCliente}*! 🙏 Obrigado pela confianca na Ka-Net! Qualquer coisa, so falar!`,
+        `Com prazer, *${nomeCliente}*! ✨ A Ka-Net esta sempre aqui para si. Boa navegacao!`,
+        `Sempre as ordens, *${nomeCliente}*! 💪 Se precisar de internet, ja sabe onde nos encontrar!`
+    ];
+    return respostas[Math.floor(Math.random() * respostas.length)];
+}
+
+/**
+ * Resposta humana a despedidas
+ */
+function gerarRespostaDespedida(nomeCliente) {
+    const respostas = [
+        `Ate logo, *${nomeCliente}*! 👋 Boa navegacao e volte sempre!`,
+        `Cuide-se, *${nomeCliente}*! 🙏 Quando precisar de mais internet, estamos aqui!`,
+        `Ate breve, *${nomeCliente}*! ✨ Obrigado pela preferencia na Ka-Net!`
+    ];
+    return respostas[Math.floor(Math.random() * respostas.length)];
+}
+
+/**
+ * Resposta humana a confirmacoes positivas curtas (ok, certo, sim, beleza)
+ */
+function gerarRespostaPositiva(nomeCliente) {
+    const sd = getSaudacaoHora();
+    const respostas = [
+        `${sd}, *${nomeCliente}*! 😊 Como posso ajudar?\n\n1️⃣ Menu de precos\n2️⃣ Formas de pagamento\n3️⃣ Suporte`,
+        `Perfeito, *${nomeCliente}*! Diga-me o que precisa. 🙌\n\n1️⃣ Ver pacotes | 2️⃣ Pagar | 3️⃣ Ajuda`,
+        `Combinado, *${nomeCliente}*! 🤝 Pode falar — estou aqui para ajudar!`
+    ];
+    return respostas[Math.floor(Math.random() * respostas.length)];
+}
 function gerarMensagemBoasVindas(nomeCliente, senderNumber = null, jid = null, rawLid = null) {
     const sd = getSaudacaoHora();
     const { supportNum, sysName } = getSuporteDetails();
@@ -4994,12 +5033,35 @@ async function startWhatsApp(orderCallback, db = null) {
                         .replace(/\s+/g, ' ')
                         .trim();
 
-                    const regexSaudacao = /^(?:ola|oi+|bom dia|boa tarde|boa noite|tudo bem|td bem|tudo bom|opa|salve|alo|hello|hi|eae|eai|start|iniciar|comecar|bot|ka net|kanet|ajuda|info|ajude|menu)(?:\s|$)/i;
+                    // Detectar agradecimentos
+                    const ehAgradecimentoWa = /^(?:obrigado|obrigada|obg|obgd|valeu|mto obg|mt obg|muito obrigado|muito obrigada|obrigadissimo|obrigadissima|thanks|thank you|ngiyabonga|enkosi|inkomu)(?:[\s!.]*$)/i.test(textNorm) ||
+                        /^(?:ficou bom|chegou|recebi|ja recebi|ja chegou|funcionou|deu certo|esta a funcionar|a funcionar|megas chegaram|chegaram os megas)(?:[\s!.]*$)/i.test(textNorm);
+
+                    const ehDespedidaWa = /^(?:tchau|xau|ate logo|ate amanha|ate breve|ate ja|adeus|bye|ciao|fui|saindo|boa noite obg|boa noite obrigado|ate|falou|vlw|flw)(?:[\s!.]*$)/i.test(textNorm);
+
+                    const ehPositivoWa = /^(?:ok|okay|certo|entendido|perfeito|combinado|pode|sim|claro|com certeza|confirmo|confirmado|beleza|show|otimo|optimo|excelente|fixe|muito bom|boa|bom)(?:[\s!.]*$)/i.test(textNorm) && textNorm.length <= 20;
+
+                    const regexSaudacao = /^(?:ola|oi+|bom dia|boa tarde|boa noite|bom dm|boa td|boa nt|tudo bem|td bem|tudo bom|opa|salve|alo|hello|hi|eae|eai|e ai|start|iniciar|comecar|bot|ka net|kanet|ajuda|info|ajude|menu)(?:\s|$)/i;
                     const ehSaudacaoExplicita = regexSaudacao.test(textNorm) ||
                         /^(?:ola|oi+|opa|salve)\s+(?:tudo bem|como esta|amigo|mano|irmao|boa|bom)/i.test(textNorm) ||
                         /^(?:como esta|tudo bem|td bem)\??$/i.test(textNorm) ||
                         ['preciso de megas', 'quero megas', 'comprar', 'quero net', 'preciso de net', 'quero comprar', 'como comprar', 'como funciona', 'quanto custa', 'preco', 'precos'].some(w => textNorm.startsWith(w));
 
+                    if (ehAgradecimentoWa) {
+                        addLog(`🙏 [AGRADECIMENTO] Resposta humana para ${jid}`);
+                        await reply(gerarRespostaAgradecimento(nomeCliente));
+                        continue;
+                    }
+                    if (ehDespedidaWa) {
+                        addLog(`👋 [DESPEDIDA] Resposta de despedida para ${jid}`);
+                        await reply(gerarRespostaDespedida(nomeCliente));
+                        continue;
+                    }
+                    if (ehPositivoWa && !isGroupMsg) {
+                        addLog(`✅ [POSITIVO] Resposta positiva para ${jid}`);
+                        await reply(gerarRespostaPositiva(nomeCliente));
+                        continue;
+                    }
                     if (ehSaudacaoExplicita) {
                         addLog(`👋 [SAUDAÇÃO] Mensagem padrão de boas-vindas enviada para ${jid}`);
                         await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber, jid, rawLidClean));

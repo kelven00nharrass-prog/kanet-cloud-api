@@ -242,6 +242,44 @@ Atendimento: 24h / 7 dias por semana.`;
 /**
  * Gera Mensagem de Boas-Vindas em texto puro GSM (compatível com todos celulares)
  */
+
+/**
+ * Retorna saudacao adequada a hora do dia
+ */
+function getSaudacaoHoraSms() {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) return 'Bom dia';
+    if (h >= 12 && h < 18) return 'Boa tarde';
+    return 'Boa noite';
+}
+
+/**
+ * Resposta humana para saudacoes, agradecimentos e palavras positivas
+ */
+function gerarRespostaSaudacaoSms(tipoMensagem) {
+    const sd = getSaudacaoHoraSms();
+    if (tipoMensagem === 'agradecimento') {
+        const respostas = [
+            'Ka-Net: De nada! E um prazer servir. Se precisar de megas, estamos aqui!',
+            'Ka-Net: Fico feliz que correu bem! Precisar de mais dados, so falar!',
+            'Ka-Net: Sempre as ordens! Boa navegacao!'
+        ];
+        return respostas[Math.floor(Math.random() * respostas.length)];
+    }
+    if (tipoMensagem === 'despedida') {
+        return 'Ka-Net: Ate logo! Quando precisar de megas, estamos aqui. Boa navegacao!';
+    }
+    if (tipoMensagem === 'positivo') {
+        return sd + '! Ka-Net a seu servico. Responda com:\n1 - Pagamento\n2 - Tabela de precos\n3 - Suporte\nOu envie o comprovativo para ativar megas!';
+    }
+    // saudacao
+    const respostas = [
+        sd + '! Ka-Net a seu servico. Posso ajudar com:\n1 - Formas de pagamento\n2 - Tabela de precos\n3 - Suporte\nOu so enviar o comprovativo!',
+        sd + '! Bem-vindo a Ka-Net! Como posso ajudar?\n1 - Pagamento | 2 - Precos | 3 - Suporte',
+        sd + '! Ka-Net pronta a servir. O que pretende?\n1 - Pagar | 2 - Ver precos | 3 - Ajuda'
+    ];
+    return respostas[Math.floor(Math.random() * respostas.length)];
+}
 function gerarBoasVindasSms() {
     const { sysName } = getSuporteDetails();
     return `Ola! Bem-vindo ao atendimento automatico da ${sysName}.
@@ -619,6 +657,39 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
                 return;
             }
         }
+    }
+
+
+    // ── 6a. SAUDACOES, AGRADECIMENTOS E PALAVRAS POSITIVAS ──
+    const textNormSms = cleanText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const ehSaudacao = /^(?:ola|oi+|opa|salve|hello|hi|bom dia|boa tarde|boa noite|bom dm|boa td|boa nt|tudo bem|td bem|tudo bom|como esta|como vai|como voce esta|e ai|eai|eae|oi boa|oi bom)(?:\s|$)/i.test(textNormSms);
+
+    const ehAgradecimento = /^(?:obrigado|obrigada|obg|obgd|valeu|muito obrigado|muito obrigada|obrigadissimo|obrigadissima|thanks|thank you|mto obg|mt obg|obg mto|ngiyabonga|enkosi|inkomu|muito bom|ficou bom|chegou|recebi|ja recebi|ja chegou|funcionou|deu certo)(?:\s|$)/i.test(textNormSms) || textNormSms === 'obg' || textNormSms === 'valeu';
+
+    const ehDespedida = /^(?:tchau|xau|ate logo|ate amanha|ate breve|ate ja|adeus|bye|ciao|fui|saindo|boa noite obg|boa noite obrigado)(?:\s|$)/i.test(textNormSms);
+
+    const ehPositivo = /^(?:ok|okay|certo|entendido|perfeito|combinado|pode|sim|claro|com certeza|confirmo|confirmado|beleza|show|otimo|optimo|excelente|fixe|muito bom|boa|bom|certo obg)(?:\s|$)/i.test(textNormSms) && textNormSms.length <= 20;
+
+    if (ehAgradecimento) {
+        console.log(`[SMS BOT] Resposta de agradecimento para ${cleanSender}`);
+        await sendSms(cleanSender, gerarRespostaSaudacaoSms('agradecimento'), simSlot, port);
+        return;
+    }
+    if (ehDespedida) {
+        console.log(`[SMS BOT] Resposta de despedida para ${cleanSender}`);
+        await sendSms(cleanSender, gerarRespostaSaudacaoSms('despedida'), simSlot, port);
+        return;
+    }
+    if (ehSaudacao) {
+        console.log(`[SMS BOT] Resposta de saudacao para ${cleanSender}`);
+        await sendSms(cleanSender, gerarRespostaSaudacaoSms('saudacao'), simSlot, port);
+        return;
+    }
+    if (ehPositivo) {
+        console.log(`[SMS BOT] Resposta positiva para ${cleanSender}`);
+        await sendSms(cleanSender, gerarRespostaSaudacaoSms('positivo'), simSlot, port);
+        return;
     }
 
     // ── 6. MENSAGEM PADRÃO / SAUDAÇÃO ──
