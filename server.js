@@ -345,47 +345,72 @@ app.post('/api/devices/:port/reset', (req, res) => {
   return res.json({ success: true, mensagem: `Porta ${port} libertada e desbloqueada com sucesso!`, device: dev });
 });
 
-// ── FUNÇÃO DE DECREMENTO AUTOMÁTICO DE SALDO EM METICAIS (PORTA 8077) ──
+// ── FUNÇÃO DE DECREMENTO AUTOMÁTICO DE SALDO (MT NA 8077 / MB NAS DEMAIS PORTAS) ──
 function decrementDeviceSaldo(port, order) {
   const pNum = Number(port);
+  const dev = inMemoryDevices[pNum];
+  if (!dev) return;
+
   if (pNum === 8077) {
-    const dev = inMemoryDevices[pNum];
-    if (dev) {
-      const modoStr = String(order.modo || '').toLowerCase();
-      let orderCostMt = Number(order.valor || order.valor_pago) || 0;
-      if (!orderCostMt || orderCostMt <= 0) {
-        if (typeof getValorFromMb === 'function') {
-          orderCostMt = getValorFromMb(order.quantidade, order.modo);
-        }
+    const modoStr = String(order.modo || '').toLowerCase();
+    let orderCostMt = Number(order.valor || order.valor_pago) || 0;
+    if (!orderCostMt || orderCostMt <= 0) {
+      if (typeof getValorFromMb === 'function') {
+        orderCostMt = getValorFromMb(order.quantidade, order.modo);
       }
-      if (!orderCostMt || orderCostMt <= 0) {
-        orderCostMt = (modoStr === 'tudo_top' || modoStr === 'ilimitado') ? 500 : 500;
+    }
+    if (!orderCostMt || orderCostMt <= 0) {
+      orderCostMt = (modoStr === 'tudo_top' || modoStr === 'ilimitado') ? 500 : 500;
+    }
+
+    const currentMt = Number(dev.saldo_mt) || 0;
+    const newMt = Math.max(0, currentMt - orderCostMt);
+
+    dev.saldo_mt = newMt;
+    dev.saldo_credito = `${newMt} MT`;
+    dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 dias de override
+
+    console.log(`📉 [SALDO 8077 DECREMENTADO] Ativação de ${orderCostMt} MT no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newMt} MT`);
+
+    if (newMt <= 0) {
+      dev.sem_saldo = true;
+      dev.is_apto = false;
+      console.warn(`🚨 [ALERTA SALDO 8077 ZERADO] Saldo da Porta 8077 ESGOTADO (${newMt} MT)!`);
+
+      if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
+        baileysEngine.enviarNotificacaoGrupo(
+          `🚨 *ALERTA CRÍTICO: SALDO 8077 ZERADO!* 🚨\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `📲 *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
+          `📦 *Última Ativação:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
+          `🔴 *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `⚠️ *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
+        );
       }
+    }
+  } else {
+    // ── DECREMENTO AUTOMÁTICO DE DADOS EM MEGAS (PORTAS 8021, 8022, ETC.) ──
+    const mbEnviados = Number(order.quantidade) || 0;
+    if (mbEnviados > 0) {
+      const slot = dev.active_sim_slot || 1;
+      if (slot === 2 && dev.sim2_saldo_mb !== undefined) {
+        dev.sim2_saldo_mb = Math.max(0, Number(dev.sim2_saldo_mb) - mbEnviados);
+        dev.saldo_mb = dev.sim2_saldo_mb;
+      } else if (dev.sim1_saldo_mb !== undefined) {
+        dev.sim1_saldo_mb = Math.max(0, Number(dev.sim1_saldo_mb) - mbEnviados);
+        dev.saldo_mb = dev.sim1_saldo_mb;
+      } else if (dev.saldo_mb !== undefined) {
+        dev.saldo_mb = Math.max(0, Number(dev.saldo_mb) - mbEnviados);
+      }
+      console.log(`📉 [SALDO DADOS DECREMENTADO] Celular Porta ${pNum} enviou ${mbEnviados}MB. Saldo restante no painel: ${dev.saldo_mb}MB (SIM ${slot})`);
 
-      const currentMt = Number(dev.saldo_mt) || 0;
-      const newMt = Math.max(0, currentMt - orderCostMt);
-
-      dev.saldo_mt = newMt;
-      dev.saldo_credito = `${newMt} MT`;
-      dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 dias de override
-
-      console.log(`📉 [SALDO 8077 DECREMENTADO] Ativação de ${orderCostMt} MT no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newMt} MT`);
-
-      if (newMt <= 0) {
-        dev.sem_saldo = true;
-        dev.is_apto = false;
-        console.warn(`🚨 [ALERTA SALDO 8077 ZERADO] Saldo da Porta 8077 ESGOTADO (${newMt} MT)!`);
-
-        if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
-          baileysEngine.enviarNotificacaoGrupo(
-            `🚨 *ALERTA CRÍTICO: SALDO 8077 ZERADO!* 🚨\n` +
-            `━━━━━━━━━━━━━━━━━━\n` +
-            `📲 *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
-            `📦 *Última Ativação:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
-            `🔴 *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
-            `━━━━━━━━━━━━━━━━━━\n` +
-            `⚠️ *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
-          );
+      if (dev.saldo_mb < 100) {
+        const otherSlotSaldo = slot === 2 ? (Number(dev.sim1_saldo_mb) || 0) : (Number(dev.sim2_saldo_mb) || 0);
+        if (otherSlotSaldo < 100) {
+          dev.sem_saldo = true;
+          dev.is_apto = false;
+          console.warn(`⚠️ [SALDO ESGOTADO] Celular Porta ${pNum} ficou com saldo abaixo do mínimo (<100MB) em ambos os chips!`);
         }
       }
     }
@@ -1507,7 +1532,8 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
       resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
       resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
     );
-    if (!success && isSuccessText && !isErrorText) {
+    const isParcialReported = !!(req.body.last_result && req.body.last_result.parcial);
+    if (!success && isSuccessText && !isErrorText && !isParcialReported) {
       console.log(`✅ [USSD AUTO-OVERRIDE] Resposta contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
       success = true;
       req.body.last_result.success = true;
@@ -1655,11 +1681,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
     // ── NOTIFICAÇÕES PARA OS GRUPOS DO SISTEMA (Anti-duplicação) ──
     if (order) {
-      const isParcial = !!req.body.last_result.parcial;
+      const isParcial = !!(req.body.last_result && req.body.last_result.parcial) || (!success && Number(req.body.last_result.quantidade) > 0 && Number(req.body.last_result.quantidade) < (Number(req.body.last_result.quantidade_solicitada) || Number(order.quantidade) || 0));
       const qtdEntregue = Number(req.body.last_result.quantidade) || 0;
       const qtdPedida = Number(req.body.last_result.quantidade_solicitada) || Number(order.quantidade) || 0;
 
-      if (success) {
+      if (success && !isParcial) {
         order.status = 'completed';
         order.completedAt = new Date().toISOString();
         order.lastError = null;
@@ -1681,7 +1707,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         }
       } else if (isParcial && qtdEntregue > 0 && qtdPedida > qtdEntregue) {
         // 💡 ENVIO PARCIAL CONCLUÍDO NO CELULAR: A primeira parte foi entregue!
-        const restanteMb = qtdPedida - qtdEntregue;
+        const diffMb = qtdPedida - qtdEntregue;
         order.status = 'completed';
         order.quantidade = qtdEntregue;
         order.completedAt = new Date().toISOString();
@@ -1691,14 +1717,21 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           smsSalesEngine.notifyOrderCompleted(order);
         }
 
-        // Criar uma nova ordem pendente para o restante dos Megas ser atendido por outra porta
-        const restanteId = `${resId}-RESTANTE`;
-        const orderRestante = {
-          id: restanteId,
-          orderId: restanteId,
-          parentOrderId: resId,
-          numero: order.numero,
-          quantidade: restanteMb,
+        // 🛡️ REGRA VODACOM: O envio mínimo por USSD é 100MB!
+        // Se a diferença for insignificante (< 50MB, ex: 23MB de 1001MB entregues num pedido de 1024MB):
+        // O cliente já recebeu ~98% do pacote (1GB). Não criar pedido de 23MB que ficaria preso na fila!
+        if (diffMb < 50) {
+          console.log(`✅ [PARCIAL QUASE TOTAL] Pedido ${resId} entregou ${qtdEntregue}MB de ${qtdPedida}MB. Diferença de apenas ${diffMb}MB (< 50MB tolerância). Pedido considerado 100% satisfeito!`);
+        } else {
+          // Se faltar >= 50MB e < 100MB, arredondar para 100MB para que a operadora aceite o USSD!
+          const restanteMb = diffMb < 100 ? 100 : diffMb;
+          const restanteId = `${resId}-RESTANTE`;
+          const orderRestante = {
+            id: restanteId,
+            orderId: restanteId,
+            parentOrderId: resId,
+            numero: order.numero,
+            quantidade: restanteMb,
           modo: order.modo || 'diario',
           input_val: '', // ⚠️ Limpar input_val para que envie estritamente a diferença restante (restanteMb)
           jid: order.jid || null,
@@ -1770,6 +1803,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           baileysEngine.sendTextMessage(clientJid, msgParcial, { mentions: mentionsList })
             .catch(e => console.warn('⚠️ [ENVIO PARCIAL WA ERRO]:', e.message));
         }
+        } // fecha o else do if (diffMb < 50)
       } else {
         const errorMsg = (req.body.last_result && req.body.last_result.error) || 'Falha USSD / Timeout';
         order.lastError = errorMsg;
@@ -2054,7 +2088,8 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
     resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
     resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
   );
-  if (!success && isSuccessText && !isErrorText) {
+  const isTaskParcial = !!(req.body.parcial || req.body.isParcial);
+  if (!success && isSuccessText && !isErrorText && !isTaskParcial) {
     console.log(`✅ [TASKS AUTO-OVERRIDE] Mensagem contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
     success = true;
   }
