@@ -288,6 +288,68 @@ function buscarPacotePorValor(valorPago) {
     return { nome: `${val} MT em Megas`, mb: Math.round(val * 40), tipo: 'diario' };
 }
 
+
+/**
+ * Detecta se o texto e um comprovativo M-Pesa legitimo (pagamento em dinheiro)
+ */
+function isMpesaReceipt(texto) {
+    if (!texto) return false;
+    const cleanLower = String(texto).trim().toLowerCase();
+
+    // Rejeicoes: transferencias de saldo, recarga, txuna, bonus
+    if (/(?:saldo\s+(?:de\s+)?(?:voz|dados|megas|internet|recarga|principal)|transferiste\s+saldo|recebeste\s+saldo|txuna|empr[e\u00e9]stimo|recarga\s+(?:de\s+)?\d|b[o\u00f3]nus)/i.test(cleanLower)) {
+        return false;
+    }
+
+    // Rejeitar bancos que nao sejam M-Pesa
+    if (/(?:bci|millennium|bim|standard\s*bank|moza|banco)/i.test(cleanLower) && !cleanLower.includes('m-pesa') && !cleanLower.includes('mpesa')) {
+        return false;
+    }
+
+    // Indicadores M-Pesa: "Confirmado" ou "m-pesa"
+    const hasMpesaKeyword = /\bm-?pesa\b/i.test(cleanLower);
+    const hasConfirmado = /\bconfirmado\b/i.test(cleanLower);
+    if (!hasMpesaKeyword && !hasConfirmado) return false;
+
+    // Acao de transacao em dinheiro
+    const hasAction = /(?:recebeu|recebeste|depositou|creditou|transferiste|transferiu|pagou|enviou)\s+(?:de\s+)?[\d.,]+\s*(?:mt|mzn|mts?)/i.test(cleanLower) ||
+        /[\d.,]+\s*(?:mt|mzn|mts?)\s+(?:de|para)\s+/i.test(cleanLower);
+
+    // Valor monetario
+    const hasValor = /[\d.,]+\s*(?:mt|mzn|mts?)\b/i.test(cleanLower);
+
+    return (hasMpesaKeyword || hasConfirmado) && hasAction && hasValor;
+}
+
+/**
+ * Detecta se o texto e um comprovativo e-Mola legitimo (pagamento em dinheiro)
+ */
+function isEmolaReceipt(texto) {
+    if (!texto) return false;
+    const cleanLower = String(texto).trim().toLowerCase();
+
+    // Rejeicoes: partilha de saldo, emprestimo, recarga
+    if (/(?:partilha\s+de\s+saldo|saldo\s+(?:de\s+)?(?:voz|dados|megas|internet)|cr[e\u00e9]dito\s+emprestado|empresta\s+movitel|recarga\s+(?:de\s+)?\d)/i.test(cleanLower)) {
+        return false;
+    }
+
+    // Rejeitar bancos
+    if (/(?:bci|millennium|bim|standard\s*bank|moza|banco)/i.test(cleanLower) && !cleanLower.includes('emola') && !cleanLower.includes('e-mola')) {
+        return false;
+    }
+
+    // Indicadores e-Mola: "e-mola", "ID da transacao", "PP" + 6 digitos
+    const hasEmolaKeyword = /\be-?mola\b/i.test(cleanLower);
+    const hasIdTrans = /\b(?:id\s*(?:da\s*)?transa[c\u00e7][a\u00e3]o|id\s*trans|transaction\s*id)\b/i.test(cleanLower);
+    const hasPPCode = /\bpp[0-9]{6}\b/i.test(cleanLower);
+
+    if (!hasEmolaKeyword && !hasIdTrans && !hasPPCode) return false;
+
+    // Valor monetario
+    const hasValor = /[\d.,]+\s*(?:mt|mzn|mts?)\b/i.test(cleanLower);
+    return hasValor;
+}
+
 /**
  * NÚMEROS DE SISTEMA / CONTA QUE NUNCA DEVEM SER CONSIDERADOS COMO DESTINO DOS MEGAS
  */
