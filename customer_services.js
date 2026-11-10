@@ -1173,19 +1173,7 @@ function obterStatusIndicacao(telefoneOrLid) {
 // ── 1. GESTÃO DE FIDELIDADE (CONTAGEM DE COMPRAS) ──────────────────────────────
 
 function gerarMensagemDesbloqueioVip(totalCompras) {
-    if (totalCompras === 1) {
-        return (
-            '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
-            '  🎉 *BEM-VINDO(A) À FAMÍLIA KA-NET!* 🌟\n' +
-            '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
-            'Parabéns pela sua primeira compra na Ka-Net! 🚀✨\n\n' +
-            '🎁 *SEU NÚMERO JÁ FOI CADASTRADO NO CLUBE DE FIDELIDADE:*\n' +
-            '• A partir de agora, todas as suas recargas contam no seu histórico! 📊\n' +
-            '• ⚡ Você já pode enviar *.configurar* para receber internet automática nas próximas vezes sem precisar de mandar comprovativo!\n' +
-            '• 💸 Ao acumular compras, você sobe de nível e desbloqueia o *Txeneco* (internet a crédito de confiança)!\n\n' +
-            '🙏 _Muito obrigado pela sua preferência e bem-vindo(a) à Ka-Net!_ 🌐🤝'
-        );
-    }
+    // Nota: Mensagem de primeira compra ("BEM-VINDO(A) À FAMÍLIA KA-NET!") desativada a pedido do administrador para não sobrecarregar grupos/privado
     if (totalCompras === 100) {
         return (
             '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
