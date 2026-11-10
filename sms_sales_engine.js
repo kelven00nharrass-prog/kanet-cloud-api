@@ -43,9 +43,14 @@ const smsTransacoesProcessadas = new Set();
 const recentIncomingSmsCache = new Map();
 
 let dispatchOrderCallback = null;
+let baileysEngineInstance = null;
 
 function setOrderDispatcher(fn) {
     dispatchOrderCallback = fn;
+}
+
+function setBaileysEngine(engine) {
+    baileysEngineInstance = engine;
 }
 
 function getPaymentDetails() {
@@ -552,9 +557,18 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
 
         console.log(`💳 [SMS COMPROVATIVO DETECTADO] Ref=${txnId} | ${valor} MT | Destino=${numDestino || 'Aguardando Vodacom'}`);
 
-        // Anti-duplicação
-        if (smsTransacoesProcessadas.has(txnId)) {
-            await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} ja foi utilizado anteriormente no sistema.`, simSlot, port);
+        // Anti-duplicação global (SMS + WhatsApp + inMemoryPayments)
+        let jaUsada = smsTransacoesProcessadas.has(txnId);
+        if (!jaUsada && baileysEngineInstance && typeof baileysEngineInstance.isTransacaoJaUsada === 'function') {
+            jaUsada = baileysEngineInstance.isTransacaoJaUsada(txnId);
+        }
+        if (!jaUsada && inMemoryPayments && inMemoryPayments.has(txnId)) {
+            const pay = inMemoryPayments.get(txnId);
+            if (pay && pay.usado) jaUsada = true;
+        }
+        if (jaUsada) {
+            console.warn(`🛑 [ANTI-DUPLICAÇÃO SMS] Comprovativo ${txnId} rejeitado por já ter sido utilizado.`);
+            await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} ja foi utilizado anteriormente no sistema.`, simSlot, 8077);
             return;
         }
 
@@ -711,6 +725,17 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
  */
 async function ativarPedidoSms({ txnId, valor, numDestino, senderPhone, pacote }) {
     smsTransacoesProcessadas.add(txnId);
+    if (inMemoryPayments && inMemoryPayments.has(txnId)) {
+        const pay = inMemoryPayments.get(txnId);
+        if (pay) {
+            pay.usado = true;
+            pay.usadoPor = `sms_bot_${numDestino}`;
+            pay.usadoEm = Date.now();
+        }
+    }
+    if (baileysEngineInstance && typeof baileysEngineInstance.registrarTransacaoComoUsada === 'function') {
+        baileysEngineInstance.registrarTransacaoComoUsada(txnId, numDestino, valor, 'sms', senderPhone);
+    }
     const orderId = `SMS-${txnId}-${Date.now()}`;
 
     console.log(`⚡ [SMS ATIVAÇÃO] Despachando ordem ${orderId}: ${pacote.mb}MB para ${numDestino}`);
@@ -774,9 +799,12 @@ async function notifyOrderCompleted(order) {
     const mb = order.quantidade || 0;
     const num = order.numero;
     const ref = order.txn_id || order.orderId;
-    const targetPort = order.targetPort || order.assignedToPort || 8077;
+    // ⚠️ REGRA CRÍTICA: Sempre enviar SMS via Porta 8077 (o único celular com Gateway SMS)!
+    const targetPort = 8077;
 
-    const msg = `✅ Ka-Net: O seu pacote de ${mb >= 1024 ? (mb/1024).toFixed(1) + 'GB' : mb + 'MB'} foi ativado com SUCESSO no número ${num}!\nRef: ${ref}.\nObrigado pela preferência! Volte sempre!`;
+    const volStr = mb >= 1024 ? ((mb / 1024).toFixed(1) + 'GB') : (mb + 'MB');
+    const msg = `Ka-Net: O seu pacote de ${volStr} foi ativado com SUCESSO no numero ${num}! Ref: ${ref}. Obrigado pela preferencia! Volte sempre!`;
+    console.log(`📤 [SMS NOTIFICAÇÃO SUCESSO] Enviando SMS de confirmação para ${targetPhone} via Porta 8077 (Ref: ${ref})`);
     await sendSms(targetPhone, msg, 0, targetPort);
 }
 
@@ -785,6 +813,7 @@ module.exports = {
     onOperadoraSmsPaymentReceived,
     notifyOrderCompleted,
     setOrderDispatcher,
+    setBaileysEngine,
     sendSms,
     getNextPendingSms,
     confirmSmsSent,

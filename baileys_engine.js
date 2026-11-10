@@ -4369,15 +4369,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     continue;
                                 }
                             } else {
-                                let jaProcessada = transacoesProcessadas.has(txn_id);
-                                if (!jaProcessada) {
-                                    for (const item of transacoesProcessadas) {
-                                        if (matchTxnId(item, txn_id)) {
-                                            jaProcessada = true;
-                                            break;
-                                        }
-                                    }
-                                }
+                                let jaProcessada = isTransacaoJaUsada(txn_id);
                                 if (jaProcessada) {
                                     await reply(
                                         `⚠️ *CONFIRMAÇÃO JÁ UTILIZADA*\n━━━━━━━━━━━━━━━━━━\n` +
@@ -5540,6 +5532,44 @@ function registrarTransacaoAutoReceptor(cleanTxnId, targetPhone, valor, payerPho
     console.log(`⚡ [AUTO-RECEPTOR REGISTADO] Ref: ${txnClean} vinculada a ${targetPhone}`);
 }
 
+function registrarTransacaoComoUsada(cleanTxnId, targetPhone, valor, canal = 'sms', payerPhone = '') {
+    if (!cleanTxnId) return;
+    const txnClean = String(cleanTxnId).trim().toUpperCase();
+    transacoesProcessadas.add(txnClean);
+    transacoesProcessadasMap.set(txnClean, {
+        status: 'completed',
+        canal,
+        numeroDestino: targetPhone,
+        valor: Number(valor),
+        sender: payerPhone,
+        timestamp: Date.now(),
+        completedAt: Date.now()
+    });
+    const smsRec = findSmsPayment(txnClean);
+    if (smsRec) {
+        smsRec.usado = true;
+        smsRec.usadoPor = `${canal}_${targetPhone}`;
+        smsRec.usadoEm = Date.now();
+    }
+    salvarTransacoes();
+    salvarSmsPayments();
+    console.log(`🔒 [ANTI-FRAUDE CROSS-CHANNEL] Transação ${txnClean} (${valor} MT) travada via canal ${canal} para ${targetPhone}`);
+}
+
+function isTransacaoJaUsada(cleanTxnId) {
+    if (!cleanTxnId) return false;
+    const txnClean = String(cleanTxnId).trim().toUpperCase();
+    if (transacoesProcessadas.has(txnClean)) return true;
+    for (const item of transacoesProcessadas) {
+        if (matchTxnId(item, txnClean)) return true;
+    }
+    const reg = transacoesProcessadasMap.get(txnClean);
+    if (reg && (reg.status === 'completed' || reg.status === 'locked')) return true;
+    const smsRec = findSmsPayment(txnClean);
+    if (smsRec && smsRec.usado) return true;
+    return false;
+}
+
 async function resetSession(db) {
     console.log('🧹 [BAILEYS] Reset total de sessão WhatsApp solicitado.');
     try {
@@ -5979,6 +6009,8 @@ module.exports = {
     buscarPacotePorValor,
     separarMultiplosComprovativos,
     executarLembretesDividas,
+    registrarTransacaoComoUsada,
+    isTransacaoJaUsada,
     get DYN_CFG() { return DYN_CFG; },
     getRecentLogs: () => recentLogs
 };

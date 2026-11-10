@@ -2103,6 +2103,10 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       order.lastError = null;
       decrementDeviceSaldo(port, order);
 
+      if (smsSalesEngine) {
+        smsSalesEngine.notifyOrderCompleted(order);
+      }
+
       if (db) {
         db.collection('orders').doc(orderId).set({
           ...order,
@@ -2573,6 +2577,10 @@ app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (re
       part2Order.updatedAt = new Date().toISOString();
       console.log(`🚀 [PARTE 2 LIBERADA] Parte 2 (${part2Order.id} - ${part2Order.quantidade}MB) liberada para envio imediato!`);
     }
+  }
+
+  if (smsSalesEngine) {
+    smsSalesEngine.notifyOrderCompleted(order);
   }
 
   saveOrdersToCache();
@@ -4087,8 +4095,26 @@ try {
 let smsSalesEngine = null;
 try {
   smsSalesEngine = require('./sms_sales_engine');
+  if (baileysEngine && typeof smsSalesEngine.setBaileysEngine === 'function') {
+    smsSalesEngine.setBaileysEngine(baileysEngine);
+  }
   smsSalesEngine.setOrderDispatcher((order) => {
     console.log(`📱 [SMS NUVEM] Nova ordem recebida via SMS Bot: ${order.orderId} (${order.quantidade}MB para ${order.numero})`);
+    
+    // 🔒 TRAVA GLOBAL IMEDIATA: Bloquear reuso deste comprovativo em qualquer canal (WhatsApp / SMS)
+    if (order.txn_id) {
+      if (inMemoryPayments && inMemoryPayments.has(order.txn_id)) {
+        const pay = inMemoryPayments.get(order.txn_id);
+        if (pay) {
+          pay.usado = true;
+          pay.usadoPor = `sms_bot_${order.numero}`;
+          pay.usadoEm = Date.now();
+        }
+      }
+      if (baileysEngine && typeof baileysEngine.registrarTransacaoComoUsada === 'function') {
+        baileysEngine.registrarTransacaoComoUsada(order.txn_id, order.numero, order.valor, 'sms', order.clientPhone);
+      }
+    }
     const valPago = Number(order.valor) || Number(order.valor_pago) || getValorFromMb(order.quantidade, order.modo);
     const orderDoc = {
       ...order,
