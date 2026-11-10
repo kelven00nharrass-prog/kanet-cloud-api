@@ -393,10 +393,12 @@ function isEmolaReceipt(texto) {
 }
 
 /**
- * NÚMEROS DE SISTEMA / CONTA QUE NUNCA DEVEM SER CONSIDERADOS COMO DESTINO DOS MEGAS
+ * NÚMEROS DE CONTAS DE RECEBIMENTO DO SISTEMA
+ * ⚠️ NUNCA devem ser considerados como destino dos megas nem como clientes/remetentes do bot!
  */
 const SYSTEM_PAYMENT_NUMBERS = new Set([
-    '856268811', '879691565', '864882152', '856116039', '84100', '86100', '82100', '87100', '4004',
+    '856268811', '879691565', '864882152', '856116039',
+    '84100', '86100', '82100', '87100', '4004',
     '258856268811', '258879691565', '258864882152', '258856116039'
 ]);
 
@@ -517,6 +519,12 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
         return;
     }
 
+    // 🛑 REGRA CRÍTICA: Nunca responder para as próprias contas de recebimento de pagamentos da Ka-Net (ex: 856268811)
+    if (SYSTEM_PAYMENT_NUMBERS.has(cleanSender)) {
+        console.log(`ℹ️ [SMS BOT] Remetente é conta de recebimento do sistema (${cleanSender}). Ignorado para evitar auto-envio.`);
+        return;
+    }
+
     // ── 0. CHAMADA PERDIDA → SMS de resposta imediato ──
     if (String(body).trim().toLowerCase() === 'chamada_perdida') {
         const sd = getSaudacaoHoraSms();
@@ -533,10 +541,10 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
     const text = String(body).trim();
     const cleanText = text.toLowerCase();
 
-    // Deduplicação anti-loop
+    // Deduplicação anti-loop ampliada (30 segundos para evitar duplicação por retentativas de rede)
     const dedupKey = `${cleanSender}_${cleanText.slice(0, 35)}`;
     const now = Date.now();
-    if (recentIncomingSmsCache.has(dedupKey) && (now - recentIncomingSmsCache.get(dedupKey)) < 8000) {
+    if (recentIncomingSmsCache.has(dedupKey) && (now - recentIncomingSmsCache.get(dedupKey)) < 30000) {
         console.log(`🛡️ [SMS BOT DEDUP] Ignorando SMS duplicado recente de ${cleanSender}`);
         return;
     }
@@ -557,6 +565,14 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
             await sendSms(cleanSender, "Ka-Net: Nao conseguimos ler o codigo da transacao ou o valor do comprovativo. Por favor, reenvie o SMS original completo da operadora.", simSlot, port);
             return;
         }
+
+        // Deduplicação por TXN ID nos últimos 30 segundos
+        const txnDedupKey = `TXN_${txnId}`;
+        if (recentIncomingSmsCache.has(txnDedupKey) && (now - recentIncomingSmsCache.get(txnDedupKey)) < 30000) {
+            console.log(`🛡️ [SMS BOT DEDUP] Ignorando comprovativo ${txnId} já recebido e em processamento nos últimos 30s.`);
+            return;
+        }
+        recentIncomingSmsCache.set(txnDedupKey, now);
 
         console.log(`💳 [SMS COMPROVATIVO DETECTADO] Ref=${txnId} | ${valor} MT | Destino=${numDestino || 'Aguardando Vodacom'}`);
 
@@ -743,8 +759,8 @@ async function ativarPedidoSms({ txnId, valor, numDestino, senderPhone, pacote }
 
     console.log(`⚡ [SMS ATIVAÇÃO] Despachando ordem ${orderId}: ${pacote.mb}MB para ${numDestino}`);
 
-    // Avisar o cliente que a ativação iniciou (usando porta 8077 dedicada de SMS)
-    await sendSms(senderPhone, `🎉 Ka-Net: Comprovativo validado! A ativar ${pacote.nome} para o número ${numDestino}. Aguarde alguns segundos.`, 0, 8077);
+    // Avisar o cliente que a ativação iniciou (usando porta 8077 dedicada de SMS, formato GSM 7-bit puro)
+    await sendSms(senderPhone, `Ka-Net: Comprovativo validado! A ativar ${pacote.nome} para o numero ${numDestino}. Aguarde alguns segundos.`, 0, 8077);
 
     // Se temos dispatcher configurado, enfileirar ordem
     if (dispatchOrderCallback) {
