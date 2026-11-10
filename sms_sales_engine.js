@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ==============================================================================
  * KA-NET SMS SALES ENGINE (BOT DE ATENDIMENTO E VENDAS AUTOMÁTICAS POR SMS)
  * ==============================================================================
@@ -138,35 +138,38 @@ async function sendSms(destinatario, mensagem, simSlot = 0, targetPort = null) {
     const cleanMsg = String(mensagem).trim();
     const smsId = 'SMS-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
 
+    // ⚠️ REGRA CRÍTICA: Porta 8077 é o ÚNICO Gateway SMS do sistema Ka-Net!
+    // Qualquer tentativa de enviar SMS com porta nula, 8021, 8022 ou outra porta diária DEVE ser redirecionada para 8077!
+    const effectiveTargetPort = (targetPort && (Number(targetPort) === 8090 || Number(targetPort) === 8777)) ? Number(targetPort) : 8077;
+
     const smsItem = {
         id: smsId,
         numero: cleanNum,
         mensagem: cleanMsg,
         sim_slot: simSlot !== undefined ? Number(simSlot) : 0,
-        targetPort: targetPort ? Number(targetPort) : null,
+        targetPort: effectiveTargetPort,
         createdAt: Date.now()
     };
 
-    // 1. Tentar envio direto HTTP se a porta estiver disponível localmente
-    const directPort = targetPort || process.env.SMS_GATEWAY_PORT;
-    const directHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
-    if (directPort) {
+    // 1. Tentar envio direto HTTP se a porta estiver disponível explicitamente em host remoto
+    const directHost = process.env.SMS_GATEWAY_HOST;
+    if (directHost && directHost !== '127.0.0.1' && directHost !== 'localhost') {
         try {
-            const response = await axios.post(`http://${directHost}:${directPort}/sms/send`, {
+            const response = await axios.post(`http://${directHost}:${effectiveTargetPort}/sms/send`, {
                 numero: cleanNum,
                 mensagem: cleanMsg,
                 sim_slot: smsItem.sim_slot
             }, { timeout: 3500 });
-            console.log(`📱 [SMS ENGINE ENVIADO DIRETO] Porta ${directPort} -> ${cleanNum}`);
+            console.log(`📱 [SMS ENGINE ENVIADO DIRETO] Porta ${effectiveTargetPort} -> ${cleanNum}`);
             return response.data;
         } catch (err) {
-            console.log(`ℹ️ [SMS ENGINE] Envio direto HTTP falhou na porta ${directPort} (${err.message}). Adicionando à fila para coleta pelo celular.`);
+            console.log(`ℹ️ [SMS ENGINE] Envio direto HTTP falhou na porta ${effectiveTargetPort} (${err.message}). Adicionando à fila para coleta pelo celular.`);
         }
     }
 
     // 2. Colocar na fila em Nuvem para o Gateway Android coletar via /api/devices/:port/health
     pendingOutgoingSms.push(smsItem);
-    console.log(`📥 [SMS ENGINE FILA] SMS ${smsId} enfileirado para ${cleanNum} (Porta Alvo: ${targetPort || 'Qualquer'}, ${pendingOutgoingSms.length} na fila)`);
+    console.log(`📥 [SMS ENGINE FILA] SMS ${smsId} enfileirado para ${cleanNum} (Porta Alvo: ${effectiveTargetPort}, ${pendingOutgoingSms.length} na fila)`);
     return { success: true, queued: true, id: smsId };
 }
 

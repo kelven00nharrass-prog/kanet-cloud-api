@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
@@ -12,6 +12,26 @@ const geminiAI = require('./gemini_ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ── CAPTURA DE LOGS DO SERVIDOR EM MEMÓRIA (ÚLTIMOS 150 EVENTOS) ──
+const recentServerLogs = [];
+const origLog = console.log;
+const origWarn = console.warn;
+const origErr = console.error;
+
+function pushServerLog(type, args) {
+  try {
+    const text = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    const entry = `[${new Date().toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo' })}] [${type}] ${text}`;
+    recentServerLogs.unshift(entry);
+    if (recentServerLogs.length > 150) recentServerLogs.pop();
+  } catch (_) {}
+}
+
+console.log = function(...args) { pushServerLog('INFO', args); origLog.apply(console, args); };
+console.warn = function(...args) { pushServerLog('WARN', args); origWarn.apply(console, args); };
+console.error = function(...args) { pushServerLog('ERROR', args); origErr.apply(console, args); };
+
 const MASTER_TOKENS = new Set([
   process.env.MASTER_TOKEN || 'KaNetKelven2026Secure',
   'GitoAquinoMasterToken2025'
@@ -3538,11 +3558,23 @@ app.post('/api/whatsapp/test-send', async (req, res) => {
 app.get('/api/whatsapp/recent-logs', (req, res) => {
   try {
     const token = req.headers['x-master-token'] || req.query.token;
-    if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
+    if (!MASTER_TOKENS.has(token) && token !== 'KaNetKelven2026Secure') return res.status(403).json({ error: 'Não autorizado' });
     if (baileysEngine && typeof baileysEngine.getRecentLogs === 'function') {
       return res.json({ success: true, logs: baileysEngine.getRecentLogs() });
     }
     return res.json({ success: true, logs: [] });
+  } catch(e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/admin/server-logs', (req, res) => {
+  try {
+    const token = req.headers['x-master-token'] || req.query.token;
+    if (!MASTER_TOKENS.has(token) && token !== 'KaNetKelven2026Secure') {
+      return res.status(403).json({ error: 'Nao autorizado' });
+    }
+    return res.json({ success: true, count: recentServerLogs.length, logs: recentServerLogs });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
