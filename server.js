@@ -6566,6 +6566,7 @@ setTimeout(processClientPackageReminders, 15000);
 // ------------------------------------------------------------------------------
 
 const PLANS_CACHE_FILE = path.join(__dirname, 'cache_scheduled_plans.json');
+const PLANS_SEED_FILE  = path.join(__dirname, 'plans_seed.json');
 const scheduledPlans   = new Map(); // planId ? planDoc
 
 // -- Tabela Oficial de Planos Especiais com Fallback Permanente ---------------
@@ -6628,12 +6629,20 @@ function loadScheduledPlans() {
 
 function _loadScheduledPlansFromFile() {
   try {
+    let loaded = 0;
     if (fs.existsSync(PLANS_CACHE_FILE)) {
       const raw = JSON.parse(fs.readFileSync(PLANS_CACHE_FILE, 'utf8'));
       for (const [id, plan] of Object.entries(raw)) {
-        if (plan.status === 'ativo') scheduledPlans.set(id, plan);
+        if (plan.status === 'ativo') { scheduledPlans.set(id, plan); loaded++; }
       }
       console.log(`📦 [PLANOS] ${scheduledPlans.size} planos activos carregados do cache local.`);
+    }
+    if (loaded === 0 && fs.existsSync(PLANS_SEED_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(PLANS_SEED_FILE, 'utf8'));
+      for (const [id, plan] of Object.entries(raw)) {
+        if (plan.status === 'ativo') scheduledPlans.set(id, plan);
+      }
+      console.log(`🌱 [SEED PLANOS] ${scheduledPlans.size} planos activos restaurados da semente permanente.`);
     }
   } catch(e) { console.warn('⚠️  [PLANOS] Erro ao carregar cache local:', e.message); }
 }
