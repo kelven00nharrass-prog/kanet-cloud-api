@@ -5210,6 +5210,27 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
+                    // ── 15.1 PEDIDO DO LINK DO GRUPO OFICIAL ────────────────
+                    const ehPedidoLinkGrupo = [
+                        'link', 'link do grupo', 'link de grupo', 'link grupo', 'grupo', 'grupos',
+                        'grupo vip', 'grupo oficial', 'mandar link', 'manda link', 'manda o link',
+                        'manda me o link', 'mande o link', 'envia o link', 'envia link', 'qual e o grupo',
+                        'qual e o link', 'tem grupo', 'tem grupo de whatsapp', 'entrar no grupo'
+                    ].includes(cleanCmd) ||
+                        /\b(?:link\s+do\s+grupo|link\s+grupo|entrar\s+no\s+grupo|grupo\s+vip|grupo\s+oficial|manda(?:r)?\s+(?:o\s+)?link|envia(?:r)?\s+(?:o\s+)?link)\b/i.test(cleanText);
+
+                    if (ehPedidoLinkGrupo) {
+                        const linkOficialGrupo = DYN_CFG.LINK_GRUPO_OFICIAL || 'https://chat.whatsapp.com/IZHBcmGSo0fFH3QNoEHokT';
+                        await reply(
+                            `🌐 *GRUPO OFICIAL AXION — VENDAS E PROMOÇÕES* 🚀\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                            `Entre agora no nosso grupo oficial para receber ofertas exclusivas, recargas super rápidas e atendimento 24/7:\n\n` +
+                            `👉 ${linkOficialGrupo}\n\n` +
+                            `_Seja bem-vindo(a) à melhor e mais rápida rede de recargas!_ ✨`
+                        );
+                        continue;
+                    }
+
 
                     // ── 16. SAUDAÇÃO / BOAS VINDAS PADRÃO (PRIVADO OU SAUDAÇÃO EXPLÍCITA) ─
                     const isGroupMsg = jid.endsWith('@g.us');

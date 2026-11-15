@@ -454,6 +454,19 @@ async function startWhatsApp(db = null) {
                                     `• *.blacklist del <número>* ➔ Remove um número da blacklist.`);
                         continue;
                     }
+
+                    // 7. PEDIDO DE LINK DO GRUPO
+                    if (['link', 'link do grupo', 'grupo', 'grupo vip', 'grupo oficial'].includes(cleanCmd) ||
+                        /\b(?:link\s+do\s+grupo|link\s+grupo|entrar\s+no\s+grupo|manda(?:r)?\s+(?:o\s+)?link)\b/i.test(cleanCmd)) {
+                        await reply(
+                            `🌐 *GRUPO OFICIAL AXION — VENDAS E PROMOÇÕES* 🚀\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                            `Entre no nosso grupo oficial:\n` +
+                            `👉 https://chat.whatsapp.com/IZHBcmGSo0fFH3QNoEHokT\n\n` +
+                            `_Seja bem-vindo(a) à melhor e mais rápida rede de recargas!_ ✨`
+                        );
+                        continue;
+                    }
                 }
             } catch (err) {
                 console.error('❌ [ANTICONCORRÊNCIA MSG ERRO]:', err.message);
