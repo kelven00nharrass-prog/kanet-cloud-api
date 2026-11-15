@@ -1,4 +1,5 @@
 require('dotenv').config();
+const axionRedis = require('./axion_redis');
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
@@ -12,6 +13,15 @@ const geminiAI = require('./gemini_ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// -- INICIALIZAR REDIS --
+axionRedis.initRedis().then(ok => {
+  if (ok) {
+    console.log('✅ [REDIS] Upstash Redis conectado com sucesso!');
+  } else {
+    console.warn('⚠️  [REDIS] Redis não disponível — a usar apenas ficheiros locais e seeds.');
+  }
+}).catch(e => console.error('❌ [REDIS] Erro na inicialização:', e.message));
 
 // -- CAPTURA DE LOGS DO SERVIDOR EM MEM�RIA (�LTIMOS 150 EVENTOS) --
 const recentServerLogs = [];
@@ -2315,9 +2325,30 @@ function saveOrdersToCache() {
     const list = Array.from(inMemoryOrders.entries()).slice(-2000);
     fs.writeFileSync(ORDERS_CACHE_FILE, JSON.stringify(list), 'utf8');
   } catch(e) { console.error('❌ [CACHE] Falha ao gravar orders_cache.json:', e.message); }
+  // Guardar no Redis em background
+  if (axionRedis.isRedisAvailable()) {
+    axionRedis.saveAllOrders(Array.from(inMemoryOrders.values()))
+      .catch(e => console.warn('⚠️  [REDIS] Falha ao guardar orders:', e.message));
+  }
 }
 
 function loadOrdersFromCache() {
+  // Tentar Redis primeiro (async — resultado aplicado após init)
+  if (axionRedis.isRedisAvailable()) {
+    axionRedis.loadAllOrders().then(orders => {
+      if (orders && orders.length > 0) {
+        orders.forEach(o => { if (o && o.orderId) inMemoryOrders.set(o.orderId, o); });
+        console.log(`📦 [REDIS] ${inMemoryOrders.size} pedidos restaurados do Redis.`);
+        return;
+      }
+      _loadOrdersFromFile();
+    }).catch(() => _loadOrdersFromFile());
+  } else {
+    _loadOrdersFromFile();
+  }
+}
+
+function _loadOrdersFromFile() {
   try {
     let loadedCount = 0;
     if (fs.existsSync(ORDERS_CACHE_FILE)) {
@@ -2685,9 +2716,29 @@ function savePaymentsToCache() {
     const keep = adminReceiptsHistory.slice(-200);
     fs.writeFileSync(PAYMENTS_CACHE_FILE, JSON.stringify(keep), 'utf8');
   } catch(e) { console.error('❌ [CACHE] Falha ao salvar payments_cache.json:', e.message); }
+  // Guardar no Redis em background
+  if (axionRedis.isRedisAvailable()) {
+    axionRedis.saveAllPayments(adminReceiptsHistory.slice(-200))
+      .catch(e => console.warn('⚠️  [REDIS] Falha ao guardar payments:', e.message));
+  }
 }
 
 function loadPaymentsFromCache() {
+  if (axionRedis.isRedisAvailable()) {
+    axionRedis.loadAllPayments().then(payments => {
+      if (payments && payments.length > 0) {
+        adminReceiptsHistory.push(...payments);
+        console.log(`📦 [REDIS] ${adminReceiptsHistory.length} comprovativos restaurados do Redis.`);
+        return;
+      }
+      _loadPaymentsFromFile();
+    }).catch(() => _loadPaymentsFromFile());
+  } else {
+    _loadPaymentsFromFile();
+  }
+}
+
+function _loadPaymentsFromFile() {
   try {
     let loadedCount = 0;
     if (fs.existsSync(PAYMENTS_CACHE_FILE)) {
@@ -6561,15 +6612,30 @@ function getPlanosEspeciaisConfig() {
 
 // -- Persist�ncia --------------------------------------------------------------
 function loadScheduledPlans() {
+  if (axionRedis.isRedisAvailable()) {
+    axionRedis.loadAllPlans().then(plans => {
+      if (plans && plans.length > 0) {
+        plans.forEach(p => { if (p && p.planId && p.status === 'ativo') scheduledPlans.set(p.planId, p); });
+        console.log(`📦 [REDIS] ${scheduledPlans.size} planos activos restaurados do Redis.`);
+        return;
+      }
+      _loadScheduledPlansFromFile();
+    }).catch(() => _loadScheduledPlansFromFile());
+  } else {
+    _loadScheduledPlansFromFile();
+  }
+}
+
+function _loadScheduledPlansFromFile() {
   try {
     if (fs.existsSync(PLANS_CACHE_FILE)) {
       const raw = JSON.parse(fs.readFileSync(PLANS_CACHE_FILE, 'utf8'));
       for (const [id, plan] of Object.entries(raw)) {
         if (plan.status === 'ativo') scheduledPlans.set(id, plan);
       }
-      console.log(`?? [PLANOS] ${scheduledPlans.size} planos activos carregados do cache local.`);
+      console.log(`📦 [PLANOS] ${scheduledPlans.size} planos activos carregados do cache local.`);
     }
-  } catch(e) { console.warn('?? [PLANOS] Erro ao carregar cache local:', e.message); }
+  } catch(e) { console.warn('⚠️  [PLANOS] Erro ao carregar cache local:', e.message); }
 }
 
 function saveScheduledPlans() {
@@ -6584,7 +6650,13 @@ function saveScheduledPlans() {
       }
     }
     fs.writeFileSync(PLANS_CACHE_FILE, JSON.stringify(obj, null, 2), 'utf8');
-  } catch(e) { console.warn('?? [PLANOS] Erro ao guardar cache:', e.message); }
+  } catch(e) { console.warn('⚠️  [PLANOS] Erro ao guardar cache:', e.message); }
+  // Guardar planos no Redis em background
+  if (axionRedis.isRedisAvailable()) {
+    const plansArr = Array.from(scheduledPlans.values());
+    axionRedis.saveAllPlans(plansArr)
+      .catch(e => console.warn('⚠️  [REDIS] Falha ao guardar planos:', e.message));
+  }
 }
 
 loadScheduledPlans();
@@ -7588,6 +7660,36 @@ app.post('/api/plans/hora-preferida', (req, res) => {
 // -- Axion Licensing System (3 linhas � n�o altera nada existente) --
 app.use('/licensing', require('./licensing/license_routes'));
 require('./licensing/license_checker').startChecker();
+
+
+
+// -- ENDPOINT: Forçar sync Redis manual --
+app.post('/api/admin/redis-sync', async (req, res) => {
+  const token = req.headers['authorization']?.replace('Bearer ', '') || req.query.token;
+  if (!MASTER_TOKENS.includes(token)) return res.status(403).json({ error: 'Acesso negado' });
+  if (!axionRedis.isRedisAvailable()) {
+    return res.status(503).json({ error: 'Redis não disponível', hint: 'Verifique as variáveis UPSTASH_REDIS_REST_URL e UPSTASH_REDIS_REST_TOKEN no Render' });
+  }
+  try {
+    const ordersArr = Array.from(inMemoryOrders.values());
+    const paymentsArr = adminReceiptsHistory.slice(-200);
+    const plansArr = Array.from(scheduledPlans.values());
+    await axionRedis.saveAllOrders(ordersArr);
+    await axionRedis.saveAllPayments(paymentsArr);
+    await axionRedis.saveAllPlans(plansArr);
+    console.log(`✅ [REDIS SYNC] Manual: ${ordersArr.length} ordens, ${paymentsArr.length} pagamentos, ${plansArr.length} planos guardados.`);
+    res.json({
+      ok: true,
+      ordens: ordersArr.length,
+      pagamentos: paymentsArr.length,
+      planos: plansArr.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch(e) {
+    console.error('❌ [REDIS SYNC] Erro:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.listen(PORT, '0.0.0.0', () => {
 
