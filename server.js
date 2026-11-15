@@ -253,7 +253,7 @@ async function handleTransfer(req, res) {
 
 app.post(['/api/transferir', '/transferir-dados', '/transferir-dados/'], handleTransfer);
 
-// ── ENDPOINT EXCLUSIVO PARA O ENVIO MANUAL DO KA-NET ADMIN MASTER ──
+// ── ENDPOINT EXCLUSIVO PARA O ENVIO MANUAL DO AXION ADMIN MASTER ──
 app.post('/api/send/manual', async (req, res) => {
   try {
     const { numero, volume, quantidade, modo = 'diario', porta = null } = req.body || {};
@@ -713,7 +713,7 @@ function getPortForModo(modo, requiredMb = 0) {
   return 8025; // fallback padrão (Huawei)
 }
 
-// ── REGRA OFICIAL KA-NET: DIVISÃO INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) ──
+// ── REGRA OFICIAL AXION: DIVISÃO INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) ──
 // 1. Mensal: Vodacom *162# -> 5 -> 1 entrega 2.8GB (2867MB) por 95 MT.
 //    Se pedido > 2867MB (ex: 5GB, 8GB, 10GB): Parte 1 (2867MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
 // 2. Tudo Top: Vodacom *111# -> 4 -> 3 -> 1 entrega 11GB (11264MB) + Minutos por 500 MT.
@@ -779,7 +779,7 @@ function splitSpecialOrderIfEligible(orderDoc) {
     inMemoryOrders.set(part2Id, orderPart2);
     saveOrdersToCache();
 
-    console.log(`📦 [SPLIT MENSAL KA-NET] Pedido Mensal ${parentId} (${totalMb}MB) dividido automaticamente:`);
+    console.log(`📦 [SPLIT MENSAL AXION] Pedido Mensal ${parentId} (${totalMb}MB) dividido automaticamente:`);
     console.log(`   👉 Parte 1 (Mensal): ${parte1}MB -> Porta 8077 (1ª Oferta *162#)`);
     console.log(`   👉 Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
 
@@ -840,7 +840,7 @@ function splitSpecialOrderIfEligible(orderDoc) {
     inMemoryOrders.set(part2Id, orderPart2);
     saveOrdersToCache();
 
-    console.log(`📦 [SPLIT TUDO TOP KA-NET] Pedido Tudo Top ${parentId} (${totalMb}MB) dividido automaticamente:`);
+    console.log(`📦 [SPLIT TUDO TOP AXION] Pedido Tudo Top ${parentId} (${totalMb}MB) dividido automaticamente:`);
     console.log(`   👉 Parte 1 (Tudo Top): ${parte1}MB -> Porta 8077 (1ª Oferta *111# 11GB + Minutos)`);
     console.log(`   👉 Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
 
@@ -854,7 +854,7 @@ function splitMensalOrderIfEligible(orderDoc) {
   return splitSpecialOrderIfEligible(orderDoc);
 }
 
-// ── REGRA OFICIAL KA-NET: DIVISÃO INTELIGENTE DE PACOTES DIÁRIOS (SPLIT DIÁRIO) ──
+// ── REGRA OFICIAL AXION: DIVISÃO INTELIGENTE DE PACOTES DIÁRIOS (SPLIT DIÁRIO) ──
 // 1. Limite USSD da Vodacom: O valor máximo permitido por transferência é 10.240MB (10GB).
 //    Se pedido > 10240MB (ex: 15GB, 20GB): Parte 1 (máx 10240MB) + Parte 2 (Resto).
 // 2. Proteção de Saldo: Se nenhum celular diário tem saldo suficiente para cobrir o pedido inteiro,
@@ -2659,7 +2659,7 @@ app.delete('/api/orders/:orderId', (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════
-// 📊 KA-NET ADMIN MASTER API: RELATÓRIOS & EXTRATO DE RECEBIMENTOS
+// 📊 AXION ADMIN MASTER API: RELATÓRIOS & EXTRATO DE RECEBIMENTOS
 // ══════════════════════════════════════════════════════════════════
 
 // In-Memory Payments store for M-Pesa & e-Mola receipts
@@ -3510,7 +3510,7 @@ app.post('/api/admin/config/custo-gb', authenticateAdmin, async (req, res) => {
       cfg = require(cfgPath);
     } catch (_) { console.warn('⚠️ [CONFIG] Falha ao recarregar bot_config.js para atualizar custo GB:', _.message); }
     cfg.CUSTO_GB_MT = novoCusto;
-    fs.writeFileSync(cfgPath, '// GERADO PELO SISTEMA KA-NET CLOUD\nmodule.exports = ' + JSON.stringify(cfg, null, 4) + ';\n', 'utf8');
+    fs.writeFileSync(cfgPath, '// GERADO PELO SISTEMA AXION CLOUD\nmodule.exports = ' + JSON.stringify(cfg, null, 4) + ';\n', 'utf8');
 
     if (db) {
       db.collection('bot_settings').doc('pricing_tables').set({ CUSTO_GB_MT: novoCusto }, { merge: true }).catch(() => {});
@@ -3547,7 +3547,7 @@ app.post('/api/whatsapp/test-send', async (req, res) => {
     if (!targetJid) return res.status(400).json({ error: 'Forneça jid ou numero' });
     if (!baileysEngine || !baileysEngine.sendTextMessage) return res.status(503).json({ error: 'Bot não disponível' });
     
-    await baileysEngine.sendTextMessage(targetJid, mensagem || '🤖 *Teste KA-NET* — Bot online e a responder correctamente!');
+    await baileysEngine.sendTextMessage(targetJid, mensagem || '🤖 *Teste AXION* — Bot online e a responder correctamente!');
     return res.json({ success: true, jid: targetJid, mensagem: mensagem || 'Teste enviado' });
   } catch(e) {
     return res.status(500).json({ success: false, erro: e.message });
@@ -3870,7 +3870,7 @@ app.post('/api/webhooks/paymoz', async (req, res) => {
 // ----------------------------------------------------
 
 // ════════════════════════════════════════════════════════════════
-// 6.5 KA-NET PRO ADMIN ROUTES & CLOUD PWA
+// 6.5 AXION PRO ADMIN ROUTES & CLOUD PWA
 // ════════════════════════════════════════════════════════════════
 
 // Firebase DB Helper
@@ -5120,7 +5120,7 @@ app.all('/api/admin/fix-duplicates', (req, res) => {
 });
 
 // ----------------------------------------------------
-// 20. KA-NET CLIENT HUB API (APP DO CLIENTE & CRM)
+// 20. AXION CLIENT HUB API (APP DO CLIENTE & CRM)
 // ----------------------------------------------------
 
 // Armazenamento em memória para Clientes, Suporte e Mensagens
@@ -5521,7 +5521,7 @@ app.post('/api/admin/announcement', (req, res) => {
     if (currentAnnouncement.active && baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       const emojiType = currentAnnouncement.type === 'alert' ? '🚨' : currentAnnouncement.type === 'promo' ? '🔥' : '📢';
       baileysEngine.enviarNotificacaoGrupo(
-        `${emojiType} *COMUNICADO OFICIAL KA-NET* ${emojiType}\n` +
+        `${emojiType} *COMUNICADO OFICIAL AXION* ${emojiType}\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
         `📌 *${currentAnnouncement.title}*\n\n` +
         `${currentAnnouncement.message}\n` +
@@ -7528,7 +7528,7 @@ require('./licensing/license_checker').startChecker();
 app.listen(PORT, '0.0.0.0', () => {
 
   console.log('==================================================================');
-  console.log(`🚀 [KA-NET CLOUD API] Servidor Online na porta ${PORT}`);
+  console.log(`🚀 [AXION CLOUD API] Servidor Online na porta ${PORT}`);
   console.log(`📱 [WHATSAPP QR CODE] Aceda a http://localhost:${PORT}/qr para conectar`);
   console.log('==================================================================');
 

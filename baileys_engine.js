@@ -1,6 +1,6 @@
 ﻿/**
  * ==============================================================================
- * KA-NET CLOUD WHATSAPP ENGINE (POWERED BY BAILEYS) - 100% BOT ORIGINAL
+ * axion CLOUD WHATSAPP ENGINE (POWERED BY BAILEYS) - 100% BOT ORIGINAL
  * ==============================================================================
  * - Estrutura idêntica de tabelas, menus, boas-vindas, formas de pagamento
  * - Suporta TODOS os comandos do painel de ajuda:
@@ -183,7 +183,7 @@ carregarConfigs();
 
 function salvarBotConfig() {
     try {
-        const content = '// GERADO PELO SISTEMA KA-NET CLOUD\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
+        const content = '// GERADO PELO SISTEMA AXION CLOUD\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
         fs.writeFileSync(BOT_CONFIG_PATH, content, 'utf8');
     } catch (e) {
         console.error('❌ Erro ao salvar bot_config.js:', e.message);
@@ -624,7 +624,7 @@ function gerarInfoTxenecoCompleta(senderNumber) {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
 
     return `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-        `  ⚡ *GUIA OFICIAL: TXENECO KA-NET* 📶\n` +
+        `  ⚡ *GUIA OFICIAL: TXENECO AXION* 📶\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
         `O *Txeneco* é o serviço exclusivo de *Internet a Crédito* da Axion: você recebe os seus Megabytes adiantados no celular e paga depois! 🚀\n\n` +
         statusBox + `\n` +
@@ -1648,7 +1648,7 @@ function isPerguntaComprarBot(texto) {
 function gerarRespostaStatusOnline() {
     if (modoManutencao) {
         return (
-            `⚠️ *KA-NET EM MANUTENÇÃO MOMENTÂNEA* ⏳\n` +
+            `⚠️ *AXION EM MANUTENÇÃO MOMENTÂNEA* ⏳\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
             `De momento o sistema está em pausa para manutenção rápida e melhorias técnicas.\n\n` +
             `Voltamos a operar normalmente dentro de instantes! Agradecemos a compreensão. 🌐`
@@ -1878,7 +1878,7 @@ async function restoreConfigsFromFirestore(db) {
                     salvarBotConfig();
                 } else {
                     try {
-                        const content = '// GERADO PELO SISTEMA KA-NET CLOUD (CACHE FIRESTORE)\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
+                        const content = '// GERADO PELO SISTEMA AXION CLOUD (CACHE FIRESTORE)\nmodule.exports = ' + JSON.stringify(DYN_CFG, null, 4) + ';\n';
                         fs.writeFileSync(BOT_CONFIG_PATH, content, 'utf8');
                     } catch (_) {
                         console.warn('⚠️ [CACHE] Erro ao salvar BOT_CONFIG local:', _.message);
@@ -2644,7 +2644,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                 const confMsg = p.aguardando_confirmacao ? `\n\n❓ *Entrega pendente de confirmação!* Responda *SIM* para receber ou *NÃO* para adiar.` : '';
                                 await reply(
                                     `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                    `  📊 *MEU PLANO KA-NET* 📊\n` +
+                                    `  📊 *MEU PLANO AXION* 📊\n` +
                                     `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                                     `📦 *Tipo:* ${tipoLabel}\n` +
                                     `💾 *Saldo Restante:* *${p.saldo_formatado}*\n` +
@@ -3611,7 +3611,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         const saldoMb = customerServices.consultarBonus(senderNumber);
                         if (saldoMb <= 0) {
                             await reply(
-                                `🎁 *SALDO DE BÔNUS KA-NET*\n━━━━━━━━━━━━━━━━━━\n` +
+                                `🎁 *SALDO DE BÔNUS axion*\n━━━━━━━━━━━━━━━━━━\n` +
                                 `Você não possui saldo de bônus acumulado no momento.\n` +
                                 `Fique atento às nossas promoções e sorteios no grupo!`
                             );
@@ -3619,7 +3619,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             const sldF = saldoMb >= 1024 ? `${(saldoMb / 1024).toFixed(1)}GB (${saldoMb}MB)` : `${saldoMb}MB`;
                             await reply(
                                 `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                `  🎁 *SEU SALDO DE BÔNUS KA-NET* 🎁\n` +
+                                `  🎁 *SEU SALDO DE BÔNUS axion* 🎁\n` +
                                 `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                                 `💾 *Saldo Disponível:* *${sldF}*\n\n` +
                                 `💡 *Como Sacar:*\n` +
@@ -3948,7 +3948,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     if (['/status', '!status', '.status', 'status'].includes(cleanText) && senderIsMaster) {
                         await reply(
-                            `📊 *STATUS DO SISTEMA KA-NET CLOUD*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                            `📊 *STATUS DO SISTEMA AXION CLOUD*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
                             `🤖 *Cloud Bot:* Online 24h/7d (Render)\n` +
                             `📱 *WhatsApp:* Conectado (${connectedUser})\n` +
                             `🛑 *Manutenção:* ${modoManutencao ? 'ATIVA' : 'DESATIVADA'}\n` +
@@ -4834,7 +4834,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (ehConsultaCalcAjuda) {
                         await reply(
                             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                            `  🧮 *CALCULADOR DE MEGAS KA-NET* ⚡\n` +
+                            `  🧮 *CALCULADOR DE MEGAS AXION* ⚡\n` +
                             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                             `Calculamos megas exatos para *qualquer valor* em Meticais que transferir!\n\n` +
                             `💡 *Como consultar:*\n` +
@@ -4877,7 +4877,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                             await reply(
                                 `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                                `  🧮 *CÁLCULO DE MEGAS KA-NET* ⚡\n` +
+                                `  🧮 *CÁLCULO DE MEGAS AXION* ⚡\n` +
                                 `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
                                 `Para o valor de *${valorConsultaCalc} MT*, você recebe:\n\n` +
                                 `╭─────────────────────────────╮\n` +
@@ -5024,7 +5024,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     const ehPositivoWa = /^(?:ok|okay|certo|entendido|perfeito|combinado|pode|sim|claro|com certeza|confirmo|confirmado|beleza|show|otimo|optimo|excelente|fixe|muito bom|boa|bom)(?:[\s!.]*$)/i.test(textNorm) && textNorm.length <= 20;
 
-                    const regexSaudacao = /^(?:ola|oi+|bom dia|boa tarde|boa noite|bom dm|boa td|boa nt|tudo bem|td bem|tudo bom|opa|salve|alo|hello|hi|eae|eai|e ai|start|iniciar|comecar|bot|ka net|kanet|ajuda|info|ajude|menu)(?:\s|$)/i;
+                    const regexSaudacao = /^(?:ola|oi+|bom dia|boa tarde|boa noite|bom dm|boa td|boa nt|tudo bem|td bem|tudo bom|opa|salve|alo|hello|hi|eae|eai|e ai|start|iniciar|comecar|bot|axion|axion|ajuda|info|ajude|menu)(?:\s|$)/i;
                     const ehSaudacaoExplicita = regexSaudacao.test(textNorm) ||
                         /^(?:ola|oi+|opa|salve)\s+(?:tudo bem|como esta|amigo|mano|irmao|boa|bom)/i.test(textNorm) ||
                         /^(?:como esta|tudo bem|td bem)\??$/i.test(textNorm) ||
@@ -5059,13 +5059,13 @@ async function startWhatsApp(orderCallback, db = null) {
 
                         const isCallToBot = mentionedJids.some(m => m.includes(myJidNumber)) ||
                             text.includes(myJidNumber) ||
-                            /^(?:@?bot|kanet|ka-net)[,:\s]/i.test(cleanCmd) ||
-                            /^(?:@?bot|kanet|ka-net)$/i.test(cleanCmd) ||
+                            /^(?:@?bot|axion|axion)[,:\s]/i.test(cleanCmd) ||
+                            /^(?:@?bot|axion|axion)$/i.test(cleanCmd) ||
                             cleanText.startsWith('@bot') ||
                             cleanText.startsWith('bot ') ||
                             cleanText === 'bot';
 
-                        const queryGroup = cleanCmd.replace(/^(?:@?bot|kanet|ka-net)[,:\s]*/i, '').trim();
+                        const queryGroup = cleanCmd.replace(/^(?:@?bot|axion|axion)[,:\s]*/i, '').trim();
 
                         // Resposta instantânea de Status Online no grupo
                         if (isPerguntaOnlineBot(queryGroup || cleanCmd) && (isCallToBot || isPerguntaOnlineBot(cleanCmd))) {
@@ -5719,10 +5719,10 @@ async function sendAnnouncementToGroups(mensagem, targetJids = null) {
     const results = [];
     const msgTexto =
         `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-        `  📢 *COMUNICADO KA-NET* 📢\n` +
+        `  📢 *COMUNICADO AXION* 📢\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
         `${mensagem || 'Comunicado geral para todos os clientes.'}\n\n` +
-        `_Atenciosamente, Equipa KA-NET_ 📶`;
+        `_Atenciosamente, Equipa axion_ 📶`;
 
     for (const jid of jidsToAnnounce) {
         try {
@@ -5788,7 +5788,7 @@ async function executarLembretesIlimitados() {
                 customerServices.salvarAssinatura(sub);
 
                 const msg3Dias =
-                    `⏳ *LEMBRETE DE VENCIMENTO: PACOTE ILIMITADO KA-NET* ⏳\n` +
+                    `⏳ *LEMBRETE DE VENCIMENTO: PACOTE ILIMITADO axion* ⏳\n` +
                     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
                     `Olá, *${sub.nomeCliente || 'Estimado(a) Cliente'}*! 👋\n\n` +
                     `Informamos que o seu pacote *${sub.planoNome}* expira em *3 dias*:\n` +
@@ -5822,7 +5822,7 @@ async function executarLembretesIlimitados() {
                     const horaExp = dataFormatada.includes(',') ? dataFormatada.split(',')[1].trim() : dataFormatada;
 
                     const msg12h =
-                        `⏳ *LEMBRETE KA-NET: FALTAM 12 HORAS* ⏳\n` +
+                        `⏳ *LEMBRETE axion: FALTAM 12 HORAS* ⏳\n` +
                         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
                         `Olá, *${sub.nomeCliente || 'Cliente'}*! 👋\n\n` +
                         `Faltam apenas *12 horas* para o término do seu pacote *${sub.planoNome}* (expira hoje às ${horaExp}).\n\n` +
