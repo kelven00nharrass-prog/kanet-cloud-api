@@ -23,7 +23,7 @@ Promise.resolve(axionRedis.initRedis()).then(ok => {
   }
 }).catch(e => console.error('❌ [REDIS] Erro na inicialização:', e.message));
 
-// -- CAPTURA DE LOGS DO SERVIDOR EM MEM�RIA (�LTIMOS 150 EVENTOS) --
+// -- CAPTURA DE LOGS DO SERVIDOR EM MEMÓRIA (ÚLTIMOS 150 EVENTOS) --
 const recentServerLogs = [];
 const origLog = console.log;
 const origWarn = console.warn;
@@ -56,7 +56,7 @@ function authenticateAdmin(req, res, next) {
                 req.query.token ||
                 req.body?.token;
   if (!token || !MASTER_TOKENS.has(token)) {
-    return res.status(403).json({ success: false, error: 'Acesso n�o autorizado. Token Master inv�lido.' });
+    return res.status(403).json({ success: false, error: 'Acesso não autorizado. Token Master inválido.' });
   }
   next();
 }
@@ -101,7 +101,7 @@ try {
     db = admin.firestore();
     try {
       rtdb = admin.database();
-    } catch (_) { console.warn('?? [FIREBASE] RTDB n�o dispon�vel:', _.message || _); }
+    } catch (_) { console.warn('?? [FIREBASE] RTDB não disponível:', _.message || _); }
     console.log('?? [FIREBASE] Firestore Conectado:', serviceAccount.project_id || 'ka-net-math');
   } else {
     console.log('?? [FIREBASE] Sem credenciais no momento. Operando em modo Cloud Gateway.');
@@ -112,7 +112,7 @@ try {
 
 // In-Memory Device & Order Store (Fallback & Instant Sync)
 
-// In-Memory Device & Order Store (Din�mico - sem dispositivos fantasmas)
+// In-Memory Device & Order Store (Dinâmico - sem dispositivos fantasmas)
 let pendingBotCommand = null;
 let inMemoryMetrics = null;
 const inMemoryDevices = {};
@@ -131,7 +131,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const compression = require('compression');
-app.use(compression()); // Compress�o gzip � reduz respostas JSON/HTML em 60-80%
+app.use(compression()); // Compressão gzip � reduz respostas JSON/HTML em 60-80%
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
@@ -165,7 +165,7 @@ async function handleTransfer(req, res) {
     const { numero, quantidade, modo = 'data', remetente = 'Bot', porta = null, request_id = null } = req.body;
 
     if (!numero) {
-      return res.status(400).json({ success: false, status: 'erro', mensagem: 'N�mero obrigat�rio' });
+      return res.status(400).json({ success: false, status: 'erro', mensagem: 'Número obrigatério' });
     }
 
     const numLimpo = String(numero).replace(/\D/g, '');
@@ -174,47 +174,47 @@ async function handleTransfer(req, res) {
     const qtyMb = Number(quantidade) || Number(req.body.input_val) || 0;
     const valPago = Number(req.body.valor) || Number(req.body.valor_pago) || getValorFromMb(qtyMb, modo);
 
-    // -- 1. PROTE��O CONTRA DUPLICA��O POR REFER�NCIA / ID --
+    // -- 1. PROTEçãO CONTRA DUPLICAçãO POR REFERÊNENCIA / ID --
     if (inMemoryOrders.has(orderId)) {
       const existing = inMemoryOrders.get(orderId);
       if (existing.status === 'completed' || existing.status === 'sucesso') {
-        console.warn(`??? [DEDUPLICA��O] Pedido com refer�ncia ${orderId} j� foi CONCLU�DO. Bloqueando duplica��o.`);
+        console.warn(`??? [DEDUPLICAçãO] Pedido com referência ${orderId} já foi CONCLUÍDO. Bloqueando duplicação.`);
         return res.status(200).json({
           status: 'concluido',
           success: true,
           duplicado: true,
           orderId,
-          mensagem: 'Pedido j� conclu�do.'
+          mensagem: 'Pedido já concluído.'
         });
       }
       if (existing.status === 'assigned' || existing.status === 'processing' || existing.status === 'pending') {
-        console.warn(`??? [DEDUPLICA��O] Pedido com refer�ncia ${orderId} j� est� na fila (${existing.status}). Ignorando duplica��o.`);
+        console.warn(`??? [DEDUPLICAçãO] Pedido com referência ${orderId} já está na fila (${existing.status}). Ignorando duplicação.`);
         return res.status(200).json({
           status: 'processando',
           success: true,
           duplicado: true,
           orderId,
-          mensagem: `Este pedido (${orderId}) j� est� na fila e a ser atendido!`
+          mensagem: `Este pedido (${orderId}) já está na fila e a ser atendido!`
         });
       }
     }
 
-    // -- 2. PROTE��O DE REFER�NCIA NO CACHE PERSISTENTE (caso o servidor tenha reiniciado) --
+    // -- 2. PROTEçãO DE REFERÊNENCIA NO CACHE PERSISTENTE (caso o servidor tenha reiniciado) --
     if (fs.existsSync(ORDERS_CACHE_FILE)) {
       try {
         const cachedList = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
         const found = cachedList.find(([k, v]) => k === orderId);
         if (found && (found[1].status === 'completed' || found[1].status === 'sucesso')) {
-          console.warn(`??? [DEDUPLICA��O CACHE] Refer�ncia ${orderId} j� consta como CONCLUÍDA.`);
+          console.warn(`??? [DEDUPLICAçãO CACHE] Referência ${orderId} já consta como CONCLUÍDA.`);
           return res.status(200).json({
             status: 'concluido',
             success: true,
             duplicado: true,
             orderId,
-            mensagem: `Este pedido com a refer�ncia ${orderId} j� foi atendido e conclu�do anteriormente!`
+            mensagem: `Este pedido com a referência ${orderId} já foi atendido e concluído anteriormente!`
           });
         }
-      } catch(e) { console.warn('?? [DEDUPLICA��O] Falha ao ler cache de pedidos:', e.message); }
+      } catch(e) { console.warn('?? [DEDUPLICAçãO] Falha ao ler cache de pedidos:', e.message); }
     }
 
     const orderDoc = {
@@ -234,7 +234,7 @@ async function handleTransfer(req, res) {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial Axion de divis�o de pacotes Mensais (1� oferta + resto di�rio) e Di�rios
+    // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
     splitMensalOrderIfEligible(orderDoc);
     splitDailyOrderIfEligible(orderDoc);
 
@@ -250,7 +250,7 @@ async function handleTransfer(req, res) {
       }
     }
 
-    // Resposta imediata para o Bot n�o travar
+    // Resposta imediata para o Bot não travar
     return res.status(200).json({
       status: 'sucesso',
       success: true,
@@ -271,7 +271,7 @@ app.post('/api/send/manual', async (req, res) => {
   try {
     const { numero, volume, quantidade, modo = 'diario', porta = null } = req.body || {};
     if (!numero) {
-      return res.status(400).json({ success: false, message: 'N�mero de telefone � obrigat�rio.' });
+      return res.status(400).json({ success: false, message: 'Número de telefone � obrigatério.' });
     }
 
     const numLimpo = String(numero).replace(/\D/g, '');
@@ -295,11 +295,11 @@ app.post('/api/send/manual', async (req, res) => {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial de divis�o mensal (se for mensal > 2867MB), Tudo Top (> 11GB) ou Di�rio
+    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB), Tudo Top (> 11GB) ou Diário
     splitMensalOrderIfEligible(orderDoc);
     splitDailyOrderIfEligible(orderDoc);
 
-    // Aplicar detector e ativador de Planos Especiais (Renov�vel e Faseado)
+    // Aplicar detector e ativador de Planos Especiais (Renovável e Faseado)
     handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(orderId, orderDoc);
@@ -342,7 +342,7 @@ app.get('/api/devices', async (req, res) => {
 app.post('/api/devices/:port/reset', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} n�o encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
 
   // Resetar flags de bloqueio
   dev.sem_saldo = false;
@@ -356,7 +356,7 @@ app.post('/api/devices/:port/reset', (req, res) => {
   dev._lastBlockLogTime = 0;
   dev.manual_saldo_override = Date.now();
 
-  // Enviar comando ao celular via pr�ximo polling (/health)
+  // Enviar comando ao celular via próximo polling (/health)
   dev.pending_commands = dev.pending_commands || {};
   dev.pending_commands.reset_counters = true;
 
@@ -378,7 +378,7 @@ app.post('/api/devices/:port/reset', (req, res) => {
   return res.json({ success: true, mensagem: `Porta ${port} libertada e desbloqueada com sucesso!`, device: dev });
 });
 
-// -- FUN��O DE DECREMENTO AUTOM�TICO DE SALDO (MT NA 8077 / MB NAS DEMAIS PORTAS) --
+// -- FUNçãO DE DECREMENTO AUTOMÁTICO DE SALDO (MT NA 8077 / MB NAS DEMAIS PORTAS) --
 function decrementDeviceSaldo(port, order) {
   const pNum = Number(port);
   const dev = inMemoryDevices[pNum];
@@ -403,7 +403,7 @@ function decrementDeviceSaldo(port, order) {
     dev.saldo_credito = `${newMt} MT`;
     dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 dias de override
 
-    console.log(`?? [SALDO 8077 DECREMENTADO] Ativa��o de ${orderCostMt} MT no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newMt} MT`);
+    console.log(`?? [SALDO 8077 DECREMENTADO] Ativação de ${orderCostMt} MT no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newMt} MT`);
 
     if (newMt <= 0) {
       dev.sem_saldo = true;
@@ -412,10 +412,10 @@ function decrementDeviceSaldo(port, order) {
 
       if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
         baileysEngine.enviarNotificacaoGrupo(
-          `?? *ALERTA CR�TICO: SALDO 8077 ZERADO!* ??\n` +
+          `?? *ALERTA CRÍTICO: SALDO 8077 ZERADO!* ??\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `?? *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
-          `?? *�ltima Ativa��o:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
+          `?? *última Ativação:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
           `?? *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `?? *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
@@ -423,7 +423,7 @@ function decrementDeviceSaldo(port, order) {
       }
     }
   } else {
-    // -- DECREMENTO AUTOM�TICO DE DADOS EM MEGAS (PORTAS 8021, 8022, ETC.) --
+    // -- DECREMENTO AUTOMÁTICO DE DADOS EM MEGAS (PORTAS 8021, 8022, ETC.) --
     const mbEnviados = Number(order.quantidade) || 0;
     if (mbEnviados > 0) {
       const slot = dev.active_sim_slot || 1;
@@ -443,7 +443,7 @@ function decrementDeviceSaldo(port, order) {
         if (otherSlotSaldo < 100) {
           dev.sem_saldo = true;
           dev.is_apto = false;
-          console.warn(`?? [SALDO ESGOTADO] Celular Porta ${pNum} ficou com saldo abaixo do m�nimo (<100MB) em ambos os chips!`);
+          console.warn(`?? [SALDO ESGOTADO] Celular Porta ${pNum} ficou com saldo abaixo do mínimo (<100MB) em ambos os chips!`);
         }
       }
     }
@@ -454,7 +454,7 @@ function decrementDeviceSaldo(port, order) {
 app.post('/api/devices/:port/set-saldo', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} n�o encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
 
   const { sim1_saldo_mb, sim2_saldo_mb, saldo_mb, saldo_mt } = req.body || {};
   if (sim1_saldo_mb !== undefined) dev.sim1_saldo_mb = Number(sim1_saldo_mb);
@@ -504,7 +504,7 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
 app.post('/api/devices/:port/set-sim', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} n�o encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
 
   const slot = Number(req.body && req.body.slot);
   if (slot !== 1 && slot !== 2) {
@@ -524,29 +524,29 @@ app.post('/api/devices/:port/set-sim', (req, res) => {
 app.post('/api/devices/:port/toggle-pause', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} n�o encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
 
   dev.paused = !dev.paused;
   console.log(`?? [MANUSEIO PAINEL] Porta ${port} ${dev.paused ? 'PAUSADA' : 'RETOMADA'} pelo operador.`);
   return res.json({
     success: true,
     paused: dev.paused,
-    mensagem: dev.paused ? `Porta ${port} pausada. N�o receber� pedidos at� ser retomada.` : `Porta ${port} retomada e pronta para pedidos!`,
+    mensagem: dev.paused ? `Porta ${port} pausada. Não receberá pedidos até ser retomada.` : `Porta ${port} retomada e pronta para pedidos!`,
     device: dev
   });
 });
 
-// -- FOR�AR DESPACHO DE PEDIDO PARA ESTA PORTA (operador) --
+// -- FORÇAR DESPACHO DE PEDIDO PARA ESTA PORTA (operador) --
 app.post('/api/devices/:port/force-dispatch', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} n�o encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
 
   if (dev.pending_order) {
-    return res.status(400).json({ success: false, mensagem: `Porta ${port} j� tem um pedido em processamento (${dev.pending_order.numero}).` });
+    return res.status(400).json({ success: false, mensagem: `Porta ${port} já tem um pedido em processamento (${dev.pending_order.numero}).` });
   }
 
-  // Buscar primeiro pedido pendente compat�vel
+  // Buscar primeiro pedido pendente compatével
   let targetOrder = null;
   let targetOrderId = null;
   for (const [orderId, order] of inMemoryOrders.entries()) {
@@ -561,7 +561,7 @@ app.post('/api/devices/:port/force-dispatch', (req, res) => {
   }
 
   if (!targetOrder) {
-    return res.json({ success: false, mensagem: `Nenhum pedido pendente compat�vel na fila para a Porta ${port}.` });
+    return res.json({ success: false, mensagem: `Nenhum pedido pendente compatével na fila para a Porta ${port}.` });
   }
 
   targetOrder.status = 'assigned';
@@ -585,18 +585,18 @@ app.post('/api/devices/:port/force-dispatch', (req, res) => {
   return res.json({ success: true, mensagem: `Pedido ${targetOrderId} (${targetOrder.quantidade}MB) despachado para a Porta ${port}!`, order: targetOrder });
 });
 
-// -- FOR�AR DESPACHO OVERRIDE (ignora modo/compatibilidade) --
-// Usar quando portas normais est�o sem saldo mas h� outra porta dispon�vel
+// -- FORÇAR DESPACHO OVERRIDE (ignora modo/compatibilidade) --
+// Usar quando portas normais estáo sem saldo mas h� outra porta disponível
 app.post('/api/devices/:port/force-dispatch-override', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} n�o encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
 
   if (dev.pending_order) {
-    return res.status(400).json({ success: false, mensagem: `Porta ${port} j� tem um pedido em processamento (${dev.pending_order.numero}).` });
+    return res.status(400).json({ success: false, mensagem: `Porta ${port} já tem um pedido em processamento (${dev.pending_order.numero}).` });
   }
 
-  // Buscar pedido espec�fico (por ID) ou primeiro pendente qualquer
+  // Buscar pedido específico (por ID) ou primeiro pendente qualquer
   const targetOrderId = req.body && req.body.orderId;
   let foundOrder = null;
   let foundId = null;
@@ -660,7 +660,7 @@ app.post('/api/devices/reset-all', (req, res) => {
     count++;
   }
   console.log(`?? [MANUSEIO PAINEL] Todos os ${count} celulares foram libertados e desbloqueados.`);
-  return res.json({ success: true, mensagem: `Todos os ${count} celulares foram libertados e est�o prontos!`, count });
+  return res.json({ success: true, mensagem: `Todos os ${count} celulares foram libertados e estáo prontos!`, count });
 });
 
 function isDailyPort(port) {
@@ -678,7 +678,7 @@ function isPortCompatibleWithModo(port, modo) {
   if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top')) {
     return p === 8077;
   }
-  // Pacotes Di�rios: compat�vel com qualquer celular di�rio (8021 a 8028)
+  // Pacotes Diários: compatével com qualquer celular diário (8021 a 8028)
   return p !== 8077 && p !== 8777 && p !== 8090;
 }
 
@@ -689,13 +689,13 @@ function getPortForModo(modo, requiredMb = 0) {
 
   const reqMb = Number(requiredMb) || 0;
 
-  // Para di�rios: selecionar dinamicamente a melhor porta di�ria online e apta
+  // Para diários: selecionar dinamicamente a melhor porta diária online e apta
   const dailyDevs = Object.values(inMemoryDevices).filter(d => {
     const port = Number(d.porta);
     return port !== 8077 && port !== 8777 && port !== 8090 && isDeviceApto(d);
   });
   if (dailyDevs.length > 0) {
-    // 1. Se foi especificada uma quantidade de MB necess�ria, priorizar dispositivos que cobrem 100% da quantidade
+    // 1. Se foi especificada uma quantidade de MB necessária, priorizar dispositivos que cobrem 100% da quantidade
     if (reqMb > 0) {
       const capableDevs = dailyDevs.filter(d => getDeviceAvailableMb(d) >= reqMb);
       if (capableDevs.length > 0) {
@@ -708,7 +708,7 @@ function getPortForModo(modo, requiredMb = 0) {
       }
     }
 
-    // 2. Se nenhuma cobre 100%, escolher a que tem MAIOR saldo dispon�vel (e mais transfer�ncias livres)
+    // 2. Se nenhuma cobre 100%, escolher a que tem MAIOR saldo disponível (e mais transferências livres)
     dailyDevs.sort((a, b) => {
       const balDiff = getDeviceAvailableMb(b) - getDeviceAvailableMb(a);
       if (balDiff !== 0) return balDiff;
@@ -716,21 +716,21 @@ function getPortForModo(modo, requiredMb = 0) {
     });
     return Number(dailyDevs[0].porta);
   }
-  // Se nenhuma porta di�ria estiver apta no momento, verificar qualquer porta di�ria registrada online
+  // Se nenhuma porta diária estiver apta no momento, verificar qualquer porta diária registrada online
   const anyDailyDev = Object.values(inMemoryDevices).find(d => {
     const port = Number(d.porta);
     return port !== 8077 && port !== 8777 && port !== 8090;
   });
   if (anyDailyDev) return Number(anyDailyDev.porta);
 
-  return 8025; // fallback padr�o (Huawei)
+  return 8025; // fallback padrão (Huawei)
 }
 
-// -- REGRA OFICIAL AXION: DIVIS�O INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) --
+// -- REGRA OFICIAL AXION: DIVISÃO INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) --
 // 1. Mensal: Vodacom *162# -> 5 -> 1 entrega 2.8GB (2867MB) por 95 MT.
-//    Se pedido > 2867MB (ex: 5GB, 8GB, 10GB): Parte 1 (2867MB) via Porta 8077 + Parte 2 (Resto) via Portas Di�rias.
+//    Se pedido > 2867MB (ex: 5GB, 8GB, 10GB): Parte 1 (2867MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
 // 2. Tudo Top: Vodacom *111# -> 4 -> 3 -> 1 entrega 11GB (11264MB) + Minutos por 500 MT.
-//    Se pedido > 11264MB (ex: 15GB, 25GB): Parte 1 (11264MB) via Porta 8077 + Parte 2 (Resto) via Portas Di�rias.
+//    Se pedido > 11264MB (ex: 15GB, 25GB): Parte 1 (11264MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
 const MENSAL_BASE_MB = 2867;     // 2.8 GB
 const TUDO_TOP_BASE_MB = 11264;  // 11 GB
 
@@ -755,7 +755,7 @@ function splitSpecialOrderIfEligible(orderDoc) {
     orderDoc.part2Id = part2Id;
     orderDoc.quantidade = parte1;
     orderDoc.targetPort = 8077;
-    orderDoc.input_val = '1'; // 1� oferta mensal
+    orderDoc.input_val = '1'; // 1ª oferta mensal
 
     const orderPart2 = {
       id: part2Id,
@@ -793,8 +793,8 @@ function splitSpecialOrderIfEligible(orderDoc) {
     saveOrdersToCache();
 
     console.log(`?? [SPLIT MENSAL AXION] Pedido Mensal ${parentId} (${totalMb}MB) dividido automaticamente:`);
-    console.log(`   ?? Parte 1 (Mensal): ${parte1}MB -> Porta 8077 (1� Oferta *162#)`);
-    console.log(`   ?? Parte 2 (Di�rio): ${parte2}MB -> Portas Di�rias (Aguardando conclus�o da Parte 1)`);
+    console.log(`   ?? Parte 1 (Mensal): ${parte1}MB -> Porta 8077 (1ª Oferta *162#)`);
+    console.log(`   ?? Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
 
     return true;
   }
@@ -816,7 +816,7 @@ function splitSpecialOrderIfEligible(orderDoc) {
     orderDoc.part2Id = part2Id;
     orderDoc.quantidade = parte1;
     orderDoc.targetPort = 8077;
-    orderDoc.input_val = '1'; // 1� oferta Tudo Top (11GB)
+    orderDoc.input_val = '1'; // 1ª oferta Tudo Top (11GB)
 
     const orderPart2 = {
       id: part2Id,
@@ -854,8 +854,8 @@ function splitSpecialOrderIfEligible(orderDoc) {
     saveOrdersToCache();
 
     console.log(`?? [SPLIT TUDO TOP AXION] Pedido Tudo Top ${parentId} (${totalMb}MB) dividido automaticamente:`);
-    console.log(`   ?? Parte 1 (Tudo Top): ${parte1}MB -> Porta 8077 (1� Oferta *111# 11GB + Minutos)`);
-    console.log(`   ?? Parte 2 (Di�rio): ${parte2}MB -> Portas Di�rias (Aguardando conclus�o da Parte 1)`);
+    console.log(`   ?? Parte 1 (Tudo Top): ${parte1}MB -> Porta 8077 (1ª Oferta *111# 11GB + Minutos)`);
+    console.log(`   ?? Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
 
     return true;
   }
@@ -867,12 +867,12 @@ function splitMensalOrderIfEligible(orderDoc) {
   return splitSpecialOrderIfEligible(orderDoc);
 }
 
-// -- REGRA OFICIAL AXION: DIVIS�O INTELIGENTE DE PACOTES DI�RIOS (SPLIT DI�RIO) --
-// 1. Limite USSD da Vodacom: O valor m�ximo permitido por transfer�ncia � 10.240MB (10GB).
-//    Se pedido > 10240MB (ex: 15GB, 20GB): Parte 1 (m�x 10240MB) + Parte 2 (Resto).
-// 2. Prote��o de Saldo: Se nenhum celular di�rio tem saldo suficiente para cobrir o pedido inteiro,
-//    mas o melhor celular tem saldo >= 100MB e a sobra tamb�m � >= 100MB:
-//    Parte 1 (saldo dispon�vel do melhor celular) + Parte 2 (Resto na fila aguardando).
+// -- REGRA OFICIAL AXION: DIVISÃO INTELIGENTE DE PACOTES DIÁRIOS (SPLIT DIÁRIO) --
+// 1. Limite USSD da Vodacom: O valor máximo permitido por transferência � 10.240MB (10GB).
+//    Se pedido > 10240MB (ex: 15GB, 20GB): Parte 1 (máx 10240MB) + Parte 2 (Resto).
+// 2. Proteção de Saldo: Se nenhum celular diário tem saldo suficiente para cobrir o pedido inteiro,
+//    mas o melhor celular tem saldo >= 100MB e a sobra também é >= 100MB:
+//    Parte 1 (saldo disponível do melhor celular) + Parte 2 (Resto na fila aguardando).
 function splitDailyOrderIfEligible(orderDoc) {
   if (!orderDoc || orderDoc.isSplit) return false;
   const modo = String(orderDoc.modo || 'diario').toLowerCase().trim();
@@ -880,9 +880,9 @@ function splitDailyOrderIfEligible(orderDoc) {
   if (!isDiario) return false;
 
   const qty = Number(orderDoc.quantidade) || 0;
-  if (qty < 200) return false; // Para dividir com m�nimo de 100MB por parte, precisa de pelo menos 200MB
+  if (qty < 200) return false; // Para dividir com mínimo de 100MB por parte, precisa de pelo menos 200MB
 
-  // Buscar celulares di�rios online e aptos
+  // Buscar celulares diários online e aptos
   const dailyDevs = Object.values(inMemoryDevices).filter(d => {
     const port = Number(d.porta);
     return port !== 8077 && port !== 8777 && port !== 8090 && isDeviceApto(d);
@@ -897,7 +897,7 @@ function splitDailyOrderIfEligible(orderDoc) {
   let parte1 = 0;
   let parte2 = 0;
 
-  // Caso 1: Pedido maior que o teto m�ximo permitido por envio USSD da Vodacom (10.240MB = 10GB)
+  // Caso 1: Pedido maior que o teto máximo permitido por envio USSD da Vodacom (10.240MB = 10GB)
   if (qty > 10240) {
     const maxParte1 = 10240;
     parte1 = bestBalance >= 100 ? Math.min(maxParte1, Math.floor(bestBalance)) : maxParte1;
@@ -907,8 +907,8 @@ function splitDailyOrderIfEligible(orderDoc) {
       shouldSplit = true;
     }
   }
-  // Caso 2: Nenhum celular di�rio tem saldo suficiente para cobrir o pedido inteiro,
-  // mas o melhor celular tem saldo >= 100MB e a sobra tamb�m � >= 100MB
+  // Caso 2: Nenhum celular diário tem saldo suficiente para cobrir o pedido inteiro,
+  // mas o melhor celular tem saldo >= 100MB e a sobra também é >= 100MB
   else if (bestBalance < qty && bestBalance >= 100 && (qty - bestBalance) >= 100) {
     shouldSplit = true;
     parte1 = Math.floor(bestBalance);
@@ -964,9 +964,9 @@ function splitDailyOrderIfEligible(orderDoc) {
     inMemoryOrders.set(part2Id, orderPart2);
     saveOrdersToCache();
 
-    console.log(`?? [SPLIT DI�RIO INTELIGENTE] Pedido Di�rio ${parentId} (${totalMb}MB) dividido automaticamente:`);
-    console.log(`   ?? Parte 1: ${parte1}MB -> Porta ${bestDev.porta} (Saldo dispon�vel: ${bestBalance}MB)`);
-    console.log(`   ?? Parte 2: ${parte2}MB -> Fila de espera (Aguardando conclus�o da Parte 1)`);
+    console.log(`?? [SPLIT DIÁRIO INTELIGENTE] Pedido Diário ${parentId} (${totalMb}MB) dividido automaticamente:`);
+    console.log(`   ?? Parte 1: ${parte1}MB -> Porta ${bestDev.porta} (Saldo disponível: ${bestBalance}MB)`);
+    console.log(`   ?? Parte 2: ${parte2}MB -> Fila de espera (Aguardando conclusão da Parte 1)`);
 
     return true;
   }
@@ -987,7 +987,7 @@ function isDeviceApto(dev) {
   const port = Number(dev.porta);
 
   // -- PORTA DEDICADA DE SMS & ATENDIMENTO (8090) --
-  // Nunca atende pacotes de dados USSD (di�rios, semanais ou mensais)
+  // Nunca atende pacotes de dados USSD (diários, semanais ou mensais)
   if (port === 8090 || dev.tipo === 'sms_dedicated') {
     return false;
   }
@@ -1011,7 +1011,7 @@ function isDeviceApto(dev) {
   const knownSaldos = [s1, s2, smb].filter(s => s !== null);
   if (knownSaldos.length > 0) {
     const maxSaldo = Math.max(...knownSaldos);
-    if (maxSaldo < 100) return false; // Sem saldo suficiente para transfer�ncia m�nima de 100MB
+    if (maxSaldo < 100) return false; // Sem saldo suficiente para transferência mínima de 100MB
   }
 
   return true;
@@ -1079,10 +1079,10 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   if (reqOpMode) dev.operationMode = reqOpMode;
 
   // -- AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA (ROTEAMENTO ESTRITO & APTID�O) --
-  // - Portas Di�rias (8025, 8023, 8024): Exclusivas para pacotes di�rios (24hrs)
-  // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados (NUNCA assume di�rios)
+  // - Portas Diárias (8025, 8023, 8024): Exclusivas para pacotes diários (24hrs)
+  // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados (NUNCA assume diários)
   // - Porta 8777: Exclusiva para recargas de saldo/cr�dito
-  // - S� atribui pedidos se o celular estiver 100% APTO (com saldo >= 100MB e sem ter atingido limite di�rio)
+  // - S� atribui pedidos se o celular estiver 100% APTO (com saldo >= 100MB e sem ter atingido limite diário)
   if (isDeviceApto(dev)) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
         if (order.status !== 'pending') continue;
@@ -1103,12 +1103,12 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
         // Se for pacote especial (semanal, mensal, tudo top) e este celular for a porta 8077, aceita diretamente!
         if (port === 8077 && isEspecial) {
-          // Totalmente compat�vel: celular de ofertas especiais processa pacotes semanais/mensais/top
+          // Totalmente compatével: celular de ofertas especiais processa pacotes semanais/mensais/top
         } else if (port === 8777 && isSaldo) {
-          // Totalmente compat�vel: celular de saldo processa transfer�ncias de saldo
+          // Totalmente compatével: celular de saldo processa transferências de saldo
         } else {
           // Portas 8077 (especiais) e 8777 (saldo) respeitam estritamente seu modo.
-          // Para celulares di�rios (8021 a 8028), permitir atender pacotes de dados di�rios normais mesmo se configurados como fornecimento,
+          // Para celulares diários (8021 a 8028), permitir atender pacotes de dados diários normais mesmo se configurados como fornecimento,
           // garantindo que o failover entre portas funcione sempre!
           const isDedicatedPort = port === 8077 || port === 8777 || port === 8090;
           if (isDedicatedPort && devMode === 'fornecimento' && !isFornecOrder) {
@@ -1131,19 +1131,19 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
         }
 
-        // Aplicar regra oficial Axion de divis�o de pacotes Mensais (1� oferta + resto di�rio) e Di�rios
+        // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
         splitMensalOrderIfEligible(order);
         splitDailyOrderIfEligible(order);
 
         let isCompatible = isPortCompatibleWithModo(port, order.modo);
 
-        // Se este pedido j� falhou ou deu timeout nesta porta, passar logo para outro celular
+        // Se este pedido já falhou ou deu timeout nesta porta, passar logo para outro celular
         if (order.failedPorts && order.failedPorts.includes(port)) {
           const hasOtherApto = Object.values(inMemoryDevices).some(d =>
             Number(d.porta) !== port && isDeviceApto(d) && !d.isBusy && !order.failedPorts.includes(Number(d.porta))
           );
           if (hasOtherApto) {
-            continue; // Pula este celular e manda para o pr�ximo!
+            continue; // Pula este celular e manda para o próximo!
           }
         }
 
@@ -1153,16 +1153,16 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           const targetLastSeen = targetDev ? new Date(targetDev.lastSeen || 0).getTime() : 0;
           const targetOnline = targetDev && (nowMs - targetLastSeen < 90000);
           const targetApto = targetDev && isDeviceApto(targetDev);
-          // O celular alvo s� impede outros se estiver online, apto, livre E sem nenhuma tarefa pendente atribu�da
+          // O celular alvo só impede outros se estiver online, apto, livre E sem nenhuma tarefa pendente atribu�da
           const isTargetReallyFree = targetOnline && targetApto && !targetDev.isBusy && !targetDev.pending_order;
           if (isTargetReallyFree) {
             isCompatible = false;
           } else {
-            // Se o alvo n�o est� livre ou ficou offline, limpar targetPort para liberar para qualquer porta apta
+            // Se o alvo não está livre ou ficou offline, limpar targetPort para liberar para qualquer porta apta
             order.targetPort = null;
           }
         }
-        // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA di�rios)
+        // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA diários)
         if (port === 8077) {
           const m = String(order.modo || '').toLowerCase().trim();
           const isEspecial = m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top');
@@ -1175,9 +1175,9 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           const availableMb = getDeviceAvailableMb(dev);
           const isDiarioMode = (order.modo || 'diario').toLowerCase().trim() === 'diario' || (order.modo || 'diario').toLowerCase().trim() === '24hrs';
 
-          // Se for modo di�rio e o celular atual N�O tiver saldo suficiente para cobrir o pedido inteiro:
+          // Se for modo diário e o celular atual N�O tiver saldo suficiente para cobrir o pedido inteiro:
           if (isDiarioMode && orderMb > availableMb) {
-            // Tentar divis�o inteligente se este celular tiver pelo menos MIN_TRANSFER_MB (100MB) e sobra >= 100MB:
+            // Tentar divisão inteligente se este celular tiver pelo menos MIN_TRANSFER_MB (100MB) e sobra >= 100MB:
             // FIX: Permitir re-split mesmo em pedidos isSplit=true (ex: camada diaria do mensal/tudo-top)
             //    A flag isSplit indica apenas que eh uma fatia de um pedido maior; ela mesma pode ser
             //    subdividida entre multiplos celulares se nenhum tiver saldo suficiente para cobri-la inteira.
@@ -1204,7 +1204,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
               order.assignedToPort = port;
               order.processingAt = new Date().toISOString();
 
-              // Criar Parte 2 aguardando a conclus�o da Parte 1
+              // Criar Parte 2 aguardando a conclusão da Parte 1
               const orderPart2 = {
                 id: part2Id,
                 orderId: part2Id,
@@ -1242,18 +1242,18 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
               };
 
               console.log(`?? [ENVIO INTELIGENTE DIVIDIDO] Pedido ${parentId} de ${totalMb}MB dividido em 2 partes:`);
-              console.log(`   ?? Parte 1: ${parte1}MB atribu�do � Porta ${port} (Saldo dispon�vel: ${availableMb}MB)`);
-              console.log(`   ?? Parte 2: ${parte2}MB aguardando conclus�o da Parte 1 para despacho por outra porta.`);
+              console.log(`   ?? Parte 1: ${parte1}MB atribu�do � Porta ${port} (Saldo disponível: ${availableMb}MB)`);
+              console.log(`   ?? Parte 2: ${parte2}MB aguardando conclusão da Parte 1 para despacho por outra porta.`);
 
               break;
             } else {
-              // ??? Celular n�o tem saldo para o pedido completo e n�o � eleg�vel para split:
-              // NUNCA atribuir este pedido a esta porta! Pular para o pr�ximo pedido da fila.
+              // ??? Celular não tem saldo para o pedido completo e não � eleg�vel para split:
+              // NUNCA atribuir este pedido a esta porta! Pular para o próximo pedido da fila.
               continue;
             }
           }
 
-          // Atribui��o padr�o (celular tem saldo suficiente para cobrir o pedido)
+          // Atribuição padrão (celular tem saldo suficiente para cobrir o pedido)
           order.status = 'assigned';
           order.targetPort = port;
           order.assignedToPort = port;
@@ -1275,10 +1275,10 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         }
       }
   } else if (dev.limite_atingido || dev.sem_saldo || (dev.transfers_available !== undefined && dev.transfers_available <= 0)) {
-    // -- L�GICA DE FALLBACK: redirecionar pedidos desta porta para outra porta dispon�vel --
+    // -- L�GICA DE FALLBACK: redirecionar pedidos desta porta para outra porta disponível --
     const now2 = Date.now();
     const lastBlockLog = dev._lastBlockLogTime || 0;
-    if (now2 - lastBlockLog > 30000) { // logar m�x 1x a cada 30s por porta
+    if (now2 - lastBlockLog > 30000) { // logar máx 1x a cada 30s por porta
       dev._lastBlockLogTime = now2;
       console.log(`?? [PAUSA OPERACIONAL] Celular Porta ${port} sem saldo ou atingiu o limite. A verificar portas alternativas...`);
     }
@@ -1286,25 +1286,25 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
     for (const [orderId, order] of inMemoryOrders.entries()) {
       if (order.status === 'pending') {
         const designatedPort = order.targetPort || getPortForModo(order.modo, order.quantidade);
-        if (designatedPort !== port) continue; // n�o � desta porta, ignorar
+        if (designatedPort !== port) continue; // não � desta porta, ignorar
 
-        // Procurar outra porta dispon�vel que suporte o mesmo modo
+        // Procurar outra porta disponível que suporte o mesmo modo
         const modoOrder = (order.modo || 'diario').toLowerCase().trim();
         let fallbackDev = null;
         let fallbackPort = null;
 
         for (const [candidatePortStr, candidateDev] of Object.entries(inMemoryDevices)) {
           const candidatePort = Number(candidatePortStr);
-          if (candidatePort === port) continue; // n�o usar a porta esgotada
+          if (candidatePort === port) continue; // não usar a porta esgotada
           if (!isDeviceApto(candidateDev)) continue; // deve estar apto
 
-          // Verificar se a porta candidata � compat�vel com o modo do pedido
+          // Verificar se a porta candidata � compatével com o modo do pedido
           const candidateDesignated = getPortForModo(modoOrder, order.quantidade);
           // Aceitar apenas se o candidato for a porta correta para esse modo
-          // Exce��o: se a porta original for 8077 e n�o houver outra 8077, mas houver 8023 dispon�vel e ambos forem vodacom
-          // ? Para pacotes di�rios (8023) ? fallback: outra porta vodacom dispon�vel  
-          // ? Para semanais/mensais (8077) ? fallback: outra porta vodacom dispon�vel
-          // ? Para saldo (8777) ? sem fallback (porta espec�fica)
+          // Exceção: se a porta original for 8077 e não houver outra 8077, mas houver 8023 disponível e ambos forem vodacom
+          // ? Para pacotes diários (8023) ? fallback: outra porta vodacom disponível  
+          // ? Para semanais/mensais (8077) ? fallback: outra porta vodacom disponível
+          // ? Para saldo (8777) ? sem fallback (porta específica)
           // FIX: Verificar saldo do candidato antes de aceitar como fallback (evitar deadlock)
           const cIsOrderDaily = modoOrder === 'diario' || modoOrder === '24hrs' || modoOrder === '24h';
           const cCandBalance = getDeviceAvailableMb(candidateDev);
@@ -1318,17 +1318,17 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
 
           // -- FALLBACK ESTRITO: manter compatibilidade de modo --
-          // Di�rios (8024/8025/8023) ? s� fallback para outras portas di�rias (NUNCA 8077 nem 8777)
-          // Semanais/Mensais/Ilimitados (8077) ? s� fallback para portas n�o-di�rias e n�o-8777
+          // Diários (8024/8025/8023) ? só fallback para outras portas diárias (NUNCA 8077 nem 8777)
+          // Semanais/Mensais/Ilimitados (8077) ? só fallback para portas não-diárias e não-8777
           // Saldo (8777) ? sem fallback
           const isOrderDaily = modoOrder === 'diario' || modoOrder === '24hrs' || modoOrder === '24h';
           const candidateIsDaily = candidatePort !== 8077 && candidatePort !== 8777;
           if (modoOrder !== 'saldo' && modoOrder !== 'credito' && candidatePort !== 8777) {
-            // Pedido di�rio ? candidato deve ser porta di�ria (n�o 8077)
-            if (isOrderDaily && !candidateIsDaily) continue; // ? BLOQUEAR 8077 para pedidos di�rios
-            // Pedido semanal/mensal ? candidato deve ser porta n�o-di�ria (8077 ou similar)
+            // Pedido diário ? candidato deve ser porta diária (não 8077)
+            if (isOrderDaily && !candidateIsDaily) continue; // ? BLOQUEAR 8077 para pedidos diários
+            // Pedido semanal/mensal ? candidato deve ser porta não-diária (8077 ou similar)
             if (!isOrderDaily && candidateIsDaily && candidatePort !== port) {
-              // aceitar s� se n�o houver op��o 8077 apta (j� verificado acima)
+              // aceitar só se não houver opção 8077 apta (já verificado acima)
             }
             // FIX: So aceitar fallback com saldo suficiente
             if (!fallbackDev && cHasSaldo) {
@@ -1367,24 +1367,24 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
           console.log(`?? [REDIRECIONAMENTO] Pedido ${orderId} redirecionado: Porta ${port} (cheia/sem saldo) ? Porta ${fallbackPort} (apta)`);
 
-          // Notificar o grupo de notifica��es sobre o redirecionamento
+          // Notificar o grupo de notificações sobre o redirecionamento
           if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *REDIRECIONAMENTO AUTOM�TICO DE PEDIDO*\n` +
+              `?? *REDIRECIONAMENTO AUTOMÁTICO DE PEDIDO*\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${orderId}\`\n` +
               `📲 *Destino:* *${order.numero}*\n` +
               `?? *Volume:* *${volStr}*\n` +
               `?? *Porta Original:* Celular ${port} (Sem saldo / Limite atingido)\n` +
-              `? *Redirecionado Para:* Celular ${fallbackPort} (Dispon�vel)\n` +
+              `? *Redirecionado Para:* Celular ${fallbackPort} (Disponível)\n` +
               `?? *Hora:* ${horaAgora}\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `?? O pedido ser� processado automaticamente pelo celular alternativo.`
             );
           }
-          break; // s� redirecionar 1 por vez
+          break; // só redirecionar 1 por vez
         } else {
-          // Nenhuma porta dispon�vel para este modo � avisar grupo (1x por pedido)
+          // Nenhuma porta disponível para este modo � avisar grupo (1x por pedido)
           // FIX DEADLOCK: Garantir que o pedido fica em 'pending' com targetPort=null
           // para que qualquer porta que recarregue saldo possa pega-lo imediatamente.
           order.status = 'pending';
@@ -1398,19 +1398,19 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
             if (baileysEngine && typeof baileysEngine.enviarErroGrupo === 'function') {
               baileysEngine.enviarErroGrupo(
-                `?? *PEDIDO EM ESPERA � SEM CELULAR DISPON�VEL* ??\n` +
+                `?? *PEDIDO EM ESPERA � SEM CELULAR DISPONÍVEL* ??\n` +
                 `━━━━━━━━━━━━━━━━━━\n` +
                 `🔑 *Ref:* \`${orderId}\`\n` +
                 `📲 *Destino:* *${order.numero}*\n` +
                 `?? *Volume:* *${volStr}*\n` +
-                `?? *Porta Necess�ria:* Celular ${port}\n` +
+                `?? *Porta Necessária:* Celular ${port}\n` +
                 `?? *Hora:* ${horaAgora}\n` +
                 `━━━━━━━━━━━━━━━━━━\n` +
-                `?? Todos os celulares dispon�veis para este tipo de pacote est�o sem saldo ou atingiram o limite.\n` +
-                `?? *Solu��o:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cart�es.`
+                `?? Todos os celulares disponíveis para este tipo de pacote estáo sem saldo ou atingiram o limite.\n` +
+                `?? *Solução:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cart�es.`
               );
             }
-            console.log(`?? [SEM FALLBACK] Pedido ${orderId} (${volStr}) em espera � nenhum celular dispon�vel para Porta ${port}.`);
+            console.log(`?? [SEM FALLBACK] Pedido ${orderId} (${volStr}) em espera � nenhum celular disponível para Porta ${port}.`);
           }
           break;
         }
@@ -1444,15 +1444,15 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   const port = Number(req.params.port);
   const currentDev = inMemoryDevices[port] || {};
 
-  // Preservar pending_order existente se o heartbeat n�o enviou pending_order explicitamente
+  // Preservar pending_order existente se o heartbeat não enviou pending_order explicitamente
   let pendingOrder = currentDev.pending_order;
   if ('pending_order' in req.body) {
     pendingOrder = req.body.pending_order;
   }
 
   // -- FIX SALDO NULL: Nunca sobrescrever saldo conhecido com null/undefined --
-  // O app Android envia null quando o saldo ainda n�o foi consultado via USSD.
-  // Preservar o �ltimo saldo real para n�o confundir o roteador de pedidos.
+  // O app Android envia null quando o saldo ainda não foi consultado via USSD.
+  // Preservar o último saldo real para não confundir o roteador de pedidos.
   const bodyClean = { ...req.body };
 
   const reqStatusLic = (req.body?.license_id || req.headers['x-license-id'] || req.query.license_id || '').trim();
@@ -1471,17 +1471,17 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   const saldoFields = ['sim1_saldo_mb', 'sim2_saldo_mb', 'saldo_mb'];
   for (const field of saldoFields) {
     if (field in bodyClean && (bodyClean[field] === null || bodyClean[field] === undefined || bodyClean[field] < 0)) {
-      // Manter o valor anterior se existir; caso contr�rio remover para n�o poluir
+      // Manter o valor anterior se existir; caso contr�rio remover para não poluir
       if (currentDev[field] !== null && currentDev[field] !== undefined && currentDev[field] >= 0) {
         bodyClean[field] = currentDev[field]; // preservar saldo real anterior
       } else {
-        delete bodyClean[field]; // nunca havia saldo, n�o definir
+        delete bodyClean[field]; // nunca havia saldo, não definir
       }
     }
   }
 
-  // Se o operador definiu o saldo manualmente pelo painel nos �ltimos 5 minutos,
-  // n�o deixar o celular sobrescrever com saldo menor/sem_saldo antes que o novo saldo seja aplicado
+  // Se o operador definiu o saldo manualmente pelo painel nos últimos 5 minutos,
+  // não deixar o celular sobrescrever com saldo menor/sem_saldo antes que o novo saldo seja aplicado
   const isManualOverride = currentDev.manual_saldo_override && (Date.now() - currentDev.manual_saldo_override < 300000);
   if (isManualOverride) {
     if (bodyClean.sim1_saldo_mb !== undefined && bodyClean.sim1_saldo_mb < 100 && (currentDev.sim1_saldo_mb || 0) >= 100) {
@@ -1516,7 +1516,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
   // -- FIX PEDIDOS FANTASMA: TTL de 10 min para pedidos presos em 'assigned'/'processing' --
   // Se o celular pegou o pedido mas nunca reportou resultado (crash, offline, etc.),
-  // o pedido fica travado. Ap�s 10 min sem resultado, volta automaticamente para 'pending'.
+  // o pedido fica travado. Após 10 min sem resultado, volta automaticamente para 'pending'.
   const PROCESSING_TTL_MS = 10 * 60 * 1000; // 10 minutos
   for (const [orderId, order] of inMemoryOrders.entries()) {
     if ((order.status === 'assigned' || order.status === 'processing') &&
@@ -1527,12 +1527,12 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.assignedToPort = null;
         order.processingAt = null;
         order.targetPort = null;
-        order.lastError = `Timeout: celular porta ${port} n�o reportou resultado em ${Math.round(processingAge/60000)}min`;
+        order.lastError = `Timeout: celular porta ${port} não reportou resultado em ${Math.round(processingAge/60000)}min`;
         order.retryCount = (order.retryCount || 0) + 1;
         order.notified = false;
         order.groupNotified = false;
         saveOrdersToCache();
-        console.warn(`? [TIMEOUT PEDIDO] Pedido ${orderId} estava em ${order.status} na Porta ${port} h� ${Math.round(processingAge/60000)}min sem resultado. Devolvido � fila.`);
+        console.warn(`? [TIMEOUT PEDIDO] Pedido ${orderId} estava em ${order.status} na Porta ${port} h� ${Math.round(processingAge/60000)}min sem resultado. Devolvido à fila.`);
       }
     }
   }
@@ -1544,13 +1544,13 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const order = inMemoryOrders.get(resId);
     let success = !!req.body.last_result.success;
     const resMsg = String(req.body.last_result.result || req.body.last_result.mensagem || req.body.last_result.error || '').toLowerCase();
-    const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('m�nim')) &&
-                            (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transfer�ncia') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
+    const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
+                            (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
     const isTudoTopOrOffer = (
       resMsg.includes('recebeu') && (
         resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
-        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('v�lidos') ||
-        resMsg.includes('validas') || resMsg.includes('v�lidas') ||
+        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
+        resMsg.includes('validas') || resMsg.includes('válidas') ||
         resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote') ||
         resMsg.includes('dados') || resMsg.includes('mensal') || resMsg.includes('semanal')
       )
@@ -1558,16 +1558,16 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     resMsg.includes('dados mensal') || resMsg.includes('dados semanal') ||
     resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
     const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
-                          resMsg.includes('transferencia') || resMsg.includes('transfer�ncia') || resMsg.includes('tranferencia') ||
+                          resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                           resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
                           resMsg.includes('transferiste') || resMsg.includes('transferiu');
     const isErrorText = !isVodacomZeroMb && !isTudoTopOrOffer && (
       resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
-      resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inv�lido')
+      resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
     );
     const isParcialReported = !!(req.body.last_result && req.body.last_result.parcial);
     if (!success && isSuccessText && !isErrorText && !isParcialReported) {
-      console.log(`? [USSD AUTO-OVERRIDE] Resposta cont�m confirma��o Tudo Top/0MB/Transfer�ncia ('${resMsg}'). Marcando como SUCESSO!`);
+      console.log(`? [USSD AUTO-OVERRIDE] Resposta contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
       success = true;
       req.body.last_result.success = true;
     }
@@ -1576,7 +1576,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
     const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
 
-    // Resolver JID do cliente com m�xima resili�ncia (do pedido em cache, do body ou do hist�rico Baileys)
+    // Resolver JID do cliente com m�xima resili�ncia (do pedido em cache, do body ou do histórico Baileys)
     let clientJid = (order && order.jid) || req.body.last_result.jid || null;
     if (!clientJid && resId && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
       clientJid = baileysEngine.getJidForOrder(resId);
@@ -1607,7 +1607,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
         const isGroup = clientJid && clientJid.endsWith('@g.us');
         
-        // Valida��o rigorosa: NUNCA usar LID como men��o de n�mero
+        // Validação rigorosa: NUNCA usar LID como menção de número
         let realPhone = null;
         const cleanSenderDigits = String(rawSender).replace(/\D/g, '');
         if (cleanSenderDigits.length === 12 && cleanSenderDigits.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanSenderDigits)) {
@@ -1616,7 +1616,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           realPhone = '258' + cleanSenderDigits;
         }
 
-        // Se o remetente for LID (sem telefone limpo direto), usar o n�mero ativado (targetNum) para mencionar o comprador
+        // Se o remetente for LID (sem telefone limpo direto), usar o número ativado (targetNum) para mencionar o comprador
         if (!realPhone && targetNum) {
           const cleanTarget = String(targetNum).replace(/\D/g, '');
           if (cleanTarget.length === 9 && /^8[2-7]\d{7}$/.test(cleanTarget)) {
@@ -1646,7 +1646,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
         const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(resId).startsWith('WA-') ? String(resId).split('-')[1] : resId);
 
-        // -- ?? NOTIFICA��O ESPEC�FICA DE PACOTES EM PARTES (SPLIT) --
+        // -- ?? NOTIFICAçãO ESPECÍFICA DE PACOTES EM PARTES (SPLIT) --
         if (order && order.isSplit && order.splitPart === 1) {
           const part1Mb = Number(order.quantidade) || 0;
           const part1Str = part1Mb < 1024 ? `${part1Mb} MB` : `${(part1Mb / 1024).toFixed(part1Mb % 1024 === 0 ? 0 : 1)} GB`;
@@ -1656,7 +1656,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           const totalStr = totalMb < 1024 ? `${totalMb} MB` : `${(totalMb / 1024).toFixed(totalMb % 1024 === 0 ? 0 : 1)} GB`;
 
           const msgParte1 = (
-            `?? *1� PARTE ENTREGUE (1/2)* ?\n` +
+            `?? *1ª PARTE ENTREGUE (1/2)* ?\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
             saudacao +
             `? *Entregue agora:* *${part1Str}*\n` +
@@ -1665,15 +1665,15 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             valorLinha +
             `🔑 *Ref:* \`${cleanRef}\`\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `?? _A 2� parte j� est� a ser processada e entra em instantes!_`
+            `?? _A 2ª parte já está a ser processada e entra em instantes!_`
           );
 
           try {
             baileysEngine.sendTextMessage(clientJid, msgParte1, { mentions: mentionsList })
-              .catch(errSend => console.error(`? [NOTIFICA��O WA PARTE 1 ERRO]:`, errSend.message));
-            console.log(`?? [NOTIFICA��O WA] Cliente ${clientJid} notificado de 1� PARTE (${part1Str} de ${totalStr}) no pedido ${resId}`);
+              .catch(errSend => console.error(`? [NOTIFICAçãO WA PARTE 1 ERRO]:`, errSend.message));
+            console.log(`?? [NOTIFICAçãO WA] Cliente ${clientJid} notificado de 1ª PARTE (${part1Str} de ${totalStr}) no pedido ${resId}`);
           } catch(errSendSync) {
-            console.error(`? [NOTIFICA��O WA PARTE 1 CRASH]:`, errSendSync.message);
+            console.error(`? [NOTIFICAçãO WA PARTE 1 CRASH]:`, errSendSync.message);
           }
         } else {
           let headerConclusao = `✅ *RECARGA CONCLUÍDA* ⚡\n`;
@@ -1698,21 +1698,21 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
               `_Obrigado por escolher a Axion!_`,
               { mentions: mentionsList }
             ).catch(errSend => {
-              console.error(`? [NOTIFICA��O WA ERRO] Falha ao enviar para ${clientJid}:`, errSend.message);
+              console.error(`? [NOTIFICAçãO WA ERRO] Falha ao enviar para ${clientJid}:`, errSend.message);
             });
-            console.log(`?? [NOTIFICA��O WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
+            console.log(`?? [NOTIFICAçãO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
           } catch(errSendSync) {
-            console.error(`? [NOTIFICA��O WA CRASH]:`, errSendSync.message);
+            console.error(`? [NOTIFICAçãO WA CRASH]:`, errSendSync.message);
           }
         }
       } else {
         // ??? NUNCA enviar mensagem de aviso de instabilidade ao cliente no WhatsApp!
         // O reenvio acontece automaticamente no background. Enviar aviso assusta o cliente, que exige reembolso.
-        console.log(`?? [RETRY SILENCIOSO] Instabilidade tempor�ria no pedido ${resId}. Cliente n�o notificado para evitar falsos alarmes.`);
+        console.log(`?? [RETRY SILENCIOSO] Instabilidade temporária no pedido ${resId}. Cliente não notificado para evitar falsos alarmes.`);
       }
     }
 
-    // -- NOTIFICA��ES PARA OS GRUPOS DO SISTEMA (Anti-duplica��o) --
+    // -- NOTIFICA��ES PARA OS GRUPOS DO SISTEMA (Anti-duplicação) --
     if (order) {
       const isParcial = !!(req.body.last_result && req.body.last_result.parcial) || (!success && Number(req.body.last_result.quantidade) > 0 && Number(req.body.last_result.quantidade) < (Number(req.body.last_result.quantidade_solicitada) || Number(order.quantidade) || 0));
       const qtdEntregue = Number(req.body.last_result.quantidade) || 0;
@@ -1722,14 +1722,14 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.status = 'completed';
         order.completedAt = new Date().toISOString();
         order.lastError = null;
-        console.log(`?? [PEDIDO SUCESSO] Pedido ${resId} conclu�do com sucesso pelo Celular Porta ${port}!`);
+        console.log(`?? [PEDIDO SUCESSO] Pedido ${resId} concluído com sucesso pelo Celular Porta ${port}!`);
         decrementDeviceSaldo(port, order);
 
         if (smsSalesEngine) {
           smsSalesEngine.notifyOrderCompleted(order);
         }
 
-        // Se este pedido foi a Parte 1 de uma divis�o inteligente, liberar a Parte 2 na fila
+        // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
         if (order.isSplit && order.splitPart === 1 && order.part2Id) {
           const part2Order = inMemoryOrders.get(order.part2Id);
           if (part2Order && part2Order.status === 'waiting_part1') {
@@ -1739,7 +1739,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           }
         }
       } else if (isParcial && qtdEntregue > 0 && qtdPedida > qtdEntregue) {
-        // ?? ENVIO PARCIAL CONCLU�DO NO CELULAR: A primeira parte foi entregue!
+        // ?? ENVIO PARCIAL CONCLUÍDO NO CELULAR: A primeira parte foi entregue!
         const diffMb = qtdPedida - qtdEntregue;
         order.status = 'completed';
         order.quantidade = qtdEntregue;
@@ -1750,11 +1750,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           smsSalesEngine.notifyOrderCompleted(order);
         }
 
-        // ??? REGRA VODACOM: O envio m�nimo por USSD � 100MB!
+        // ??? REGRA VODACOM: O envio mínimo por USSD � 100MB!
         // Se a diferen�a for insignificante (< 50MB, ex: 23MB de 1001MB entregues num pedido de 1024MB):
-        // O cliente j� recebeu ~98% do pacote (1GB). N�o criar pedido de 23MB que ficaria preso na fila!
+        // O cliente já recebeu ~98% do pacote (1GB). Não criar pedido de 23MB que ficaria preso na fila!
         if (diffMb < 50) {
-          console.log(`? [PARCIAL QUASE TOTAL] Pedido ${resId} entregou ${qtdEntregue}MB de ${qtdPedida}MB. Diferen�a de apenas ${diffMb}MB (< 50MB toler�ncia). Pedido considerado 100% satisfeito!`);
+          console.log(`? [PARCIAL QUASE TOTAL] Pedido ${resId} entregou ${qtdEntregue}MB de ${qtdPedida}MB. Diferen�a de apenas ${diffMb}MB (< 50MB tolerância). Pedido considerado 100% satisfeito!`);
         } else {
           // Se faltar >= 50MB e < 100MB, arredondar para 100MB para que a operadora aceite o USSD!
           const restanteMb = diffMb < 100 ? 100 : diffMb;
@@ -1791,9 +1791,9 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           groupNotified: false
         };
         inMemoryOrders.set(restanteId, orderRestante);
-        console.log(`?? [ENVIO PARCIAL REGISTADO] Pedido ${resId} entregou ${qtdEntregue}MB. Criado pedido ${restanteId} de ${restanteMb}MB na fila para conclus�o!`);
+        console.log(`?? [ENVIO PARCIAL REGISTADO] Pedido ${resId} entregou ${qtdEntregue}MB. Criado pedido ${restanteId} de ${restanteMb}MB na fila para conclusão!`);
 
-        // Notificar cliente da 1� parte parcial entregue no WhatsApp
+        // Notificar cliente da 1ª parte parcial entregue no WhatsApp
         if (clientJid && baileysEngine) {
           const part1Str = qtdEntregue < 1024 ? `${qtdEntregue} MB` : `${(qtdEntregue / 1024).toFixed(qtdEntregue % 1024 === 0 ? 0 : 1)} GB`;
           const part2Str = restanteMb < 1024 ? `${restanteMb} MB` : `${(restanteMb / 1024).toFixed(restanteMb % 1024 === 0 ? 0 : 1)} GB`;
@@ -1821,7 +1821,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
 
           const msgParcial = (
-            `?? *1� PARTE ENTREGUE (1/2)* ?\n` +
+            `?? *1ª PARTE ENTREGUE (1/2)* ?\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
             saudacao +
             `? *Entregue agora:* *${part1Str}*\n` +
@@ -1830,7 +1830,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             valorLinha +
             `🔑 *Ref:* \`${cleanRef}\`\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `?? _A 2� parte j� est� na fila para envio imediato por outro terminal!_`
+            `?? _A 2ª parte já está na fila para envio imediato por outro terminal!_`
           );
 
           baileysEngine.sendTextMessage(clientJid, msgParcial, { mentions: mentionsList })
@@ -1844,10 +1844,10 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.failedPorts = order.failedPorts || [];
         if (!order.failedPorts.includes(port)) order.failedPorts.push(port);
 
-        // ??? PROTE��O ANTI-DUPLICA��O FINANCEIRA:
+        // ??? PROTEçãO ANTI-DUPLICAçãO FINANCEIRA:
         // Apenas repassar para outra porta se o celular reportou que N�O TINHA SALDO ou limite atingido.
-        // NUNCA fazer reenvio autom�tico se o celular chegou a discar USSD e deu timeout ou falha de leitura,
-        // pois a Vodacom frequentemente conclui o envio mesmo com timeout! Reenvio s� manual pelo operador.
+        // NUNCA fazer reenvio automático se o celular chegou a discar USSD e deu timeout ou falha de leitura,
+        // pois a Vodacom frequentemente conclui o envio mesmo com timeout! Reenvio só manual pelo operador.
         const errorLower = errorMsg.toLowerCase();
         const isSaldoError = errorLower.includes('saldo') || errorLower.includes('limite') || errorLower.includes('inapto') || errorLower.includes('insuficiente');
 
@@ -1862,7 +1862,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         } else {
           order.status = 'failed';
           order.completedAt = new Date().toISOString();
-          console.warn(`?? [PROTE��O ANTI-REPETI��O] Pedido ${resId} marcado como falhado (${errorMsg}) para evitar repeti��o acidental de saldo. Reenvio apenas se o operador solicitar no painel.`);
+          console.warn(`?? [PROTEçãO ANTI-REPETI��O] Pedido ${resId} marcado como falhado (${errorMsg}) para evitar repetição acidental de saldo. Reenvio apenas se o operador solicitar no painel.`);
 
           // Se a Parte 1 falhou, cancelar a Parte 2
           if (order.isSplit && order.splitPart === 1 && order.part2Id) {
@@ -1896,7 +1896,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     }
 
     // ?? REGISTAR COMPRA NO SISTEMA DE FIDELIDADE & TXENECO
-    // REGRA FUNDAMENTAL: O cliente � EXCLUSIVAMENTE quem compra (envia comprovativo / paga), NUNCA o destinat�rio que apenas recebe os Megas!
+    // REGRA FUNDAMENTAL: O cliente � EXCLUSIVAMENTE quem compra (envia comprovativo / paga), NUNCA o destinatério que apenas recebe os Megas!
     // Evitar registrar 2x se for a Parte 2 de um pedido dividido (split)
     const isSplitPart2 = !!(order && order.isSplit && order.splitPart === 2);
     if (success && !isSplitPart2) {
@@ -1979,7 +1979,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
           if (order && order.isSplit && order.splitPart === 1) {
             baileysEngine.enviarNotificacaoGrupo(
-              `? *1� PARTE ENTREGUE (1/2)* ??\n` +
+              `? *1ª PARTE ENTREGUE (1/2)* ??\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${resId}\`\n` +
               `📲 *Destino:* *${targetNum}*\n` +
@@ -1987,11 +1987,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
               `?? *Porta:* Celular ${port}\n` +
               `?? *Hora:* ${horaAgora}\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `? *Status:* 1� parte entregue! 2� parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
+              `? *Status:* 1ª parte entregue! 2ª parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
             );
           } else if (order && order.isSplit && order.splitPart === 2) {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *PACOTE 100% CONCLU�DO (2/2)* ??\n` +
+              `?? *PACOTE 100% CONCLUÍDO (2/2)* ??\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${resId}\`\n` +
               `📲 *Destino:* *${targetNum}*\n` +
@@ -2011,7 +2011,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
               `?? *Porta:* Celular ${port}\n` +
               `?? *Hora:* ${horaAgora}\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `? *Status:* Conclu�do e confirmado pela operadora`
+              `? *Status:* Concluído e confirmado pela operadora`
             );
           }
         }
@@ -2021,15 +2021,15 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           baileysEngine.enviarErroGrupo(
             `?? *ERRO DETECTADO [NORMAL]* ??\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `?? *Refer�ncia:* \`${resId}\`\n` +
-            `?? *N�mero:* *${targetNum}*\n` +
+            `?? *Referência:* \`${resId}\`\n` +
+            `?? *Número:* *${targetNum}*\n` +
             `?? *Tipo:* ${(order && order.modo) || 'diario'}${order && order.isSplit ? ` (Parte ${order.splitPart}/2)` : ''}\n` +
             `?? *Porta:* Celular ${port}\n` +
             `?? *Volume:* ${volStr}\n` +
             `?? *Data/Hora:* ${horaAgora}\n` +
             `? *Erro:* ${errMsg}\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `?? *Status:* Aguardando verifica��o / interven��o manual`
+            `?? *Status:* Aguardando verificação / intervenção manual`
           );
         }
       }
@@ -2043,7 +2043,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   return res.json({ success: true, timestamp: new Date().toISOString() });
 });
 
-// Endpoint para o Aplicativo Android buscar transfer�ncias pendentes (sem cabo)
+// Endpoint para o Aplicativo Android buscar transferências pendentes (sem cabo)
 app.get('/api/devices/:port/tasks', async (req, res) => {
   const port = Number(req.params.port);
   
@@ -2052,7 +2052,7 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
     inMemoryDevices[port].lastSeen = new Date().toISOString();
   }
 
-  // Buscar pr�ximo pedido pendente para esta porta ou gen�rico
+  // Buscar próximo pedido pendente para esta porta ou gen�rico
   let task = null;
   const isPortDaily = isDailyPort(port);
 
@@ -2061,9 +2061,9 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
       const modo = (order.modo || 'diario').toLowerCase().trim();
       const isOrderDaily = modo === 'diario' || modo === '24hrs' || modo === '24h';
 
-      // ?? REGRA ESTRITA: Porta 8077 NUNCA pode pegar pedidos di�rios!
+      // ?? REGRA ESTRITA: Porta 8077 NUNCA pode pegar pedidos diários!
       if (port === 8077 && isOrderDaily) continue;
-      // ?? REGRA ESTRITA: Portas di�rias NUNCA podem pegar pedidos semanais, mensais ou saldo!
+      // ?? REGRA ESTRITA: Portas diárias NUNCA podem pegar pedidos semanais, mensais ou saldo!
       if (isPortDaily && !isOrderDaily) continue;
 
       if (!order.targetPort || order.targetPort === port) {
@@ -2084,19 +2084,19 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
   return res.json({ hasTask: false });
 });
 
-// Endpoint para o Aplicativo Android confirmar conclus�o de USSD
+// Endpoint para o Aplicativo Android confirmar conclusão de USSD
 app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   const { port, orderId } = req.params;
   let { success, mensagem, saldo_mb } = req.body;
 
   const resMsg = String(mensagem || '').toLowerCase();
-  const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('m�nim')) &&
-                          (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transfer�ncia') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
+  const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
+                          (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
   const isTudoTopOrOffer = (
       resMsg.includes('recebeu') && (
         resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
-        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('v�lidos') ||
-        resMsg.includes('validas') || resMsg.includes('v�lidas') ||
+        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
+        resMsg.includes('validas') || resMsg.includes('válidas') ||
         resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote') ||
         resMsg.includes('dados') || resMsg.includes('mensal') || resMsg.includes('semanal')
       )
@@ -2105,25 +2105,25 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
     resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
   // Anti-falso positivo: 'mmi' aparece em dialogos de carregamento ("A executar codigo MMI...")
   // 'concluid'/'sucesso' sozinhos podem estar em msgs de ERRO ("Operacao nao concluida com sucesso")
-  const hasNegationServer = resMsg.includes('nao ') || resMsg.includes('n�o ') ||
+  const hasNegationServer = resMsg.includes('nao ') || resMsg.includes('não ') ||
                             resMsg.includes('sem sucesso') || resMsg.includes('sem saldo') ||
-                            resMsg.includes('nao foi') || resMsg.includes('n�o foi');
+                            resMsg.includes('nao foi') || resMsg.includes('não foi');
   const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
-                        resMsg.includes('transferencia') || resMsg.includes('transfer�ncia') || resMsg.includes('tranferencia') ||
+                        resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
                         resMsg.includes('transferiste') || resMsg.includes('transferiu') ||
-                        (!hasNegationServer && (resMsg.includes('codigo mmi concluido') || resMsg.includes('c�digo mmi conclu�do') ||
-                          resMsg.includes('mmi concluido') || resMsg.includes('mmi conclu�do'))) ||
+                        (!hasNegationServer && (resMsg.includes('codigo mmi concluido') || resMsg.includes('código mmi concluído') ||
+                          resMsg.includes('mmi concluido') || resMsg.includes('mmi concluído'))) ||
                         (!hasNegationServer && resMsg.includes('concluid') &&
                           (resMsg.includes('transferen') || resMsg.includes('envio') || resMsg.includes('pedido') || resMsg.includes('operac'))) ||
                         (!hasNegationServer && resMsg.includes('com sucesso') &&
                           (resMsg.includes('transferen') || resMsg.includes('pedido') || resMsg.includes('operac') || resMsg.includes('recarga')));
   const isErrorText = !isVodacomZeroMb && !isTudoTopOrOffer && (
     resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
-    resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inv�lido')
+    resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
   );
   const isTaskParcial = !!(req.body.parcial || req.body.isParcial);
   if (!success && isSuccessText && !isErrorText && !isTaskParcial) {
-    console.log(`? [TASKS AUTO-OVERRIDE] Mensagem cont�m confirma��o Tudo Top/0MB/Transfer�ncia ('${resMsg}'). Marcando como SUCESSO!`);
+    console.log(`? [TASKS AUTO-OVERRIDE] Mensagem contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
     success = true;
   }
 
@@ -2161,7 +2161,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
         customerServices.registrarCompra(clientPhone, orderId, order.valor || order.valor_pago || 0, order.quantidade || 0);
       }
 
-      // Se este pedido foi a Parte 1 de uma divis�o inteligente, liberar a Parte 2 na fila
+      // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
       if (order.isSplit && order.splitPart === 1 && order.part2Id) {
         const part2Order = inMemoryOrders.get(order.part2Id);
         if (part2Order && part2Order.status === 'waiting_part1') {
@@ -2171,7 +2171,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
         }
       }
 
-      // Notificar cliente no WhatsApp caso ainda n�o tenha sido notificado
+      // Notificar cliente no WhatsApp caso ainda não tenha sido notificado
       if (!order.notified && baileysEngine) {
         let clientJid = order.jid || null;
         if (!clientJid && typeof baileysEngine.getJidForOrder === 'function') {
@@ -2218,7 +2218,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
             const totalStr = totalMb < 1024 ? `${totalMb} MB` : `${(totalMb / 1024).toFixed(totalMb % 1024 === 0 ? 0 : 1)} GB`;
 
             const msgParte1 = (
-              `?? *1� PARTE ENTREGUE (1/2)* ?\n` +
+              `?? *1ª PARTE ENTREGUE (1/2)* ?\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               saudacao +
               `? *Entregue agora:* *${part1Str}*\n` +
@@ -2227,15 +2227,15 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
               valorLinha +
               `🔑 *Ref:* \`${cleanRef}\`\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `?? _A 2� parte j� est� a ser processada e entra em instantes!_`
+              `?? _A 2ª parte já está a ser processada e entra em instantes!_`
             );
 
             try {
               baileysEngine.sendTextMessage(clientJid, msgParte1, { mentions: mentionsList })
-                .catch(e => console.error('? [NOTIFICA��O WA PARTE 1 ERRO]:', e.message));
-              console.log(`?? [NOTIFICA��O WA] Cliente ${clientJid} notificado de 1� PARTE no pedido ${orderId}`);
+                .catch(e => console.error('? [NOTIFICAçãO WA PARTE 1 ERRO]:', e.message));
+              console.log(`?? [NOTIFICAçãO WA] Cliente ${clientJid} notificado de 1ª PARTE no pedido ${orderId}`);
             } catch(e) {
-              console.error('? [NOTIFICA��O WA PARTE 1 CRASH]:', e.message);
+              console.error('? [NOTIFICAçãO WA PARTE 1 CRASH]:', e.message);
             }
           } else {
             let headerConclusao = `✅ *RECARGA CONCLUÍDA* ⚡\n`;
@@ -2259,10 +2259,10 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
                 `📊 *Consultar Saldo:* \`*100*03#\`\n` +
                 `_Obrigado por escolher a Axion!_`,
                 { mentions: mentionsList }
-              ).catch(e => console.error('? [NOTIFICA��O WA ERRO]:', e.message));
-              console.log(`?? [NOTIFICA��O WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
+              ).catch(e => console.error('? [NOTIFICAçãO WA ERRO]:', e.message));
+              console.log(`?? [NOTIFICAçãO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
             } catch(e) {
-              console.error('? [NOTIFICA��O WA CRASH]:', e.message);
+              console.error('? [NOTIFICAçãO WA CRASH]:', e.message);
             }
           }
         }
@@ -2277,15 +2277,15 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
                            errorLower.includes('inapto') || errorLower.includes('insuficiente');
 
       // ??? PROTEC��O ANTI-DUPLA ACTIVA��O:
-      // Tudo Top, Mensal e Semanal disparam USSD que a Vodacom pode processar mesmo ap�s timeout.
-      // NUNCA fazer retry autom�tico nesses modos a n�o ser que o erro seja claramente "sem saldo".
+      // Tudo Top, Mensal e Semanal disparam USSD que a Vodacom pode processar mesmo após timeout.
+      // NUNCA fazer retry automático nesses modos a não ser que o erro seja claramente "sem saldo".
       const modoOrder = String(order.modo || '').toLowerCase();
       const isHighValueMode = modoOrder === 'tudo_top' || modoOrder === 'ilimitado' ||
                               modoOrder === 'mensal' || modoOrder === 'semanal';
 
       const isTimeoutError = errorLower.includes('timeout') || errorLower.includes('sem resposta') || errorLower.includes('tempo limite') || errorLower.includes('falha ussd');
 
-      // Se for erro de saldo OU erro de timeout, repassar imediatamente para o pr�ximo celular
+      // Se for erro de saldo OU erro de timeout, repassar imediatamente para o próximo celular
       if ((isSaldoError || isTimeoutError) && (order.retryCount || 0) < 5) {
         order.status = 'pending';
         order.assignedToPort = null;
@@ -2388,7 +2388,7 @@ async function restoreAllDataFromFirestore() {
           clientRemindersSent.add(`${orderId}_D0`);
         }
       });
-      console.log(`?? [FIRESTORE RESTORE] ${count} pedidos de vendas hist�ricos restaurados do Firestore.`);
+      console.log(`?? [FIRESTORE RESTORE] ${count} pedidos de vendas históricos restaurados do Firestore.`);
       saveOrdersToCache();
     }
   } catch (err) {
@@ -2418,7 +2418,7 @@ async function restoreAllDataFromFirestore() {
           countP++;
         }
       });
-      console.log(`?? [FIRESTORE RESTORE] ${countP} extratos de pagamentos hist�ricos restaurados do Firestore.`);
+      console.log(`?? [FIRESTORE RESTORE] ${countP} extratos de pagamentos históricos restaurados do Firestore.`);
       savePaymentsToCache();
     }
   } catch (err) {
@@ -2436,7 +2436,7 @@ async function restoreAllDataFromFirestore() {
           countPlans++;
         }
       });
-      console.log(`?? [FIRESTORE RESTORE] ${countPlans} planos agendados (faseado/renov�vel) ativos restaurados.`);
+      console.log(`?? [FIRESTORE RESTORE] ${countPlans} planos agendados (faseado/renovável) ativos restaurados.`);
       saveScheduledPlans();
     }
   } catch (err) {
@@ -2539,10 +2539,10 @@ app.get('/api/orders', (req, res) => {
     orders: displayOrders,
     all_orders: allOrders,
     active,      // Em processamento agora
-    pending,     // � espera de celular
-    waiting,     // � espera da parte 1 (split)
+    pending,     // à espera de celular
+    waiting,     // à espera da parte 1 (split)
     completed: completed.slice(0, 10),
-    failed: failed.slice(0, 10),   // �ltimos falhados
+    failed: failed.slice(0, 10),   // últimos falhados
     phantoms     // Pedidos potencialmente travados (>5min sem resultado)
   });
 });
@@ -2554,7 +2554,7 @@ app.post('/api/orders/:orderId/retry', (req, res) => {
   const order = inMemoryOrders.get(orderId);
 
   if (!order) {
-    return res.status(404).json({ success: false, mensagem: 'Pedido n�o encontrado na fila.' });
+    return res.status(404).json({ success: false, mensagem: 'Pedido não encontrado na fila.' });
   }
 
   // Desocupar qualquer celular que estivesse com este pedido preso
@@ -2570,7 +2570,7 @@ app.post('/api/orders/:orderId/retry', (req, res) => {
   order.processingAt = null;
   order.completedAt = null;
   order.lastError = null;
-  order.createdAt = new Date().toISOString(); // Resetar TTL para n�o expirar imediatamente ap�s retry
+  order.createdAt = new Date().toISOString(); // Resetar TTL para não expirar imediatamente após retry
   if (targetPort) {
     order.targetPort = targetPort;
   }
@@ -2603,7 +2603,7 @@ app.post(['/api/orders/:orderId/cancel', '/api/orders/:orderId/cancelar'], (req,
   return res.json({ success: true, mensagem: `Pedido ${orderId} cancelado.` });
 });
 
-// Marcar pedido manualmente como Conclu�do (quando a operadora concluiu no chip mas deu timeout na tela)
+// Marcar pedido manualmente como Concluído (quando a operadora concluiu no chip mas deu timeout na tela)
 app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (req, res) => {
   const { orderId } = req.params;
   let order = inMemoryOrders.get(orderId);
@@ -2633,7 +2633,7 @@ app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (re
     }
   }
 
-  // Se este pedido foi a Parte 1 de uma divis�o inteligente, liberar a Parte 2 na fila
+  // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
   if (order.isSplit && order.splitPart === 1 && order.part2Id) {
     const part2Order = inMemoryOrders.get(order.part2Id);
     if (part2Order && part2Order.status === 'waiting_part1') {
@@ -2665,8 +2665,8 @@ app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (re
     customerServices.registrarCompra(clientPhone, orderId, order.valor || order.valor_pago || 0, order.quantidade || 0);
   }
 
-  console.log(`? [PAINEL] Pedido ${orderId} marcado manualmente como CONCLU�DO pelo operador.`);
-  return res.json({ success: true, mensagem: `Pedido ${orderId} marcado com sucesso como CONCLU�DO!`, order });
+  console.log(`? [PAINEL] Pedido ${orderId} marcado manualmente como CONCLUÍDO pelo operador.`);
+  return res.json({ success: true, mensagem: `Pedido ${orderId} marcado com sucesso como CONCLUÍDO!`, order });
 });
 
 app.post('/api/orders/clear', (req, res) => {
@@ -2699,11 +2699,11 @@ app.delete('/api/orders/:orderId', (req, res) => {
   const existed = inMemoryOrders.has(orderId);
   if (existed) inMemoryOrders.delete(orderId);
   saveOrdersToCache();
-  return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido n�o encontrado.' });
+  return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido não encontrado.' });
 });
 
 // ------------------------------------------------------------------
-// ?? AXION ADMIN MASTER API: RELAT�RIOS & EXTRATO DE RECEBIMENTOS
+// ?? AXION ADMIN MASTER API: RELATÓRIOS & EXTRATO DE RECEBIMENTOS
 // ------------------------------------------------------------------
 
 // In-Memory Payments store for M-Pesa & e-Mola receipts
@@ -2788,7 +2788,7 @@ app.get('/api/admin/recebimentos', async (req, res) => {
       }
     }
 
-    // Complementar com dados em mem�ria
+    // Complementar com dados em memória
     const mapAll = new Map();
     docs.forEach(p => mapAll.set(p.txn_id || p.id, p));
     inMemoryPayments.forEach((v, k) => { if (!mapAll.has(k)) mapAll.set(k, v); });
@@ -2811,7 +2811,7 @@ app.get('/api/admin/recebimentos', async (req, res) => {
       const val = Number(p.valor) || 0;
       const met = String(p.metodo || p.operadora || '').toLowerCase();
       const txn = p.txn_id || p.id || '';
-      // Detec��o por campo metodo (fi�vel ap�s fix) + fallback por prefixo txn_id
+      // Detecção por campo metodo (fi�vel após fix) + fallback por prefixo txn_id
       const isEmola = met.includes('emola') || met.includes('e-mola')
         || /^(ID|PP26)/i.test(txn) && !met.includes('mpesa');
 
@@ -2861,7 +2861,7 @@ app.get('/api/admin/payments', async (req, res) => {
       if (ref) map.set(ref, p);
     });
 
-    // 2. Incluir pagamentos de SMS em mem�ria
+    // 2. Incluir pagamentos de SMS em memória
     inMemoryPayments.forEach((p, k) => {
       const ref = p.txn_id || p.id || k;
       if (ref) {
@@ -2901,7 +2901,7 @@ app.get('/api/admin/payments', async (req, res) => {
       }
     }
 
-    // 4. Buscar do Firestore sms_payments se dispon�vel (persist�ncia na nuvem)
+    // 4. Buscar do Firestore sms_payments se disponível (persistência na nuvem)
     if (db) {
       try {
         const snap = await db.collection('sms_payments').orderBy('processedAt', 'desc').limit(150).get();
@@ -2926,7 +2926,7 @@ app.get('/api/admin/payments', async (req, res) => {
       } catch (err) { console.warn('?? [FIREBASE] Falha ao consultar sms_payments em /admin/payments:', err.message); }
     }
 
-    // 5. Incluir tamb�m vendas conclu�das que tenham valor
+    // 5. Incluir também vendas concluídas que tenham valor
     const ordersList = Array.from(inMemoryOrders.values()).filter(o => o.valor || o.valor_pago);
     ordersList.forEach(o => {
       const ref = o.orderId || o.id;
@@ -2969,7 +2969,7 @@ app.get('/api/admin/payments', async (req, res) => {
 app.post('/api/admin/payments/register', (req, res) => {
   const { ref, operadora, valor, numero, remetente, status, detalhes } = req.body || {};
   if (!ref || !valor) {
-    return res.status(400).json({ success: false, mensagem: 'Ref e Valor s�o obrigat�rios.' });
+    return res.status(400).json({ success: false, mensagem: 'Ref e Valor são obrigatérios.' });
   }
 
   const paymentDoc = {
@@ -2995,7 +2995,7 @@ app.post('/api/admin/payments/register', (req, res) => {
   return res.json({ success: true, payment: paymentDoc });
 });
 
-// 2. Relat�rios de Vendas (Di�rio, Semanal, Mensal, Trimestral, Semestral, Anual) para Axion Admin Master
+// 2. Relatérios de Vendas (Diário, Semanal, Mensal, Trimestral, Semestral, Anual) para Axion Admin Master
 app.get('/api/admin/reports', async (req, res) => {
   try {
     const period = (req.query.period || 'today').toLowerCase(); // today, week, month, quarter, semester, year
@@ -3003,7 +3003,7 @@ app.get('/api/admin/reports', async (req, res) => {
     
     let startTime = new Date();
     if (period === 'today' || period === 'diario') {
-      // Come�ar �s 00:00 no fuso de Mo�ambique
+      // Come�ar às 00:00 no fuso de Moçambique
       const todayDateStr = now.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' });
       startTime = new Date(todayDateStr + 'T00:00:00+02:00');
     } else if (period === 'week' || period === 'semanal') {
@@ -3024,10 +3024,10 @@ app.get('/api/admin/reports', async (req, res) => {
     const startMs = startTime.getTime();
     const orderMap = new Map();
 
-    // Ler ordens em mem�ria
+    // Ler ordens em memória
     inMemoryOrders.forEach((v, k) => orderMap.set(k, v));
 
-    // Se Firestore estiver ativo, enriquecer com hist�rico persistente
+    // Se Firestore estiver ativo, enriquecer com histórico persistente
     if (db) {
       try {
         const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(200).get();
@@ -3038,7 +3038,7 @@ app.get('/api/admin/reports', async (req, res) => {
             orderMap.set(id, d);
           }
         });
-      } catch (_) { console.warn('?? [FIREBASE] Falha ao consultar ordens para relat�rio admin:', _.message); }
+      } catch (_) { console.warn('?? [FIREBASE] Falha ao consultar ordens para relatério admin:', _.message); }
     }
 
     const allOrders = Array.from(orderMap.values());
@@ -3078,7 +3078,7 @@ app.get('/api/admin/reports', async (req, res) => {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // Formato compat�vel com Axion-Admin-Master (MainActivity.kt)
+    // Formato compatével com Axion-Admin-Master (MainActivity.kt)
     const historicoFormatado = completed.slice(-30).reverse().map(o => {
       const qty = Number(o.quantidade) || 0;
       return {
@@ -3149,7 +3149,7 @@ function resolveDeviceConfig(portOrSerial) {
   return { port: pStr, serial: pStr, name: `Celular (${pStr})`, width: 720, height: 1280 };
 }
 
-// 1. Listar celulares dispon�veis para controle remoto
+// 1. Listar celulares disponíveis para controle remoto
 app.get('/api/remote/devices', (req, res) => {
   try {
     exec('adb devices -l', { timeout: 3000 }, (err, stdout, stderr) => {
@@ -3208,7 +3208,7 @@ app.get('/api/remote/:port/screen', (req, res) => {
     const adbCmd = `adb -s ${dev.serial} exec-out screencap -p`;
     exec(adbCmd, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024, timeout: 5000 }, (err, stdout, stderr) => {
       if (err || !stdout || stdout.length === 0) {
-        return res.status(503).json({ success: false, mensagem: `ADB indispon�vel ou celular (${dev.serial}) offline.` });
+        return res.status(503).json({ success: false, mensagem: `ADB indisponível ou celular (${dev.serial}) offline.` });
       }
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
@@ -3226,7 +3226,7 @@ app.post('/api/remote/:port/touch', (req, res) => {
   const { x, y, width, height } = req.body;
 
   if (x === undefined || y === undefined) {
-    return res.status(400).json({ success: false, mensagem: 'Coordenadas (x, y) obrigat�rias.' });
+    return res.status(400).json({ success: false, mensagem: 'Coordenadas (x, y) obrigatérias.' });
   }
 
   let realX = Math.round(x);
@@ -3275,7 +3275,7 @@ app.post('/api/remote/:port/swipe', (req, res) => {
   }
 });
 
-// 5. Teclas de Navega��o e Sistema (Keyevent)
+// 5. Teclas de Navegação e Sistema (Keyevent)
 app.post('/api/remote/:port/key', (req, res) => {
   const { port } = req.params;
   const dev = resolveDeviceConfig(port);
@@ -3322,7 +3322,7 @@ app.post('/api/remote/:port/type', (req, res) => {
   const dev = resolveDeviceConfig(port);
   const { text } = req.body;
 
-  if (!text) return res.status(400).json({ success: false, mensagem: 'Texto n�o fornecido.' });
+  if (!text) return res.status(400).json({ success: false, mensagem: 'Texto não fornecido.' });
 
   const safeText = String(text).replace(/\s/g, '%s').replace(/["`$\\]/g, '\\$&');
   try {
@@ -3341,7 +3341,7 @@ app.post('/api/remote/:port/ussd', (req, res) => {
   const dev = resolveDeviceConfig(port);
   const { code } = req.body;
 
-  if (!code) return res.status(400).json({ success: false, mensagem: 'C�digo USSD n�o fornecido.' });
+  if (!code) return res.status(400).json({ success: false, mensagem: 'Código USSD não fornecido.' });
 
   const encoded = encodeURIComponent(String(code).trim());
   try {
@@ -3379,7 +3379,7 @@ app.post('/api/remote/:port/launch-scrcpy', (req, res) => {
   }
 });
 
-// -- TABELAS DE PRE�OS PARA O PAINEL --
+// -- TABELAS DE PREÇOS PARA O PAINEL --
 app.get(['/api/price-tables', '/api/prices', '/api/groups/prices'], (req, res) => {
   let cfg = {};
   if (baileysEngine && baileysEngine.DYN_CFG) {
@@ -3414,7 +3414,7 @@ app.get('/api/bot-status', (req, res) => {
     return res.json({ success: false, connected: false, qr_pending: false, error: e.message });
   }
 });
-// -- RELAT�RIOS FINANCEIROS E VENDAS PARA O PAINEL --
+// -- RELATÓRIOS FINANCEIROS E VENDAS PARA O PAINEL --
 app.get('/api/reports', async (req, res) => {
   try {
     let all = Array.from(inMemoryOrders.values());
@@ -3447,7 +3447,7 @@ app.get('/api/reports', async (req, res) => {
       }
     });
 
-    // Fuso hor�rio oficial de Mo�ambique (CAT / Africa/Maputo)
+    // Fuso horário oficial de Moçambique (CAT / Africa/Maputo)
     function toMaputoDate(dateVal) {
       if (!dateVal) return '';
       try {
@@ -3462,7 +3462,7 @@ app.get('/api/reports', async (req, res) => {
     const todayStr = toMaputoDate(new Date());
     const monthStr = todayStr.slice(0, 7);
 
-    // Vendas conclu�das
+    // Vendas concluídas
     const completed = all.filter(o => o.status === 'completed' || o.success === true);
 
     // Vendas de hoje
@@ -3577,7 +3577,7 @@ app.post('/api/admin/config/custo-gb', authenticateAdmin, async (req, res) => {
   try {
     const novoCusto = parseFloat(req.body?.custo_gb || req.body?.preco_gb);
     if (isNaN(novoCusto) || novoCusto <= 0) {
-      return res.status(400).json({ success: false, mensagem: 'Valor de custo do GB inv�lido.' });
+      return res.status(400).json({ success: false, mensagem: 'Valor de custo do GB inválido.' });
     }
     const cfgPath = path.resolve(__dirname, 'bot_config.js');
     let cfg = {};
@@ -3601,27 +3601,27 @@ app.post('/api/admin/config/custo-gb', authenticateAdmin, async (req, res) => {
 app.post('/api/admin/restart-bot', authenticateAdmin, (req, res) => {
   try {
     if (baileysEngine && typeof baileysEngine.startWhatsApp === 'function') {
-      console.log('?? [ADMIN] Reinicializa��o manual do Bot WhatsApp solicitada pelo Painel');
+      console.log('?? [ADMIN] Reinicialização manual do Bot WhatsApp solicitada pelo Painel');
       baileysEngine.startWhatsApp(null, db);
       return res.json({ success: true, mensagem: 'Bot WhatsApp a reiniciar na nuvem...' });
     }
-    return res.json({ success: false, mensagem: 'M�dulo WhatsApp indispon�vel' });
+    return res.json({ success: false, mensagem: 'M�dulo WhatsApp indisponível' });
   } catch(e) {
     return res.status(500).json({ success: false, mensagem: e.message });
   }
 });
 
-// -- ENDPOINT DE TESTE: Envia mensagem de teste para JID/n�mero --
+// -- ENDPOINT DE TESTE: Envia mensagem de teste para JID/número --
 app.post('/api/whatsapp/test-send', async (req, res) => {
   try {
     const token = req.headers['x-master-token'] || req.query.token || req.body?.token;
-    if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'N�o autorizado' });
+    if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
     
     const { jid, numero, mensagem } = req.body || {};
     const targetJid = jid || (numero ? `${String(numero).replace(/\D/g, '')}@s.whatsapp.net` : null);
     
     if (!targetJid) return res.status(400).json({ error: 'Forne�a jid ou numero' });
-    if (!baileysEngine || !baileysEngine.sendTextMessage) return res.status(503).json({ error: 'Bot n�o dispon�vel' });
+    if (!baileysEngine || !baileysEngine.sendTextMessage) return res.status(503).json({ error: 'Bot não disponível' });
     
     await baileysEngine.sendTextMessage(targetJid, mensagem || '?? *Teste AXION* � Bot online e a responder correctamente!');
     return res.json({ success: true, jid: targetJid, mensagem: mensagem || 'Teste enviado' });
@@ -3634,7 +3634,7 @@ app.post('/api/whatsapp/test-send', async (req, res) => {
 app.get('/api/whatsapp/recent-logs', (req, res) => {
   try {
     const token = req.headers['x-master-token'] || req.query.token;
-    if (!MASTER_TOKENS.has(token) && token !== 'AxionKelven2026Secure') return res.status(403).json({ error: 'N�o autorizado' });
+    if (!MASTER_TOKENS.has(token) && token !== 'AxionKelven2026Secure') return res.status(403).json({ error: 'Não autorizado' });
     if (baileysEngine && typeof baileysEngine.getRecentLogs === 'function') {
       return res.json({ success: true, logs: baileysEngine.getRecentLogs() });
     }
@@ -3708,7 +3708,7 @@ app.get('/api/groups', async (req, res) => {
       // Usar lista ao vivo como fonte principal
       finalGroups = liveGroups.map(g => {
         let tipo = 'Grupo de Clientes';
-        if (g.jid === jidNotif)  tipo = 'Canal de Notifica��es';
+        if (g.jid === jidNotif)  tipo = 'Canal de Notificações';
         if (g.jid === jidErros)  tipo = 'Canal de Erros';
 
         return {
@@ -3717,13 +3717,13 @@ app.get('/api/groups', async (req, res) => {
           autorizado: true,
           tipo,
           membros: g.participants_count || '?',
-          tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padr�o (24h / Semanal / Mensal)'
+          tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
         };
       });
     } else {
-      // Fallback: grupos conhecidos hardcoded quando WhatsApp est� offline
+      // Fallback: grupos conhecidos hardcoded quando WhatsApp está offline
       const fallback = [
-        { jid: jidNotif, nome: 'Axion Notifica��es', tipo: 'Canal de Notifica��es' },
+        { jid: jidNotif, nome: 'Axion Notificações', tipo: 'Canal de Notificações' },
         { jid: jidErros,  nome: 'Axion Alertas & Erros', tipo: 'Canal de Erros' },
         { jid: '120363424819563179@g.us', nome: 'Axion VIP Clientes', tipo: 'Grupo de Clientes' }
       ];
@@ -3731,7 +3731,7 @@ app.get('/api/groups', async (req, res) => {
         ...g,
         autorizado: true,
         membros: '?',
-        tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padr�o (24h / Semanal / Mensal)'
+        tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
       }));
     }
 
@@ -3748,7 +3748,7 @@ app.post('/api/maintenance', (req, res) => {
   try {
     const rawVal = req.body.ativo !== undefined ? req.body.ativo : req.body.active;
     if (rawVal === undefined || rawVal === null) {
-      return res.status(400).json({ success: false, error: 'Campo "ativo" ou "active" (boolean) � obrigat�rio.' });
+      return res.status(400).json({ success: false, error: 'Campo "ativo" ou "active" (boolean) � obrigatério.' });
     }
     const ativo = (rawVal === true || rawVal === 'true');
     let estado = ativo;
@@ -3759,7 +3759,7 @@ app.post('/api/maintenance', (req, res) => {
       success: true,
       modoManutencao: estado,
       active: estado,
-      mensagem: estado ? '?? Sistema em manuten��o � vendas bloqueadas.' : '?? Sistema online � vendas liberadas.'
+      mensagem: estado ? '?? Sistema em manutenção � vendas bloqueadas.' : '?? Sistema online � vendas liberadas.'
     });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -3790,7 +3790,7 @@ app.get('/api/system/status', (req, res) => {
       online: !manutencao,
       modoManutencao: manutencao,
       botSilenciado: silenciado,
-      mensagem: manutencao ? '?? Servidores em manuten��o tempor�ria' : '?? Servidores online e operacionais'
+      mensagem: manutencao ? '?? Servidores em manutenção temporária' : '?? Servidores online e operacionais'
     });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -3806,7 +3806,7 @@ app.get('/api/app/hub/version', (req, res) => {
       versionCode: 22,
       pwaVersion: '2026.10.02-v2',
       apkUrl: 'https://kanet-cloud-api-f3le.onrender.com/hub/Axion-Client-Hub.apk',
-      changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Autom�tico de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
+      changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
       releasedAt: new Date().toISOString()
     });
   } catch(e) {
@@ -3819,13 +3819,13 @@ app.post('/api/bot/silence', (req, res) => {
   try {
     const { silenciado } = req.body;
     if (typeof silenciado !== 'boolean') {
-      return res.status(400).json({ success: false, error: 'Campo "silenciado" (boolean) � obrigat�rio.' });
+      return res.status(400).json({ success: false, error: 'Campo "silenciado" (boolean) � obrigatério.' });
     }
     let estado = silenciado;
     if (baileysEngine && typeof baileysEngine.setBotSilenciado === 'function') {
       estado = baileysEngine.setBotSilenciado(silenciado);
     }
-    return res.json({ success: true, silenciado: estado, mensagem: estado ? '?? Bot silenciado � sem respostas autom�ticas.' : '?? Bot activo � a responder normalmente.' });
+    return res.json({ success: true, silenciado: estado, mensagem: estado ? '?? Bot silenciado � sem respostas automáticas.' : '?? Bot activo � a responder normalmente.' });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -3847,13 +3847,13 @@ app.post('/api/groups/:jid/fechar', (req, res) => {
   try {
     const jid = decodeURIComponent(req.params.jid);
     if (!jid || !jid.endsWith('@g.us')) {
-      return res.status(400).json({ success: false, error: 'JID de grupo inv�lido.' });
+      return res.status(400).json({ success: false, error: 'JID de grupo inválido.' });
     }
     let fechado = false;
     if (baileysEngine && typeof baileysEngine.toggleGrupoFechado === 'function') {
       fechado = baileysEngine.toggleGrupoFechado(jid);
     }
-    return res.json({ success: true, jid, fechado, mensagem: fechado ? '?? Grupo fechado � bot n�o responde neste grupo.' : '?? Grupo aberto � bot volta a responder normalmente.' });
+    return res.json({ success: true, jid, fechado, mensagem: fechado ? '?? Grupo fechado � bot não responde neste grupo.' : '?? Grupo aberto � bot volta a responder normalmente.' });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -3864,10 +3864,10 @@ app.post('/api/admin/groups/close-with-reason', async (req, res) => {
   try {
     const { motivo, targetJids } = req.body || {};
     if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
-      return res.status(400).json({ success: false, error: 'O motivo / mensagem do fecho � obrigat�rio.' });
+      return res.status(400).json({ success: false, error: 'O motivo / mensagem do fecho � obrigatério.' });
     }
     if (!baileysEngine || typeof baileysEngine.closeGroupsWithReason !== 'function') {
-      return res.status(503).json({ success: false, error: 'Servi�o WhatsApp n�o est� ativo.' });
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
     }
     const result = await baileysEngine.closeGroupsWithReason(motivo.trim(), targetJids);
     return res.json({
@@ -3885,7 +3885,7 @@ app.post('/api/admin/groups/open-all', async (req, res) => {
   try {
     const { targetJids } = req.body || {};
     if (!baileysEngine || typeof baileysEngine.openAllGroups !== 'function') {
-      return res.status(503).json({ success: false, error: 'Servi�o WhatsApp n�o est� ativo.' });
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
     }
     const result = await baileysEngine.openAllGroups(targetJids);
     return res.json({
@@ -3903,10 +3903,10 @@ app.post('/api/admin/groups/announce', async (req, res) => {
   try {
     const { mensagem, targetJids } = req.body || {};
     if (!mensagem || typeof mensagem !== 'string' || !mensagem.trim()) {
-      return res.status(400).json({ success: false, error: 'A mensagem do comunicado � obrigat�ria.' });
+      return res.status(400).json({ success: false, error: 'A mensagem do comunicado � obrigatéria.' });
     }
     if (!baileysEngine || typeof baileysEngine.sendAnnouncementToGroups !== 'function') {
-      return res.status(503).json({ success: false, error: 'Servi�o WhatsApp n�o est� ativo.' });
+      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
     }
     const result = await baileysEngine.sendAnnouncementToGroups(mensagem.trim(), targetJids);
     return res.json({
@@ -4051,7 +4051,7 @@ app.post('/api/admin/transfers/reset', async (req, res) => {
       await admin.database().ref('admin/metrics/today').set({ lucro: 0, vendas: 0, megas: 0 });
       await admin.database().ref('bot_commands/pending').set({ cmd: 'reset_transfers', issued_at: new Date().toISOString() });
     }
-    res.json({ success: true, message: 'Contador de transfer�ncias zerado!' });
+    res.json({ success: true, message: 'Contador de transferências zerado!' });
   } catch(e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -4061,7 +4061,7 @@ app.post('/api/admin/bot/command', async (req, res) => {
   try {
     const { cmd } = req.body;
     if (!['start','stop','restart','reset_whatsapp'].includes(cmd)) {
-      return res.status(400).json({ success: false, error: 'Comando inv�lido' });
+      return res.status(400).json({ success: false, error: 'Comando inválido' });
     }
     pendingBotCommand = { cmd, issued_at: new Date().toISOString() };
     if (admin.apps.length) await fbSet('bot_commands/pending', pendingBotCommand);
@@ -4131,10 +4131,10 @@ try {
       createdAt: new Date().toISOString()
     };
 
-    // Aplicar regra oficial Axion de divis�o de pacotes Mensais (1� oferta + resto di�rio) e Di�rios
+    // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
     splitMensalOrderIfEligible(orderDoc);
     splitDailyOrderIfEligible(orderDoc);
-    // Aplicar ativa��o de Planos Especiais (Renov�vel & Faseado)
+    // Aplicar ativação de Planos Especiais (Renovável & Faseado)
     handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(order.orderId, orderDoc);
@@ -4147,7 +4147,7 @@ try {
     }
 
     // Roteamento Estrito e Inteligente de Portas baseado em Saldo Real:
-    // - Portas Di�rias (8025, 8023, 8026): Di�rios (24hrs) selecionando a porta com saldo >= quantidade
+    // - Portas Diárias (8025, 8023, 8026): Diários (24hrs) selecionando a porta com saldo >= quantidade
     // - 8077: Semanais, Mensais e Ilimitados
     // - 8777: Saldo
     const targetPort = getPortForModo(orderDoc.modo, orderDoc.quantidade);
@@ -4185,7 +4185,7 @@ try {
 }
 
 // ----------------------------------------------------------------
-// 7.0 BAILEYS FORNECIMENTO & ANTICONCORR�NCIA
+// 7.0 BAILEYS FORNECIMENTO & ANTICONCORRÊNENCIA
 // ----------------------------------------------------------------
 let baileysAnticoncorrencia = null;
 try {
@@ -4204,13 +4204,13 @@ try {
     baileysAnticoncorrencia.setBaileysEngine(baileysEngine);
   }
   baileysAnticoncorrencia.startWhatsApp(db);
-  console.log('??? [ANTICONCORR�NCIA NUVEM] Motor WhatsApp Espi�o / Anticoncorr�ncia inicializado com sucesso!');
+  console.log('??? [ANTICONCORRÊNENCIA NUVEM] Motor WhatsApp Espião / Anticoncorrência inicializado com sucesso!');
 } catch (e) {
-  console.warn('?? [ANTICONCORR�NCIA NUVEM] Erro ao carregar baileys_anticoncorrencia:', e.message);
+  console.warn('?? [ANTICONCORRÊNENCIA NUVEM] Erro ao carregar baileys_anticoncorrencia:', e.message);
 }
 
 // ----------------------------------------------------------------
-// 7.1 SMS SALES BOT ENGINE (VENDAS E ATENDIMENTO AUTOM�TICO VIA SMS)
+// 7.1 SMS SALES BOT ENGINE (VENDAS E ATENDIMENTO AUTOMÁTICO VIA SMS)
 // ----------------------------------------------------------------
 let smsSalesEngine = null;
 try {
@@ -4378,7 +4378,7 @@ app.get('/api/whatsapp/status', (req, res) => {
     return res.json({ session: 'revenda', ...revendaStatus });
   }
 
-  // Resumo compat�vel por defeito (retorna revenda no n�vel raiz para apps antigas, mais objetos separados)
+  // Resumo compatével por defeito (retorna revenda no nível raiz para apps antigas, mais objetos separados)
   return res.json({
     ...revendaStatus,
     session: 'revenda',
@@ -4396,21 +4396,21 @@ app.post(['/api/whatsapp/reset', '/api/admin/whatsapp/reset'], async (req, res) 
         const result = await baileysAnticoncorrencia.resetSession(db);
         return res.json(result);
       }
-      return res.status(500).json({ success: false, message: 'Baileys Anticoncorr�ncia n�o inicializado' });
+      return res.status(500).json({ success: false, message: 'Baileys Anticoncorrência não inicializado' });
     }
     if (session === 'fornecimento') {
       if (baileysFornecimento && typeof baileysFornecimento.resetSession === 'function') {
         const result = await baileysFornecimento.resetSession(db);
         return res.json(result);
       }
-      return res.status(500).json({ success: false, message: 'Baileys Fornecimento n�o inicializado' });
+      return res.status(500).json({ success: false, message: 'Baileys Fornecimento não inicializado' });
     }
 
     if (baileysEngine && typeof baileysEngine.resetSession === 'function') {
       const result = await baileysEngine.resetSession(db);
       return res.json(result);
     }
-    return res.status(500).json({ success: false, message: 'Baileys Revenda n�o inicializado' });
+    return res.status(500).json({ success: false, message: 'Baileys Revenda não inicializado' });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -4493,7 +4493,7 @@ app.get('/qr', (req, res) => {
     <h1>? Axion WhatsApp Cloud</h1>
     <p>Conecte o seu WhatsApp diretamente ao servidor na Nuvem (sem computador ligado).</p>
 
-    <!-- Seletor de Sess�o Multi-WhatsApp -->
+    <!-- Seletor de Sessão Multi-WhatsApp -->
     <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap;">
       <button id="tab-revenda" onclick="switchSession('revenda')" style="padding: 8px 14px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #0284c7; color: white; transition: all 0.2s;">
         ?? WhatsApp Revenda
@@ -4502,12 +4502,12 @@ app.get('/qr', (req, res) => {
         ?? WhatsApp Fornecimento
       </button>
       <button id="tab-anticoncorrencia" onclick="switchSession('anticoncorrencia')" style="padding: 8px 14px; border-radius: 8px; border: 1px solid #334155; font-weight: 600; cursor: pointer; background: #0f172a; color: #94a3b8; transition: all 0.2s;">
-        ??? WhatsApp Espi�o / Anticoncorr�ncia
+        ??? WhatsApp Espião / Anticoncorrência
       </button>
     </div>
 
     <div id="session-desc" style="font-size: 13px; color: #38bdf8; margin-bottom: 12px; font-weight: 500;">
-      ?? Sess�o Ativa: Revenda (Clientes, Vouchers & Varejo)
+      ?? Sessão Ativa: Revenda (Clientes, Vouchers & Varejo)
     </div>
 
     <div id="status-container" class="status status-waiting">
@@ -4528,7 +4528,7 @@ app.get('/qr', (req, res) => {
       <strong>Como conectar:</strong>
       <ol>
         <li>Abra o <b>WhatsApp</b> no celular do Bot</li>
-        <li>Toque em <b>Defini��es / Menu (?)</b></li>
+        <li>Toque em <b>Definições / Menu (?)</b></li>
         <li>Selecione <b>Aparelhos Conectados</b></li>
         <li>Toque em <b>Conectar um Aparelho</b> e aponte para o QR Code acima</li>
       </ol>
@@ -4557,23 +4557,23 @@ app.get('/qr', (req, res) => {
         btnRev.style.background = '#0284c7';
         btnRev.style.color = '#ffffff';
         btnRev.style.border = 'none';
-        desc.innerText = '?? Sess�o Ativa: Revenda (Clientes, Vouchers & Varejo)';
+        desc.innerText = '?? Sessão Ativa: Revenda (Clientes, Vouchers & Varejo)';
       } else if (sess === 'fornecimento') {
         btnForn.style.background = '#0284c7';
         btnForn.style.color = '#ffffff';
         btnForn.style.border = 'none';
-        desc.innerText = '?? Sess�o Ativa: Fornecimento (Atacado, Dados por Grosso)';
+        desc.innerText = '?? Sessão Ativa: Fornecimento (Atacado, Dados por Grosso)';
       } else if (sess === 'anticoncorrencia') {
         btnAnti.style.background = '#ef4444';
         btnAnti.style.color = '#ffffff';
         btnAnti.style.border = 'none';
-        desc.innerText = '??? Sess�o Ativa: Espi�o / Anticoncorr�ncia (Infiltra��o e Extra��o de Grupos)';
+        desc.innerText = '??? Sessão Ativa: Espião / Anticoncorrência (Infiltração e Extração de Grupos)';
       }
       updateQR();
     }
 
     async function resetCurrentSession() {
-      if (!confirm('Deseja realmente gerar um novo QR Code / reiniciar a sess�o ' + activeSession.toUpperCase() + '?')) return;
+      if (!confirm('Deseja realmente gerar um novo QR Code / reiniciar a sessão ' + activeSession.toUpperCase() + '?')) return;
       try {
         await fetch('/api/whatsapp/reset', {
           method: 'POST',
@@ -4620,7 +4620,7 @@ app.get('/qr', (req, res) => {
 // 8. SMS PAYMENT RECEIVER (M-Pesa / e-Mola ? Auto Transfer)
 // ----------------------------------------------------------------
 
-// Tabela de pre�os: valor_pago_MT ? MB a enviar
+// Tabela de preços: valor_pago_MT ? MB a enviar
 const PRICE_TABLE = [
   { valor: 10,  mb: 250  },
   { valor: 15,  mb: 400  },
@@ -4633,17 +4633,17 @@ const PRICE_TABLE = [
   { valor: 200, mb: 10240 }
 ];
 
-// Anti-duplica��o: armazena txn_ids j� processados (m�x 1000 itens em mem�ria)
+// Anti-duplicação: armazena txn_ids já processados (máx 1000 itens em memória)
 const inMemoryPayments = new Map();
 
-// Armazena pedidos do Client Hub aguardando confirma��o real da rede (M-Pesa / e-Mola)
+// Armazena pedidos do Client Hub aguardando confirmação real da rede (M-Pesa / e-Mola)
 const hubAguardandoOperadora = new Map(); // cleanTxnId -> { orderId, orderDoc, preco, timer }
 
 async function findOperatorPayment(cleanTxnId) {
   if (!cleanTxnId) return null;
   const tid = String(cleanTxnId).trim().toUpperCase().replace(/\.$/, '');
 
-  // 1. Procurar em mem�ria no server.js
+  // 1. Procurar em memória no server.js
   if (inMemoryPayments.has(tid)) return inMemoryPayments.get(tid);
 
   // 2. Procurar no baileys_engine (smsPaymentsMap)
@@ -4651,7 +4651,7 @@ async function findOperatorPayment(cleanTxnId) {
     return baileysEngine.smsPaymentsMap.get(tid);
   }
 
-  // 3. Procurar no Firestore sms_payments se dispon�vel
+  // 3. Procurar no Firestore sms_payments se disponível
   if (db) {
     try {
       const snap = await db.collection('sms_payments').doc(tid).get();
@@ -4659,7 +4659,7 @@ async function findOperatorPayment(cleanTxnId) {
     } catch (_) { console.warn(`?? [FIREBASE] Falha ao buscar pagamento ${tid} no Firestore:`, _.message); }
   }
 
-  // 4. Busca flex�vel (prefixos ou sufixos comuns do c�digo)
+  // 4. Busca flex�vel (prefixos ou sufixos comuns do código)
   const all = new Map();
   for (const [k, v] of inMemoryPayments.entries()) all.set(k, v);
   if (baileysEngine && baileysEngine.smsPaymentsMap) {
@@ -4700,9 +4700,9 @@ function getMbFromValor(valor) {
     if (cfg.PLANOS_ESPECIAIS && cfg.PLANOS_ESPECIAIS[vStr]) {
       return cfg.PLANOS_ESPECIAIS[vStr].quantidade_mb || cfg.PLANOS_ESPECIAIS[vStr].quantidade || 1024;
     }
-  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de pre�os em getMbFromValor:', e.message); }
+  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de preços em getMbFromValor:', e.message); }
 
-  // 2. Chamar o calculador proporcional do baileys_engine se dispon�vel
+  // 2. Chamar o calculador proporcional do baileys_engine se disponível
   if (baileysEngine && typeof baileysEngine.calcularPacoteProporcional === 'function') {
     try {
       const calc = baileysEngine.calcularPacoteProporcional(v);
@@ -4753,7 +4753,7 @@ function getMbFromValor(valor) {
     return mbEst > 0 ? mbEst : 100;
   }
 
-  // 4. �ltimo fallback pela PRICE_TABLE
+  // 4. último fallback pela PRICE_TABLE
   const exact = PRICE_TABLE.find(p => p.valor === v);
   if (exact) return exact.mb;
   const match = [...PRICE_TABLE].reverse().find(p => p.valor <= v);
@@ -4790,7 +4790,7 @@ function getValorFromMb(mb, modo = 'diario') {
       }
       if (closestVal > 0 && closestDiff <= numMb * 0.45) return closestVal;
     }
-  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de pre�os em getValorFromMb:', e.message); }
+  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de preços em getValorFromMb:', e.message); }
 
   const exact = PRICE_TABLE.find(p => p.mb === numMb);
   if (exact) return exact.valor;
@@ -4819,7 +4819,7 @@ app.post('/api/sms/payment', (req, res) => {
     if (!txn_id || !valor) {
       return res.status(400).json({
         success: false,
-        mensagem: 'Campos obrigat�rios: txn_id, valor'
+        mensagem: 'Campos obrigatérios: txn_id, valor'
       });
     }
     if (!remetente || String(remetente).trim() === '') {
@@ -4829,42 +4829,42 @@ app.post('/api/sms/payment', (req, res) => {
     let cleanTxnId = String(txn_id || '').trim().toUpperCase();
     if (cleanTxnId.endsWith('.')) cleanTxnId = cleanTxnId.slice(0, -1);
 
-    // ?? REGRA ESTRITA: Apenas M-Pesa e e-Mola s�o aceitos como pagamento!
+    // ?? REGRA ESTRITA: Apenas M-Pesa e e-Mola são aceitos como pagamento!
     const cleanMetodo = String(metodo || '').toLowerCase().trim();
     const isMpesa = cleanMetodo === 'mpesa' || cleanMetodo === 'm-pesa';
     const isEmola = cleanMetodo === 'emola' || cleanMetodo === 'e-mola';
 
     if (!isMpesa && !isEmola) {
-      console.warn(`?? [SMS PAYMENT REJEITADO] M�todo "${metodo}" n�o � M-Pesa nem e-Mola. Ignorando.`);
+      console.warn(`?? [SMS PAYMENT REJEITADO] M�todo "${metodo}" não � M-Pesa nem e-Mola. Ignorando.`);
       return res.status(400).json({
         success: false,
-        mensagem: 'Apenas pagamentos M-Pesa e e-Mola s�o aceitos pelo sistema.'
+        mensagem: 'Apenas pagamentos M-Pesa e e-Mola são aceitos pelo sistema.'
       });
     }
 
-    // Se o SMS bruto foi enviado, validar que n�o � mensagem de saldo de recarga/voz/txuna/empr�stimo
+    // Se o SMS bruto foi enviado, validar que não � mensagem de saldo de recarga/voz/txuna/empr�stimo
     if (raw_sms) {
       const rawLower = String(raw_sms).toLowerCase();
       if (/(?:saldo\s+(?:de\s+)?(?:voz|dados|megas|internet|recarga|principal)|transferiste\s+saldo|recebeste\s+saldo|partilha\s+de\s+saldo|txuna|empr[e�]stimo|recarga\s+(?:de\s+)?\d|b[o�]nus)/i.test(rawLower)) {
-        console.warn(`?? [SMS PAYMENT REJEITADO] SMS bruto � transfer�ncia de saldo/recarga/txuna, n�o � pagamento: "${raw_sms.slice(0, 70)}"`);
+        console.warn(`?? [SMS PAYMENT REJEITADO] SMS bruto � transferência de saldo/recarga/txuna, não � pagamento: "${raw_sms.slice(0, 70)}"`);
         return res.status(400).json({
           success: false,
-          mensagem: 'Transfer�ncias de saldo, recargas ou txuna n�o s�o aceitas como pagamento.'
+          mensagem: 'Transferências de saldo, recargas ou txuna não são aceitas como pagamento.'
         });
       }
     }
 
-    // Anti-fraude: verificar duplica��o
+    // Anti-fraude: verificar duplicação
     if (inMemoryPayments.has(cleanTxnId)) {
-      console.warn(`?? [SMS PAYMENT] Transa��o duplicada ignorada no cache geral: ${cleanTxnId}`);
-      // Notificar Baileys caso haja algum cliente aguardando confirma��o desta transa��o
+      console.warn(`?? [SMS PAYMENT] Transação duplicada ignorada no cache geral: ${cleanTxnId}`);
+      // Notificar Baileys caso haja algum cliente aguardando confirmação desta transação
       if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
         baileysEngine.registrarSmsPayment({ txn_id: cleanTxnId, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
       }
       return res.json({
         success: false,
         duplicado: true,
-        mensagem: `Transa��o ${cleanTxnId} j� foi processada`
+        mensagem: `Transação ${cleanTxnId} já foi processada`
       });
     }
 
@@ -4893,12 +4893,12 @@ app.post('/api/sms/payment', (req, res) => {
       });
     }
 
-    // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Confirma��o da Operadora" (WhatsApp)
+    // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Confirmação da Operadora" (WhatsApp)
     if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
       baileysEngine.registrarSmsPayment({ txn_id: cleanTxnId, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
     }
 
-    // Validar pedidos do Bot de Vendas por SMS aguardando confirma��o da operadora
+    // Validar pedidos do Bot de Vendas por SMS aguardando confirmação da operadora
     // -- ?? AUTOMA��O DE RECEPTOR PADR�O (ENVIO DIRETO SEM COMPROVATIVO) ------
     if (customerServices && typeof customerServices.obterReceptorPadrao === 'function') {
       let payerPhone = customerServices.normalizarTelefone(remetente);
@@ -4931,7 +4931,7 @@ app.post('/api/sms/payment', (req, res) => {
           origem: 'receptor_padrao_automatico',
           sender: payerPhone,
           senderPhone: payerPhone,
-          remetente: `Receptor Padr�o (${payerPhone})`,
+          remetente: `Receptor Padrão (${payerPhone})`,
           isAutoReceptor: true,
           txn_id: cleanTxnId,
           createdAt: new Date().toISOString()
@@ -4976,19 +4976,19 @@ app.post('/api/sms/payment', (req, res) => {
             baileysEngine.enviarMensagemTexto(
               clientJid,
               `?????????????━━━━━━━━━━━━━━━━━━\n` +
-              `  ? *RECARGA AUTOM�TICA ENVIADA!* ??\n` +
+              `  ? *RECARGA AUTOMÁTICA ENVIADA!* ??\n` +
               `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-              `Detectamos a sua transfer�ncia de *${valor} MT* (${metodo || 'M-Pesa'}).\n\n` +
+              `Detectamos a sua transferência de *${valor} MT* (${metodo || 'M-Pesa'}).\n\n` +
               `📲 *Destino:* *${defRec.targetPhone}*\n` +
               `?? *Volume:* *${volStr}*\n` +
               `🔑 *Ref:* \`${cleanTxnId}\`\n\n` +
-              `?? *Os megas j� est�o a ser ativados automaticamente no n�mero de destino!*\n` +
-              `? _N�o precisas de enviar comprovativo no WhatsApp._`
+              `?? *Os megas já estáo a ser ativados automaticamente no número de destino!*\n` +
+              `? _Não precisas de enviar comprovativo no WhatsApp._`
             ).catch(() => {});
           }
           if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *RECARGA AUTOM�TICA (RECEPTOR PADR�O)* ?\n` +
+              `?? *RECARGA AUTOMÁTICA (RECEPTOR PADR�O)* ?\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${cleanTxnId}\`\n` +
               `📲 *Destino:* *${defRec.targetPhone}*\n` +
@@ -5006,7 +5006,7 @@ app.post('/api/sms/payment', (req, res) => {
       smsSalesEngine.onOperadoraSmsPaymentReceived({ txn_id: cleanTxnId, valor });
     }
 
-    // Validar pedidos do Aplicativo Client Hub que estejam aguardando esta confirma��o da operadora
+    // Validar pedidos do Aplicativo Client Hub que estejam aguardando esta confirmação da operadora
     let hubMatch = null;
     let hubKey = null;
     if (hubAguardandoOperadora.has(cleanTxnId)) {
@@ -5075,7 +5075,7 @@ app.post('/api/sms/payment', (req, res) => {
           clientPhone: String(item.orderDoc.cliente_solicitante).replace(/\D/g, ''),
           clientName: 'Sistema Axion',
           sender: 'admin',
-          text: `?? Pagamento de ${vNum} MT confirmado pela rede (${metodo || 'M-Pesa'})! O seu pacote de ${item.orderDoc.quantidade}MB foi aprovado e est� a ser entregue para +258 ${item.orderDoc.numero}.`,
+          text: `?? Pagamento de ${vNum} MT confirmado pela rede (${metodo || 'M-Pesa'})! O seu pacote de ${item.orderDoc.quantidade}MB foi aprovado e está a ser entregue para +258 ${item.orderDoc.numero}.`,
           createdAt: new Date().toISOString(),
           read: false
         });
@@ -5092,19 +5092,19 @@ app.post('/api/sms/payment', (req, res) => {
     // Determinar quantos MB enviar
     const mbAEnviar = getMbFromValor(valor);
     if (!mbAEnviar) {
-      console.warn(`?? [SMS PAYMENT] Valor ${valor} MT n�o corresponde a nenhum plano. Txn: ${txn_id}`);
+      console.warn(`?? [SMS PAYMENT] Valor ${valor} MT não corresponde a nenhum plano. Txn: ${txn_id}`);
       return res.json({
         success: false,
-        mensagem: `Valor ${valor} MT n�o corresponde a nenhum plano dispon�vel`,
+        mensagem: `Valor ${valor} MT não corresponde a nenhum plano disponível`,
         planos_disponiveis: PRICE_TABLE.map(p => p.valor + ' MT = ' + p.mb + ' MB')
       });
     }
 
-    // Notificar Grupo de Notifica��es e aguardar que o cliente envie o comprovativo no WhatsApp com o n�mero de destino
+    // Notificar Grupo de Notificações e aguardar que o cliente envie o comprovativo no WhatsApp com o número de destino
     const volStr = mbAEnviar < 1024 ? `${mbAEnviar} MB` : `${mbAEnviar / 1024} GB`;
     const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
 
-    console.log(`?? [SMS PAYMENT RECEBIDO] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT (${volStr}) de ${remetente}. Aguardando cliente enviar n�mero de destino.`);
+    console.log(`?? [SMS PAYMENT RECEBIDO] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT (${volStr}) de ${remetente}. Aguardando cliente enviar número de destino.`);
 
     if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       baileysEngine.enviarNotificacaoGrupo(
@@ -5116,7 +5116,7 @@ app.post('/api/sms/payment', (req, res) => {
         `?? *Remetente:* *${remetente}*\n` +
         `?? *Hora:* ${horaAgora}\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `? *Status:* Registado. A aguardar que o cliente envie o comprovativo com o n�mero de destino no WhatsApp.`
+        `? *Status:* Registado. A aguardar que o cliente envie o comprovativo com o número de destino no WhatsApp.`
       );
     }
 
@@ -5125,7 +5125,7 @@ app.post('/api/sms/payment', (req, res) => {
       txn_id,
       mb_correspondente: mbAEnviar,
       status: 'aguardando_cliente',
-      mensagem: `Pagamento ${txn_id} de ${valor} MT (${volStr}) registado. A aguardar n�mero de destino pelo cliente.`
+      mensagem: `Pagamento ${txn_id} de ${valor} MT (${volStr}) registado. A aguardar número de destino pelo cliente.`
     });
   } catch (err) {
     console.error('? [SMS PAYMENT ERRO]:', err);
@@ -5134,9 +5134,9 @@ app.post('/api/sms/payment', (req, res) => {
 });
 
 // ----------------------------------------------------------------
-// Pesquisa de refer�ncias SMS (M-Pesa / e-Mola)
-// GET /api/sms/payments          ? lista �ltimos 50 (aceita ?q= para filtrar)
-// GET /api/sms/payments/:txn_id  ? procura por ID exacto (em mem�ria + Firestore)
+// Pesquisa de referências SMS (M-Pesa / e-Mola)
+// GET /api/sms/payments          ? lista últimos 50 (aceita ?q= para filtrar)
+// GET /api/sms/payments/:txn_id  ? procura por ID exacto (em memória + Firestore)
 // ----------------------------------------------------------------
 app.get('/api/sms/payments', (req, res) => {
   try {
@@ -5166,27 +5166,27 @@ app.get('/api/sms/payments', (req, res) => {
   }
 });
 
-// Pesquisar refer�ncia espec�fica por txn_id
+// Pesquisar referência específica por txn_id
 app.get('/api/sms/payments/:txn_id', async (req, res) => {
   try {
     const txnId = req.params.txn_id;
     let payment = null;
 
-    // 1. Procurar em mem�ria
+    // 1. Procurar em memória
     if (inMemoryPayments.has(txnId)) payment = inMemoryPayments.get(txnId);
     if (!payment && baileysEngine && baileysEngine.smsPaymentsMap && baileysEngine.smsPaymentsMap.has(txnId)) {
       payment = baileysEngine.smsPaymentsMap.get(txnId);
     }
 
-    // 2. Procurar no Firestore (se dispon�vel)
+    // 2. Procurar no Firestore (se disponível)
     if (!payment && db) {
       try {
         const snap = await db.collection('sms_payments').doc(txnId).get();
         if (snap.exists) payment = snap.data();
-      } catch (_) { console.warn(`?? [FIREBASE] Falha ao buscar transa��o SMS ${txnId} no Firestore:`, _.message); }
+      } catch (_) { console.warn(`?? [FIREBASE] Falha ao buscar transação SMS ${txnId} no Firestore:`, _.message); }
     }
 
-    // 3. Pesquisa parcial (cont�m) nos pagamentos em mem�ria
+    // 3. Pesquisa parcial (contém) nos pagamentos em memória
     let similarResults = [];
     if (!payment) {
       const all = new Map();
@@ -5203,10 +5203,10 @@ app.get('/api/sms/payments/:txn_id', async (req, res) => {
       return res.json({ success: true, encontrado: true, payment });
     } else if (similarResults.length > 0) {
       return res.json({ success: true, encontrado: false, similares: similarResults,
-        mensagem: `Refer�ncia exacta n�o encontrada. ${similarResults.length} resultado(s) similar(es).` });
+        mensagem: `Referência exacta não encontrada. ${similarResults.length} resultado(s) similar(es).` });
     } else {
       return res.status(404).json({ success: false, encontrado: false,
-        mensagem: `Refer�ncia ${txnId} n�o encontrada em mem�ria ou base de dados.` });
+        mensagem: `Referência ${txnId} não encontrada em memória ou base de dados.` });
     }
   } catch (err) {
     return res.status(500).json({ success: false, mensagem: err.message });
@@ -5216,7 +5216,7 @@ app.get('/api/sms/payments/:txn_id', async (req, res) => {
 // -- ADMIN: Corrigir duplicatas em TABELAS e TABELAS_GRUPO --
 app.all('/api/admin/fix-duplicates', (req, res) => {
   const token = req.headers['x-master-token'] || req.query.token;
-  if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'N�o autorizado' });
+  if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
 
   if (baileysEngine && typeof baileysEngine.limparDuplicatasTabelas === 'function') {
     const alterado = baileysEngine.limparDuplicatasTabelas();
@@ -5231,17 +5231,17 @@ app.all('/api/admin/fix-duplicates', (req, res) => {
     });
   }
 
-  return res.status(500).json({ ok: false, error: 'Motor Baileys n�o carregado' });
+  return res.status(500).json({ ok: false, error: 'Motor Baileys não carregado' });
 });
 
 // ----------------------------------------------------
 // 20. AXION CLIENT HUB API (APP DO CLIENTE & CRM)
 // ----------------------------------------------------
 
-// Armazenamento em mem�ria para Clientes, Suporte e Mensagens
+// Armazenamento em memória para Clientes, Suporte e Mensagens
 const clientUsers = new Map(); // phone -> { phone, name, password, pin, biometricEnabled, createdAt, lastLogin }
 const clientSupportMessages = []; // { id, clientPhone, clientName, sender: 'client'|'admin', text, createdAt, read: boolean }
-const clientSmsHistory = new Set(); // txn_ids j� usados para evitar fraude
+const clientSmsHistory = new Set(); // txn_ids já usados para evitar fraude
 
 // Carregar clientes salvos em cache local
 const CLIENTS_CACHE_FILE = path.resolve(__dirname, 'clients_store.json');
@@ -5270,11 +5270,11 @@ app.post('/api/client/auth/register', (req, res) => {
   try {
     const { phone, name, password, pin } = req.body || {};
     if (!phone || !password) {
-      return res.status(400).json({ success: false, mensagem: 'Telefone e senha s�o obrigat�rios.' });
+      return res.status(400).json({ success: false, mensagem: 'Telefone e senha são obrigatérios.' });
     }
     const cleanPhone = String(phone).replace(/\D/g, '');
     if (clientUsers.has(cleanPhone)) {
-      return res.status(400).json({ success: false, mensagem: 'Este n�mero j� possui cadastro. Fa�a login.' });
+      return res.status(400).json({ success: false, mensagem: 'Este número já possui cadastro. Fa�a login.' });
     }
     const user = {
       phone: cleanPhone,
@@ -5309,7 +5309,7 @@ app.post('/api/client/auth/login', (req, res) => {
     const user = clientUsers.get(cleanPhone);
 
     if (!user) {
-      return res.status(404).json({ success: false, mensagem: 'Cliente n�o encontrado. Por favor registe-se.' });
+      return res.status(404).json({ success: false, mensagem: 'Cliente não encontrado. Por favor registe-se.' });
     }
 
     if (!isBiometric && !verifyPassword(password, user.password)) {
@@ -5338,7 +5338,7 @@ app.post('/api/client/auth/biometric-toggle', (req, res) => {
   const { phone, enabled } = req.body || {};
   const cleanPhone = String(phone || '').replace(/\D/g, '');
   const user = clientUsers.get(cleanPhone);
-  if (!user) return res.status(404).json({ success: false, mensagem: 'Usu�rio n�o encontrado.' });
+  if (!user) return res.status(404).json({ success: false, mensagem: 'Usu�rio não encontrado.' });
 
   user.biometricEnabled = Boolean(enabled);
   saveClientsStore();
@@ -5360,7 +5360,7 @@ app.get('/api/client/system-status', (req, res) => {
     };
   });
 
-  // Verificar Portas Di�rias (8024, 8023, 8025)
+  // Verificar Portas Diárias (8024, 8023, 8025)
   const dailyDevs = devices.filter(d => d.porta !== 8077 && d.porta !== 8777);
   const dailyOnline = dailyDevs.some(d => d.online && !d.sem_saldo);
 
@@ -5373,11 +5373,11 @@ app.get('/api/client/system-status', (req, res) => {
     sistema_operacional: dailyOnline || specialOnline,
     diario: {
       disponivel: dailyOnline,
-      mensagem: dailyOnline ? 'Pronto para envios di�rios 24h' : 'Portas di�rias temporariamente ocupadas'
+      mensagem: dailyOnline ? 'Pronto para envios diários 24h' : 'Portas diárias temporariamente ocupadas'
     },
     saldo_especial: {
       disponivel: specialOnline,
-      mensagem: specialOnline ? 'Porta 8077 pronta para Semanal / Mensal / Tudo Top' : 'Porta 8077 aguardando reposi��o de cr�dito'
+      mensagem: specialOnline ? 'Porta 8077 pronta para Semanal / Mensal / Tudo Top' : 'Porta 8077 aguardando reposição de cr�dito'
     },
     titulares: {
       mpesa: {
@@ -5432,14 +5432,14 @@ const DEFAULT_SERVER_PACKAGES = {
     { preco: 850, nome: "25 GB + Minutos", quantidade_mb: 25600, display_size: "25 GB + Voz", periodo: "?? Vodacom (30 Dias)", modo: "diamante" }
   ],
   especiais: [
-    { preco: 76, nome: "?? 3GB+700 (Renova��o)", quantidade_mb: 3772, display_size: "3.7 GB", periodo: "Renova��o (+100MB/dia)", modo: "renovavel" },
-    { preco: 120, nome: "?? 5GB+700 (Renova��o)", quantidade_mb: 5820, display_size: "5.8 GB", periodo: "Renova��o (+100MB/dia)", modo: "renovavel" },
-    { preco: 130, nome: "?? 5GB Faseado (1GB/dia)", quantidade_mb: 5120, display_size: "5.0 GB", periodo: "Di�rio Faseado (1GB/dia)", modo: "faseado" },
-    { preco: 195, nome: "?? 8GB+700 (Renova��o)", quantidade_mb: 8892, display_size: "8.8 GB", periodo: "Renova��o (+100MB/dia)", modo: "renovavel" },
-    { preco: 240, nome: "?? 10GB+700 (Renova��o)", quantidade_mb: 10940, display_size: "10.9 GB", periodo: "Renova��o (+100MB/dia)", modo: "renovavel" },
-    { preco: 255, nome: "?? 10GB Faseado (1GB/dia)", quantidade_mb: 10240, display_size: "10.0 GB", periodo: "Di�rio Faseado (1GB/dia)", modo: "faseado" },
-    { preco: 381, nome: "?? 15GB Faseado (1GB/dia)", quantidade_mb: 15360, display_size: "15.0 GB", periodo: "Di�rio Faseado (1GB/dia)", modo: "faseado" },
-    { preco: 510, nome: "?? 20GB Faseado (1GB/dia)", quantidade_mb: 20480, display_size: "20.0 GB", periodo: "Di�rio Faseado (1GB/dia)", modo: "faseado" }
+    { preco: 76, nome: "?? 3GB+700 (Renovação)", quantidade_mb: 3772, display_size: "3.7 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
+    { preco: 120, nome: "?? 5GB+700 (Renovação)", quantidade_mb: 5820, display_size: "5.8 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
+    { preco: 130, nome: "?? 5GB Faseado (1GB/dia)", quantidade_mb: 5120, display_size: "5.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" },
+    { preco: 195, nome: "?? 8GB+700 (Renovação)", quantidade_mb: 8892, display_size: "8.8 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
+    { preco: 240, nome: "?? 10GB+700 (Renovação)", quantidade_mb: 10940, display_size: "10.9 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
+    { preco: 255, nome: "?? 10GB Faseado (1GB/dia)", quantidade_mb: 10240, display_size: "10.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" },
+    { preco: 381, nome: "?? 15GB Faseado (1GB/dia)", quantidade_mb: 15360, display_size: "15.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" },
+    { preco: 510, nome: "?? 20GB Faseado (1GB/dia)", quantidade_mb: 20480, display_size: "20.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" }
   ]
 };
 
@@ -5459,7 +5459,7 @@ function loadDynamicPackages() {
 }
 loadDynamicPackages();
 
-// Restaurar pacotes do RTDB se arquivo local n�o existir (ap�s restart do Render)
+// Restaurar pacotes do RTDB se arquivo local não existir (após restart do Render)
 async function restoreDynamicPackagesFromRTDB() {
   if (!rtdb) return;
   try {
@@ -5468,7 +5468,7 @@ async function restoreDynamicPackagesFromRTDB() {
     if (data && typeof data === 'object' && (data.diario || data.semanal || data.mensal)) {
       currentDynamicPackages = { ...DEFAULT_SERVER_PACKAGES, ...data };
       saveDynamicPackages();
-      console.log('?? [RTDB RESTORE] Pacotes din�micos restaurados do Firebase RTDB.');
+      console.log('?? [RTDB RESTORE] Pacotes dinâmicos restaurados do Firebase RTDB.');
     }
   } catch (e) {
     console.warn('?? [RTDB RESTORE] Erro ao restaurar pacotes:', e.message);
@@ -5486,7 +5486,7 @@ function saveDynamicPackages() {
   }
 }
 
-// -- 20.3 Cat�logo Completo de Pacotes Din�micos (Sincronizado com Admin & Apps) --
+// -- 20.3 Catélogo Completo de Pacotes Dinâmicos (Sincronizado com Admin & Apps) --
 app.get('/api/client/packages', (req, res) => {
   return res.json({
     success: true,
@@ -5506,7 +5506,7 @@ app.post('/api/admin/packages/save', (req, res) => {
   try {
     const { packages } = req.body || {};
     if (!packages || typeof packages !== 'object') {
-      return res.status(400).json({ success: false, mensagem: 'Estrutura de pacotes inv�lida.' });
+      return res.status(400).json({ success: false, mensagem: 'Estrutura de pacotes inválida.' });
     }
 
     if (Array.isArray(packages.diario)) currentDynamicPackages.diario = packages.diario;
@@ -5524,7 +5524,7 @@ app.post('/api/admin/packages/save', (req, res) => {
       rtdb.ref('system_packages').set(currentDynamicPackages).catch(e => console.warn('?? [RTDB] Erro ao salvar system_packages:', e.message));
     }
 
-    console.log('? [ADMIN] Tabelas de pacotes atualizadas dinamicamente pelo Admin! Vers�o:', currentDynamicPackages.version);
+    console.log('? [ADMIN] Tabelas de pacotes atualizadas dinamicamente pelo Admin! Versão:', currentDynamicPackages.version);
 
     return res.json({
       success: true,
@@ -5537,13 +5537,13 @@ app.post('/api/admin/packages/save', (req, res) => {
   }
 });
 
-// -- 20.3.1 Sistema de An�ncios e Alertas para Clientes (Axion Broadcast) --
+// -- 20.3.1 Sistema de Anúncios e Alertas para Clientes (Axion Broadcast) --
 const ANNOUNCEMENT_CACHE_FILE = path.resolve(__dirname, 'cache_announcement.json');
 
 let currentAnnouncement = {
   id: 'ANN-DEFAULT',
   title: '?? Bem-vindo ao Axion Client Hub!',
-  message: 'Recarregue pacotes de megas com ativa��o imediata via M-Pesa e e-Mola sem filas!',
+  message: 'Recarregue pacotes de megas com ativação imediata via M-Pesa e e-Mola sem filas!',
   type: 'promo', // 'promo' | 'alert' | 'news' | 'info'
   active: false,
   sendNotification: true,
@@ -5565,7 +5565,7 @@ function loadAnnouncement() {
 }
 loadAnnouncement();
 
-// Restaurar an�ncio do RTDB se arquivo local n�o existir (ap�s restart do Render)
+// Restaurar anúncio do RTDB se arquivo local não existir (após restart do Render)
 async function restoreAnnouncementFromRTDB() {
   if (!rtdb) return;
   try {
@@ -5574,10 +5574,10 @@ async function restoreAnnouncementFromRTDB() {
     if (data && typeof data === 'object' && data.id) {
       currentAnnouncement = { ...currentAnnouncement, ...data };
       saveAnnouncement();
-      console.log('?? [RTDB RESTORE] An�ncio restaurado do Firebase RTDB.');
+      console.log('?? [RTDB RESTORE] Anúncio restaurado do Firebase RTDB.');
     }
   } catch (e) {
-    console.warn('?? [RTDB RESTORE] Erro ao restaurar an�ncio:', e.message);
+    console.warn('?? [RTDB RESTORE] Erro ao restaurar anúncio:', e.message);
   }
 }
 if (!fs.existsSync(ANNOUNCEMENT_CACHE_FILE)) {
@@ -5592,7 +5592,7 @@ function saveAnnouncement() {
   }
 }
 
-// Endpoint para os clientes (Client Hub) obterem o an�ncio atual
+// Endpoint para os clientes (Client Hub) obterem o anúncio atual
 app.get('/api/client/announcement', (req, res) => {
   return res.json({
     success: true,
@@ -5600,7 +5600,7 @@ app.get('/api/client/announcement', (req, res) => {
   });
 });
 
-// Endpoint Admin para ler o an�ncio
+// Endpoint Admin para ler o anúncio
 app.get('/api/admin/announcement', (req, res) => {
   return res.json({
     success: true,
@@ -5608,7 +5608,7 @@ app.get('/api/admin/announcement', (req, res) => {
   });
 });
 
-// Endpoint Admin para salvar/publicar o an�ncio
+// Endpoint Admin para salvar/publicar o anúncio
 app.post('/api/admin/announcement', (req, res) => {
   try {
     const { title, message, type, active, sendNotification } = req.body || {};
@@ -5630,9 +5630,9 @@ app.post('/api/admin/announcement', (req, res) => {
       rtdb.ref('system_announcement').set(currentAnnouncement).catch(e => console.warn('?? [RTDB] Erro ao salvar system_announcement:', e.message));
     }
 
-    console.log(`?? [ADMIN] An�ncio publicado para os clientes! Ativo: ${currentAnnouncement.active} | T�tulo: ${currentAnnouncement.title}`);
+    console.log(`?? [ADMIN] Anúncio publicado para os clientes! Ativo: ${currentAnnouncement.active} | T�tulo: ${currentAnnouncement.title}`);
 
-    // Se o bot WhatsApp estiver conectado e o admin marcar para enviar notifica��o
+    // Se o bot WhatsApp estiver conectado e o admin marcar para enviar notificação
     if (currentAnnouncement.active && baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       const emojiType = currentAnnouncement.type === 'alert' ? '??' : currentAnnouncement.type === 'promo' ? '??' : '??';
       baileysEngine.enviarNotificacaoGrupo(
@@ -5648,39 +5648,39 @@ app.post('/api/admin/announcement', (req, res) => {
     return res.json({
       success: true,
       mensagem: currentAnnouncement.active 
-        ? '?? An�ncio publicado com sucesso! Todos os clientes receber�o alerta no aplicativo.' 
-        : 'An�ncio desativado no aplicativo dos clientes.',
+        ? '?? Anúncio publicado com sucesso! Todos os clientes receberáo alerta no aplicativo.' 
+        : 'Anúncio desativado no aplicativo dos clientes.',
       announcement: currentAnnouncement
     });
   } catch(e) {
-    return res.status(500).json({ success: false, mensagem: 'Erro ao salvar an�ncio: ' + e.message });
+    return res.status(500).json({ success: false, mensagem: 'Erro ao salvar anúncio: ' + e.message });
   }
 });
 
-// -- 20.4 Compra via Confirma��o de SMS (M-Pesa / e-Mola) --
-// As MESMAS regras do WhatsApp: confirma��es que foram REALMENTE recebidas no nosso M-Pesa ou e-Mola
+// -- 20.4 Compra via Confirmação de SMS (M-Pesa / e-Mola) --
+// As MESMAS regras do WhatsApp: confirmações que foram REALMENTE recebidas no nosso M-Pesa ou e-Mola
 app.post('/api/client/purchase', async (req, res) => {
   try {
     const { clientPhone, recipientPhone, smsText, packagePrice, packageModo, packageMb, packageName } = req.body || {};
 
-    // -- 1. Campos obrigat�rios --
+    // -- 1. Campos obrigatérios --
     if (!recipientPhone || !smsText || !packagePrice || !packageMb) {
-      return res.status(400).json({ success: false, mensagem: 'Preencha todos os campos: n�mero destinat�rio, comprovativo de pagamento e pacote escolhido.' });
+      return res.status(400).json({ success: false, mensagem: 'Preencha todos os campos: número destinatério, comprovativo de pagamento e pacote escolhido.' });
     }
 
     const smsClean = String(smsText).trim();
 
     // -- 2. Validar que � um comprovativo M-Pesa / e-Mola --
-    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transa��o|Transacao|ID\s*(?:da)?\s*transa|ID\s*Trans|PP2\d{5})/i.test(smsClean);
+    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transação|Transacao|ID\s*(?:da)?\s*transa|ID\s*Trans|PP2\d{5})/i.test(smsClean);
     const temValor    = /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(smsClean);
     if (!temIndicador || !temValor) {
       return res.status(400).json({
         success: false,
-        mensagem: '? Texto inv�lido. Deve colar a mensagem de confirma��o real recebida no M-Pesa ou e-Mola (com valor em MT e c�digo de transa��o).'
+        mensagem: '? Texto inválido. Deve colar a mensagem de confirmação real recebida no M-Pesa ou e-Mola (com valor em MT e código de transação).'
       });
     }
 
-    // -- 3. Extrair ID de transa��o --
+    // -- 3. Extrair ID de transação --
     function extrairTxIdLocal(texto) {
       const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[c�][a�]o|ID\s*Trans|TxId|Ref(?:er[e�]ncia)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
       if (mExplicit && mExplicit[1] && mExplicit[1].length >= 6) return mExplicit[1].toUpperCase().replace(/\.$/, '');
@@ -5714,17 +5714,17 @@ app.post('/api/client/purchase', async (req, res) => {
     const valorSMS = extrairValorLocal(smsClean);
     const preco    = Number(packagePrice);
 
-    // -- 5. Verificar se o pagamento foi feito para os nossos n�meros oficiais (M-Pesa 856268811 / e-Mola 864882152) --
+    // -- 5. Verificar se o pagamento foi feito para os nossos números oficiais (M-Pesa 856268811 / e-Mola 864882152) --
     const NOSSOS_NUMEROS = ['856268811', '879691565', '864882152'];
     const destinoPagamento = NOSSOS_NUMEROS.find(n => smsClean.includes(n) || smsClean.includes('258' + n));
     if (!destinoPagamento) {
       return res.status(400).json({
         success: false,
-        mensagem: `? Pagamento n�o reconhecido. O comprovativo deve mostrar transfer�ncia para uma das contas oficiais Axion:\n?? M-Pesa: 856268811 (Kelven Junior)\n?? e-Mola: 879691565 (Kelven Junior Anabela Nharrava)\n\nCertifique-se de que transferiu para a nossa conta correta.`
+        mensagem: `? Pagamento não reconhecido. O comprovativo deve mostrar transferência para uma das contas oficiais Axion:\n?? M-Pesa: 856268811 (Kelven Junior)\n?? e-Mola: 879691565 (Kelven Junior Anabela Nharrava)\n\nCertifique-se de que transferiu para a nossa conta correta.`
       });
     }
 
-    // -- 6. Verificar valor compat�vel com o pre�o do pacote (toler�ncia �1 MT) --
+    // -- 6. Verificar valor compatével com o preço do pacote (tolerância �1 MT) --
     if (valorSMS !== null && (preco - valorSMS) > 1) {
       return res.status(400).json({
         success: false,
@@ -5732,21 +5732,21 @@ app.post('/api/client/purchase', async (req, res) => {
       });
     }
 
-    // -- 7. Verificar n�mero destinat�rio de megas (Vodacom/Movitel/Tmcel) --
+    // -- 7. Verificar número destinatério de megas (Vodacom/Movitel/Tmcel) --
     const cleanDest = String(recipientPhone).replace(/\D/g, '').slice(-9);
     if (!cleanDest.startsWith('84') && !cleanDest.startsWith('85') && !cleanDest.startsWith('86') && !cleanDest.startsWith('87') && !cleanDest.startsWith('82') && !cleanDest.startsWith('83')) {
-      return res.status(400).json({ success: false, mensagem: 'N�mero destinat�rio de Mo�ambique inv�lido (deve ser Vodacom, Movitel ou Tmcel).' });
+      return res.status(400).json({ success: false, mensagem: 'Número destinatério de Moçambique inválido (deve ser Vodacom, Movitel ou Tmcel).' });
     }
 
-    // -- 8. Anti-fraude: bloquear reutiliza��o do mesmo comprovativo --
+    // -- 8. Anti-fraude: bloquear reutilização do mesmo comprovativo --
     if (clientSmsHistory.has(txnId) && !txnId.startsWith('TXN-')) {
-      return res.status(400).json({ success: false, mensagem: '? Este comprovativo/refer�ncia j� foi utilizado anteriormente no sistema. Cada confirma��o � v�lida apenas para 1 compra.' });
+      return res.status(400).json({ success: false, mensagem: '? Este comprovativo/referência já foi utilizado anteriormente no sistema. Cada confirmação � válida apenas para 1 compra.' });
     }
 
-    // -- 9. VALIDA��O REAL: A CONFIRMA��O FOI REALMENTE RECEBIDA NO NOSSO M-PESA OU E-MOLA? --
+    // -- 9. VALIDA��O REAL: A CONFIRMAçãO FOI REALMENTE RECEBIDA NO NOSSO M-PESA OU E-MOLA? --
     let realPay = await findOperatorPayment(txnId);
 
-    // Se ainda n�o caiu no servidor, aguarda ativamente at� 10 segundos (polling de 1s) para cobrir o atraso normal de rede SMS
+    // Se ainda não caiu no servidor, aguarda ativamente até 10 segundos (polling de 1s) para cobrir o atraso normal de rede SMS
     if (!realPay && !txnId.startsWith('TXN-')) {
       for (let i = 0; i < 10; i++) {
         await new Promise(r => setTimeout(r, 1000));
@@ -5761,12 +5761,12 @@ app.post('/api/client/purchase', async (req, res) => {
     const metodo  = (destinoPagamento === '879691565' || destinoPagamento === '864882152') ? 'emola' : 'mpesa';
     const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
-    // CASO A: OPERADORA J� CONFIRMOU O RECEBIMENTO NO NOSSO TELEFONE!
+    // CASO A: OPERADORA Já CONFIRMOU O RECEBIMENTO NO NOSSO TELEFONE!
     if (realPay) {
       if (realPay.usado) {
         return res.status(400).json({
           success: false,
-          mensagem: '? Este comprovativo j� foi confirmado e utilizado anteriormente por outro pedido.'
+          mensagem: '? Este comprovativo já foi confirmado e utilizado anteriormente por outro pedido.'
         });
       }
 
@@ -5774,7 +5774,7 @@ app.post('/api/client/purchase', async (req, res) => {
       if (valOperadora < (preco - 1)) {
         return res.status(400).json({
           success: false,
-          mensagem: `? Valor recebido pela rede (${valOperadora} MT) � menor que o pre�o do pacote (${preco} MT).`
+          mensagem: `? Valor recebido pela rede (${valOperadora} MT) � menor que o preço do pacote (${preco} MT).`
         });
       }
 
@@ -5832,14 +5832,14 @@ app.post('/api/client/purchase', async (req, res) => {
           `?? *Origem:* Axion Client Hub App\n` +
           `?? *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
-          `? *Status:* Confirmado pelo SMS da rede. Enviado para ativa��o imediata!`
+          `? *Status:* Confirmado pelo SMS da rede. Enviado para ativação imediata!`
         );
       }
 
       return res.json({
         success: true,
         status: 'confirmed',
-        mensagem: `? Pagamento de ${valOperadora} MT confirmado oficialmente pela rede ${metodoNome}! Os seus megas est�o a ser enviados imediatamente para +258 ${cleanDest}.`,
+        mensagem: `? Pagamento de ${valOperadora} MT confirmado oficialmente pela rede ${metodoNome}! Os seus megas estáo a ser enviados imediatamente para +258 ${cleanDest}.`,
         orderId,
         destinatario: cleanDest,
         quantidade_mb: qtyMb,
@@ -5849,9 +5849,9 @@ app.post('/api/client/purchase', async (req, res) => {
       });
     }
 
-    // CASO B: A CONFIRMA��O DA OPERADORA AINDA N�O ENTROU NO SISTEMA (DELAYS DE REDE SMS)
-    // Regra id�ntica ao WhatsApp: status 'aguardando_operadora' por at� 3 minutos
-    console.log(`? [CLIENT HUB] Ref ${txnId} aguardando SMS da operadora... Iniciando fila de valida��o.`);
+    // CASO B: A CONFIRMAçãO DA OPERADORA AINDA N�O ENTROU NO SISTEMA (DELAYS DE REDE SMS)
+    // Regra id�ntica ao WhatsApp: status 'aguardando_operadora' por até 3 minutos
+    console.log(`? [CLIENT HUB] Ref ${txnId} aguardando SMS da operadora... Iniciando fila de validação.`);
 
     const orderDoc = {
       id: orderId,
@@ -5862,7 +5862,7 @@ app.post('/api/client/purchase', async (req, res) => {
       valor: preco,
       valor_pago: valorSMS || preco,
       modo,
-      status: 'aguardando_operadora', // N�o envia megas at� a confirma��o real entrar!
+      status: 'aguardando_operadora', // Não envia megas até a confirmação real entrar!
       origem: 'client_hub',
       metodo,
       sms_ref: txnId,
@@ -5887,11 +5887,11 @@ app.post('/api/client/purchase', async (req, res) => {
       if (hubAguardandoOperadora.has(txnId)) {
         hubAguardandoOperadora.delete(txnId);
         orderDoc.status = 'failed';
-        orderDoc.motivo = 'Confirma��o por SMS da operadora n�o foi recebida no tempo limite (10 min).';
+        orderDoc.motivo = 'Confirmação por SMS da operadora não foi recebida no tempo limite (10 min).';
         orderDoc.updatedAt = new Date().toISOString();
         inMemoryOrders.set(orderId, orderDoc);
         saveOrdersToCache();
-        console.warn(`? [HUB TIMEOUT] Pedido ${orderId} cancelado: SMS da operadora n�o entrou em 10 minutos.`);
+        console.warn(`? [HUB TIMEOUT] Pedido ${orderId} cancelado: SMS da operadora não entrou em 10 minutos.`);
       }
     }, 10 * 60 * 1000);
 
@@ -5905,7 +5905,7 @@ app.post('/api/client/purchase', async (req, res) => {
     return res.json({
       success: true,
       status: 'aguardando_operadora',
-      mensagem: `? Comprovativo registado! Estamos a aguardar a confirma��o oficial da rede (${metodoNome}). Assim que o SMS da operadora entrar no sistema (geralmente em 30 a 60 segundos), os seus megas ser�o enviados automaticamente. Pode acompanhar na aba 'Meus Pedidos'.`,
+      mensagem: `? Comprovativo registado! Estamos a aguardar a confirmação oficial da rede (${metodoNome}). Assim que o SMS da operadora entrar no sistema (geralmente em 30 a 60 segundos), os seus megas ser�o enviados automaticamente. Pode acompanhar na aba 'Meus Pedidos'.`,
       orderId,
       destinatario: cleanDest,
       quantidade_mb: qtyMb,
@@ -5920,7 +5920,7 @@ app.post('/api/client/purchase', async (req, res) => {
   }
 });
 
-// -- 20.5 Hist�rico de Compras do Cliente --
+// -- 20.5 Histórico de Compras do Cliente --
 app.get('/api/client/orders/:phone', (req, res) => {
   const cleanPhone = String(req.params.phone || '').replace(/\D/g, '');
   const orders = [...inMemoryOrders.values()]
@@ -5949,7 +5949,7 @@ app.get('/api/client/support/messages/:phone', (req, res) => {
 
 app.post('/api/client/support/send', (req, res) => {
   const { phone, name, text, sender, isDirectAdmin, hasPaymentProof, paymentDetails } = req.body || {};
-  if (!phone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e mensagem s�o obrigat�rios.' });
+  if (!phone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e mensagem são obrigatérios.' });
 
   const cleanPhone = String(phone).replace(/\D/g, '');
   const msgObj = {
@@ -5979,7 +5979,7 @@ app.post('/api/client/support/send', (req, res) => {
 app.post('/api/client/support/process-proof', async (req, res) => {
   try {
     const { phone, name, smsText } = req.body || {};
-    if (!smsText) return res.status(400).json({ success: false, mensagem: 'Texto do comprovativo � obrigat�rio.' });
+    if (!smsText) return res.status(400).json({ success: false, mensagem: 'Texto do comprovativo � obrigatério.' });
 
     const smsClean = String(smsText).trim();
     const cleanPhone = String(phone || '').replace(/\D/g, '');
@@ -5992,7 +5992,7 @@ app.post('/api/client/support/process-proof', async (req, res) => {
       return res.json({
         success: false,
         recognized: false,
-        mensagem: 'N�o foi poss�vel reconhecer este texto como um comprovativo M-Pesa ou e-Mola.'
+        mensagem: 'Não foi possível reconhecer este texto como um comprovativo M-Pesa ou e-Mola.'
       });
     }
 
@@ -6028,13 +6028,13 @@ app.post('/api/client/support/process-proof', async (req, res) => {
 
     const txnId = extrairTxIdChat(smsClean);
     const valor = extrairValorChat(smsClean) || 0;
-    // Detec��o fi�vel por prefixo: e-Mola come�a com "ID da transacao", M-Pesa com "Confirmado DJDXXXXX"
+    // Detecção fi�vel por prefixo: e-Mola come�a com "ID da transacao", M-Pesa com "Confirmado DJDXXXXX"
     const isEmolaPrefix = /^(ID\s*(da\s*)?transa[c�][a�]o|Transaction\s*ID|ID\s*Trans)/i.test(smsClean.trim());
     const isMpesaPrefix = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(smsClean.trim());
     const isEmola = isEmolaPrefix ? true : isMpesaPrefix ? false : /e-?mola|879691565|864882152/i.test(smsClean);
     const metodo = isEmola ? 'e-Mola' : 'M-Pesa';
 
-    // 4. Verificar se a operadora j� confirmou no gateway
+    // 4. Verificar se a operadora já confirmou no gateway
     let realPay = await findOperatorPayment(txnId);
 
     const paymentDetails = {
@@ -6064,16 +6064,16 @@ app.post('/api/client/support/process-proof', async (req, res) => {
     let respostaTexto = '';
     if (realPay) {
       respostaTexto = `? <b>Comprovativo M-Pesa/e-Mola Reconhecido e Validado!</b><br><br>` +
-        `� <b>C�digo/Ref:</b> <code class="text-cyan-400 font-bold">${txnId}</code><br>` +
+        `� <b>Código/Ref:</b> <code class="text-cyan-400 font-bold">${txnId}</code><br>` +
         `� <b>Valor Recebido:</b> <b>${realPay.valor || valor} MT</b> (${metodo})<br>` +
         `� <b>Status:</b> Confirmado pelo nosso gateway de rede!<br><br>` +
-        `?? O seu pagamento j� est� aprovado no sistema! O Administrador Kelven foi notificado para despachar ou voc� pode ir na aba <b>Loja</b> e concluir a compra com esse comprovativo.`;
+        `?? O seu pagamento já está aprovado no sistema! O Administrador Kelven foi notificado para despachar ou voc� pode ir na aba <b>Loja</b> e concluir a compra com esse comprovativo.`;
     } else {
       respostaTexto = `? <b>Comprovativo de Pagamento Detectado!</b><br><br>` +
-        `� <b>C�digo/Ref:</b> <code class="text-amber-400 font-bold">${txnId}</code><br>` +
+        `� <b>Código/Ref:</b> <code class="text-amber-400 font-bold">${txnId}</code><br>` +
         `� <b>Valor Identificado:</b> <b>${valor} MT</b> (${metodo})<br>` +
         `� <b>Status:</b> Registado no sistema! A aguardar o SMS oficial da operadora entrar no telem�vel gateway.<br><br>` +
-        `?? <b>Aten��o:</b> O sistema e o Administrador Kelven j� receberam a sua confirma��o. Assim que a rede entregar o SMS (30 a 60 segundos), o envio � liberado!`;
+        `?? <b>Atenção:</b> O sistema e o Administrador Kelven já receberam a sua confirmação. Assim que a rede entregar o SMS (30 a 60 segundos), o envio � liberado!`;
     }
 
     return res.json({
@@ -6091,12 +6091,12 @@ app.post('/api/client/support/process-proof', async (req, res) => {
   }
 });
 
-// -- ENDPOINT: Listar N�meros Configurados pelos Clientes (Receptores Padr�o) --
+// -- ENDPOINT: Listar Números Configurados pelos Clientes (Receptores Padrão) --
 app.get(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'N�o autorizado' });
+    return res.status(403).json({ error: 'Não autorizado' });
   }
 
   let receptores = customerServices && typeof customerServices.listarTodosReceptores === 'function'
@@ -6119,12 +6119,12 @@ app.get(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   return res.json({ success: true, count: receptores.length, receptores });
 });
 
-// -- ENDPOINT: Configurar Receptor Padr�o Manualmente (Admin / API) --
+// -- ENDPOINT: Configurar Receptor Padrão Manualmente (Admin / API) --
 app.post(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token || req.body?.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'N�o autorizado' });
+    return res.status(403).json({ error: 'Não autorizado' });
   }
 
   const { pagador, pagadores, receptor, destino, ownerJid } = req.body || {};
@@ -6132,7 +6132,7 @@ app.post(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   const listPagadores = pagadores || (pagador ? [pagador] : [targetReceptor]);
 
   if (!targetReceptor) {
-    return res.status(400).json({ success: false, error: 'Receptor obrigat�rio' });
+    return res.status(400).json({ success: false, error: 'Receptor obrigatério' });
   }
 
   if (customerServices && typeof customerServices.definirReceptorPadrao === 'function') {
@@ -6140,15 +6140,15 @@ app.post(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
     return res.json(result);
   }
 
-  return res.status(500).json({ success: false, error: 'Customer services n�o inicializado' });
+  return res.status(500).json({ success: false, error: 'Customer services não inicializado' });
 });
 
-// -- ENDPOINT: Remover Receptor Padr�o (Admin / API) --
+// -- ENDPOINT: Remover Receptor Padrão (Admin / API) --
 app.delete(['/api/admin/recipients/:phone', '/api/recipients/:phone'], async (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token || req.body?.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'N�o autorizado' });
+    return res.status(403).json({ error: 'Não autorizado' });
   }
 
   const phone = req.params.phone;
@@ -6157,7 +6157,7 @@ app.delete(['/api/admin/recipients/:phone', '/api/recipients/:phone'], async (re
     return res.json(result);
   }
 
-  return res.status(500).json({ success: false, error: 'Customer services n�o inicializado' });
+  return res.status(500).json({ success: false, error: 'Customer services não inicializado' });
 });
 
 // -- 20.7 CRM & Suporte no Axion Admin Master --
@@ -6165,7 +6165,7 @@ app.get('/api/admin/crm/stats', (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'N�o autorizado' });
+    return res.status(403).json({ error: 'Não autorizado' });
   }
 
   const now = Date.now();
@@ -6228,7 +6228,7 @@ app.get('/api/admin/crm/stats', (req, res) => {
 });
 
 app.get('/api/admin/crm/support-tickets', (req, res) => {
-  // Agrupa mensagens n�o lidas por cliente para o Admin responder
+  // Agrupa mensagens não lidas por cliente para o Admin responder
   const grouped = {};
   clientSupportMessages.forEach(m => {
     if (!grouped[m.clientPhone]) {
@@ -6263,7 +6263,7 @@ app.get('/api/admin/crm/support-tickets', (req, res) => {
 app.post('/api/admin/crm/support-reply', (req, res) => {
   const clientPhone = req.body?.clientPhone || req.body?.phone;
   const text = req.body?.text || req.body?.reply || req.body?.message;
-  if (!clientPhone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e resposta obrigat�rios.' });
+  if (!clientPhone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e resposta obrigatérios.' });
 
   const cleanPhone = String(clientPhone).replace(/\D/g, '');
   const msgObj = {
@@ -6283,7 +6283,7 @@ app.post('/api/admin/crm/support-reply', (req, res) => {
 
   clientSupportMessages.push(msgObj);
 
-  // Se solicitado envio tamb�m via SMS de hardware (Porta 8077 do Gateway)
+  // Se solicitado envio também via SMS de hardware (Porta 8077 do Gateway)
   if (req.body.sendViaSms || req.body.sendSms) {
     const gatewayPort = req.body.port || process.env.SMS_GATEWAY_PORT || 8077;
     const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
@@ -6294,7 +6294,7 @@ app.post('/api/admin/crm/support-reply', (req, res) => {
     }, { timeout: 6000 }).then(smsRes => {
       console.log(`?? [SMS SUPORTE ENVIADO] Porta ${gatewayPort} -> ${cleanPhone}:`, smsRes.data?.mensagem || 'OK');
     }).catch(err => {
-      console.warn(`?? [SMS SUPORTE AVISO] N�o foi poss�vel despachar SMS na porta ${gatewayPort}:`, err.message);
+      console.warn(`?? [SMS SUPORTE AVISO] Não foi possível despachar SMS na porta ${gatewayPort}:`, err.message);
     });
   }
 
@@ -6349,7 +6349,7 @@ app.post(['/api/sms/send', '/api/sms/gateway/send'], async (req, res) => {
   const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
 
   if (!targetNum || !targetText) {
-    return res.status(400).json({ success: false, mensagem: 'N�mero de telefone e texto do SMS s�o obrigat�rios.' });
+    return res.status(400).json({ success: false, mensagem: 'Número de telefone e texto do SMS são obrigatérios.' });
   }
 
   try {
@@ -6372,7 +6372,7 @@ app.post(['/api/sms/send', '/api/sms/gateway/send'], async (req, res) => {
   }
 });
 
-// -- 20.7.1 CONFIRMA��O DE ENVIO DE SMS PELO GATEWAY ANDROID (PORTA 8090) --
+// -- 20.7.1 CONFIRMAçãO DE ENVIO DE SMS PELO GATEWAY ANDROID (PORTA 8090) --
 app.post(['/api/sms/outgoing/confirm', '/api/sms/confirm'], (req, res) => {
   const { id, success, error } = req.body || {};
   if (smsSalesEngine && typeof smsSalesEngine.confirmSmsSent === 'function') {
@@ -6390,8 +6390,8 @@ app.get('/api/sms/outgoing/pending', (req, res) => {
   return res.json({ success: true, pending_sms: null });
 });
 
-// -- 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOM�TICO) --
-// -- CHAMADA PERDIDA: Registo e resposta SMS autom�tico ----------------------
+// -- 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOMÁTICO) --
+// -- CHAMADA PERDIDA: Registo e resposta SMS automático ----------------------
 // POST /api/calls/missed  ? recebe chamada perdida do gateway Android
 app.post('/api/calls/missed', async (req, res) => {
   try {
@@ -6421,11 +6421,11 @@ app.post('/api/calls/missed', async (req, res) => {
       baileysEngine.enviarNotificacaoGrupo(
         `?? *CHAMADA PERDIDA* � Axion\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `?? *N�mero:* *${cleanNum}*\n` +
+        `?? *Número:* *${cleanNum}*\n` +
         `?? *Porta:* ${originPort || 'Auto'}\n` +
         `?? *Hora:* ${new Date(ts).toLocaleTimeString('pt-MZ')}\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `? SMS autom�tico enviado ao cliente!`
+        `? SMS automático enviado ao cliente!`
       );
     }
 
@@ -6442,7 +6442,7 @@ app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
   const cleanBody = body || text || mensagem;
 
   if (!cleanSender || !cleanBody) {
-    return res.status(400).json({ success: false, mensagem: 'Remetente e mensagem s�o obrigat�rios.' });
+    return res.status(400).json({ success: false, mensagem: 'Remetente e mensagem são obrigatérios.' });
   }
 
   const originPort = port ? Number(port) : null;
@@ -6465,7 +6465,7 @@ app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
   return res.json({ success: true, mensagem: 'SMS processado pelo Bot de Vendas Axion!' });
 });
 
-// -- 20.8 Motor de Alertas de Expira��o (D-3 e D-0) & Planos Faseados/Renov�veis --
+// -- 20.8 Motor de Alertas de Expiração (D-3 e D-0) & Planos Faseados/Renov�veis --
 const clientRemindersSent = new Set(); // chave: `${orderId}_D3` ou `${orderId}_D0`
 
 function processClientPackageReminders() {
@@ -6476,12 +6476,12 @@ function processClientPackageReminders() {
     if (!order.createdAt) continue;
     const modo = (order.modo || '').toLowerCase();
     
-    // Determinar dura��o do pacote em dias
+    // Determinar duração do pacote em dias
     let duracaoDias = 0;
     if (modo === 'semanal') duracaoDias = 7;
     else if (modo === 'mensal') duracaoDias = 30;
     else if (modo === 'tudo_top' || modo === 'ilimitado') duracaoDias = 30;
-    else continue; // di�rios n�o precisam de lembrete D-3
+    else continue; // diários não precisam de lembrete D-3
 
     const createdAtTime = new Date(order.createdAt).getTime();
     const dataExpiracaoTime = createdAtTime + (duracaoDias * ONE_DAY_MS);
@@ -6496,13 +6496,13 @@ function processClientPackageReminders() {
       if (!clientRemindersSent.has(reminderKey)) {
         clientRemindersSent.add(reminderKey);
 
-        const textoD3 = `?? [Axion Lembrete]: Ol�! O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira em 3 dias. Para continuar conectado sem interrup��es, renove j� no seu Axion Client Hub ou via WhatsApp!`;
+        const textoD3 = `?? [Axion Lembrete]: Olá! O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira em 3 dias. Para continuar conectado sem interrupções, renove já no seu Axion Client Hub ou via WhatsApp!`;
 
         // Salvar mensagem no chat de suporte do app para o cliente ver imediatamente
         clientSupportMessages.push({
           id: `REMINDER-${Date.now()}`,
           clientPhone,
-          clientName: 'Axion Notifica��es',
+          clientName: 'Axion Notificações',
           sender: 'admin',
           text: textoD3,
           createdAt: new Date().toISOString(),
@@ -6518,7 +6518,7 @@ function processClientPackageReminders() {
       }
     }
 
-    // 2. Alerta no Pr�prio Dia de Expira��o (D-0) � APENAS no pr�prio dia (n�o em pedidos antigos)
+    // 2. Alerta no Pr�prio Dia de Expiração (D-0) � APENAS no pr�prio dia (não em pedidos antigos)
     if (diasRestantes === 0 && (now - createdAtTime) <= (duracaoDias + 1) * ONE_DAY_MS) {
       const reminderKey = `${order.id || order.orderId}_D0`;
       if (!clientRemindersSent.has(reminderKey)) {
@@ -6529,7 +6529,7 @@ function processClientPackageReminders() {
         clientSupportMessages.push({
           id: `REMINDER-D0-${Date.now()}`,
           clientPhone,
-          clientName: 'Axion Notifica��es',
+          clientName: 'Axion Notificações',
           sender: 'admin',
           text: textoD0,
           createdAt: new Date().toISOString(),
@@ -6546,21 +6546,21 @@ function processClientPackageReminders() {
   }
 }
 
-// Executar verifica��o de lembretes a cada 1 hora
+// Executar verificação de lembretes a cada 1 hora
 setInterval(processClientPackageReminders, 60 * 60 * 1000);
-// Executar primeira checagem ap�s 15 segundos do boot
+// Executar primeira checagem após 15 segundos do boot
 setTimeout(processClientPackageReminders, 15000);
 
 // ------------------------------------------------------------------------------
-// --- 20.9 MOTOR DE PLANOS AGENDADOS: RENOV�VEL & FASEADO --------------------
+// --- 20.9 MOTOR DE PLANOS AGENDADOS: RENOVÁVEL & FASEADO --------------------
 // ------------------------------------------------------------------------------
 //
-// RENOV�VEL: Envia MB inicial no momento da compra + MB_diaria cada dia seguinte
+// RENOVÁVEL: Envia MB inicial no momento da compra + MB_diaria cada dia seguinte
 //            1 hora mais cedo que o dia anterior.
-//            Ex: Compra 3GB+700 �s 10h ? agora envia 3072MB inicial
+//            Ex: Compra 3GB+700 às 10h ? agora envia 3072MB inicial
 //                Dia 1 ? 09h ? 100MB | Dia 2 ? 08h ? 100MB | ... por 7 dias
 //
-// FASEADO:   Envia 1GB por dia at� esgotar o total.
+// FASEADO:   Envia 1GB por dia até esgotar o total.
 //            Dia 0 ? agora ? 1024MB | Dia 1 ? 1h antes ? 1024MB | ...
 //            Ex: 5GB Faseado (5�1024MB) | 10GB Faseado (10�1024MB)
 // ------------------------------------------------------------------------------
@@ -6571,12 +6571,12 @@ const scheduledPlans   = new Map(); // planId ? planDoc
 
 // -- Tabela Oficial de Planos Especiais com Fallback Permanente ---------------
 const DEFAULT_PLANOS_ESPECIAIS = {
-  // -- Renov�vel -------------------------------------------------------------
-  "76":   { nome: "?? 3GB+700 (Renova��o)",   tipo: "renovavel",      total: 3772,  inicial: 3072,  diaria: 100  },
-  "120":  { nome: "?? 5GB+700 (Renova��o)",   tipo: "renovavel",      total: 5820,  inicial: 5120,  diaria: 100  },
-  "195":  { nome: "?? 8GB+700 (Renova��o)",   tipo: "renovavel",      total: 8892,  inicial: 8192,  diaria: 100  },
-  "240":  { nome: "?? 10GB+700 (Renova��o)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100  },
-  // -- Faseado Autom�tico ----------------------------------------------------
+  // -- Renovável -------------------------------------------------------------
+  "76":   { nome: "?? 3GB+700 (Renovação)",   tipo: "renovavel",      total: 3772,  inicial: 3072,  diaria: 100  },
+  "120":  { nome: "?? 5GB+700 (Renovação)",   tipo: "renovavel",      total: 5820,  inicial: 5120,  diaria: 100  },
+  "195":  { nome: "?? 8GB+700 (Renovação)",   tipo: "renovavel",      total: 8892,  inicial: 8192,  diaria: 100  },
+  "240":  { nome: "?? 10GB+700 (Renovação)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100  },
+  // -- Faseado Automático ----------------------------------------------------
   "130":  { nome: "?? 5GB Faseado (1GB/dia)",  tipo: "faseado",        total: 5120,  inicial: 1024,  diaria: 1024 },
   "255":  { nome: "?? 10GB Faseado (1GB/dia)", tipo: "faseado",        total: 10240, inicial: 1024,  diaria: 1024 },
   "381":  { nome: "?? 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024,  diaria: 1024 },
@@ -6670,7 +6670,7 @@ function saveScheduledPlans() {
 
 loadScheduledPlans();
 
-// -- Helper: Calcular pr�xima hora de entrega ----------------------------------
+// -- Helper: Calcular próxima hora de entrega ----------------------------------
 function calcularProximaEntrega(plan, baseDate) {
   const now = baseDate || new Date();
 
@@ -6707,10 +6707,10 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
   const planId   = `PLAN-${tipo.toUpperCase()}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const now      = new Date();
 
-  // Total de entregas di�rias adicionais ap�s a entrega inicial
+  // Total de entregas diárias adicionais após a entrega inicial
   const entregas_diarias_total = Math.max(1, Math.round((total_mb - (mb_inicial || mb_diaria)) / mb_diaria));
 
-  // Pr�xima entrega usando o helper (respeita hora_preferida do cliente)
+  // Próxima entrega usando o helper (respeita hora_preferida do cliente)
   const proxima = calcularProximaEntrega({ hora_preferida }, now);
   proxima.setSeconds(0);
   proxima.setMilliseconds(0);
@@ -6726,12 +6726,12 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
     hora_preferida: hora_preferida || null,  // ex: "07:00" (faseado_mensal)
     entregas_diarias_total,
     entregas_feitas: 0,
-    saldo_mb:    total_mb - (mb_inicial || mb_diaria), // saldo ap�s entrega inicial
+    saldo_mb:    total_mb - (mb_inicial || mb_diaria), // saldo após entrega inicial
     valor,
     sms_ref:     sms_ref || '',
     hora_compra: now.toISOString(),
     proxima_entrega: proxima.toISOString(),
-    // Campos espec�ficos do faseado_mensal
+    // Campos específicos do faseado_mensal
     aguardando_confirmacao: false,
     confirmacao_expira_em:  null,
     historico: [],
@@ -6741,12 +6741,12 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
 
   scheduledPlans.set(planId, plan);
   saveScheduledPlans();
-  console.log(`? [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | Total: ${total_mb}MB | Inicial: ${mb_inicial}MB | Di�ria: ${mb_diaria}MB/dia | Total dias: ${entregas_diarias_total} | Pr�xima: ${proxima.toISOString()}`);
+  console.log(`? [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | Total: ${total_mb}MB | Inicial: ${mb_inicial}MB | Diária: ${mb_diaria}MB/dia | Total dias: ${entregas_diarias_total} | Próxima: ${proxima.toISOString()}`);
   return plan;
 }
 
 
-// -- Detector e Ativador Autom�tico de Planos Especiais ------------------------
+// -- Detector e Ativador Automático de Planos Especiais ------------------------
 function handleSpecialPlanIfApplicable(orderDoc) {
   if (!orderDoc || orderDoc.isSpecialPlanHandled) return false;
   const val = Number(orderDoc.valor) || Number(orderDoc.valor_pago);
@@ -6776,10 +6776,10 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     const mbInicial = plano.inicial || 1024;
     const mbDiaria  = plano.diaria  || 1024;
     const totalMb   = plano.total   || (mbInicial + (mbDiaria * (tipo === 'renovavel' ? 7 : 4)));
-    const labelTipo = tipo === 'faseado_mensal' ? 'Faseado Mensal' : tipo === 'faseado' ? 'Faseado' : 'Renov�vel';
+    const labelTipo = tipo === 'faseado_mensal' ? 'Faseado Mensal' : tipo === 'faseado' ? 'Faseado' : 'Renovável';
 
-    // ?? CR�TICO: Todos os planos especiais enviam a Fase 1 como pacote DI�RIO normal
-    // pelas portas di�rias dispon�veis (8023, 8025, etc.)
+    // ?? CRÍTICO: Todos os planos especiais enviam a Fase 1 como pacote DIÁRIO normal
+    // pelas portas diárias disponíveis (8023, 8025, etc.)
     orderDoc.quantidade = mbInicial;
     orderDoc.origem = tipo;
     orderDoc.modo = 'diario';
@@ -6787,7 +6787,7 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     orderDoc.input_val = '';
     orderDoc.remetente = `Axion ${labelTipo} (Fase 1)`;
 
-    // Criar o plano agendado para as pr�ximas entregas
+    // Criar o plano agendado para as próximas entregas
     const plan = criarPlano({
       numero: orderDoc.numero,
       tipo,
@@ -6800,11 +6800,11 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     });
 
     console.log(`? [PLANO ESPECIAL DETECTADO] Ordem ${orderDoc.orderId} (${val || 0}MT) configurada como ${tipo.toUpperCase()}!`);
-    console.log(`   ?? Entrega Inicial: ${mbInicial}MB (enviando agora via celular di�rio)`);
-    console.log(`   ? Pr�ximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias | Pr�xima: ${plan.proxima_entrega}`);
+    console.log(`   ?? Entrega Inicial: ${mbInicial}MB (enviando agora via celular diário)`);
+    console.log(`   ? Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias | Próxima: ${plan.proxima_entrega}`);
 
 
-    // Notificar cliente no WhatsApp com explica��o detalhada, clara e tranquilizadora do plano
+    // Notificar cliente no WhatsApp com explicação detalhada, clara e tranquilizadora do plano
     let clientJid = orderDoc.jid;
     if (!clientJid && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
       clientJid = baileysEngine.getJidForOrder(orderDoc.id || orderDoc.orderId);
@@ -6820,31 +6820,31 @@ function handleSpecialPlanIfApplicable(orderDoc) {
         ? `?????????????━━━━━━━━━━━━━━━━━━\n` +
           `  ?? *PLANO FASEADO ACTIVADO!* ?\n` +
           `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-          `Ol�! Muito obrigado pela sua prefer�ncia. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
           `1?? *1� Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
-          `?? *Pr�ximas Fases:* *${plan.entregas_diarias_total} entregas di�rias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
-          `? *Pr�ximo Envio:* *Amanh� �s ${horaProx}*\n` +
+          `?? *Próximas Fases:* *${plan.entregas_diarias_total} entregas diárias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
+          `? *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
           `📲 *Destino:* *${orderDoc.numero}*\n` +
           `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
           `?? *Como funciona o Plano Faseado?*\n` +
           `� A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
           `� O envio � feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
-          `� Voc� receber� uma notifica��o aqui no WhatsApp a cada fase entregue!\n\n` +
+          `� Voc� receberá uma notificação aqui no WhatsApp a cada fase entregue!\n\n` +
           `?? *D�vidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
         : `?????????????━━━━━━━━━━━━━━━━━━\n` +
-          `  ?? *PLANO RENOV�VEL ACTIVADO!* ?\n` +
+          `  ?? *PLANO RENOVÁVEL ACTIVADO!* ?\n` +
           `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-          `Ol�! Muito obrigado pela sua prefer�ncia. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
           `1?? *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
-          `?? *Renova��es Di�rias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
-          `? *Pr�ximo Envio:* *Amanh� �s ${horaProx}*\n` +
+          `?? *Renovações Diárias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
+          `? *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
           `📲 *Destino:* *${orderDoc.numero}*\n` +
           `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
-          `?? *Como funciona o Plano Renov�vel?*\n` +
+          `?? *Como funciona o Plano Renovável?*\n` +
           `� Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
-          `� Durante os pr�ximos 7 dias, o sistema transfere *${mbDiaria} MB di�rios* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
+          `� Durante os próximos 7 dias, o sistema transfere *${mbDiaria} MB diários* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
           `� Assim, os seus dados duram a semana toda sem expirar!\n` +
-          `� Voc� receber� uma notifica��o aqui no WhatsApp a cada renova��o di�ria.\n\n` +
+          `� Voc� receberá uma notificação aqui no WhatsApp a cada renovação diária.\n\n` +
           `?? *D�vidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`;
 
       baileysEngine.enviarMensagemTexto(clientJid, msgTexto).catch(() => {});
@@ -6855,7 +6855,7 @@ function handleSpecialPlanIfApplicable(orderDoc) {
   return false;
 }
 
-// -- Executar entrega di�ria agendada ------------------------------------------
+// -- Executar entrega diária agendada ------------------------------------------
 async function executarEntregaPlano(planId) {
   const plan = scheduledPlans.get(planId);
   if (!plan || plan.status !== 'ativo') return;
@@ -6864,34 +6864,34 @@ async function executarEntregaPlano(planId) {
   const orderId  = `${planId}-D${entregaN}`;
   const timestamp = new Date().toISOString();
 
-  // Resetar flags de confirma��o (faseado_mensal)
+  // Resetar flags de confirmação (faseado_mensal)
   plan.aguardando_confirmacao = false;
   plan.confirmacao_expira_em  = null;
 
   const isFaseadoMensal = plan.tipo === 'faseado_mensal';
-  const labelTipo = isFaseadoMensal ? 'Faseado Mensal' : plan.tipo === 'faseado' ? 'Faseado' : 'Renov�vel';
+  const labelTipo = isFaseadoMensal ? 'Faseado Mensal' : plan.tipo === 'faseado' ? 'Faseado' : 'Renovável';
 
-  // Criar ordem di�ria normal na fila de processamento
+  // Criar ordem diária normal na fila de processamento
   const orderDoc = {
     orderId,
     id:       orderId,
     numero:   plan.numero,
     quantidade: plan.mb_diaria,
-    valor:    0, // j� pago na compra inicial
+    valor:    0, // já pago na compra inicial
     valor_pago: 0,
-    modo:     'diario', // USSD di�rio padr�o
-    targetPort: null,   // Qualquer porta di�ria apta pega na hora
+    modo:     'diario', // USSD diário padrão
+    targetPort: null,   // Qualquer porta diária apta pega na hora
     status:   'pending',
     origem:   plan.tipo,
     planId,
-    remetente: `Axion Auto (${isFaseadoMensal ? `${labelTipo} - Entrega ${entregaN}` : plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renova��o ${entregaN}`})`,
+    remetente: `Axion Auto (${isFaseadoMensal ? `${labelTipo} - Entrega ${entregaN}` : plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renovação ${entregaN}`})`,
     createdAt: timestamp,
     updatedAt: timestamp
   };
 
   inMemoryOrders.set(orderId, orderDoc);
 
-  // Guardar refer�ncia da �ltima entrega para monitorizar se foi bem sucedida
+  // Guardar referência da última entrega para monitorizar se foi bem sucedida
   plan.ultima_entrega_orderId = orderId;
   plan.ultima_entrega_tentativas = 0;
 
@@ -6902,7 +6902,7 @@ async function executarEntregaPlano(planId) {
       console.warn('Firebase plan order err:', e.message));
   }
 
-  // Registar no hist�rico do plano
+  // Registar no histórico do plano
   plan.historico.push({ entrega: entregaN, orderId, timestamp, mb: plan.mb_diaria });
   plan.entregas_feitas = entregaN;
 
@@ -6920,10 +6920,10 @@ async function executarEntregaPlano(planId) {
     ? `Entrega ${entregaN} (Saldo: ${plan.saldo_mb !== undefined ? (plan.saldo_mb >= 1024 ? (plan.saldo_mb/1024).toFixed(1)+'GB' : plan.saldo_mb+'MB') : 'N/A'})`
     : plan.tipo === 'faseado'
       ? `Fase ${entregaN + 1}/${plan.entregas_diarias_total + 1}`
-      : `Renova��o ${entregaN}/${plan.entregas_diarias_total}`;
+      : `Renovação ${entregaN}/${plan.entregas_diarias_total}`;
   console.log(`?? [PLANO ${plan.tipo.toUpperCase()}] ${label} ? ${plan.mb_diaria}MB ? ${plan.numero} | Ordem: ${orderId}`);
 
-  // Calcular pr�xima hora de envio usando o helper (respeita hora_preferida)
+  // Calcular próxima hora de envio usando o helper (respeita hora_preferida)
   const proxima = calcularProximaEntrega(plan);
   proxima.setSeconds(0);
   proxima.setMilliseconds(0);
@@ -6941,77 +6941,77 @@ async function executarEntregaPlano(planId) {
   if (plan.tipo === 'faseado_mensal') {
     if (isFinal) {
       textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
-                   `  ?? *PLANO FASEADO MENSAL CONCLU�DO!* ??\n` +
+                   `  ?? *PLANO FASEADO MENSAL CONCLUÍDO!* ??\n` +
                    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-                   `Ol�! Acab�mos de enviar os seus �ltimos *${(plan.mb_diaria/1024).toFixed(1)} GB* para o n�mero *${plan.numero}*!\n\n` +
+                   `Olá! Acabámos de enviar os seus últimos *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
-                   `? O seu Plano Faseado Mensal foi conclu�do com sucesso.\n\n` +
-                   `Muito obrigado pela confian�a na *Axion Internet*!`;
+                   `? O seu Plano Faseado Mensal foi concluído com sucesso.\n\n` +
+                   `Muito obrigado pela confiança na *Axion Internet*!`;
     } else {
       textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *ENTREGA FASEADA MENSAL REALIZADA!* ??\n` +
                    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-                   `Ol�! Acab�mos de enviar *${(plan.mb_diaria/1024).toFixed(1)} GB* para o n�mero *${plan.numero}*.\n\n` +
+                   `Olá! Acabámos de enviar *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*.\n\n` +
                    `?? *Estado do seu Plano:*\n` +
                    `� *Saldo Restante:* ${saldoFormatado || 'N/A'}\n` +
                    `� *Aprox. dias restantes:* ${restantes} dia(s)\n` +
-                   `� *Pr�xima confirma��o:* Amanh� �s *${horaProx}*\n\n` +
-                   `?? *Lembre-se:* Amanh� vamos perguntar se quer receber. Responda *SIM*, *N�O*, ou use *sacar Xgb* para sacar quando quiser.\n\n` +
-                   `? _Boa navega��o!_`;
+                   `� *Próxima confirmação:* Amanhã às *${horaProx}*\n\n` +
+                   `?? *Lembre-se:* Amanhã vamos perguntar se quer receber. Responda *SIM*, *N�O*, ou use *sacar Xgb* para sacar quando quiser.\n\n` +
+                   `? _Boa navegação!_`;
     }
   } else if (plan.tipo === 'faseado') {
 
     if (isFinal) {
       textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
-                   `  ?? *PLANO FASEADO CONCLU�DO!* ??\n` +
+                   `  ?? *PLANO FASEADO CONCLUÍDO!* ??\n` +
                    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-                   `Ol�! Acab�mos de enviar a *�ltima Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o n�mero *${plan.numero}*!\n\n` +
+                   `Olá! Acabámos de enviar a *última Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
-                   `? Todas as fases foram conclu�das com sucesso.\n\n` +
-                   `Muito obrigado pela confian�a na *Axion Internet*!`;
+                   `? Todas as fases foram concluídas com sucesso.\n\n` +
+                   `Muito obrigado pela confiança na *Axion Internet*!`;
     } else {
       textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *${label.toUpperCase()} ENTREGUE!* ??\n` +
                    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-                   `Ol�! Acab�mos de transferir mais *${(plan.mb_diaria/1024).toFixed(1)} GB* para o seu n�mero *${plan.numero}*.\n\n` +
+                   `Olá! Acabámos de transferir mais *${(plan.mb_diaria/1024).toFixed(1)} GB* para o seu número *${plan.numero}*.\n\n` +
                    `?? *Progresso do seu Plano Faseado:*\n` +
                    `� *Fases Conclu�das:* ${entregaN + 1} de ${plan.entregas_diarias_total + 1}\n` +
                    `� *Fases Restantes:* ${restantes} fase(s)\n` +
-                   `� *Pr�ximo Envio:* Amanh� �s *${horaProx}* (1 hora antes de expirar a anterior)\n\n` +
-                   `? _Os dados acumularam com o saldo anterior. Boa navega��o!_`;
+                   `� *Próximo Envio:* Amanhã às *${horaProx}* (1 hora antes de expirar a anterior)\n\n` +
+                   `? _Os dados acumularam com o saldo anterior. Boa navegação!_`;
     }
   } else {
-    // Renov�vel
+    // Renovável
     if (isFinal) {
       textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
-                   `  ?? *PLANO RENOV�VEL CONCLU�DO!* ??\n` +
+                   `  ?? *PLANO RENOVÁVEL CONCLUÍDO!* ??\n` +
                    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-                   `Ol�! Acab�mos de enviar a *�ltima Renova��o (${label})* de *+${plan.mb_diaria} MB* para o n�mero *${plan.numero}*!\n\n` +
+                   `Olá! Acabámos de enviar a *última Renovação (${label})* de *+${plan.mb_diaria} MB* para o número *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
-                   `? O ciclo de 7 dias de renova��es autom�ticas foi conclu�do com sucesso.\n\n` +
-                   `Muito obrigado pela confian�a na *Axion Internet*!`;
+                   `? O ciclo de 7 dias de renovações automáticas foi concluído com sucesso.\n\n` +
+                   `Muito obrigado pela confiança na *Axion Internet*!`;
     } else {
       textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *${label.toUpperCase()} ENTREGUE!* ??\n` +
                    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-                   `Ol�! Acab�mos de transferir *+${plan.mb_diaria} MB* de renova��o para o seu n�mero *${plan.numero}*.\n\n` +
-                   `?? *Progresso da sua Renova��o:*\n` +
-                   `� *Renova��es Conclu�das:* ${entregaN} de ${plan.entregas_diarias_total}\n` +
-                   `� *Renova��es Restantes:* ${restantes} dia(s)\n` +
-                   `� *Pr�xima Renova��o:* Amanh� �s *${horaProx}* (1 hora antes de expirar)\n\n` +
-                   `? _A validade dos seus megas foi renovada com sucesso para n�o expirar!_`;
+                   `Olá! Acabámos de transferir *+${plan.mb_diaria} MB* de renovação para o seu número *${plan.numero}*.\n\n` +
+                   `?? *Progresso da sua Renovação:*\n` +
+                   `� *Renovações Conclu�das:* ${entregaN} de ${plan.entregas_diarias_total}\n` +
+                   `� *Renovações Restantes:* ${restantes} dia(s)\n` +
+                   `� *Próxima Renovação:* Amanhã às *${horaProx}* (1 hora antes de expirar)\n\n` +
+                   `? _A validade dos seus megas foi renovada com sucesso para não expirar!_`;
     }
   }
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
-    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar renova��o:', e.message));
+    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar renovação:', e.message));
   }
 
   // Guardar mensagem no suporte do app
   clientSupportMessages.push({
     id: `PLAN-MSG-${Date.now()}`,
     clientPhone: plan.clientPhone,
-    clientName: 'Axion Autom�tico',
+    clientName: 'Axion Automático',
     sender: 'admin',
     text: textoNotif,
     createdAt: timestamp,
@@ -7022,16 +7022,16 @@ async function executarEntregaPlano(planId) {
   if (isFinal) {
     plan.status = 'concluido';
     plan.concluido_em = timestamp;
-    console.log(`?? [PLANO ${plan.tipo.toUpperCase()}] ${planId} CONCLU�DO! Total entregue: ${plan.total_mb}MB ao ${plan.numero}`);
+    console.log(`?? [PLANO ${plan.tipo.toUpperCase()}] ${planId} CONCLUÍDO! Total entregue: ${plan.total_mb}MB ao ${plan.numero}`);
     saveScheduledPlans();
     return;
   }
 
   saveScheduledPlans();
-  console.log(`? [PLANO] Pr�xima entrega agendada: ${plan.proxima_entrega}`);
+  console.log(`? [PLANO] Próxima entrega agendada: ${plan.proxima_entrega}`);
 }
 
-// -- Enviar pedido de confirma��o ao cliente (faseado_mensal) ------------------
+// -- Enviar pedido de confirmação ao cliente (faseado_mensal) ------------------
 async function enviarPedidoConfirmacao(planId) {
   const plan = scheduledPlans.get(planId);
   if (!plan || plan.status !== 'ativo' || plan.aguardando_confirmacao) return;
@@ -7047,20 +7047,20 @@ async function enviarPedidoConfirmacao(planId) {
     `?????????????━━━━━━━━━━━━━━━━━━\n` +
     `  ?? *FASEADO MENSAL � ENTREGA DO DIA* ??\n` +
     `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-    `Ol�! Os seus *${mbF}* de hoje est�o prontos para ser enviados para o *${plan.numero}*.\n\n` +
+    `Olá! Os seus *${mbF}* de hoje estáo prontos para ser enviados para o *${plan.numero}*.\n\n` +
     `?? *Saldo Restante:* *${sldF}*\n\n` +
     `Quer receber os seus dados agora?\n\n` +
     `? Responda *SIM* para receber agora\n` +
-    `?? Responda *N�O* para adiar para amanh�\n` +
+    `?? Responda *N�O* para adiar para amanhã\n` +
     `?? Responda *sacar Xgb* para sacar uma quantidade diferente\n\n` +
-    `_Esta pergunta expira em 2 horas. Se n�o responder, a entrega ser� adiada automaticamente._`;
+    `_Esta pergunta expira em 2 horas. Se não responder, a entrega ser� adiada automaticamente._`;
 
   // Enviar via WhatsApp
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msg).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar plano:', e.message));
   }
 
-  // Guardar notifica��o para o Hub (clientSupportMessages)
+  // Guardar notificação para o Hub (clientSupportMessages)
   if (typeof clientSupportMessages !== 'undefined') {
     clientSupportMessages.push({
       id:          `PLAN-CONF-${planId}-${Date.now()}`,
@@ -7076,14 +7076,14 @@ async function enviarPedidoConfirmacao(planId) {
   }
 
   saveScheduledPlans();
-  console.log(`? [PLANO MENSAL] ${planId}: confirma��o enviada. Expira: ${plan.confirmacao_expira_em}`);
+  console.log(`? [PLANO MENSAL] ${planId}: confirmação enviada. Expira: ${plan.confirmacao_expira_em}`);
 }
 
 // -- Processar resposta SIM/N�O do cliente -------------------------------------
 // Retorna { success, acao, mensagem }
 async function handleConfirmacaoPlano(numero, resposta) {
   const numLimpo = String(numero).replace(/\D/g, '').slice(-9);
-  // Encontrar plano activo do n�mero
+  // Encontrar plano activo do número
   let plan = null;
   let planId = null;
   for (const [pid, p] of scheduledPlans.entries()) {
@@ -7097,12 +7097,12 @@ async function handleConfirmacaoPlano(numero, resposta) {
 
   if (['sim', 's', 'yes', '1'].includes(resp)) {
     if (!plan.aguardando_confirmacao) {
-      return { success: false, error: 'N�o h� entrega pendente de confirma��o neste momento.' };
+      return { success: false, error: 'Não h� entrega pendente de confirmação neste momento.' };
     }
     await executarEntregaPlano(planId);
     return { success: true, acao: 'entrega_iniciada', mensagem: `? A sua entrega de ${plan.mb_diaria >= 1024 ? (plan.mb_diaria/1024).toFixed(1)+'GB' : plan.mb_diaria+'MB'} foi iniciada!` };
 
-  } else if (['nao', 'n�o', 'n', 'no', '0'].includes(resp)) {
+  } else if (['nao', 'não', 'n', 'no', '0'].includes(resp)) {
     plan.aguardando_confirmacao = false;
     plan.confirmacao_expira_em  = null;
     const proxima = calcularProximaEntrega(plan);
@@ -7110,10 +7110,10 @@ async function handleConfirmacaoPlano(numero, resposta) {
     saveScheduledPlans();
     const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
     const sldF = plan.saldo_mb >= 1024 ? `${(plan.saldo_mb/1024).toFixed(1)}GB` : `${plan.saldo_mb}MB`;
-    return { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: *${sldF}*. Voltaremos a perguntar amanh� �s *${horaProx}*.\n\nUse *sacar Xgb* sempre que quiser sacar.` };
+    return { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: *${sldF}*. Voltaremos a perguntar amanhã às *${horaProx}*.\n\nUse *sacar Xgb* sempre que quiser sacar.` };
 
   } else {
-    return { success: false, error: 'Resposta inv�lida. Responda SIM ou N�O.' };
+    return { success: false, error: 'Resposta inválida. Responda SIM ou N�O.' };
   }
 }
 
@@ -7133,7 +7133,7 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
   if (!plan.saldo_mb || plan.saldo_mb <= 0) return { success: false, error: 'Saldo esgotado.' };
 
   const mbReal = Math.min(Number(mbSolicitado), plan.saldo_mb);
-  if (mbReal < 100) return { success: false, error: 'Saque m�nimo: 100MB.' };
+  if (mbReal < 100) return { success: false, error: 'Saque mínimo: 100MB.' };
 
   const targetDestino = numeroDestino ? String(numeroDestino).replace(/\D/g, '').slice(-9) : plan.numero;
 
@@ -7157,7 +7157,7 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
   saveOrdersToCache();
   if (db) db.collection('orders').doc(orderId).set(orderDoc).catch(e => console.warn('?? [FIRESTORE] Erro ao salvar pedido plano:', e.message));
 
-  // Descontar saldo e actualizar hist�rico
+  // Descontar saldo e actualizar histórico
   plan.saldo_mb = Math.max(0, plan.saldo_mb - mbReal);
   if (plan.saldo_mb === 0) { plan.status = 'concluido'; plan.concluido_em = timestamp; }
   plan.historico.push({ tipo: 'saque', orderId, timestamp, mb: mbReal, destino: targetDestino });
@@ -7173,7 +7173,7 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
     `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
     `? *${mbF}* activados para o *${targetDestino}*!\n` +
     `?? *Saldo Restante:* *${sldF}*\n\n` +
-    `Use *sacar Xgb* para sacar mais, ou aguarde a pr�xima entrega di�ria.`;
+    `Use *sacar Xgb* para sacar mais, ou aguarde a próxima entrega diária.`;
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgCliente).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar cliente:', e.message));
@@ -7183,17 +7183,17 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
   return { success: true, orderId, mb_sacado: mbReal, saldo_restante: plan.saldo_mb, mensagem: msgCliente };
 }
 
-// -- Motor de verifica��o (a cada 1 minuto) ------------------------------------
+// -- Motor de verificação (a cada 1 minuto) ------------------------------------
 function checkScheduledPlans() {
   const now = Date.now();
   for (const [planId, plan] of scheduledPlans.entries()) {
     if (plan.status !== 'ativo') continue;
 
-    // -- FASEADO MENSAL: verificar confirma��o expirada --
+    // -- FASEADO MENSAL: verificar confirmação expirada --
     if (plan.tipo === 'faseado_mensal' && plan.aguardando_confirmacao && plan.confirmacao_expira_em) {
       const confirmaExpira = new Date(plan.confirmacao_expira_em).getTime();
       if (now >= confirmaExpira) {
-        // Sem resposta em 2h ? adiar para amanh�
+        // Sem resposta em 2h ? adiar para amanhã
         plan.aguardando_confirmacao = false;
         plan.confirmacao_expira_em  = null;
         const proxima = calcularProximaEntrega(plan);
@@ -7201,16 +7201,16 @@ function checkScheduledPlans() {
         saveScheduledPlans();
         const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
         const sldF = (plan.saldo_mb || 0) >= 1024 ? `${((plan.saldo_mb||0)/1024).toFixed(1)}GB` : `${plan.saldo_mb||0}MB`;
-        const msgAdiado = `?? A entrega de hoje foi adiada por falta de resposta. Saldo: *${sldF}*. Voltaremos amanh� �s *${horaProx}*. Use *sacar Xgb* quando quiser.`;
+        const msgAdiado = `?? A entrega de hoje foi adiada por falta de resposta. Saldo: *${sldF}*. Voltaremos amanhã às *${horaProx}*. Use *sacar Xgb* quando quiser.`;
         if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
           baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgAdiado).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar adiamento:', e.message));
         }
-        console.log(`?? [PLANO MENSAL] ${planId}: confirma��o expirou ? adiado para ${plan.proxima_entrega}`);
+        console.log(`?? [PLANO MENSAL] ${planId}: confirmação expirou ? adiado para ${plan.proxima_entrega}`);
       }
-      continue; // N�o verificar proxima_entrega enquanto aguarda/processou confirma��o
+      continue; // Não verificar proxima_entrega enquanto aguarda/processou confirmação
     }
 
-    // -- RETRY: Verificar se a �ltima entrega falhou e recolocar na fila --------
+    // -- RETRY: Verificar se a última entrega falhou e recolocar na fila --------
     if (plan.ultima_entrega_orderId) {
       const ultOrdem = inMemoryOrders.get(plan.ultima_entrega_orderId);
       const MAX_RETRY_PLAN = 3;
@@ -7231,10 +7231,10 @@ function checkScheduledPlans() {
             console.log(`?? [PLANO RETRY] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou ? Tentativa ${tentativas + 1}/${MAX_RETRY_PLAN} re-enfileirada`);
             continue;
           }
-          continue; // Aguardar delay antes do pr�ximo retry
+          continue; // Aguardar delay antes do próximo retry
         } else {
           // Esgotou tentativas ? notificar admin e avan�ar
-          console.warn(`?? [PLANO FALHA DEFINITIVA] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou ap�s ${MAX_RETRY_PLAN} tentativas. Avan�ando plano.`);
+          console.warn(`?? [PLANO FALHA DEFINITIVA] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou após ${MAX_RETRY_PLAN} tentativas. Avan�ando plano.`);
           plan.ultima_entrega_orderId = null;
           plan.ultima_entrega_tentativas = 0;
           saveScheduledPlans();
@@ -7242,7 +7242,7 @@ function checkScheduledPlans() {
       } else if (ultOrdem && (ultOrdem.status === 'pending' || ultOrdem.status === 'assigned' || ultOrdem.status === 'processing')) {
         continue; // Entrega ainda em curso, aguardar
       } else {
-        // Conclu�da (completed) ou n�o encontrada ? limpar refer�ncia
+        // Conclu�da (completed) ou não encontrada ? limpar referência
         plan.ultima_entrega_orderId = null;
         plan.ultima_entrega_tentativas = 0;
       }
@@ -7251,9 +7251,9 @@ function checkScheduledPlans() {
     const nextMs = new Date(plan.proxima_entrega).getTime();
     if (now >= nextMs) {
       if (plan.tipo === 'faseado_mensal') {
-        // Enviar pedido de confirma��o ao cliente em vez de entregar directamente
+        // Enviar pedido de confirmação ao cliente em vez de entregar directamente
         enviarPedidoConfirmacao(planId).catch(e =>
-          console.error(`? [PLANO MENSAL] Erro ao enviar confirma��o ${planId}:`, e.message));
+          console.error(`? [PLANO MENSAL] Erro ao enviar confirmação ${planId}:`, e.message));
       } else {
         executarEntregaPlano(planId).catch(e =>
           console.error(`? [PLANO] Erro na entrega ${planId}:`, e.message));
@@ -7263,7 +7263,7 @@ function checkScheduledPlans() {
 }
 
 setInterval(checkScheduledPlans, 60 * 1000); // Verificar a cada 1 minuto
-setTimeout(checkScheduledPlans, 5000);        // Primeira checagem 5s ap�s boot
+setTimeout(checkScheduledPlans, 5000);        // Primeira checagem 5s após boot
 
 
 // -- ENDPOINT: Listar Planos Agendados Activos --------------------------------
@@ -7280,64 +7280,64 @@ app.get('/api/ilimitados', (req, res) => {
 
 app.post('/api/ilimitados', (req, res) => {
   if (!customerServices || typeof customerServices.cadastrarOuRenovarAssinaturaIlimitada !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices n�o dispon�vel' });
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
   }
   const sub = customerServices.cadastrarOuRenovarAssinaturaIlimitada(req.body);
-  if (!sub) return res.status(400).json({ success: false, erro: 'Dados inv�lidos' });
+  if (!sub) return res.status(400).json({ success: false, erro: 'Dados inválidos' });
   res.json({ success: true, mensagem: 'Assinatura ilimitada registada com sucesso!', assinatura: sub });
 });
 
 app.post('/api/ilimitados/:id/renovar', (req, res) => {
   if (!customerServices || typeof customerServices.renovarAssinaturaIlimitadaManual !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices n�o dispon�vel' });
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
   }
   const dias = parseInt(req.body.dias, 10) || 30;
   const sub = customerServices.renovarAssinaturaIlimitadaManual(req.params.id, dias);
-  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura n�o encontrada' });
+  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
   res.json({ success: true, mensagem: `Assinatura renovada por mais ${dias} dias!`, assinatura: sub });
 });
 
 app.post('/api/ilimitados/:id/cancelar', (req, res) => {
   if (!customerServices || typeof customerServices.cancelarAssinaturaIlimitada !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices n�o dispon�vel' });
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
   }
   const ok = customerServices.cancelarAssinaturaIlimitada(req.params.id);
-  if (!ok) return res.status(404).json({ success: false, erro: 'Assinatura n�o encontrada' });
+  if (!ok) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
   res.json({ success: true, mensagem: 'Assinatura cancelada com sucesso.' });
 });
 
-// Actualizar campos de uma assinatura (correc��o manual de datas, etc.)
+// Actualizar campos de uma assinatura (correcção manual de datas, etc.)
 app.put('/api/ilimitados/:id', authenticateAdmin, (req, res) => {
   if (!customerServices || typeof customerServices.atualizarAssinaturaIlimitada !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices n�o dispon�vel' });
+    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
   }
   const campos = req.body || {};
-  delete campos.id; // N�o deixar mudar o ID
+  delete campos.id; // Não deixar mudar o ID
   const sub = customerServices.atualizarAssinaturaIlimitada(req.params.id, campos);
-  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura n�o encontrada' });
+  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
   res.json({ success: true, mensagem: 'Assinatura actualizada com sucesso!', assinatura: sub });
 });
 
-// Sincroniza��o manual: redescobrir assinaturas ilimitadas dos �ltimos 28 dias a partir de orders
+// Sincronização manual: redescobrir assinaturas ilimitadas dos últimos 28 dias a partir de orders
 app.post('/api/ilimitados/sync', async (req, res) => {
   if (!customerServices || typeof customerServices.restaurarDoFirestoreIlimitados !== 'function') {
-    return res.json({ success: true, mensagem: 'Sincroniza��o agendada no pr�ximo rein�cio (fun��o dedicada n�o dispon�vel).' });
+    return res.json({ success: true, mensagem: 'Sincronização agendada no próximo rein�cio (função dedicada não disponível).' });
   }
-  // Reinjectar db se customerServices ainda n�o o tem (pode acontecer se Firebase demorou a inicializar)
+  // Reinjectar db se customerServices ainda não o tem (pode acontecer se Firebase demorou a inicializar)
   if (db && typeof customerServices.initCustomerServices === 'function') {
     try { customerServices.initCustomerServices(db, null, null); } catch(_) {}
   }
   try {
     await customerServices.restaurarDoFirestoreIlimitados();
     const list = customerServices.listarAssinaturasIlimitadas('todas');
-    res.json({ success: true, mensagem: 'Sincroniza��o conclu�da!', total: list.length });
+    res.json({ success: true, mensagem: 'Sincronização concluída!', total: list.length });
   } catch (e) {
-    // Se Firestore ainda n�o init, tentar restaurarDoFirestore completo
+    // Se Firestore ainda não init, tentar restaurarDoFirestore completo
     if (e.message && e.message.includes('Firestore') && db) {
       try {
         await customerServices.restaurarDoFirestore();
         const list = customerServices.listarAssinaturasIlimitadas('todas');
-        return res.json({ success: true, mensagem: 'Sincroniza��o completa conclu�da!', total: list.length });
+        return res.json({ success: true, mensagem: 'Sincronização completa concluída!', total: list.length });
       } catch (e2) {
         return res.status(500).json({ success: false, erro: e2.message });
       }
@@ -7351,15 +7351,15 @@ app.get('/api/plans/scheduled', (req, res) => {
   res.json({ success: true, count: plans.length, plans });
 });
 
-// -- API: Criar plano renov�vel / faseado -------------------------------------
+// -- API: Criar plano renovável / faseado -------------------------------------
 app.post('/api/subscribe/plan', async (req, res) => {
   try {
     const { numero, planoKey, sms_ref, clientPhone, recipientPhone } = req.body || {};
     if (!numero && !recipientPhone) {
-      return res.status(400).json({ success: false, error: 'N�mero de destino obrigat�rio.' });
+      return res.status(400).json({ success: false, error: 'Número de destino obrigatério.' });
     }
     if (!planoKey) {
-      return res.status(400).json({ success: false, error: 'Chave do plano obrigat�ria.' });
+      return res.status(400).json({ success: false, error: 'Chave do plano obrigatéria.' });
     }
 
     // Ler plano do bot_config
@@ -7375,7 +7375,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
     const planos = botCfg.PLANOS_ESPECIAIS || {};
     const plano  = planos[String(planoKey)];
     if (!plano) {
-      return res.status(404).json({ success: false, error: `Plano "${planoKey}" n�o encontrado.` });
+      return res.status(404).json({ success: false, error: `Plano "${planoKey}" não encontrado.` });
     }
 
     const tipo         = plano.tipo; // 'renovavel' | 'faseado' | 'faseado_mensal'
@@ -7385,12 +7385,12 @@ app.post('/api/subscribe/plan', async (req, res) => {
     const destino      = String(recipientPhone || numero).replace(/\D/g, '').slice(-9);
 
     if (tipo !== 'renovavel' && tipo !== 'renovacao' && tipo !== 'faseado' && tipo !== 'faseado_mensal') {
-      return res.status(400).json({ success: false, error: 'Tipo de plano inv�lido. Use renovavel, faseado ou faseado_mensal.' });
+      return res.status(400).json({ success: false, error: 'Tipo de plano inválido. Use renovavel, faseado ou faseado_mensal.' });
     }
 
     // -- Para faseado_mensal: cliente pode definir mb_diaria personalizado ------
     // O cliente envia mb_diaria (em MB) ou gb_diaria (em GB) no body
-    // Se n�o enviar, usa o padr�o do plano (1GB)
+    // Se não enviar, usa o padrão do plano (1GB)
     let mb_diaria = plano.diaria || 1024;
     if (tipo === 'faseado_mensal') {
       const clientMbDiaria = req.body.mb_diaria ? Number(req.body.mb_diaria)
@@ -7399,14 +7399,14 @@ app.post('/api/subscribe/plan', async (req, res) => {
       if (clientMbDiaria >= 100 && clientMbDiaria <= total_mb) {
         mb_diaria = clientMbDiaria;
       }
-      // Se n�o especificou, mant�m default (1GB)
+      // Se não especificou, mant�m default (1GB)
     }
     const mb_inicial = mb_diaria; // Primeira fase = mesma quantidade que as seguintes
 
 
-    // Preven��o de SMS duplicado
+    // Prevenção de SMS duplicado
     if (sms_ref && clientSmsHistory.has(sms_ref)) {
-      return res.status(400).json({ success: false, error: 'Comprovativo j� utilizado.' });
+      return res.status(400).json({ success: false, error: 'Comprovativo já utilizado.' });
     }
     if (sms_ref) clientSmsHistory.add(sms_ref);
 
@@ -7421,7 +7421,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
       modo:    'diario',
       status:  'pending',
       origem:  tipo,
-      remetente: `Axion ${tipo === 'faseado' ? 'Faseado' : 'Renov�vel'} (Fase 1)`,
+      remetente: `Axion ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`,
       sms_ref: sms_ref || '',
       createdAt: timestamp, updatedAt: timestamp
     };
@@ -7446,7 +7446,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
 
     return res.json({
       success:   true,
-      mensagem:  `? Plano "${plano.nome}" iniciado! ${mb_inicial}MB activados agora. As pr�ximas entregas de ${mb_diaria}MB/dia ser�o autom�ticas.`,
+      mensagem:  `? Plano "${plano.nome}" iniciado! ${mb_inicial}MB activados agora. As próximas entregas de ${mb_diaria}MB/dia ser�o automáticas.`,
       planId:    plan.planId,
       orderInit: orderId0,
       plano:     plano.nome,
@@ -7464,7 +7464,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
 app.get('/api/admin/plans', (req, res) => {
   const all = [...scheduledPlans.values()];
 
-  // Incluir tamb�m assinaturas ilimitadas ativas/recentes para visualiza��o no App Admin e Painel
+  // Incluir também assinaturas ilimitadas ativas/recentes para visualização no App Admin e Painel
   if (customerServices && typeof customerServices.listarAssinaturasIlimitadas === 'function') {
     try {
       const subs = customerServices.listarAssinaturasIlimitadas('todas');
@@ -7503,7 +7503,7 @@ app.delete('/api/admin/plans/:planId', (req, res) => {
       const ok = customerServices.cancelarAssinaturaIlimitada(planId);
       if (ok) return res.json({ success: true, mensagem: `Assinatura ilimitada ${planId} cancelada.` });
     }
-    return res.status(404).json({ success: false, error: 'Plano ou assinatura n�o encontrado.' });
+    return res.status(404).json({ success: false, error: 'Plano ou assinatura não encontrado.' });
   }
   plan.status = 'cancelado';
   plan.cancelado_em = new Date().toISOString();
@@ -7512,12 +7512,12 @@ app.delete('/api/admin/plans/:planId', (req, res) => {
   return res.json({ success: true, mensagem: `Plano ${planId} cancelado.` });
 });
 
-// -- API: Disparar Pr�xima Entrega Manualmente (Admin) -------------------------
+// -- API: Disparar Próxima Entrega Manualmente (Admin) -------------------------
 app.post('/api/admin/plans/:planId/trigger', async (req, res) => {
   const { planId } = req.params;
   const plan = scheduledPlans.get(planId);
-  if (!plan) return res.status(404).json({ success: false, error: 'Plano n�o encontrado.' });
-  if (plan.status !== 'ativo') return res.status(400).json({ success: false, error: 'Plano n�o est� activo.' });
+  if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
+  if (plan.status !== 'ativo') return res.status(400).json({ success: false, error: 'Plano não está activo.' });
   try {
     await executarEntregaPlano(planId);
     return res.json({ success: true, mensagem: `Entrega disparada com sucesso para o plano ${planId}!` });
@@ -7534,14 +7534,14 @@ app.post('/api/admin/plans/:planId/trigger', async (req, res) => {
 app.post('/api/plans/confirmar', async (req, res) => {
   try {
     const { numero, planId } = req.body || {};
-    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigat�rio.' });
+    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatério.' });
 
     let result;
     if (planId) {
       // Confirmar por planId directo (usado pelo Hub)
       const plan = scheduledPlans.get(planId);
-      if (!plan) return res.status(404).json({ success: false, error: 'Plano n�o encontrado.' });
-      if (!plan.aguardando_confirmacao) return res.status(400).json({ success: false, error: 'Sem entrega pendente de confirma��o.' });
+      if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
+      if (!plan.aguardando_confirmacao) return res.status(400).json({ success: false, error: 'Sem entrega pendente de confirmação.' });
       await executarEntregaPlano(planId);
       const mbF = plan.mb_diaria >= 1024 ? `${(plan.mb_diaria/1024).toFixed(1)}GB` : `${plan.mb_diaria}MB`;
       result = { success: true, acao: 'entrega_iniciada', mensagem: `? A sua entrega de ${mbF} foi iniciada!` };
@@ -7560,12 +7560,12 @@ app.post('/api/plans/confirmar', async (req, res) => {
 app.post('/api/plans/pular', async (req, res) => {
   try {
     const { numero, planId } = req.body || {};
-    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigat�rio.' });
+    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatério.' });
 
     let result;
     if (planId) {
       const plan = scheduledPlans.get(planId);
-      if (!plan) return res.status(404).json({ success: false, error: 'Plano n�o encontrado.' });
+      if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
       plan.aguardando_confirmacao = false;
       plan.confirmacao_expira_em  = null;
       const proxima = calcularProximaEntrega(plan);
@@ -7573,7 +7573,7 @@ app.post('/api/plans/pular', async (req, res) => {
       saveScheduledPlans();
       const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
       const sldF = (plan.saldo_mb || 0) >= 1024 ? `${((plan.saldo_mb||0)/1024).toFixed(1)}GB` : `${plan.saldo_mb||0}MB`;
-      result = { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: ${sldF}. Voltamos amanh� �s ${horaProx}.`, proxima_entrega: plan.proxima_entrega };
+      result = { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: ${sldF}. Voltamos amanhã às ${horaProx}.`, proxima_entrega: plan.proxima_entrega };
     } else {
       result = await handleConfirmacaoPlano(numero, 'nao');
     }
@@ -7589,11 +7589,11 @@ app.post('/api/plans/pular', async (req, res) => {
 app.post('/api/plans/saque', async (req, res) => {
   try {
     const { numero, mb, gb, planId, numero_destino, destino } = req.body || {};
-    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigat�rio.' });
+    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatério.' });
 
     const mbSolicitado = mb ? Number(mb) : gb ? Math.round(Number(gb) * 1024) : 0;
     if (!mbSolicitado || mbSolicitado < 100) {
-      return res.status(400).json({ success: false, error: 'Quantidade inv�lida. M�nimo 100MB. Use mb ou gb no body.' });
+      return res.status(400).json({ success: false, error: 'Quantidade inválida. M�nimo 100MB. Use mb ou gb no body.' });
     }
 
     let numParaBusca = numero;
@@ -7601,7 +7601,7 @@ app.post('/api/plans/saque', async (req, res) => {
       const p = scheduledPlans.get(planId);
       numParaBusca = p ? p.clientPhone : null;
     }
-    if (!numParaBusca) return res.status(400).json({ success: false, error: 'N�mero n�o encontrado.' });
+    if (!numParaBusca) return res.status(400).json({ success: false, error: 'Número não encontrado.' });
 
     const targetDestino = numero_destino || destino || null;
     const result = await executarSaquePlano(numParaBusca, mbSolicitado, targetDestino);
@@ -7646,7 +7646,7 @@ app.post('/api/plans/hora-preferida', (req, res) => {
   try {
     const { numero, planId, hora } = req.body || {};
     if (!hora || !/^\d{1,2}:\d{2}$/.test(hora)) {
-      return res.status(400).json({ success: false, error: 'Hora inv�lida. Use formato HH:MM (ex: 07:00).' });
+      return res.status(400).json({ success: false, error: 'Hora inválida. Use formato HH:MM (ex: 07:00).' });
     }
     const [h, m] = hora.split(':').map(Number);
     if (h < 6 || h > 22) {
@@ -7661,7 +7661,7 @@ app.post('/api/plans/hora-preferida', (req, res) => {
                     (numLimpo && (plan.clientPhone.slice(-9) === numLimpo || plan.numero.slice(-9) === numLimpo));
       if (match && plan.status === 'ativo') {
         plan.hora_preferida = hora;
-        // Recalcular pr�xima entrega com nova hora
+        // Recalcular próxima entrega com nova hora
         if (!plan.aguardando_confirmacao) {
           const proxima = calcularProximaEntrega(plan);
           plan.proxima_entrega = proxima.toISOString();
@@ -7679,7 +7679,7 @@ app.post('/api/plans/hora-preferida', (req, res) => {
 });
 
 
-// -- Axion Licensing System (3 linhas � n�o altera nada existente) --
+// -- Axion Licensing System (3 linhas � não altera nada existente) --
 app.use('/licensing', require('./licensing/license_routes'));
 require('./licensing/license_checker').startChecker();
 
@@ -7721,7 +7721,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('==================================================================');
 
   // -- KEEP-ALIVE: evita que o Render adorme�a no plano gratuito --
-  // O Render dorme ap�s 15 min de inatividade ? auto-ping a cada 14 min
+  // O Render dorme após 15 min de inatividade ? auto-ping a cada 14 min
   const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
   const PING_INTERVAL_MS = 14 * 60 * 1000; // 14 minutos
 
@@ -7740,7 +7740,7 @@ app.listen(PORT, '0.0.0.0', () => {
   }, PING_INTERVAL_MS);
 
   // -- RESTAURAR DADOS DO FIRESTORE AO ARRANCAR ------------------------
-  // Ap�s o boot, aguarda 5s para o Firebase autenticar e restaura dados
+  // Após o boot, aguarda 5s para o Firebase autenticar e restaura dados
   if (db) {
     setTimeout(async () => {
       try {
