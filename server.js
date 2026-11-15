@@ -412,13 +412,13 @@ function decrementDeviceSaldo(port, order) {
 
       if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
         baileysEngine.enviarNotificacaoGrupo(
-          `?? *ALERTA CRÍTICO: SALDO 8077 ZERADO!* ??\n` +
+          `🚨 *ALERTA CRÍTICO: SALDO 8077 ZERADO!* 🚨\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
-          `?? *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
-          `?? *última Ativação:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
-          `?? *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
+          `📱 *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
+          `💰 *Última Ativação:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
+          `⚠️ *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
-          `?? *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
+          `🛑 *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
         );
       }
     }
@@ -1370,16 +1370,16 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           // Notificar o grupo de notificações sobre o redirecionamento
           if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *REDIRECIONAMENTO AUTOMÁTICO DE PEDIDO*\n` +
+              `🔀 *REDIRECIONAMENTO AUTOMÁTICO DE PEDIDO* ⚡\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${orderId}\`\n` +
               `📲 *Destino:* *${order.numero}*\n` +
-              `?? *Volume:* *${volStr}*\n` +
-              `?? *Porta Original:* Celular ${port} (Sem saldo / Limite atingido)\n` +
-              `? *Redirecionado Para:* Celular ${fallbackPort} (Disponível)\n` +
-              `?? *Hora:* ${horaAgora}\n` +
+              `📦 *Volume:* *${volStr}*\n` +
+              `📱 *Porta Original:* Celular ${port} (Sem saldo / Limite atingido)\n` +
+              `🔄 *Redirecionado Para:* Celular ${fallbackPort} (Disponível)\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `?? O pedido ser� processado automaticamente pelo celular alternativo.`
+              `🚀 O pedido será processado automaticamente pelo celular alternativo.`
             );
           }
           break; // só redirecionar 1 por vez
@@ -1398,16 +1398,16 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
             if (baileysEngine && typeof baileysEngine.enviarErroGrupo === 'function') {
               baileysEngine.enviarErroGrupo(
-                `?? *PEDIDO EM ESPERA � SEM CELULAR DISPONÍVEL* ??\n` +
+                `⏳ *PEDIDO EM ESPERA — SEM CELULAR DISPONÍVEL* ⚠️\n` +
                 `━━━━━━━━━━━━━━━━━━\n` +
                 `🔑 *Ref:* \`${orderId}\`\n` +
                 `📲 *Destino:* *${order.numero}*\n` +
-                `?? *Volume:* *${volStr}*\n` +
-                `?? *Porta Necessária:* Celular ${port}\n` +
-                `?? *Hora:* ${horaAgora}\n` +
+                `📦 *Volume:* *${volStr}*\n` +
+                `📱 *Porta Necessária:* Celular ${port}\n` +
+                `🕒 *Hora:* ${horaAgora}\n` +
                 `━━━━━━━━━━━━━━━━━━\n` +
-                `?? Todos os celulares disponíveis para este tipo de pacote estáo sem saldo ou atingiram o limite.\n` +
-                `?? *Solução:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cart�es.`
+                `⚠️ Todos os celulares disponíveis para este tipo de pacote estão sem saldo ou atingiram o limite.\n` +
+                `💡 *Solução:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cartões.`
               );
             }
             console.log(`?? [SEM FALLBACK] Pedido ${orderId} (${volStr}) em espera � nenhum celular disponível para Porta ${port}.`);
@@ -1979,39 +1979,39 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
           if (order && order.isSplit && order.splitPart === 1) {
             baileysEngine.enviarNotificacaoGrupo(
-              `? *1ª PARTE ENTREGUE (1/2)* ??\n` +
+              `⚡ *1ª PARTE ENTREGUE (1/2)* 📦\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${resId}\`\n` +
               `📲 *Destino:* *${targetNum}*\n` +
-              `?? *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
-              `?? *Porta:* Celular ${port}\n` +
-              `?? *Hora:* ${horaAgora}\n` +
+              `📦 *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
+              `📱 *Porta:* Celular ${port}\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `? *Status:* 1ª parte entregue! 2ª parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
+              `⏳ *Status:* 1ª parte entregue! 2ª parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
             );
           } else if (order && order.isSplit && order.splitPart === 2) {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *PACOTE 100% CONCLUÍDO (2/2)* ??\n` +
+              `🎉 *PACOTE 100% CONCLUÍDO (2/2)* ⚡\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${resId}\`\n` +
               `📲 *Destino:* *${targetNum}*\n` +
-              `?? *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
-              `?? *Porta:* Celular ${port}\n` +
-              `?? *Hora:* ${horaAgora}\n` +
+              `📦 *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
+              `📱 *Porta:* Celular ${port}\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `? *Status:* Pedido dividido totalmente finalizado com sucesso!`
+              `✅ *Status:* Pedido dividido totalmente finalizado com sucesso!`
             );
           } else {
             baileysEngine.enviarNotificacaoGrupo(
-              `? *PACOTE ATIVADO COM SUCESSO!* ??\n` +
+              `✅ *PACOTE ATIVADO COM SUCESSO!* ⚡\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${resId}\`\n` +
               `📲 *Destino:* *${targetNum}*\n` +
-              `?? *Volume:* *${volStr}*\n` +
-              `?? *Porta:* Celular ${port}\n` +
-              `?? *Hora:* ${horaAgora}\n` +
+              `📦 *Volume:* *${volStr}*\n` +
+              `📱 *Porta:* Celular ${port}\n` +
+              `🕒 *Hora:* ${horaAgora}\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `? *Status:* Concluído e confirmado pela operadora`
+              `🚀 *Status:* Concluído e confirmado pela operadora`
             );
           }
         }
@@ -2019,17 +2019,17 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         if (typeof baileysEngine.enviarErroGrupo === 'function') {
           const errMsg = (req.body.last_result && (req.body.last_result.error || req.body.last_result.message)) || 'Falha no disparo USSD';
           baileysEngine.enviarErroGrupo(
-            `?? *ERRO DETECTADO [NORMAL]* ??\n` +
+            `❌ *ERRO DETECTADO [NORMAL]* ⚠️\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `?? *Referência:* \`${resId}\`\n` +
-            `?? *Número:* *${targetNum}*\n` +
-            `?? *Tipo:* ${(order && order.modo) || 'diario'}${order && order.isSplit ? ` (Parte ${order.splitPart}/2)` : ''}\n` +
-            `?? *Porta:* Celular ${port}\n` +
-            `?? *Volume:* ${volStr}\n` +
-            `?? *Data/Hora:* ${horaAgora}\n` +
-            `? *Erro:* ${errMsg}\n` +
+            `🔑 *Referência:* \`${resId}\`\n` +
+            `📲 *Número:* *${targetNum}*\n` +
+            `🏷️ *Tipo:* ${(order && order.modo) || 'diario'}${order && order.isSplit ? ` (Parte ${order.splitPart}/2)` : ''}\n` +
+            `📱 *Porta:* Celular ${port}\n` +
+            `📦 *Volume:* ${volStr}\n` +
+            `🕒 *Data/Hora:* ${horaAgora}\n` +
+            `⚠️ *Erro:* ${errMsg}\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `?? *Status:* Aguardando verificação / intervenção manual`
+            `⏳ *Status:* Aguardando verificação / intervenção manual`
           );
         }
       }
@@ -4988,14 +4988,14 @@ app.post('/api/sms/payment', (req, res) => {
           }
           if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *RECARGA AUTOMÁTICA (RECEPTOR PADR�O)* ?\n` +
+              `⚡ *RECARGA AUTOMÁTICA (RECEPTOR PADRÃO)* 🚀\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
               `🔑 *Ref:* \`${cleanTxnId}\`\n` +
               `📲 *Destino:* *${defRec.targetPhone}*\n` +
-              `?? *Pagador:* *${payerPhone}*\n` +
+              `👤 *Pagador:* *${payerPhone}*\n` +
               `💰 *Valor:* *${valor} MT* (${metodo || 'M-Pesa'})\n` +
               `━━━━━━━━━━━━━━━━━━\n` +
-              `? *Status:* Disparado automaticamente sem necessidade de comprovativo manual!`
+              `✅ *Status:* Disparado automaticamente sem necessidade de comprovativo manual!`
             );
           }
         }
@@ -5822,17 +5822,17 @@ app.post('/api/client/purchase', async (req, res) => {
 
       if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
         baileysEngine.enviarNotificacaoGrupo(
-          `?? *NOVO PEDIDO VALIDADO PELA OPERADORA (CLIENT HUB)* ?\n` +
+          `🔔 *NOVO PEDIDO VALIDADO PELA OPERADORA (CLIENT HUB)* ⚡\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `🔑 *Ref:* \`${orderId}\`\n` +
           `📲 *Destino:* *${cleanDest}*\n` +
           `📦 *Pacote:* *${packageName || (qtyMb + 'MB')}* (${modo})\n` +
           `💰 *Valor:* *${valOperadora} MT* (${metodoNome})\n` +
           `👤 *Cliente:* *${clientPhone || cleanDest}*\n` +
-          `?? *Origem:* Axion Client Hub App\n` +
-          `?? *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
+          `🏢 *Origem:* Axion Client Hub App\n` +
+          `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
-          `? *Status:* Confirmado pelo SMS da rede. Enviado para ativação imediata!`
+          `🚀 *Status:* Confirmado pelo SMS da rede. Enviado para ativação imediata!`
         );
       }
 
@@ -6419,13 +6419,13 @@ app.post('/api/calls/missed', async (req, res) => {
     // Notificar grupo WhatsApp (se baileys estiver activo)
     if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       baileysEngine.enviarNotificacaoGrupo(
-        `?? *CHAMADA PERDIDA* � Axion\n` +
+        `📞 *CHAMADA PERDIDA* — Axion\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `?? *Número:* *${cleanNum}*\n` +
-        `?? *Porta:* ${originPort || 'Auto'}\n` +
-        `?? *Hora:* ${new Date(ts).toLocaleTimeString('pt-MZ')}\n` +
+        `📲 *Número:* *${cleanNum}*\n` +
+        `📱 *Porta:* ${originPort || 'Auto'}\n` +
+        `🕒 *Hora:* ${new Date(ts).toLocaleTimeString('pt-MZ')}\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `? SMS automático enviado ao cliente!`
+        `💬 SMS automático enviado ao cliente!`
       );
     }
 
@@ -6817,35 +6817,35 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     if (clientJid && baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
       const horaProx = new Date(plan.proxima_entrega).toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
       const msgTexto = tipo === 'faseado'
-        ? `?????????????━━━━━━━━━━━━━━━━━━\n` +
-          `  ?? *PLANO FASEADO ACTIVADO!* ?\n` +
-          `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
+        ? `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  ⚡ *PLANO FASEADO ACTIVADO!* 🚀\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
           `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
-          `1?? *1� Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
-          `?? *Próximas Fases:* *${plan.entregas_diarias_total} entregas diárias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
-          `? *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
+          `1️⃣ *1ª Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
+          `📦 *Próximas Fases:* *${plan.entregas_diarias_total} entregas diárias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
+          `⏰ *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
           `📲 *Destino:* *${orderDoc.numero}*\n` +
-          `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
-          `?? *Como funciona o Plano Faseado?*\n` +
-          `� A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
-          `� O envio � feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
-          `� Voc� receberá uma notificação aqui no WhatsApp a cada fase entregue!\n\n` +
-          `?? *D�vidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
-        : `?????????????━━━━━━━━━━━━━━━━━━\n` +
-          `  ?? *PLANO RENOVÁVEL ACTIVADO!* ?\n` +
-          `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
+          `📊 *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
+          `💡 *Como funciona o Plano Faseado?\n` +
+          `• A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
+          `• O envio é feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
+          `• Você receberá uma notificação aqui no WhatsApp a cada fase entregue!\n\n` +
+          `📞 *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
+        : `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `  ⚡ *PLANO RENOVÁVEL ACTIVADO!* 🚀\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
           `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
-          `1?? *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
-          `?? *Renovações Diárias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
-          `? *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
+          `1️⃣ *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
+          `📦 *Renovações Diárias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
+          `⏰ *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
           `📲 *Destino:* *${orderDoc.numero}*\n` +
-          `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
-          `?? *Como funciona o Plano Renovável?*\n` +
-          `� Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
-          `� Durante os próximos 7 dias, o sistema transfere *${mbDiaria} MB diários* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
-          `� Assim, os seus dados duram a semana toda sem expirar!\n` +
-          `� Voc� receberá uma notificação aqui no WhatsApp a cada renovação diária.\n\n` +
-          `?? *D�vidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`;
+          `📊 *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
+          `💡 *Como funciona o Plano Renovável?\n` +
+          `• Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
+          `• Durante os próximos 7 dias, o sistema transfere *${mbDiaria} MB diários* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
+          `• Assim, os seus dados duram a semana toda sem expirar!\n` +
+          `• Você receberá uma notificação aqui no WhatsApp a cada renovação diária!\n\n` +
+          `📞 *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`;
 
       baileysEngine.enviarMensagemTexto(clientJid, msgTexto).catch(() => {});
     }
@@ -7044,16 +7044,16 @@ async function enviarPedidoConfirmacao(planId) {
   const sldF = plan.saldo_mb  >= 1024 ? `${(plan.saldo_mb/1024).toFixed(1)}GB`  : `${plan.saldo_mb}MB`;
 
   const msg =
-    `?????????????━━━━━━━━━━━━━━━━━━\n` +
-    `  ?? *FASEADO MENSAL � ENTREGA DO DIA* ??\n` +
-    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-    `Olá! Os seus *${mbF}* de hoje estáo prontos para ser enviados para o *${plan.numero}*.\n\n` +
-    `?? *Saldo Restante:* *${sldF}*\n\n` +
+    `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+    `  📅 *FASEADO MENSAL — ENTREGA DO DIA* ⚡\n` +
+    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+    `Olá! Os seus *${mbF}* de hoje estão prontos para ser enviados para o *${plan.numero}*.\n\n` +
+    `📊 *Saldo Restante:* *${sldF}*\n\n` +
     `Quer receber os seus dados agora?\n\n` +
-    `? Responda *SIM* para receber agora\n` +
-    `?? Responda *N�O* para adiar para amanhã\n` +
-    `?? Responda *sacar Xgb* para sacar uma quantidade diferente\n\n` +
-    `_Esta pergunta expira em 2 horas. Se não responder, a entrega ser� adiada automaticamente._`;
+    `1️⃣ Responda *SIM* para receber agora\n` +
+    `2️⃣ Responda *NÃO* para adiar para amanhã\n` +
+    `3️⃣ Responda *sacar Xgb* para sacar uma quantidade diferente\n\n` +
+    `_Esta pergunta expira em 2 horas. Se não responder, a entrega será adiada automaticamente._`;
 
   // Enviar via WhatsApp
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
@@ -7168,11 +7168,11 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
 
   // Notificar cliente e revendedor
   const msgCliente =
-    `?????????????━━━━━━━━━━━━━━━━━━\n` +
-    `  ?? *SAQUE PROCESSADO!* ?\n` +
-    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
-    `? *${mbF}* activados para o *${targetDestino}*!\n` +
-    `?? *Saldo Restante:* *${sldF}*\n\n` +
+      `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+      `  ⚡ *SAQUE PROCESSADO!* 🚀\n` +
+      `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+      `✅ *${mbF}* activados para o *${targetDestino}*!\n` +
+      `📊 *Saldo Restante:* *${sldF}*\n\n` +
     `Use *sacar Xgb* para sacar mais, ou aguarde a próxima entrega diária.`;
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
