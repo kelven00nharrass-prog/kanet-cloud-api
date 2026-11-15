@@ -4315,17 +4315,49 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
-                    // VARRER E EXPULSAR CONCORRENTES DO GRUPO ATUAL
-                    if (cleanText === '.expulsarconcorrentes' || cleanText === '.limpargrupoconcorrentes') {
+                    // VARRER E EXPULSAR CONCORRENTES DO GRUPO (NO PRIVADO OU NO GRUPO)
+                    if (cleanText === '.expulsarconcorrentes' || cleanText.startsWith('.expulsarconcorrentes ') || 
+                        cleanText === '.limpargrupoconcorrentes' || cleanText.startsWith('.limpargrupoconcorrentes ')) {
                         if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
-                        if (!jid.endsWith('@g.us')) {
-                            await reply('⚠️ Este comando só pode ser executado dentro de um grupo de WhatsApp.');
+
+                        const paramGrupo = text.replace(/^[.!/]?(expulsarconcorrentes|limpargrupoconcorrentes)\s*/i, '').trim();
+
+                        // Se digitou sem parâmetro e está no privado, executa a expulsão em TODOS os grupos administrados
+                        if (!paramGrupo && !jid.endsWith('@g.us')) {
+                            await reply('⏳ _Iniciando varredura e expulsão automática de concorrentes em TODOS os seus grupos administrados..._');
+                            const resExp = await expurgarConcorrentesDeTodosGrupos();
+                            await reply(resExp.mensagem);
                             continue;
                         }
 
-                        await reply('⏳ _Iniciando varredura e expulsão de concorrentes deste grupo..._');
+                        let targetJid = jid;
+                        let targetNome = 'Grupo Atual';
+
+                        // Se especificou o nome do grupo no privado (ex: .expulsarconcorrentes Grupo VIP)
+                        if (paramGrupo) {
+                            try {
+                                const allGroups = await sock.groupFetchAllParticipating();
+                                const termo = paramGrupo.toLowerCase();
+                                const found = Object.values(allGroups).find(g => 
+                                    g.id === paramGrupo || 
+                                    (g.subject && g.subject.toLowerCase().includes(termo))
+                                );
+
+                                if (!found) {
+                                    await reply(`❌ Grupo com nome contendo "${paramGrupo}" não foi encontrado nos seus grupos.`);
+                                    continue;
+                                }
+                                targetJid = found.id;
+                                targetNome = found.subject;
+                            } catch (eG) {
+                                await reply(`❌ Erro ao buscar grupo: ${eG.message}`);
+                                continue;
+                            }
+                        }
+
+                        await reply(`⏳ _Iniciando varredura e expulsão no grupo "${targetNome}"..._`);
                         try {
-                            const meta = await sock.groupMetadata(jid);
+                            const meta = await sock.groupMetadata(targetJid);
                             const participants = meta.participants || [];
                             const blacklist = carregarBlacklistConcorrentes();
                             const aExpulsar = [];
@@ -4338,15 +4370,15 @@ async function startWhatsApp(orderCallback, db = null) {
                             }
 
                             if (aExpulsar.length === 0) {
-                                await reply(`✅ *VARREDURA CONCLUÍDA!* Nenhum concorrente da lista negra foi encontrado neste grupo.`);
+                                await reply(`✅ *VARREDURA CONCLUÍDA!* Nenhum concorrente da lista negra foi encontrado no grupo "${targetNome}".`);
                                 continue;
                             }
 
-                            // Expulsar em lotes seguros
-                            await sock.groupParticipantsUpdate(jid, aExpulsar, 'remove');
-                            await reply(`🚨 *EXPULSÃO CONCLUÍDA!*\n\nForam removidos com sucesso *${aExpulsar.length}* membros concorrentes deste grupo.`);
+                            // Expulsar imediatamente
+                            await sock.groupParticipantsUpdate(targetJid, aExpulsar, 'remove');
+                            await reply(`🚨 *EXPULSÃO CONCLUÍDA NO GRUPO "${targetNome}"!*\n\nForam removidos na hora com sucesso *${aExpulsar.length}* membros concorrentes.`);
                         } catch (errExp) {
-                            await reply(`❌ Erro ao expulsar membros: ${errExp.message}\n_Certifique-se de que o bot é Administrador deste grupo._`);
+                            await reply(`❌ Erro ao expulsar membros do grupo "${targetNome}": ${errExp.message}\n_Verifique se o bot é Administrador do grupo._`);
                         }
                         continue;
                     }
