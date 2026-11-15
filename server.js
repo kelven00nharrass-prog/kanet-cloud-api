@@ -205,7 +205,7 @@ async function handleTransfer(req, res) {
         const cachedList = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
         const found = cachedList.find(([k, v]) => k === orderId);
         if (found && (found[1].status === 'completed' || found[1].status === 'sucesso')) {
-          console.warn(`??? [DEDUPLICA��O CACHE] Refer�ncia ${orderId} j� consta como CONCLU�DA.`);
+          console.warn(`??? [DEDUPLICA��O CACHE] Refer�ncia ${orderId} j� consta como CONCLUÍDA.`);
           return res.status(200).json({
             status: 'concluido',
             success: true,
@@ -413,11 +413,11 @@ function decrementDeviceSaldo(port, order) {
       if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
         baileysEngine.enviarNotificacaoGrupo(
           `?? *ALERTA CR�TICO: SALDO 8077 ZERADO!* ??\n` +
-          `??????????????????\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
           `?? *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
           `?? *�ltima Ativa��o:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
           `?? *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
-          `??????????????????\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
           `?? *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
         );
       }
@@ -1371,14 +1371,14 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
               `?? *REDIRECIONAMENTO AUTOM�TICO DE PEDIDO*\n` +
-              `??????????????????\n` +
-              `?? *Ref:* \`${orderId}\`\n` +
-              `?? *Destino:* *${order.numero}*\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `🔑 *Ref:* \`${orderId}\`\n` +
+              `📲 *Destino:* *${order.numero}*\n` +
               `?? *Volume:* *${volStr}*\n` +
               `?? *Porta Original:* Celular ${port} (Sem saldo / Limite atingido)\n` +
               `? *Redirecionado Para:* Celular ${fallbackPort} (Dispon�vel)\n` +
               `?? *Hora:* ${horaAgora}\n` +
-              `??????????????????\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               `?? O pedido ser� processado automaticamente pelo celular alternativo.`
             );
           }
@@ -1399,13 +1399,13 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             if (baileysEngine && typeof baileysEngine.enviarErroGrupo === 'function') {
               baileysEngine.enviarErroGrupo(
                 `?? *PEDIDO EM ESPERA � SEM CELULAR DISPON�VEL* ??\n` +
-                `??????????????????\n` +
-                `?? *Ref:* \`${orderId}\`\n` +
-                `?? *Destino:* *${order.numero}*\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                `🔑 *Ref:* \`${orderId}\`\n` +
+                `📲 *Destino:* *${order.numero}*\n` +
                 `?? *Volume:* *${volStr}*\n` +
                 `?? *Porta Necess�ria:* Celular ${port}\n` +
                 `?? *Hora:* ${horaAgora}\n` +
-                `??????????????????\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
                 `?? Todos os celulares dispon�veis para este tipo de pacote est�o sem saldo ou atingiram o limite.\n` +
                 `?? *Solu��o:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cart�es.`
               );
@@ -1631,19 +1631,19 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
         if (isGroup) {
           if (realPhone) {
-            saudacao = `?? *Cliente:* @${realPhone}\n`;
+            saudacao = `👤 *Cliente:* @${realPhone}\n`;
             mentionsList.push(realPhone + '@s.whatsapp.net');
             if (senderJid && String(senderJid).endsWith('@lid')) {
               mentionsList.push(senderJid);
             }
           } else if (senderNome && senderNome !== 'Cliente') {
-            saudacao = `?? *Cliente:* @${senderNome}\n`;
+            saudacao = `👤 *Cliente:* @${senderNome}\n`;
             if (senderJid) mentionsList.push(senderJid);
           }
         }
 
         const valorPago = (order && (order.valor || order.valor_pago)) || (req.body.last_result && (req.body.last_result.valor || req.body.last_result.valor_pago)) || null;
-        const valorLinha = valorPago ? `?? *Valor:* *${valorPago} MT*\n` : '';
+        const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
         const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(resId).startsWith('WA-') ? String(resId).split('-')[1] : resId);
 
         // -- ?? NOTIFICA��O ESPEC�FICA DE PACOTES EM PARTES (SPLIT) --
@@ -1657,14 +1657,14 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
           const msgParte1 = (
             `?? *1� PARTE ENTREGUE (1/2)* ?\n` +
-            `??????????????????\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
             saudacao +
             `? *Entregue agora:* *${part1Str}*\n` +
             `? *Restante a caminho:* *${part2Str}* _(Total: ${totalStr})_\n` +
-            `?? *Destino:* *${targetNum}*\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
             valorLinha +
-            `?? *Ref:* \`${cleanRef}\`\n` +
-            `??????????????????\n` +
+            `🔑 *Ref:* \`${cleanRef}\`\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
             `?? _A 2� parte j� est� a ser processada e entra em instantes!_`
           );
 
@@ -1676,25 +1676,25 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             console.error(`? [NOTIFICA��O WA PARTE 1 CRASH]:`, errSendSync.message);
           }
         } else {
-          let headerConclusao = `? *RECARGA CONCLU�DA* ?\n`;
-          let pacoteLinha = `?? *Pacote:* *${volStr}*${modoBadge}\n`;
+          let headerConclusao = `✅ *RECARGA CONCLUÍDA* ⚡\n`;
+          let pacoteLinha = `📦 *Pacote:* *${volStr}*${modoBadge}\n`;
 
           if (order && order.isSplit && order.splitPart === 2) {
-            headerConclusao = `? *RECARGA 100% CONCLU�DA (2/2)* ?\n`;
-            pacoteLinha = `?? *Pacote Total:* *${volStr}*${modoBadge} _(Entregue em 2 partes)_\n`;
+            headerConclusao = `✅ *RECARGA 100% CONCLUÍDA (2/2)* ⚡\n`;
+            pacoteLinha = `📦 *Pacote Total:* *${volStr}*${modoBadge} _(Entregue em 2 partes)_\n`;
           }
 
           try {
             baileysEngine.sendTextMessage(clientJid,
               headerConclusao +
-              `??????????????????\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               saudacao +
               pacoteLinha +
-              `?? *Destino:* *${targetNum}*\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
               valorLinha +
-              `?? *Ref:* \`${cleanRef}\`\n` +
-              `??????????????????\n` +
-              `?? *Consultar Saldo:* \`*100*03#\`\n` +
+              `🔑 *Ref:* \`${cleanRef}\`\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `📊 *Consultar Saldo:* \`*100*03#\`\n` +
               `_Obrigado por escolher a Axion!_`,
               { mentions: mentionsList }
             ).catch(errSend => {
@@ -1808,28 +1808,28 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           if (isGroup) {
             const cleanSenderDigits = String(rawSender).replace(/\D/g, '');
             if (cleanSenderDigits.length === 9) {
-              saudacao = `?? *Cliente:* @258${cleanSenderDigits}\n`;
+              saudacao = `👤 *Cliente:* @258${cleanSenderDigits}\n`;
               mentionsList.push(`258${cleanSenderDigits}@s.whatsapp.net`);
             } else if (cleanSenderDigits.length === 12 && cleanSenderDigits.startsWith('258')) {
-              saudacao = `?? *Cliente:* @${cleanSenderDigits}\n`;
+              saudacao = `👤 *Cliente:* @${cleanSenderDigits}\n`;
               mentionsList.push(`${cleanSenderDigits}@s.whatsapp.net`);
             } else if (senderNome && senderNome !== 'Cliente') {
-              saudacao = `?? *Cliente:* @${senderNome}\n`;
+              saudacao = `👤 *Cliente:* @${senderNome}\n`;
             }
           }
           const valorPago = order.valor || order.valor_pago || null;
-          const valorLinha = valorPago ? `?? *Valor:* *${valorPago} MT*\n` : '';
+          const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
 
           const msgParcial = (
             `?? *1� PARTE ENTREGUE (1/2)* ?\n` +
-            `??????????????????\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
             saudacao +
             `? *Entregue agora:* *${part1Str}*\n` +
             `? *Restante a caminho:* *${part2Str}* _(Total: ${totalStr})_\n` +
-            `?? *Destino:* *${targetNum}*\n` +
+            `📲 *Destino:* *${targetNum}*\n` +
             valorLinha +
-            `?? *Ref:* \`${cleanRef}\`\n` +
-            `??????????????????\n` +
+            `🔑 *Ref:* \`${cleanRef}\`\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
             `?? _A 2� parte j� est� na fila para envio imediato por outro terminal!_`
           );
 
@@ -1980,37 +1980,37 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           if (order && order.isSplit && order.splitPart === 1) {
             baileysEngine.enviarNotificacaoGrupo(
               `? *1� PARTE ENTREGUE (1/2)* ??\n` +
-              `??????????????????\n` +
-              `?? *Ref:* \`${resId}\`\n` +
-              `?? *Destino:* *${targetNum}*\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `🔑 *Ref:* \`${resId}\`\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
               `?? *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
               `?? *Porta:* Celular ${port}\n` +
               `?? *Hora:* ${horaAgora}\n` +
-              `??????????????????\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               `? *Status:* 1� parte entregue! 2� parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
             );
           } else if (order && order.isSplit && order.splitPart === 2) {
             baileysEngine.enviarNotificacaoGrupo(
               `?? *PACOTE 100% CONCLU�DO (2/2)* ??\n` +
-              `??????????????????\n` +
-              `?? *Ref:* \`${resId}\`\n` +
-              `?? *Destino:* *${targetNum}*\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `🔑 *Ref:* \`${resId}\`\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
               `?? *Volume:* *${volStr}* (Total: ${order.splitTotalMb} MB)\n` +
               `?? *Porta:* Celular ${port}\n` +
               `?? *Hora:* ${horaAgora}\n` +
-              `??????????????????\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               `? *Status:* Pedido dividido totalmente finalizado com sucesso!`
             );
           } else {
             baileysEngine.enviarNotificacaoGrupo(
               `? *PACOTE ATIVADO COM SUCESSO!* ??\n` +
-              `??????????????????\n` +
-              `?? *Ref:* \`${resId}\`\n` +
-              `?? *Destino:* *${targetNum}*\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `🔑 *Ref:* \`${resId}\`\n` +
+              `📲 *Destino:* *${targetNum}*\n` +
               `?? *Volume:* *${volStr}*\n` +
               `?? *Porta:* Celular ${port}\n` +
               `?? *Hora:* ${horaAgora}\n` +
-              `??????????????????\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               `? *Status:* Conclu�do e confirmado pela operadora`
             );
           }
@@ -2020,7 +2020,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           const errMsg = (req.body.last_result && (req.body.last_result.error || req.body.last_result.message)) || 'Falha no disparo USSD';
           baileysEngine.enviarErroGrupo(
             `?? *ERRO DETECTADO [NORMAL]* ??\n` +
-            `??????????????????\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
             `?? *Refer�ncia:* \`${resId}\`\n` +
             `?? *N�mero:* *${targetNum}*\n` +
             `?? *Tipo:* ${(order && order.modo) || 'diario'}${order && order.isSplit ? ` (Parte ${order.splitPart}/2)` : ''}\n` +
@@ -2028,7 +2028,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             `?? *Volume:* ${volStr}\n` +
             `?? *Data/Hora:* ${horaAgora}\n` +
             `? *Erro:* ${errMsg}\n` +
-            `??????????????????\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
             `?? *Status:* Aguardando verifica��o / interven��o manual`
           );
         }
@@ -2187,7 +2187,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
           const rawQty = order.splitTotalMb || order.quantidade || 1024;
           const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
           const valorPago = order.valor || order.valor_pago || null;
-          const valorLinha = valorPago ? `?? *Valor:* *${valorPago} MT*\n` : '';
+          const valorLinha = valorPago ? `💰 *Valor:* *${valorPago} MT*\n` : '';
           const senderNome = order.senderName || order.nomeCliente || '';
           const isGroup = clientJid && clientJid.endsWith('@g.us');
           let saudacao = '';
@@ -2197,13 +2197,13 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
             const rawSender = order.senderPhone || order.sender || order.senderNumber || '';
             const cleanDigits = String(rawSender).replace(/\D/g, '');
             if (cleanDigits.length === 9) {
-              saudacao = `?? *Cliente:* @258${cleanDigits}\n`;
+              saudacao = `👤 *Cliente:* @258${cleanDigits}\n`;
               mentionsList.push(`258${cleanDigits}@s.whatsapp.net`);
             } else if (cleanDigits.length === 12 && cleanDigits.startsWith('258')) {
-              saudacao = `?? *Cliente:* @${cleanDigits}\n`;
+              saudacao = `👤 *Cliente:* @${cleanDigits}\n`;
               mentionsList.push(`${cleanDigits}@s.whatsapp.net`);
             } else if (senderNome && senderNome !== 'Cliente') {
-              saudacao = `?? *Cliente:* @${senderNome}\n`;
+              saudacao = `👤 *Cliente:* @${senderNome}\n`;
             }
           }
 
@@ -2219,14 +2219,14 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
 
             const msgParte1 = (
               `?? *1� PARTE ENTREGUE (1/2)* ?\n` +
-              `??????????????????\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               saudacao +
               `? *Entregue agora:* *${part1Str}*\n` +
               `? *Restante a caminho:* *${part2Str}* _(Total: ${totalStr})_\n` +
-              `?? *Destino:* *${order.numero}*\n` +
+              `📲 *Destino:* *${order.numero}*\n` +
               valorLinha +
-              `?? *Ref:* \`${cleanRef}\`\n` +
-              `??????????????????\n` +
+              `🔑 *Ref:* \`${cleanRef}\`\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               `?? _A 2� parte j� est� a ser processada e entra em instantes!_`
             );
 
@@ -2238,25 +2238,25 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
               console.error('? [NOTIFICA��O WA PARTE 1 CRASH]:', e.message);
             }
           } else {
-            let headerConclusao = `? *RECARGA CONCLU�DA* ?\n`;
-            let pacoteLinha = `?? *Pacote:* *${volStr}*\n`;
+            let headerConclusao = `✅ *RECARGA CONCLUÍDA* ⚡\n`;
+            let pacoteLinha = `📦 *Pacote:* *${volStr}*\n`;
 
             if (order && order.isSplit && order.splitPart === 2) {
-              headerConclusao = `? *RECARGA 100% CONCLU�DA (2/2)* ?\n`;
-              pacoteLinha = `?? *Pacote Total:* *${volStr}* _(Entregue em 2 partes)_\n`;
+              headerConclusao = `✅ *RECARGA 100% CONCLUÍDA (2/2)* ⚡\n`;
+              pacoteLinha = `📦 *Pacote Total:* *${volStr}* _(Entregue em 2 partes)_\n`;
             }
 
             try {
               baileysEngine.sendTextMessage(clientJid,
                 headerConclusao +
-                `??????????????????\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
                 saudacao +
                 pacoteLinha +
-                `?? *Destino:* *${order.numero}*\n` +
+                `📲 *Destino:* *${order.numero}*\n` +
                 valorLinha +
-                `?? *Ref:* \`${cleanRef}\`\n` +
-                `??????????????????\n` +
-                `?? *Consultar Saldo:* \`*100*03#\`\n` +
+                `🔑 *Ref:* \`${cleanRef}\`\n` +
+                `━━━━━━━━━━━━━━━━━━\n` +
+                `📊 *Consultar Saldo:* \`*100*03#\`\n` +
                 `_Obrigado por escolher a Axion!_`,
                 { mentions: mentionsList }
               ).catch(e => console.error('? [NOTIFICA��O WA ERRO]:', e.message));
@@ -4975,13 +4975,13 @@ app.post('/api/sms/payment', (req, res) => {
             const volStr = mbQtd >= 1024 ? `${(mbQtd/1024).toFixed(1)}GB` : `${mbQtd}MB`;
             baileysEngine.enviarMensagemTexto(
               clientJid,
-              `???????????????????????????????\n` +
+              `?????????????━━━━━━━━━━━━━━━━━━\n` +
               `  ? *RECARGA AUTOM�TICA ENVIADA!* ??\n` +
-              `???????????????????????????????\n\n` +
+              `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
               `Detectamos a sua transfer�ncia de *${valor} MT* (${metodo || 'M-Pesa'}).\n\n` +
-              `?? *Destino:* *${defRec.targetPhone}*\n` +
+              `📲 *Destino:* *${defRec.targetPhone}*\n` +
               `?? *Volume:* *${volStr}*\n` +
-              `?? *Ref:* \`${cleanTxnId}\`\n\n` +
+              `🔑 *Ref:* \`${cleanTxnId}\`\n\n` +
               `?? *Os megas j� est�o a ser ativados automaticamente no n�mero de destino!*\n` +
               `? _N�o precisas de enviar comprovativo no WhatsApp._`
             ).catch(() => {});
@@ -4989,12 +4989,12 @@ app.post('/api/sms/payment', (req, res) => {
           if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
               `?? *RECARGA AUTOM�TICA (RECEPTOR PADR�O)* ?\n` +
-              `??????????????????\n` +
-              `?? *Ref:* \`${cleanTxnId}\`\n` +
-              `?? *Destino:* *${defRec.targetPhone}*\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
+              `🔑 *Ref:* \`${cleanTxnId}\`\n` +
+              `📲 *Destino:* *${defRec.targetPhone}*\n` +
               `?? *Pagador:* *${payerPhone}*\n` +
-              `?? *Valor:* *${valor} MT* (${metodo || 'M-Pesa'})\n` +
-              `??????????????????\n` +
+              `💰 *Valor:* *${valor} MT* (${metodo || 'M-Pesa'})\n` +
+              `━━━━━━━━━━━━━━━━━━\n` +
               `? *Status:* Disparado automaticamente sem necessidade de comprovativo manual!`
             );
           }
@@ -5109,13 +5109,13 @@ app.post('/api/sms/payment', (req, res) => {
     if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       baileysEngine.enviarNotificacaoGrupo(
         `?? *PAGAMENTO RECEBIDO (${(metodo || 'M-Pesa').toUpperCase()})* ??\n` +
-        `??????????????????\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
         `?? *Ref / Txn:* \`${txn_id}\`\n` +
         `?? *Valor Pago:* *${valor} MT*\n` +
-        `?? *Pacote:* *${volStr}*\n` +
+        `📦 *Pacote:* *${volStr}*\n` +
         `?? *Remetente:* *${remetente}*\n` +
         `?? *Hora:* ${horaAgora}\n` +
-        `??????????????????\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
         `? *Status:* Registado. A aguardar que o cliente envie o comprovativo com o n�mero de destino no WhatsApp.`
       );
     }
@@ -5637,10 +5637,10 @@ app.post('/api/admin/announcement', (req, res) => {
       const emojiType = currentAnnouncement.type === 'alert' ? '??' : currentAnnouncement.type === 'promo' ? '??' : '??';
       baileysEngine.enviarNotificacaoGrupo(
         `${emojiType} *COMUNICADO OFICIAL AXION* ${emojiType}\n` +
-        `??????????????????\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
         `?? *${currentAnnouncement.title}*\n\n` +
         `${currentAnnouncement.message}\n` +
-        `??????????????????\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
         `?? ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}`
       );
     }
@@ -5823,15 +5823,15 @@ app.post('/api/client/purchase', async (req, res) => {
       if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
         baileysEngine.enviarNotificacaoGrupo(
           `?? *NOVO PEDIDO VALIDADO PELA OPERADORA (CLIENT HUB)* ?\n` +
-          `??????????????????\n` +
-          `?? *Ref:* \`${orderId}\`\n` +
-          `?? *Destino:* *${cleanDest}*\n` +
-          `?? *Pacote:* *${packageName || (qtyMb + 'MB')}* (${modo})\n` +
-          `?? *Valor:* *${valOperadora} MT* (${metodoNome})\n` +
-          `?? *Cliente:* *${clientPhone || cleanDest}*\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `🔑 *Ref:* \`${orderId}\`\n` +
+          `📲 *Destino:* *${cleanDest}*\n` +
+          `📦 *Pacote:* *${packageName || (qtyMb + 'MB')}* (${modo})\n` +
+          `💰 *Valor:* *${valOperadora} MT* (${metodoNome})\n` +
+          `👤 *Cliente:* *${clientPhone || cleanDest}*\n` +
           `?? *Origem:* Axion Client Hub App\n` +
           `?? *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
-          `??????????????????\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
           `? *Status:* Confirmado pelo SMS da rede. Enviado para ativa��o imediata!`
         );
       }
@@ -6420,11 +6420,11 @@ app.post('/api/calls/missed', async (req, res) => {
     if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       baileysEngine.enviarNotificacaoGrupo(
         `?? *CHAMADA PERDIDA* � Axion\n` +
-        `??????????????????\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
         `?? *N�mero:* *${cleanNum}*\n` +
         `?? *Porta:* ${originPort || 'Auto'}\n` +
         `?? *Hora:* ${new Date(ts).toLocaleTimeString('pt-MZ')}\n` +
-        `??????????????????\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
         `? SMS autom�tico enviado ao cliente!`
       );
     }
@@ -6817,28 +6817,28 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     if (clientJid && baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
       const horaProx = new Date(plan.proxima_entrega).toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
       const msgTexto = tipo === 'faseado'
-        ? `???????????????????????????????\n` +
+        ? `?????????????━━━━━━━━━━━━━━━━━━\n` +
           `  ?? *PLANO FASEADO ACTIVADO!* ?\n` +
-          `???????????????????????????????\n\n` +
+          `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
           `Ol�! Muito obrigado pela sua prefer�ncia. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
           `1?? *1� Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
           `?? *Pr�ximas Fases:* *${plan.entregas_diarias_total} entregas di�rias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
           `? *Pr�ximo Envio:* *Amanh� �s ${horaProx}*\n` +
-          `?? *Destino:* *${orderDoc.numero}*\n` +
+          `📲 *Destino:* *${orderDoc.numero}*\n` +
           `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
           `?? *Como funciona o Plano Faseado?*\n` +
           `� A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
           `� O envio � feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
           `� Voc� receber� uma notifica��o aqui no WhatsApp a cada fase entregue!\n\n` +
           `?? *D�vidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
-        : `???????????????????????????????\n` +
+        : `?????????????━━━━━━━━━━━━━━━━━━\n` +
           `  ?? *PLANO RENOV�VEL ACTIVADO!* ?\n` +
-          `???????????????????????????????\n\n` +
+          `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
           `Ol�! Muito obrigado pela sua prefer�ncia. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
           `1?? *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
           `?? *Renova��es Di�rias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
           `? *Pr�ximo Envio:* *Amanh� �s ${horaProx}*\n` +
-          `?? *Destino:* *${orderDoc.numero}*\n` +
+          `📲 *Destino:* *${orderDoc.numero}*\n` +
           `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
           `?? *Como funciona o Plano Renov�vel?*\n` +
           `� Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
@@ -6940,17 +6940,17 @@ async function executarEntregaPlano(planId) {
   let textoNotif = '';
   if (plan.tipo === 'faseado_mensal') {
     if (isFinal) {
-      textoNotif = `???????????????????????????????\n` +
+      textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *PLANO FASEADO MENSAL CONCLU�DO!* ??\n` +
-                   `???????????????????????????????\n\n` +
+                   `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
                    `Ol�! Acab�mos de enviar os seus �ltimos *${(plan.mb_diaria/1024).toFixed(1)} GB* para o n�mero *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
                    `? O seu Plano Faseado Mensal foi conclu�do com sucesso.\n\n` +
                    `Muito obrigado pela confian�a na *Axion Internet*!`;
     } else {
-      textoNotif = `???????????????????????????????\n` +
+      textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *ENTREGA FASEADA MENSAL REALIZADA!* ??\n` +
-                   `???????????????????????????????\n\n` +
+                   `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
                    `Ol�! Acab�mos de enviar *${(plan.mb_diaria/1024).toFixed(1)} GB* para o n�mero *${plan.numero}*.\n\n` +
                    `?? *Estado do seu Plano:*\n` +
                    `� *Saldo Restante:* ${saldoFormatado || 'N/A'}\n` +
@@ -6962,17 +6962,17 @@ async function executarEntregaPlano(planId) {
   } else if (plan.tipo === 'faseado') {
 
     if (isFinal) {
-      textoNotif = `???????????????????????????????\n` +
+      textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *PLANO FASEADO CONCLU�DO!* ??\n` +
-                   `???????????????????????????????\n\n` +
+                   `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
                    `Ol�! Acab�mos de enviar a *�ltima Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o n�mero *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
                    `? Todas as fases foram conclu�das com sucesso.\n\n` +
                    `Muito obrigado pela confian�a na *Axion Internet*!`;
     } else {
-      textoNotif = `???????????????????????????????\n` +
+      textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *${label.toUpperCase()} ENTREGUE!* ??\n` +
-                   `???????????????????????????????\n\n` +
+                   `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
                    `Ol�! Acab�mos de transferir mais *${(plan.mb_diaria/1024).toFixed(1)} GB* para o seu n�mero *${plan.numero}*.\n\n` +
                    `?? *Progresso do seu Plano Faseado:*\n` +
                    `� *Fases Conclu�das:* ${entregaN + 1} de ${plan.entregas_diarias_total + 1}\n` +
@@ -6983,17 +6983,17 @@ async function executarEntregaPlano(planId) {
   } else {
     // Renov�vel
     if (isFinal) {
-      textoNotif = `???????????????????????????????\n` +
+      textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *PLANO RENOV�VEL CONCLU�DO!* ??\n` +
-                   `???????????????????????????????\n\n` +
+                   `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
                    `Ol�! Acab�mos de enviar a *�ltima Renova��o (${label})* de *+${plan.mb_diaria} MB* para o n�mero *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
                    `? O ciclo de 7 dias de renova��es autom�ticas foi conclu�do com sucesso.\n\n` +
                    `Muito obrigado pela confian�a na *Axion Internet*!`;
     } else {
-      textoNotif = `???????????????????????????????\n` +
+      textoNotif = `?????????????━━━━━━━━━━━━━━━━━━\n` +
                    `  ?? *${label.toUpperCase()} ENTREGUE!* ??\n` +
-                   `???????????????????????????????\n\n` +
+                   `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
                    `Ol�! Acab�mos de transferir *+${plan.mb_diaria} MB* de renova��o para o seu n�mero *${plan.numero}*.\n\n` +
                    `?? *Progresso da sua Renova��o:*\n` +
                    `� *Renova��es Conclu�das:* ${entregaN} de ${plan.entregas_diarias_total}\n` +
@@ -7044,9 +7044,9 @@ async function enviarPedidoConfirmacao(planId) {
   const sldF = plan.saldo_mb  >= 1024 ? `${(plan.saldo_mb/1024).toFixed(1)}GB`  : `${plan.saldo_mb}MB`;
 
   const msg =
-    `???????????????????????????????\n` +
+    `?????????????━━━━━━━━━━━━━━━━━━\n` +
     `  ?? *FASEADO MENSAL � ENTREGA DO DIA* ??\n` +
-    `???????????????????????????????\n\n` +
+    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
     `Ol�! Os seus *${mbF}* de hoje est�o prontos para ser enviados para o *${plan.numero}*.\n\n` +
     `?? *Saldo Restante:* *${sldF}*\n\n` +
     `Quer receber os seus dados agora?\n\n` +
@@ -7168,9 +7168,9 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
 
   // Notificar cliente e revendedor
   const msgCliente =
-    `???????????????????????????????\n` +
+    `?????????????━━━━━━━━━━━━━━━━━━\n` +
     `  ?? *SAQUE PROCESSADO!* ?\n` +
-    `???????????????????????????????\n\n` +
+    `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
     `? *${mbF}* activados para o *${targetDestino}*!\n` +
     `?? *Saldo Restante:* *${sldF}*\n\n` +
     `Use *sacar Xgb* para sacar mais, ou aguarde a pr�xima entrega di�ria.`;
