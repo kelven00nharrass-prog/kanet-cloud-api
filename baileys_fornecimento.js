@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * KA-NET CLOUD WHATSAPP ENGINE — FORNECIMENTO (SESSÃO SECUNDÁRIA BAILEYS)
  * ==============================================================================
@@ -151,7 +151,7 @@ async function startWhatsApp(orderCallback, db = null) {
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            browser: ['Ka-Net Fornecimento', 'Chrome', '1.0.0'],
+            browser: ['Axion Fornecimento', 'Chrome', '1.0.0'],
             syncFullHistory: false,
             markOnlineOnConnect: false,
             generateHighQualityLinkPreview: false,
@@ -247,7 +247,7 @@ async function startWhatsApp(orderCallback, db = null) {
                         text: `✅ *COMPROVATIVO DE FORNECIMENTO DETETADO!* \n\n` +
                               `📋 *Transação:* \`${txnId}\`\n` +
                               `💰 *Valor:* \`${valor} MT\`\n` +
-                              `⏳ *Estado:* O seu pedido de megas no atacado está a ser processado pela central Ka-Net!`
+                              `⏳ *Estado:* O seu pedido de megas no atacado está a ser processado pela central Axion!`
                     }, { quoted: msg });
 
                     if (orderDispatchCallback) {

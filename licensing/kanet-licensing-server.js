@@ -1,5 +1,5 @@
-/**
- * Ka-Net Licensing System — Servidor Standalone
+﻿/**
+ * Axion Licensing System — Servidor Standalone
  * -----------------------------------------------
  * Corre na porta 3001 (separado do sistema actual na 3000).
  * 
@@ -42,7 +42,7 @@ app.use('/licensing', licenseRoutes);
 app.get('/health', (req, res) => {
   res.json({
     status:  'ok',
-    service: 'Ka-Net Licensing Server',
+    service: 'Axion Licensing Server',
     version: '1.0.0',
     port:    PORT,
     uptime:  process.uptime(),
@@ -57,7 +57,7 @@ app.use((req, res) => {
 
 // ─── Error Handler ────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error('[KaNet-License] Erro:', err);
+  console.error('[Axion-License] Erro:', err);
   res.status(500).json({ success: false, error: 'Erro interno do servidor' });
 });
 
@@ -65,7 +65,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log('');
   console.log('╔════════════════════════════════════════╗');
-  console.log('║   🔐 Ka-Net Licensing Server v1.0.0    ║');
+  console.log('║   🔐 Axion Licensing Server v1.0.0    ║');
   console.log(`║   Porta: ${PORT}                           ║`);
   console.log(`║   Admin: http://localhost:${PORT}/admin     ║`);
   console.log(`║   API:   http://localhost:${PORT}/licensing ║`);

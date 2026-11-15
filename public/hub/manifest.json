@@ -1,7 +1,7 @@
-{
-  "name": "Ka-Net Client Hub",
-  "short_name": "Ka-Net Hub",
-  "description": "Loja Oficial e Central do Cliente Ka-Net Megas",
+﻿{
+  "name": "Axion Client Hub",
+  "short_name": "Axion Hub",
+  "description": "Loja Oficial e Central do Cliente Axion Megas",
   "start_url": "/hub/",
   "display": "standalone",
   "orientation": "portrait",

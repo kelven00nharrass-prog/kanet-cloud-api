@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * KA-NET SMS SALES ENGINE (BOT DE ATENDIMENTO E VENDAS AUTOMÁTICAS POR SMS)
  * ==============================================================================
@@ -71,7 +71,7 @@ function getSuporteDetails() {
     } else if (LOCAL_CFG.master_number) {
         supportNum = String(LOCAL_CFG.master_number).split(',')[0].trim();
     }
-    const sysName = LOCAL_CFG.nome_sistema || 'Ka-Net';
+    const sysName = LOCAL_CFG.nome_sistema || 'Axion';
     return { supportNum, sysName };
 }
 
@@ -138,7 +138,7 @@ async function sendSms(destinatario, mensagem, simSlot = 0, targetPort = null) {
     const cleanMsg = String(mensagem).trim();
     const smsId = 'SMS-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
 
-    // ⚠️ REGRA CRÍTICA: Porta 8077 é o ÚNICO Gateway SMS do sistema Ka-Net!
+    // ⚠️ REGRA CRÍTICA: Porta 8077 é o ÚNICO Gateway SMS do sistema Axion!
     // Qualquer tentativa de enviar SMS com porta nula, 8021, 8022 ou outra porta diária DEVE ser redirecionada para 8077!
     const effectiveTargetPort = (targetPort && (Number(targetPort) === 8090 || Number(targetPort) === 8777)) ? Number(targetPort) : 8077;
 
@@ -179,7 +179,7 @@ async function sendSms(destinatario, mensagem, simSlot = 0, targetPort = null) {
 function gerarTabelaCompactaSms() {
     carregarConfigs();
     const tabelas = DYN_CFG.TABELAS || {};
-    let msg = "Ka-Net - TABELA DE PACOTES:\n\n";
+    let msg = "Axion - TABELA DE PACOTES:\n\n";
 
     // DIÁRIOS
     if (tabelas['24hrs'] && Object.keys(tabelas['24hrs']).length > 0) {
@@ -223,7 +223,7 @@ function gerarTabelaCompactaSms() {
  */
 function gerarPagamentoCompactaSms() {
     const { mpesa_num, mpesa_name, emola_num, emola_name } = getPaymentDetails();
-    return `Ka-Net - FORMAS DE PAGAMENTO:
+    return `Axion - FORMAS DE PAGAMENTO:
 
 - M-PESA: ${mpesa_num} (${mpesa_name})
 - E-MOLA: ${emola_num} (${emola_name})
@@ -268,17 +268,17 @@ function gerarRespostaSaudacaoSms(tipoMensagem) {
     const sd = getSaudacaoHoraSms();
     if (tipoMensagem === 'agradecimento') {
         const r = [
-            'Ka-Net: De nada! Se precisar de megas, so falar.',
-            'Ka-Net: Com prazer! Boa navegacao!',
-            'Ka-Net: Sempre as ordens!'
+            'Axion: De nada! Se precisar de megas, so falar.',
+            'Axion: Com prazer! Boa navegacao!',
+            'Axion: Sempre as ordens!'
         ];
         return r[Math.floor(Math.random() * r.length)];
     }
-    if (tipoMensagem === 'despedida') return 'Ka-Net: Ate logo! Volte sempre!';
-    if (tipoMensagem === 'positivo')  return sd + '! Ka-Net a seu servico.\n1-Pagamento 2-Precos 3-Suporte';
+    if (tipoMensagem === 'despedida') return 'Axion: Ate logo! Volte sempre!';
+    if (tipoMensagem === 'positivo')  return sd + '! Axion a seu servico.\n1-Pagamento 2-Precos 3-Suporte';
     // saudacao
     const r = [
-        sd + '! Ka-Net a seu servico.\n1-Pagamento 2-Precos 3-Suporte\nOu envie o comprovativo!',
+        sd + '! Axion a seu servico.\n1-Pagamento 2-Precos 3-Suporte\nOu envie o comprovativo!',
         sd + '! Como posso ajudar?\n1-Pagamento 2-Tabela 3-Suporte'
     ];
     return r[Math.floor(Math.random() * r.length)];
@@ -519,7 +519,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
         return;
     }
 
-    // 🛑 REGRA CRÍTICA: Nunca responder para as próprias contas de recebimento de pagamentos da Ka-Net (ex: 856268811)
+    // 🛑 REGRA CRÍTICA: Nunca responder para as próprias contas de recebimento de pagamentos da Axion (ex: 856268811)
     if (SYSTEM_PAYMENT_NUMBERS.has(cleanSender)) {
         console.log(`ℹ️ [SMS BOT] Remetente é conta de recebimento do sistema (${cleanSender}). Ignorado para evitar auto-envio.`);
         return;
@@ -529,7 +529,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
     if (String(body).trim().toLowerCase() === 'chamada_perdida') {
         const sd = getSaudacaoHoraSms();
         const { supportNum } = getSuporteDetails();
-        const msg = sd + '! Vimos a sua chamada. Ka-Net responde por SMS!\n' +
+        const msg = sd + '! Vimos a sua chamada. Axion responde por SMS!\n' +
             'Responda com:\n' +
             '1-Pagamento  2-Precos  3-Suporte\n' +
             'Ou envie o comprovativo para comprar!';
@@ -562,7 +562,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
         const numDestino = extrairNumeroDestino(text, cleanSender);
 
         if (!txnId || !valor) {
-            await sendSms(cleanSender, "Ka-Net: Nao conseguimos ler o codigo da transacao ou o valor do comprovativo. Por favor, reenvie o SMS original completo da operadora.", simSlot, port);
+            await sendSms(cleanSender, "Axion: Nao conseguimos ler o codigo da transacao ou o valor do comprovativo. Por favor, reenvie o SMS original completo da operadora.", simSlot, port);
             return;
         }
 
@@ -587,7 +587,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
         }
         if (jaUsada) {
             console.warn(`🛑 [ANTI-DUPLICAÇÃO SMS] Comprovativo ${txnId} rejeitado por já ter sido utilizado.`);
-            await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} ja foi utilizado anteriormente no sistema.`, simSlot, 8077);
+            await sendSms(cleanSender, `Axion: O comprovativo ${txnId} ja foi utilizado anteriormente no sistema.`, simSlot, 8077);
             return;
         }
 
@@ -595,7 +595,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
 
         // Se o número de destino não for Vodacom (84/85) e não conseguimos extrair no texto:
         if (!numDestino) {
-            await sendSms(cleanSender, `Ka-Net: Identificamos o seu comprovativo ${txnId} (${valor} MT - ${pacote.nome})! Por favor, responda com o seu numero Vodacom (84 ou 85) que recebera os megas.`, simSlot, port);
+            await sendSms(cleanSender, `Axion: Identificamos o seu comprovativo ${txnId} (${valor} MT - ${pacote.nome})! Por favor, responda com o seu numero Vodacom (84 ou 85) que recebera os megas.`, simSlot, port);
             // Salva na fila aguardando número
             smsAguardandoOperadora.set(txnId, {
                 txn_id: txnId,
@@ -631,12 +631,12 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
                 if (smsAguardandoOperadora.has(txnId)) {
                     smsAguardandoOperadora.delete(txnId);
                     const { supportNum } = getSuporteDetails();
-                    await sendSms(cleanSender, `Ka-Net: O comprovativo ${txnId} (${valor} MT) ainda nao foi confirmado pela operadora apos 15 minutos. Se o valor ja saiu da conta, envie o extrato ao suporte: ${supportNum}.`, simSlot, port);
+                    await sendSms(cleanSender, `Axion: O comprovativo ${txnId} (${valor} MT) ainda nao foi confirmado pela operadora apos 15 minutos. Se o valor ja saiu da conta, envie o extrato ao suporte: ${supportNum}.`, simSlot, port);
                 }
             }, 900000);
 
             // Avisar o cliente que estamos aguardando a rede
-            await sendSms(cleanSender, `Ka-Net: Comprovativo ${txnId} (${valor} MT) recebido! A verificar com a rede para ativar ${pacote.nome} no numero ${numDestino}.`, simSlot, port);
+            await sendSms(cleanSender, `Axion: Comprovativo ${txnId} (${valor} MT) recebido! A verificar com a rede para ativar ${pacote.nome} no numero ${numDestino}.`, simSlot, port);
         }
         return;
     }
@@ -683,7 +683,7 @@ async function processIncomingCustomerSms({ sender, body, inMemoryPayments, port
             if (numDetectado) {
                 item.numDestino = numDetectado;
                 console.log(`📲 [SMS BOT] Número ${numDetectado} vinculado ao comprovativo ${txnId}`);
-                await sendSms(cleanSender, `Ka-Net: Numero ${numDetectado} registado! Assim que a operadora confirmar os ${item.valor} MT, o pacote ${item.pacote.nome} sera ativado.`, simSlot, port);
+                await sendSms(cleanSender, `Axion: Numero ${numDetectado} registado! Assim que a operadora confirmar os ${item.valor} MT, o pacote ${item.pacote.nome} sera ativado.`, simSlot, port);
                 
                 // Se a operadora já tiver confirmado enquanto aguardava número
                 if (inMemoryPayments && inMemoryPayments.has(txnId)) {
@@ -760,7 +760,7 @@ async function ativarPedidoSms({ txnId, valor, numDestino, senderPhone, pacote }
     console.log(`⚡ [SMS ATIVAÇÃO] Despachando ordem ${orderId}: ${pacote.mb}MB para ${numDestino}`);
 
     // Avisar o cliente que a ativação iniciou (usando porta 8077 dedicada de SMS, formato GSM 7-bit puro)
-    await sendSms(senderPhone, `Ka-Net: Comprovativo validado! A ativar ${pacote.nome} para o numero ${numDestino}. Aguarde alguns segundos.`, 0, 8077);
+    await sendSms(senderPhone, `Axion: Comprovativo validado! A ativar ${pacote.nome} para o numero ${numDestino}. Aguarde alguns segundos.`, 0, 8077);
 
     // Se temos dispatcher configurado, enfileirar ordem
     if (dispatchOrderCallback) {
@@ -822,7 +822,7 @@ async function notifyOrderCompleted(order) {
     const targetPort = 8077;
 
     const volStr = mb >= 1024 ? ((mb / 1024).toFixed(1) + 'GB') : (mb + 'MB');
-    const msg = `Ka-Net: O seu pacote de ${volStr} foi ativado com SUCESSO no numero ${num}! Ref: ${ref}. Obrigado pela preferencia! Volte sempre!`;
+    const msg = `Axion: O seu pacote de ${volStr} foi ativado com SUCESSO no numero ${num}! Ref: ${ref}. Obrigado pela preferencia! Volte sempre!`;
     console.log(`📤 [SMS NOTIFICAÇÃO SUCESSO] Enviando SMS de confirmação para ${targetPhone} via Porta 8077 (Ref: ${ref})`);
     await sendSms(targetPhone, msg, 0, targetPort);
 }

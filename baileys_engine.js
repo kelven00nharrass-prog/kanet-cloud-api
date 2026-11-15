@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * KA-NET CLOUD WHATSAPP ENGINE (POWERED BY BAILEYS) - 100% BOT ORIGINAL
  * ==============================================================================
@@ -334,7 +334,7 @@ function getSuporteDetails() {
     } else if (DYN_CFG.master_number || DYN_CFG.admin_number) {
         supportNum = String(DYN_CFG.master_number || DYN_CFG.admin_number).split(',')[0].trim();
     }
-    const sysName = LOCAL_CFG.nome_sistema || DYN_CFG.NOME_SISTEMA || 'Ka-Net System';
+    const sysName = LOCAL_CFG.nome_sistema || DYN_CFG.NOME_SISTEMA || 'Axion System';
     return { supportNum, sysName };
 }
 
@@ -587,7 +587,7 @@ function gerarInfoTxenecoCompleta(senderNumber) {
             `• Compras realizadas: *${totalCompras}*\n` +
             `• Status: *Em Progresso* ⏳\n` +
             `🎯 *Faltam apenas ${faltam} compras* para desbloquear o seu crédito de até *3 GB*!\n` +
-            `_Continue a comprar recargas na Ka-Net para liberar o benefício._\n`;
+            `_Continue a comprar recargas na Axion para liberar o benefício._\n`;
     } else if (totalCompras < 200) {
         const faltam = 200 - totalCompras;
         statusBox = `📊 *O SEU STATUS VIP DE CRÉDITO:*\n` +
@@ -626,7 +626,7 @@ function gerarInfoTxenecoCompleta(senderNumber) {
     return `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
         `  ⚡ *GUIA OFICIAL: TXENECO KA-NET* 📶\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-        `O *Txeneco* é o serviço exclusivo de *Internet a Crédito* da Ka-Net: você recebe os seus Megabytes adiantados no celular e paga depois! 🚀\n\n` +
+        `O *Txeneco* é o serviço exclusivo de *Internet a Crédito* da Axion: você recebe os seus Megabytes adiantados no celular e paga depois! 🚀\n\n` +
         statusBox + `\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
         `📋 *COMO FUNCIONA? (NOVOS LIMITES)*\n` +
@@ -695,7 +695,7 @@ function gerarGuiaConfigurarNumero(senderNumber) {
         `  _(Recarga Automática Sem Comprovativo)_\n` +
         `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
         `Cansado de ter que enviar o SMS de comprovativo toda vez que compra internet? 🤯\n` +
-        `Com o *Receptor Padrão Ka-Net*, o sistema vincula o seu M-Pesa / e-Mola ao seu número Vodacom!\n\n` +
+        `Com o *Receptor Padrão Axion*, o sistema vincula o seu M-Pesa / e-Mola ao seu número Vodacom!\n\n` +
         statusBox +
         `━━━━━━━━━━━━━━━━━━\n` +
         `🚀 *COMO FUNCIONA?\n` +
@@ -837,7 +837,7 @@ function gerarMenuOriginal(jid = null) {
         out += `│ ✅ Você define quantos GB\n`;
         out += `│    quer receber por dia.\n`;
         out += `│ 📲 Confirme por WhatsApp,\n`;
-        out += `│    SMS ou Ka-Net Hub.\n`;
+        out += `│    SMS ou Axion Hub.\n`;
         out += `╰─────────────────────────────╯\n\n`;
     }
 
@@ -1657,7 +1657,7 @@ function gerarRespostaStatusOnline() {
     return (
         `🟢⚡ *SIM, ESTAMOS 100% ONLINE!* 📶\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `O sistema automático Ka-Net está totalmente ativo e a despachar recargas 24/7 sem paragens.\n\n` +
+        `O sistema automático Axion está totalmente ativo e a despachar recargas 24/7 sem paragens.\n\n` +
         `📲 *Como comprar agora:*\n` +
         `1. Transfira o valor para o *M-Pesa* ou *e-Mola*.\n` +
         `2. Envie aqui o comprovativo com o seu número Vodacom.\n\n` +
@@ -1677,7 +1677,7 @@ function gerarRespostaPossoComprar() {
         `🚀✨ *SIM, PODE COMPRAR À VONTADE!* 🛒\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
         `Temos todos os pacotes disponíveis para ativação imediata!\n\n` +
-        `💳 *Contas Oficiais Ka-Net:*\n` +
+        `💳 *Contas Oficiais Axion:*\n` +
         `🇲🇿 *M-Pesa:* \`${mpesa_num}\` _(${mpesa_name || 'Kelven Junior'})_\n` +
         `🇲🇿 *e-Mola:* \`${emola_num}\` _(${emola_name || 'Kelven Junior Anabela Nharrava'})_\n\n` +
         `📝 _Basta transferir e enviar o comprovativo aqui com o seu número Vodacom._`
@@ -1984,7 +1984,7 @@ async function startWhatsApp(orderCallback, db = null) {
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
         const { version } = await fetchLatestBaileysVersion();
 
-        console.log(`📡 [BAILEYS] Iniciando Ka-Net WhatsApp Cloud v${version.join('.')}...`);
+        console.log(`📡 [BAILEYS] Iniciando Axion WhatsApp Cloud v${version.join('.')}...`);
 
         sock = makeWASocket({
             version,
@@ -2071,7 +2071,7 @@ async function startWhatsApp(orderCallback, db = null) {
                 connectionStatus = 'connected';
                 currentQrBase64 = null;
                 reconnectAttempts = 0; // reset após conexão bem-sucedida
-                connectedUser = sock.user?.id || 'KaNet Cloud Bot';
+                connectedUser = sock.user?.id || 'Axion Cloud Bot';
                 addLog(`✅ WhatsApp Conectado com SUCESSO! Logado como: ${connectedUser}`);
                 if (firestoreDbInstance) {
                     backupAuthToFirestore(firestoreDbInstance);
@@ -2146,7 +2146,7 @@ async function startWhatsApp(orderCallback, db = null) {
             // Se o próprio bot foi adicionado ao grupo, apresentar-se!
             if (botWasAdded) {
                 await new Promise(r => setTimeout(r, 1200));
-                let groupName = 'Grupo Ka-Net';
+                let groupName = 'Grupo Axion';
                 try {
                     const meta = await getCachedGroupMetadata(groupJid);
                     if (meta && meta.subject) groupName = meta.subject;
@@ -2179,7 +2179,7 @@ async function startWhatsApp(orderCallback, db = null) {
             // Aguardar 1.5s para sincronização dos dados do grupo
             await new Promise(r => setTimeout(r, 1500));
 
-            let groupName = 'Grupo Ka-Net';
+            let groupName = 'Grupo Axion';
             try {
                 const meta = await getCachedGroupMetadata(groupJid);
                 if (meta && meta.subject) groupName = meta.subject;
@@ -2261,11 +2261,11 @@ async function startWhatsApp(orderCallback, db = null) {
                                 if (!isMpesaOrEmola) {
                                     addLog(`🛑 [GEMINI VISION] Imagem rejeitada: serviço "${analise.servico}" não é M-Pesa nem e-Mola.`);
                                     await sock.sendMessage(jid, {
-                                        text: `⚠️ *Aviso Ka-Net:* O sistema aceita exclusivamente comprovativos oficiais de *M-Pesa* ou *e-Mola*. Outros serviços ou bancos não são aceitos.`
+                                        text: `⚠️ *Aviso Axion:* O sistema aceita exclusivamente comprovativos oficiais de *M-Pesa* ou *e-Mola*. Outros serviços ou bancos não são aceitos.`
                                     });
                                     continue;
                                 }
-                                const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de KaNet\n` + (analise.raw_text || '');
+                                const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de Axion\n` + (analise.raw_text || '');
                                 const legenda = text.trim();
                                 text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
                                 addLog(`🖼️ [GEMINI VISION] Print válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
@@ -2302,11 +2302,11 @@ async function startWhatsApp(orderCallback, db = null) {
                                 if (!isMpesaOrEmola) {
                                     addLog(`🛑 [GEMINI PDF] Documento rejeitado: serviço "${analise.servico}" não é M-Pesa nem e-Mola.`);
                                     await sock.sendMessage(jid, {
-                                        text: `⚠️ *Aviso Ka-Net:* O sistema aceita exclusivamente comprovativos oficiais de *M-Pesa* ou *e-Mola*. Outros serviços ou bancos não são aceitos.`
+                                        text: `⚠️ *Aviso Axion:* O sistema aceita exclusivamente comprovativos oficiais de *M-Pesa* ou *e-Mola*. Outros serviços ou bancos não são aceitos.`
                                     });
                                     continue;
                                 }
-                                const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de KaNet\n` + (analise.raw_text || '');
+                                const rawOuSintetico = `Confirmado ${analise.txnId}. Recebeste ${analise.valor || 0}.00MT de Axion\n` + (analise.raw_text || '');
                                 const legenda = text.trim();
                                 text = legenda ? `${rawOuSintetico}\n${legenda}` : rawOuSintetico;
                                 addLog(`📄 [GEMINI PDF] Documento válido! Serviço: ${analise.servico} | Valor: ${analise.valor} MT | TxnID: ${analise.txnId}`);
@@ -2551,7 +2551,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                         `📅 *O que acontece agora:*\n` +
                                         `No dia do vencimento, vamos enviar-lhe um lembrete com 12 horas e outro com 30 minutos de antecedência com as instruções de pagamento para manter a sua internet 100% ativa sem interrupções! 💙📶\n` +
                                         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                                        `A Ka-Net agradece pela sua confiança e preferência!`
+                                        `A Axion agradece pela sua confiança e preferência!`
                                     );
 
                                     // NOTIFICAR O MASTER KELVEN (ADMIN)
@@ -2589,7 +2589,7 @@ async function startWhatsApp(orderCallback, db = null) {
                                     await reply(
                                         `Entendido, *${pendRenovacao.nomeCliente || 'estimado(a) cliente'}*. 👍\n\n` +
                                         `A sua decisão foi registada: o pacote *${pendRenovacao.planoNome}* permanecerá ativo até ao término dos 30 dias e *não será renovado*.\n\n` +
-                                        `Se mudar de ideias até lá, basta entrar em contacto connosco a qualquer momento. A Ka-Net agradece pela sua preferência! 🙏`
+                                        `Se mudar de ideias até lá, basta entrar em contacto connosco a qualquer momento. A Axion agradece pela sua preferência! 🙏`
                                     );
 
                                     const masterJid = '258850401416@s.whatsapp.net';
@@ -2698,7 +2698,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             });
                             await reply(
                                 `💾 *BÓNUS GUARDADO COM SUCESSO!* ⚡\n\n` +
-                                `Os teus *500 MB* estão seguros no teu saldo Ka-Net.\n\n` +
+                                `Os teus *500 MB* estão seguros no teu saldo Axion.\n\n` +
                                 `Podes consultar o teu saldo com *.meubonus* ou sacar quando quiseres usando:\n` +
                                 `👉 *.sacarbonus 500 [número]*`
                             );
@@ -3205,7 +3205,7 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     if (cleanCmd === 'testarboasvindas' || cleanCmd === '.testarboasvindas' || cleanCmd === 'boasvindas' || cleanCmd === '.boasvindas') {
                         if (jid.endsWith('@g.us')) {
-                            let gName = 'Grupo Ka-Net';
+                            let gName = 'Grupo Axion';
                             try {
                                 const meta = await getCachedGroupMetadata(jid);
                                 if (meta && meta.subject) gName = meta.subject;
@@ -3552,7 +3552,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             `🛒 *Total de Compras:* *${total} compras*\n\n` +
                             dicaProgresso + `\n\n` +
                             (total >= 101 ? `💡 *Para pedir internet a crédito:*\n👉 *.txenecar <quantidade> <número>*\n\n` : '') +
-                            `🙏 _Obrigado pela preferência e confiança diária na Ka-Net!_ 🌐✨`
+                            `🙏 _Obrigado pela preferência e confiança diária na Axion!_ 🌐✨`
                         );
                         continue;
                     }
@@ -4813,7 +4813,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                             `  🎁 *PROGRAMA INDICA E GANHA* ⚡\n` +
                             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                            `Indica *3 amigos* para comprarem na *Ka-Net* e ganha *500 MB GRÁTIS*! 🚀\n\n` +
+                            `Indica *3 amigos* para comprarem na *Axion* e ganha *500 MB GRÁTIS*! 🚀\n\n` +
                             `🔗 *O Teu Código:* \`${meuCodigo}\`\n\n` +
                             `${statusProgressoTexto}\n` +
                             (totalBonus > 0 ? `🏆 *Total Ganho Até Hoje:* *${totalBonus} MB* grátis!\n\n` : `\n`) +
@@ -4823,7 +4823,7 @@ async function startWhatsApp(orderCallback, db = null) {
                             `3. Ao completar 3 amigos com compras confirmadas, o robô ativa *500 MB* no teu número na hora! ⚡\n\n` +
                             `━━━━━━━━━━━━━━━━━━\n` +
                             `👇 *Copia e envia aos teus amigos:*\n\n` +
-                            `"Ei! Compra megas automáticos e baratos no WhatsApp da Ka-Net via M-Pesa/e-Mola. Entrega em segundos! ⚡\n\n` +
+                            `"Ei! Compra megas automáticos e baratos no WhatsApp da Axion via M-Pesa/e-Mola. Entrega em segundos! ⚡\n\n` +
                             `👉 Clica aqui para ativar com o meu código: ${linkCompartilhar}"`
                         );
                         continue;
@@ -5917,7 +5917,7 @@ async function executarLembretesDividas() {
                 `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                 `  ⏰ *LEMBRETE DE PAGAMENTO TXENECO* ⏳\n` +
                 `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-                `Olá ${nomeStr}! Este é um lembrete do seu adiantamento de internet no Ka-Net:\n\n` +
+                `Olá ${nomeStr}! Este é um lembrete do seu adiantamento de internet no Axion:\n\n` +
                 `💰 *Valor Pendente a Liquidar:* *${dev.restanteMt} MT*\n` +
                 `📦 *Internet Adiantada:* *${volStr}*\n` +
                 `🏷️ *Taxa de Serviço (10%):* já inclusa no valor acima\n\n` +

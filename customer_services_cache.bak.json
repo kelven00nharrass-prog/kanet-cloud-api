@@ -1,0 +1,50 @@
+{
+  "loyalty": [],
+  "loans": [],
+  "defaultRecipients": [],
+  "bonuses": [],
+  "referrals": [],
+  "friendReferrers": [],
+  "referralCodes": [],
+  "lidMap": [],
+  "subscriptions": [
+    [
+      "SUB_841234567_1793207758722",
+      {
+        "id": "SUB_841234567_1793207758722",
+        "phone": "841234567",
+        "lid": null,
+        "jid": "258841234567@s.whatsapp.net",
+        "nomeCliente": "Carlos Manhica",
+        "planoNome": "Vodacom 11GB + Minutos",
+        "tipoPlano": "ilimitado",
+        "valor": 450,
+        "numeroDestino": "841234567",
+        "dataInicio": "2026-10-28T17:15:58.719Z",
+        "dataExpiracao": "2026-12-27T17:15:58.719Z",
+        "diasValidade": 30,
+        "status": "cancelado",
+        "intencaoRenovacao": null,
+        "dataConfirmacao": null,
+        "notificado_3dias": false,
+        "notificado_12h": false,
+        "notificado_30min": false,
+        "historicoRenovacoes": [
+          {
+            "data": "2026-10-28T17:15:58.719Z",
+            "valor": 450,
+            "dias": 30
+          },
+          {
+            "data": "2026-10-28T17:15:58.874Z",
+            "manual": true,
+            "dias": 30
+          }
+        ],
+        "updatedAt": "2026-10-28T17:15:58.877Z",
+        "createdAt": "2026-10-28T17:15:58.719Z"
+      }
+    ]
+  ],
+  "savedAt": "2026-10-28T17:15:58.877Z"
+}

@@ -1,6 +1,6 @@
-/**
+﻿/**
  * ╔══════════════════════════════════════════════════════════════╗
- * ║  Ka-Net Gemini AI Module                                     ║
+ * ║  Axion Gemini AI Module                                     ║
  * ║  - Feature 2: Vision — leitura de prints M-Pesa / e-Mola    ║
  * ║  - Feature 3: Audio  — transcrição de mensagens de voz      ║
  * ║  - Feature 4: Brain  — chat em linguagem moçambicana         ║
@@ -283,7 +283,7 @@ Responde APENAS em JSON (sem markdown):
 // FEATURE 4: CÉREBRO — Chat em Linguagem Moçambicana
 // ────────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT_KANET = `És o assistente inteligente do Ka-Net Internet de Moçambique.
+const SYSTEM_PROMPT_KANET = `És o assistente inteligente do Axion Internet de Moçambique.
 
 PERSONALIDADE:
 - Falas português moçambicano informal, caloroso e direto

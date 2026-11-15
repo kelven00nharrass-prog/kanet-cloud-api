@@ -1,5 +1,5 @@
-/**
- * Ka-Net Licensing System — Verificador de Expiração (Heartbeat)
+﻿/**
+ * Axion Licensing System — Verificador de Expiração (Heartbeat)
  * --------------------------------------------------------------
  * Corre a cada hora e verifica licenças expiradas.
  * Quando expira: muda status para 'expired' e notifica via log.
@@ -34,7 +34,7 @@ function runCheck() {
     if (msLeft <= 0 && lic.status !== 'expired') {
       updateLicense(lic.licenseId, { status: 'expired' });
       expiredCount++;
-      console.log(`[KaNet-License] ❌ EXPIRADA: ${lic.licenseId} (${lic.ownerName}) — ${lic.ownerPhone}`);
+      console.log(`[Axion-License] ❌ EXPIRADA: ${lic.licenseId} (${lic.ownerName}) — ${lic.ownerPhone}`);
 
       // TODO: Notificar o licenciado via WhatsApp
       // TODO: Bloquear o processo PM2 deste licenciado
@@ -45,14 +45,14 @@ function runCheck() {
     if (msLeft > 0 && msLeft <= WARN_BEFORE_MS && lic.status === 'active') {
       const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
       warningCount++;
-      console.log(`[KaNet-License] ⚠️  AVISO: ${lic.licenseId} (${lic.ownerName}) expira em ${daysLeft} dia(s)`);
+      console.log(`[Axion-License] ⚠️  AVISO: ${lic.licenseId} (${lic.ownerName}) expira em ${daysLeft} dia(s)`);
 
       // TODO: Enviar aviso de renovação ao licenciado via WhatsApp
     }
   }
 
   if (expiredCount > 0 || warningCount > 0) {
-    console.log(`[KaNet-License] Verificação concluída: ${expiredCount} expiradas, ${warningCount} a expirar em breve`);
+    console.log(`[Axion-License] Verificação concluída: ${expiredCount} expiradas, ${warningCount} a expirar em breve`);
   }
 
   return { expiredCount, warningCount, total: licenses.length, checkedAt: now.toISOString() };
@@ -63,11 +63,11 @@ function runCheck() {
  */
 function startChecker() {
   if (checkerInterval) {
-    console.log('[KaNet-License] Verificador já está a correr.');
+    console.log('[Axion-License] Verificador já está a correr.');
     return;
   }
 
-  console.log('[KaNet-License] ✅ Verificador de licenças iniciado (intervalo: 1 hora)');
+  console.log('[Axion-License] ✅ Verificador de licenças iniciado (intervalo: 1 hora)');
 
   // Verificar imediatamente ao arrancar
   runCheck();
@@ -88,7 +88,7 @@ function stopChecker() {
   if (checkerInterval) {
     clearInterval(checkerInterval);
     checkerInterval = null;
-    console.log('[KaNet-License] Verificador parado.');
+    console.log('[Axion-License] Verificador parado.');
   }
 }
 

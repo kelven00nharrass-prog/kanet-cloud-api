@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+﻿const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 
@@ -584,7 +584,7 @@ const html = `<!DOCTYPE html>
         <div class="price-item highlight"><div class="item-left"><i class="fa-solid fa-calendar-check"></i> 30 GB Faseado</div><div class="item-right">700 <span>MT</span></div></div>
       </div>
       <div class="special-desc-box">
-        💡 <b>Você no controle:</b> Defina quantos GB quer receber por dia. Confirme via WhatsApp, SMS ou Ka-Net Hub!
+        💡 <b>Você no controle:</b> Defina quantos GB quer receber por dia. Confirme via WhatsApp, SMS ou Axion Hub!
       </div>
     </div>
   </div>
@@ -712,7 +712,7 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 (async () => {
-  console.log('🚀 Gerando Tabela Completa de Preços Ka-Net...');
+  console.log('🚀 Gerando Tabela Completa de Preços Axion...');
   const browser = await puppeteer.launch({
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']

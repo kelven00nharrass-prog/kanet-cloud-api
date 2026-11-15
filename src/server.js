@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
@@ -10,7 +10,7 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MASTER_TOKENS = new Set([
-  process.env.MASTER_TOKEN || 'KaNetKelven2026Secure',
+  process.env.MASTER_TOKEN || 'AxionKelven2026Secure',
   'GitoAquinoMasterToken2025'
 ]);
 
@@ -82,7 +82,7 @@ app.get(['/health', '/', '/status'], (req, res) => {
   const onlineCount = Object.values(inMemoryDevices).filter(d => (now - new Date(d.lastSeen || 0).getTime()) < 35000).length;
   res.json({
     status: 'online',
-    service: 'Ka-Net Cloud API (Render + Firebase)',
+    service: 'Axion Cloud API (Render + Firebase)',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     devices_online: onlineCount,
@@ -167,7 +167,7 @@ async function handleTransfer(req, res) {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
+    // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário)
     splitMensalOrderIfEligible(orderDoc);
 
     inMemoryOrders.set(orderId, orderDoc);
@@ -188,7 +188,7 @@ async function handleTransfer(req, res) {
       success: true,
       processing: true,
       orderId,
-      mensagem: 'Pedido recebido e despachado na nuvem Ka-Net'
+      mensagem: 'Pedido recebido e despachado na nuvem Axion'
     });
   } catch (error) {
     console.error('❌ [TRANSFER ERRO]:', error);
@@ -761,7 +761,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
         }
 
-        // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
+        // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário)
         splitMensalOrderIfEligible(order);
 
         let isCompatible = isPortCompatibleWithModo(port, order.modo);
@@ -1962,7 +1962,7 @@ const ADB_DEVICE_MAP = {
 
 const SCRCPY_PATHS = [
   'C:\\Users\\Kelven\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Genymobile.scrcpy_Microsoft.Winget.Source_8wekyb3d8bbwe\\scrcpy-win64-v4.1\\scrcpy.exe',
-  'D:\\Kelven\\KaNet\\Kelven System\\scrcpy-win64-v2.4\\scrcpy.exe',
+  'D:\\Kelven\\Axion\\Kelven System\\scrcpy-win64-v2.4\\scrcpy.exe',
   'scrcpy'
 ];
 
@@ -2196,7 +2196,7 @@ app.post('/api/remote/:port/launch-scrcpy', (req, res) => {
   try {
     const child = spawn(scrcpyBin, [
       '-s', dev.serial,
-      '--window-title', `📱 Ka-Net - Celular Porta ${port} (${dev.name})`,
+      '--window-title', `📱 Axion - Celular Porta ${port} (${dev.name})`,
       '--always-on-top',
       '--stay-awake'
     ], {
@@ -2467,9 +2467,9 @@ app.get('/api/groups', async (req, res) => {
     } else {
       // Fallback: grupos conhecidos hardcoded quando WhatsApp está offline
       const fallback = [
-        { jid: jidNotif, nome: 'Ka-Net Notificações', tipo: 'Canal de Notificações' },
-        { jid: jidErros,  nome: 'Ka-Net Alertas & Erros', tipo: 'Canal de Erros' },
-        { jid: '120363424819563179@g.us', nome: 'Ka-Net VIP Clientes', tipo: 'Grupo de Clientes' }
+        { jid: jidNotif, nome: 'Axion Notificações', tipo: 'Canal de Notificações' },
+        { jid: jidErros,  nome: 'Axion Alertas & Erros', tipo: 'Canal de Erros' },
+        { jid: '120363424819563179@g.us', nome: 'Axion VIP Clientes', tipo: 'Grupo de Clientes' }
       ];
       finalGroups = fallback.map(g => ({
         ...g,
@@ -2549,7 +2549,7 @@ app.get('/api/app/hub/version', (req, res) => {
       version: '2.2.0',
       versionCode: 22,
       pwaVersion: '2026.10.02-v2',
-      apkUrl: 'https://kanet-cloud-api-f3le.onrender.com/hub/KaNet-Client-Hub.apk',
+      apkUrl: 'https://kanet-cloud-api-f3le.onrender.com/hub/Axion-Client-Hub.apk',
       changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
       releasedAt: new Date().toISOString()
     });
@@ -2913,7 +2913,7 @@ try {
       createdAt: new Date().toISOString()
     };
 
-    // Aplicar regra oficial Ka-Net de divisão de pacotes Mensais (1ª oferta + resto diário)
+    // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário)
     splitMensalOrderIfEligible(orderDoc);
     // Aplicar ativação de Planos Especiais (Renovável & Faseado)
     handleSpecialPlanIfApplicable(orderDoc);
@@ -3046,7 +3046,7 @@ app.get('/qr', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ka-Net WhatsApp Cloud — Conectar</title>
+  <title>Axion WhatsApp Cloud — Conectar</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -3110,7 +3110,7 @@ app.get('/qr', (req, res) => {
 </head>
 <body>
   <div class="card">
-    <h1>⚡ Ka-Net WhatsApp Cloud</h1>
+    <h1>⚡ Axion WhatsApp Cloud</h1>
     <p>Conecte o seu WhatsApp diretamente ao servidor na Nuvem (sem computador ligado).</p>
 
     <div id="status-container" class="status status-waiting">
@@ -3393,7 +3393,7 @@ app.post('/api/sms/payment', (req, res) => {
         clientSupportMessages.push({
           id: `MSG-NOTIF-${Date.now()}`,
           clientPhone: String(item.orderDoc.cliente_solicitante).replace(/\D/g, ''),
-          clientName: 'Sistema Ka-Net',
+          clientName: 'Sistema Axion',
           sender: 'admin',
           text: `🎉 Pagamento de ${vNum} MT confirmado pela rede (${metodo || 'M-Pesa'})! O seu pacote de ${item.orderDoc.quantidade}MB foi aprovado e está a ser entregue para +258 ${item.orderDoc.numero}.`,
           createdAt: new Date().toISOString(),
@@ -3833,12 +3833,12 @@ app.post('/api/admin/packages/save', (req, res) => {
   }
 });
 
-// ── 20.3.1 Sistema de Anúncios e Alertas para Clientes (Ka-Net Broadcast) ──
+// ── 20.3.1 Sistema de Anúncios e Alertas para Clientes (Axion Broadcast) ──
 const ANNOUNCEMENT_CACHE_FILE = path.resolve(__dirname, 'cache_announcement.json');
 
 let currentAnnouncement = {
   id: 'ANN-DEFAULT',
-  title: '🔥 Bem-vindo ao Ka-Net Client Hub!',
+  title: '🔥 Bem-vindo ao Axion Client Hub!',
   message: 'Recarregue pacotes de megas com ativação imediata via M-Pesa e e-Mola sem filas!',
   type: 'promo', // 'promo' | 'alert' | 'news' | 'info'
   active: false,
@@ -3997,7 +3997,7 @@ app.post('/api/client/purchase', async (req, res) => {
     if (!destinoPagamento) {
       return res.status(400).json({
         success: false,
-        mensagem: `❌ Pagamento não reconhecido. O comprovativo deve mostrar transferência para uma das contas oficiais Ka-Net:\n🔴 M-Pesa: 856268811 (Kelven Junior)\n🟡 e-Mola: 864882152 (Catia Anabela)\n\nCertifique-se de que transferiu para a nossa conta correta.`
+        mensagem: `❌ Pagamento não reconhecido. O comprovativo deve mostrar transferência para uma das contas oficiais Axion:\n🔴 M-Pesa: 856268811 (Kelven Junior)\n🟡 e-Mola: 864882152 (Catia Anabela)\n\nCertifique-se de que transferiu para a nossa conta correta.`
       });
     }
 
@@ -4105,7 +4105,7 @@ app.post('/api/client/purchase', async (req, res) => {
           `📦 *Pacote:* *${packageName || (qtyMb + 'MB')}* (${modo})\n` +
           `💳 *Valor:* *${valOperadora} MT* (${metodoNome})\n` +
           `👤 *Cliente:* *${clientPhone || cleanDest}*\n` +
-          `🏢 *Origem:* Ka-Net Client Hub App\n` +
+          `🏢 *Origem:* Axion Client Hub App\n` +
           `🕒 *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `⏳ *Status:* Confirmado pelo SMS da rede. Enviado para ativação imediata!`
@@ -4363,11 +4363,11 @@ app.post('/api/client/support/process-proof', async (req, res) => {
   }
 });
 
-// ── 20.7 CRM & Suporte no Ka-Net Admin Master ──
+// ── 20.7 CRM & Suporte no Axion Admin Master ──
 app.get('/api/admin/crm/stats', (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
-  if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'KaNetKelven2026Secure') {
+  if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
     return res.status(403).json({ error: 'Não autorizado' });
   }
 
@@ -4463,7 +4463,7 @@ app.post('/api/admin/crm/support-reply', (req, res) => {
   const msgObj = {
     id: `MSG-ADM-${Date.now()}`,
     clientPhone: cleanPhone,
-    clientName: 'Administrador Ka-Net',
+    clientName: 'Administrador Axion',
     sender: 'admin',
     text: String(text).trim(),
     createdAt: new Date().toISOString(),
@@ -4611,7 +4611,7 @@ app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
     });
   }
 
-  return res.json({ success: true, mensagem: 'SMS processado pelo Bot de Vendas Ka-Net!' });
+  return res.json({ success: true, mensagem: 'SMS processado pelo Bot de Vendas Axion!' });
 });
 
 // ── 20.8 Motor de Alertas de Expiração (D-3 e D-0) & Planos Faseados/Renováveis ──
@@ -4645,13 +4645,13 @@ function processClientPackageReminders() {
       if (!clientRemindersSent.has(reminderKey)) {
         clientRemindersSent.add(reminderKey);
 
-        const textoD3 = `🔔 [Ka-Net Lembrete]: Olá! O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira em 3 dias. Para continuar conectado sem interrupções, renove já no seu Ka-Net Client Hub ou via WhatsApp!`;
+        const textoD3 = `🔔 [Axion Lembrete]: Olá! O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira em 3 dias. Para continuar conectado sem interrupções, renove já no seu Axion Client Hub ou via WhatsApp!`;
 
         // Salvar mensagem no chat de suporte do app para o cliente ver imediatamente
         clientSupportMessages.push({
           id: `REMINDER-${Date.now()}`,
           clientPhone,
-          clientName: 'Ka-Net Notificações',
+          clientName: 'Axion Notificações',
           sender: 'admin',
           text: textoD3,
           createdAt: new Date().toISOString(),
@@ -4673,12 +4673,12 @@ function processClientPackageReminders() {
       if (!clientRemindersSent.has(reminderKey)) {
         clientRemindersSent.add(reminderKey);
 
-        const textoD0 = `⚠️ [Ka-Net Urgente]: O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira hoje! Evite ficar sem internet, ative agora um novo pacote no seu aplicativo Ka-Net!`;
+        const textoD0 = `⚠️ [Axion Urgente]: O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira hoje! Evite ficar sem internet, ative agora um novo pacote no seu aplicativo Axion!`;
 
         clientSupportMessages.push({
           id: `REMINDER-D0-${Date.now()}`,
           clientPhone,
-          clientName: 'Ka-Net Notificações',
+          clientName: 'Axion Notificações',
           sender: 'admin',
           text: textoD0,
           createdAt: new Date().toISOString(),
@@ -4859,7 +4859,7 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     orderDoc.modo = 'diario';
     orderDoc.targetPort = null; // Qualquer celular diário online e apto assume de imediato
     orderDoc.input_val = '';
-    orderDoc.remetente = `Ka-Net ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`;
+    orderDoc.remetente = `Axion ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`;
 
     // Criar o plano agendado para as próximas entregas diárias automáticas
     const plan = criarPlano({
@@ -4950,7 +4950,7 @@ async function executarEntregaPlano(planId) {
     status:   'pending',
     origem:   plan.tipo, // 'renovavel' | 'faseado'
     planId,
-    remetente: `Ka-Net Auto (${plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renovação ${entregaN}`})`,
+    remetente: `Axion Auto (${plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renovação ${entregaN}`})`,
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -4994,7 +4994,7 @@ async function executarEntregaPlano(planId) {
                    `Olá! Acabámos de enviar a *Última Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*!\n\n` +
                    `✨ *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
                    `✅ Todas as fases foram concluídas com sucesso.\n\n` +
-                   `Muito obrigado pela confiança na *Ka-Net Internet*!`;
+                   `Muito obrigado pela confiança na *Axion Internet*!`;
     } else {
       textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                    `  📦 *${label.toUpperCase()} ENTREGUE!* 📶\n` +
@@ -5015,7 +5015,7 @@ async function executarEntregaPlano(planId) {
                    `Olá! Acabámos de enviar a *Última Renovação (${label})* de *+${plan.mb_diaria} MB* para o número *${plan.numero}*!\n\n` +
                    `✨ *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
                    `✅ O ciclo de 7 dias de renovações automáticas foi concluído com sucesso.\n\n` +
-                   `Muito obrigado pela confiança na *Ka-Net Internet*!`;
+                   `Muito obrigado pela confiança na *Axion Internet*!`;
     } else {
       textoNotif = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
                    `  ♻️ *${label.toUpperCase()} ENTREGUE!* 📶\n` +
@@ -5037,7 +5037,7 @@ async function executarEntregaPlano(planId) {
   clientSupportMessages.push({
     id: `PLAN-MSG-${Date.now()}`,
     clientPhone: plan.clientPhone,
-    clientName: 'Ka-Net Automático',
+    clientName: 'Axion Automático',
     sender: 'admin',
     text: textoNotif,
     createdAt: timestamp,
@@ -5135,7 +5135,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
       modo:    'diario',
       status:  'pending',
       origem:  tipo,
-      remetente: `Ka-Net ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`,
+      remetente: `Axion ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`,
       sms_ref: sms_ref || '',
       createdAt: timestamp, updatedAt: timestamp
     };

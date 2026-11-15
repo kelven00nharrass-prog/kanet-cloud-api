@@ -1,5 +1,5 @@
-/**
- * Ka-Net Licensing System — Rotas REST API
+﻿/**
+ * Axion Licensing System — Rotas REST API
  * -----------------------------------------
  * Todas as rotas do sistema de licenciamento.
  * Montadas em /licensing/ no servidor principal.
@@ -33,7 +33,7 @@ const { listPackages } = require('./packages');
 
 // ─── Rota de teste ───────────────────────────────────────────────────────────
 router.get('/ping', (req, res) => {
-  res.json({ success: true, message: '🟢 Ka-Net Licensing API está online', ts: new Date().toISOString() });
+  res.json({ success: true, message: '🟢 Axion Licensing API está online', ts: new Date().toISOString() });
 });
 
 // ─── Login unificado (Kelven Master ou Licenciado) ───────────────────────────
@@ -47,11 +47,11 @@ router.post('/login', (req, res) => {
     const isMasterUser = ['kelven', 'admin', 'master'].includes(cleanUser) || cleanUser === '';
     const isMasterPass = ['kanet2026', 'kanet-master-kelven-2026', 'kanetkelven2026secure'].includes(cleanPass.toLowerCase());
 
-    if ((isMasterUser && isMasterPass) || cleanPass === 'KaNet-MASTER-KELVEN-2026' || cleanPass === 'KaNetKelven2026Secure') {
+    if ((isMasterUser && isMasterPass) || cleanPass === 'Axion-MASTER-KELVEN-2026' || cleanPass === 'AxionKelven2026Secure') {
       return res.json({
         success: true,
         role: 'master',
-        token: 'KaNet-MASTER-KELVEN-2026',
+        token: 'Axion-MASTER-KELVEN-2026',
         ownerName: 'Kelven (Master)',
         message: 'Bem-vindo, Kelven!'
       });

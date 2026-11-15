@@ -1,4 +1,4 @@
-module.exports = {
+﻿module.exports = {
     "BOT_EXPIRACAO_DIAS": 10000000,
     "SMS_GATEWAY_SEND_URL": "http://192.168.43.1:8080/send",
     "CUSTO_GB_MT": 17.5,
@@ -552,7 +552,7 @@ module.exports = {
             "diaria": 1024
         }
     },
-    "NOME_SISTEMA": "Ka-Net System",
+    "NOME_SISTEMA": "Axion System",
     "SUPPORT_NUMBER": "850401416",
     "MASTER_NUMBERS": [
         "850401416",

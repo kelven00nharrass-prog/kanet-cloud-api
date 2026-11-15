@@ -1,7 +1,7 @@
-{
-  "name": "Ka-Net Pro",
-  "short_name": "Ka-Net",
-  "description": "Painel Executivo e Controlo Ka-Net",
+﻿{
+  "name": "Axion Pro",
+  "short_name": "Axion",
+  "description": "Painel Executivo e Controlo Axion",
   "start_url": "/app/",
   "display": "standalone",
   "orientation": "portrait-primary",

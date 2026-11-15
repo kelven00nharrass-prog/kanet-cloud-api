@@ -1,5 +1,5 @@
-/**
- * Ka-Net Licensing System — Middleware Express
+﻿/**
+ * Axion Licensing System — Middleware Express
  * --------------------------------------------
  * Verifica se o token no header é válido antes de permitir acesso
  * às rotas do sistema de cada licenciado.
@@ -16,8 +16,8 @@ const { checkLicenseValidity } = require('./license_manager');
 // Token do Kelven (dono do sistema) — lê do .env
 const VALID_MASTER_TOKENS = [
   process.env.MASTER_LICENSE_TOKEN,
-  'KaNet-MASTER-KELVEN-2026',
-  'KaNetKelven2026Secure'
+  'Axion-MASTER-KELVEN-2026',
+  'AxionKelven2026Secure'
 ].filter(Boolean);
 
 function isMasterToken(token) {

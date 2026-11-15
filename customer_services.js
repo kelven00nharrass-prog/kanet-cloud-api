@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * KA-NET CUSTOMER SERVICES & ADVANCED LOYALTY ENGINE
  * ==============================================================================
@@ -925,7 +925,7 @@ function vincularIndicacao(amigoTelOrLid, codigoOuTel) {
     // Se o amigo já é cliente com compras anteriores, indicação não se aplica
     const comprasAmigo = amigo ? getComprasCount(amigo) : 0;
     if (comprasAmigo > 0) {
-        return { success: false, mensagem: '⚠️ O programa "Indica e Ganha" é válido para a *primeira compra* de novos clientes. Você já possui compras registradas na Ka-Net! Mas você pode gerar o seu próprio código com *!convite* para indicar amigos e ganhar 500 MB!' };
+        return { success: false, mensagem: '⚠️ O programa "Indica e Ganha" é válido para a *primeira compra* de novos clientes. Você já possui compras registradas na Axion! Mas você pode gerar o seu próprio código com *!convite* para indicar amigos e ganhar 500 MB!' };
     }
 
     // Se o amigo já foi indicado por alguém
@@ -949,7 +949,7 @@ function vincularIndicacao(amigoTelOrLid, codigoOuTel) {
         success: true,
         padrinho,
         codigo: codPadrinhoExib,
-        mensagem: `🎉 *CÓDIGO DE CONVITE ATIVADO!*\n\nVocê foi indicado pelo código *${codPadrinhoExib}*.\n\nAo concluir a sua primeira compra de Megas na Ka-Net, a indicação será confirmada e o seu amigo pontuará no sistema! 🚀`
+        mensagem: `🎉 *CÓDIGO DE CONVITE ATIVADO!*\n\nVocê foi indicado pelo código *${codPadrinhoExib}*.\n\nAo concluir a sua primeira compra de Megas na Axion, a indicação será confirmada e o seu amigo pontuará no sistema! 🚀`
     };
 }
 
@@ -1033,7 +1033,7 @@ function processarCompraIndicacao(compradorTel) {
             const msgAviso = 
                 `🎉 *NOVO AMIGO COMPROU COM O TEU CÓDIGO!* ⚡\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                `O teu amigo *${comprador}* acabou de comprar na Ka-Net!\n\n` +
+                `O teu amigo *${comprador}* acabou de comprar na Axion!\n\n` +
                 `👥 *Progresso Atual:* *${totalNaRodada} de 3 amigos*\n` +
                 `🎁 *Faltam apenas:* *${faltam} amigo(s)* para ganhares *500 MB GRÁTIS*!\n\n` +
                 `_Continua a partilhar o teu código: *${codPadrinho}*_`;
@@ -1094,7 +1094,7 @@ function processarCompraIndicacao(compradorTel) {
         const msgPremio = 
             `🏆 *PARABÉNS! VOCÊ GANHOU 500 MB GRÁTIS!* ⚡\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `🎉 *3 amigos* que usaram o teu código já compraram na *Ka-Net*!\n\n` +
+            `🎉 *3 amigos* que usaram o teu código já compraram na *Axion*!\n\n` +
             `🎁 *Bónus Conquistado:* *500 MB (Diário)*\n\n` +
             `📲 *Onde deseja receber os seus 500 MB?*\n` +
             `1️⃣ Digite *1* para receber neste número (*${padrinhoTel}*)\n` +
@@ -1179,7 +1179,7 @@ function gerarMensagemDesbloqueioVip(totalCompras) {
             '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
             '  🎉 *PARABÉNS! VOCÊ É CLIENTE VIP!* 🌟\n' +
             '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
-            'Incrível! Você acaba de completar a sua *100ª compra* na Ka-Net! 🏆✨\n\n' +
+            'Incrível! Você acaba de completar a sua *100ª compra* na Axion! 🏆✨\n\n' +
             '🔓 *NOVO BENEFÍCIO DESBLOQUEADO: TXENECO* ⚡\n' +
             'Pela sua fidelidade, você agora tem crédito de internet liberado sempre que precisar e estiver sem saldo!\n\n' +
             '🥉 *Nível Bronze:* até *3.0 GB* de limite\n' +
@@ -1189,7 +1189,7 @@ function gerarMensagemDesbloqueioVip(totalCompras) {
             '💳 *Como pagar a dívida (taxa 10%):*\n' +
             '👉 *.pagar <comprovativo>*\n\n' +
             '🆙 _Ao atingir 200 compras, seu limite subirá para 5 GB!_\n' +
-            '🙏 _Muito obrigado pela confiança e por fazer parte da família Ka-Net!_ 🌐✨'
+            '🙏 _Muito obrigado pela confiança e por fazer parte da família Axion!_ 🌐✨'
         );
     }
     if (totalCompras === 200) {
@@ -1197,7 +1197,7 @@ function gerarMensagemDesbloqueioVip(totalCompras) {
             '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
             '  🥈 *NOVO NÍVEL ALCANÇADO: PRATA!* 💎\n' +
             '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
-            'Sensacional! Você atingiu a marca de *200 compras* na Ka-Net! 🚀🔥\n\n' +
+            'Sensacional! Você atingiu a marca de *200 compras* na Axion! 🚀🔥\n\n' +
             '🔓 *O SEU LIMITE DE TXENECO SUBIU PARA 5.0 GB!* ⚡\n' +
             'Agora você pode txenecar pacotes de até *5 GB* no total sempre que precisar!\n\n' +
             '💡 *Como pedir:*\n' +
@@ -1211,12 +1211,12 @@ function gerarMensagemDesbloqueioVip(totalCompras) {
             '╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n' +
             '  👑 *NÍVEL OURO VIP SUPREMO!* 👑\n' +
             '╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
-            'INCRÍVEL! Você atingiu a lendária marca de *800 compras* na Ka-Net! 🌟🚀🔥\n\n' +
+            'INCRÍVEL! Você atingiu a lendária marca de *800 compras* na Axion! 🌟🚀🔥\n\n' +
             '🔓 *CRÉDITO TOTALMENTE LIVRE: ATÉ 10 GB!* ⚡\n' +
             'Você é um dos clientes mais fiéis de todo o sistema! Agora você tem a liberdade de escolher qualquer quantidade até *10 GB* a crédito!\n\n' +
             '💡 *Como pedir:*\n' +
             '👉 *.txenecar 5gb 84XXXXXXX* ou *.txenecar 10gb 84XXXXXXX*\n\n' +
-            '👑 _Toda a equipe Ka-Net agradece pela sua lealdade incomparável!_ 🌐✨'
+            '👑 _Toda a equipe Axion agradece pela sua lealdade incomparável!_ 🌐✨'
         );
     }
     return null;
@@ -1463,10 +1463,10 @@ async function solicitarTxeneco({ senderPhone, mbSolicitado, numDestino, jid, se
         return {
             success: false,
             mensagem: `🚫 *PRIVILÉGIO EXCLUSIVO DE CLIENTE FIEL*\n━━━━━━━━━━━━━━━━━━\n` +
-                      `O serviço *Txeneco Ka-Net* é um benefício reservado exclusivamente para clientes com *100 ou mais compras* realizadas.\n\n` +
+                      `O serviço *Txeneco Axion* é um benefício reservado exclusivamente para clientes com *100 ou mais compras* realizadas.\n\n` +
                       `📊 *O seu total de compras:* *${totalCompras}*\n` +
                       `🎯 Faltam apenas *${faltam} compras* para desbloquear o seu crédito de até *3 GB*!\n\n` +
-                      `🛒 Continue a comprar na Ka-Net para liberar o seu benefício!`
+                      `🛒 Continue a comprar na Axion para liberar o seu benefício!`
         };
     }
 
@@ -1679,7 +1679,7 @@ async function processarPagamentoDivida({ senderPhone, valorPago, txnId, rawText
                       trocoMsg + `\n\n` +
                       `🔓 *O seu crédito de Txeneco foi totalmente restaurado para ${tetoF}!* Já pode solicitar internet adiantada sempre que precisar.\n\n` +
                       `🙏 *MUITO OBRIGADO PELA SUA HONESTIDADE E PREFERÊNCIA!* 🌟✨\n` +
-                      `_A Ka-Net valoriza imensamente clientes fiéis e pontuais como você._ 🌐🤝`
+                      `_A Axion valoriza imensamente clientes fiéis e pontuais como você._ 🌐🤝`
         };
     } else {
         // Quitação Parcial
@@ -1984,7 +1984,7 @@ async function sacarBonus({ senderPhone, mbSolicitado, numDestino, jid }) {
             jid: jid || `258${phone}@s.whatsapp.net`,
             sender: phone,
             senderPhone: phone,
-            senderName: 'Saque Bônus Ka-Net',
+            senderName: 'Saque Bônus Axion',
             txn_id: orderId,
             valor: 0
         });
@@ -2249,7 +2249,7 @@ function cadastrarOuRenovarAssinaturaIlimitada({
         phone: chaveTelefone,
         lid: lidClean || (existingSub ? existingSub.lid : null),
         jid: jidFinal,
-        nomeCliente: nomeCliente || (existingSub ? existingSub.nomeCliente : 'Cliente Ka-Net'),
+        nomeCliente: nomeCliente || (existingSub ? existingSub.nomeCliente : 'Cliente Axion'),
         planoNome: planoNome || (existingSub ? existingSub.planoNome : 'Pacote Ilimitado'),
         tipoPlano: tipoPlano || 'ilimitado',
         valor: Number(valor) || (existingSub ? existingSub.valor : 0),

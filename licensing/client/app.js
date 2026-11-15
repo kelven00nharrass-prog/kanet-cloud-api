@@ -1,5 +1,5 @@
-/**
- * Ka-Net Portal — Lógica do Licenciado (Client App)
+﻿/**
+ * Axion Portal — Lógica do Licenciado (Client App)
  * -------------------------------------------------
  * Comunica com /licensing/me, /licensing/me/masters, etc.
  */
@@ -148,7 +148,7 @@ function renderLicense(lic) {
   if (!lic) return;
 
   // Header
-  document.getElementById('headerOwnerName').textContent = lic.ownerName || 'Ka-Net Licenciado';
+  document.getElementById('headerOwnerName').textContent = lic.ownerName || 'Axion Licenciado';
   document.getElementById('headerLicenseId').textContent = `Licença: ${lic.licenseId}`;
 
   // Status Badge
@@ -213,7 +213,7 @@ function renderLicense(lic) {
 
   // Botão WhatsApp com mensagem pronta
   const renewBtn = document.getElementById('btnWhatsAppRenew');
-  const msgWpp = encodeURIComponent(`Olá Kelven, gostaria de solicitar a renovação da minha licença Ka-Net (${lic.licenseId} - ${lic.ownerName}).`);
+  const msgWpp = encodeURIComponent(`Olá Kelven, gostaria de solicitar a renovação da minha licença Axion (${lic.licenseId} - ${lic.ownerName}).`);
   renewBtn.href = `https://wa.me/258850401416?text=${msgWpp}`;
 
   // Renderizar Portas Info

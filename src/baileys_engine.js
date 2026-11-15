@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * KA-NET CLOUD WHATSAPP ENGINE (POWERED BY BAILEYS) - 100% BOT ORIGINAL
  * ==============================================================================
@@ -290,7 +290,7 @@ function getSuporteDetails() {
     } else if (DYN_CFG.master_number || DYN_CFG.admin_number) {
         supportNum = String(DYN_CFG.master_number || DYN_CFG.admin_number).split(',')[0].trim();
     }
-    const sysName = LOCAL_CFG.nome_sistema || DYN_CFG.NOME_SISTEMA || 'Ka-Net System';
+    const sysName = LOCAL_CFG.nome_sistema || DYN_CFG.NOME_SISTEMA || 'Axion System';
     return { supportNum, sysName };
 }
 
@@ -1142,7 +1142,7 @@ async function startWhatsApp(orderCallback, db = null) {
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
         const { version } = await fetchLatestBaileysVersion();
 
-        console.log(`📡 [BAILEYS] Iniciando Ka-Net WhatsApp Cloud v${version.join('.')}...`);
+        console.log(`📡 [BAILEYS] Iniciando Axion WhatsApp Cloud v${version.join('.')}...`);
 
         sock = makeWASocket({
             version,
@@ -1220,7 +1220,7 @@ async function startWhatsApp(orderCallback, db = null) {
                 connectionStatus = 'connected';
                 currentQrBase64 = null;
                 reconnectAttempts = 0; // reset após conexão bem-sucedida
-                connectedUser = sock.user?.id || 'KaNet Cloud Bot';
+                connectedUser = sock.user?.id || 'Axion Cloud Bot';
                 addLog(`✅ WhatsApp Conectado com SUCESSO! Logado como: ${connectedUser}`);
                 if (firestoreDbInstance) {
                     backupAuthToFirestore(firestoreDbInstance);
@@ -1260,7 +1260,7 @@ async function startWhatsApp(orderCallback, db = null) {
                     // Pequeno atraso de 1.5s para sincronização do WhatsApp
                     await new Promise(r => setTimeout(r, 1500));
 
-                    let groupName = 'Grupo Ka-Net';
+                    let groupName = 'Grupo Axion';
                     try {
                         const meta = await getCachedGroupMetadata(id);
                         if (meta && meta.subject) groupName = meta.subject;

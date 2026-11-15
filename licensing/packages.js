@@ -1,5 +1,5 @@
-/**
- * Ka-Net Licensing System — Definição de Pacotes
+﻿/**
+ * Axion Licensing System — Definição de Pacotes
  * ------------------------------------------------
  * FICHEIRO NOVO — não afecta o sistema actual
  */

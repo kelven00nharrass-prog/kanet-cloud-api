@@ -1,6 +1,6 @@
-# 🔐 Ka-Net Licensing System
+﻿# 🔐 Axion Licensing System
 
-Sistema de licenciamento multi-tenant integrado no Ka-Net Cloud API.
+Sistema de licenciamento multi-tenant integrado no Axion Cloud API.
 
 ---
 
@@ -16,7 +16,7 @@ node server.js
 ```
 http://localhost:3000/licensing/admin
 ```
-Token de acesso: **`KaNet-MASTER-KELVEN-2026`**  
+Token de acesso: **`Axion-MASTER-KELVEN-2026`**  
 *(guardar este token em segurança — está no `.env`)*
 
 ---
@@ -87,7 +87,7 @@ $body = @{
 Invoke-RestMethod `
   -Uri "http://localhost:3000/licensing/licenses" `
   -Method POST `
-  -Headers @{"Authorization"="Bearer KaNet-MASTER-KELVEN-2026"; "Content-Type"="application/json"} `
+  -Headers @{"Authorization"="Bearer Axion-MASTER-KELVEN-2026"; "Content-Type"="application/json"} `
   -Body $body
 ```
 
@@ -96,7 +96,7 @@ Invoke-RestMethod `
 ## ⚙️ Variáveis de Ambiente
 
 ```env
-MASTER_LICENSE_TOKEN=KaNet-MASTER-KELVEN-2026
+MASTER_LICENSE_TOKEN=Axion-MASTER-KELVEN-2026
 ```
 
 ---
@@ -131,4 +131,4 @@ licensing/
 
 ---
 
-*Ka-Net Licensing System v1.0 — Desenvolvido por Antigravity para Kelven*
+*Axion Licensing System v1.0 — Desenvolvido por Antigravity para Kelven*

@@ -1,4 +1,4 @@
-/* Ka-Net Licensing Admin — JavaScript */
+﻿/* Axion Licensing Admin — JavaScript */
 
 const API_BASE = window.location.origin + '/licensing';
 let masterToken = localStorage.getItem('kn_token') || '';

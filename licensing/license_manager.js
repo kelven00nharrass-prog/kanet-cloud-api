@@ -1,5 +1,5 @@
-/**
- * Ka-Net Licensing System — Gestor de Licenças
+﻿/**
+ * Axion Licensing System — Gestor de Licenças
  * ---------------------------------------------
  * Lê e grava licenças num ficheiro JSON local.
  * Não afecta nenhum ficheiro do sistema actual.
