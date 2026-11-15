@@ -390,17 +390,37 @@ async function restaurarDoFirestore() {
 
         // 9. Reconciliação robusta de histórico de compras a partir de pedidos concluídos no Firestore
     try {
-        console.log('🔄 [FIRESTORE] Reconciliando histórico de compras a partir de pedidos concluídos...');
-        const ordersSnap = await firestoreDb.collection('orders')
-            .where('status', '==', 'completed')
-            .limit(2000)
-            .get();
+        console.log('🔄 [FIRESTORE/SEEDS] Reconciliando histórico de compras a partir de pedidos concluídos...');
+        let orderDocs = [];
+        if (firestoreDb) {
+            try {
+                const ordersSnap = await firestoreDb.collection('orders')
+                    .where('status', '==', 'completed')
+                    .limit(2000)
+                    .get();
+                if (!ordersSnap.empty) {
+                    orderDocs = ordersSnap.docs.map(d => ({ data: () => d.data(), id: d.id }));
+                }
+            } catch (_) {}
+        }
+        if (orderDocs.length === 0) {
+            const seedPath = path.resolve(__dirname, 'orders_seed.json');
+            if (fs.existsSync(seedPath)) {
+                try {
+                    const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+                    if (Array.isArray(seed)) {
+                        orderDocs = seed.map(([id, o]) => ({ data: () => o, id }));
+                        console.log(`🌱 [SEED RECONCILIAÇÃO] Usando ${orderDocs.length} pedidos da semente permanente.`);
+                    }
+                } catch (_) {}
+            }
+        }
 
-        if (!ordersSnap.empty) {
+        if (orderDocs.length > 0) {
             const ordersByPhone = new Map();
             const orderHistoryByPhone = new Map();
 
-            ordersSnap.docs.forEach(d => {
+            orderDocs.forEach(d => {
                 const o = d.data();
                 const candidates = [
                     o.cliente_solicitante,
