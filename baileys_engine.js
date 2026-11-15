@@ -5382,6 +5382,68 @@ async function getGroups() {
 }
 
 /**
+ * 🛡️ ANTICONCORRÊNCIA: Varre TODOS os grupos administrados pelo bot principal
+ * e remove na hora qualquer participante que esteja na blacklist!
+ */
+async function expurgarConcorrentesDeTodosGrupos() {
+    if (!sock || connectionStatus !== 'connected') {
+        return { success: false, mensagem: 'Bot principal do Axion não está conectado.' };
+    }
+
+    const blacklist = carregarBlacklistConcorrentes();
+    if (blacklist.size === 0) {
+        return { success: true, totalRemovidos: 0, mensagem: 'Blacklist está vazia. Nenhum concorrente a remover.' };
+    }
+
+    try {
+        const groups = await sock.groupFetchAllParticipating();
+        let totalRemovidosGeral = 0;
+        const gruposAfetados = [];
+
+        for (const [gid, g] of Object.entries(groups)) {
+            // Verificar se o bot é admin deste grupo
+            const myJid = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : null;
+            const participants = g.participants || [];
+            const botParticipant = participants.find(p => p.id && (p.id.split(':')[0] === myJid?.split('@')[0] || p.id === myJid));
+            const botIsAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
+
+            if (!botIsAdmin) continue; // Só pode remover se o bot for admin do grupo
+
+            const aRemoverDesteGrupo = [];
+            for (const p of participants) {
+                const num = String(p.id || '').split('@')[0].replace(/\D/g, '');
+                if (blacklist.has(num)) {
+                    aRemoverDesteGrupo.push(p.id);
+                }
+            }
+
+            if (aRemoverDesteGrupo.length > 0) {
+                try {
+                    await sock.groupParticipantsUpdate(gid, aRemoverDesteGrupo, 'remove');
+                    totalRemovidosGeral += aRemoverDesteGrupo.length;
+                    gruposAfetados.push(`${g.subject || gid} (${aRemoverDesteGrupo.length})`);
+                    console.log(`🚨 [ANTICONCORRÊNCIA AUTO-EXPULSÃO] Removidos ${aRemoverDesteGrupo.length} concorrentes de "${g.subject}"`);
+                } catch (eRem) {
+                    console.warn(`⚠️ [ANTICONCORRÊNCIA AUTO-EXPULSÃO] Falha ao remover de ${gid}:`, eRem.message);
+                }
+            }
+        }
+
+        return {
+            success: true,
+            totalRemovidos: totalRemovidosGeral,
+            gruposAfetados,
+            mensagem: totalRemovidosGeral > 0
+                ? `🚨 *EXPULSÃO AUTOMÁTICA EM MASSA!*\n\nForam expulsos na hora *${totalRemovidosGeral}* membros concorrentes dos seus grupos:\n• ` + gruposAfetados.join('\n• ')
+                : `✅ Nenhum concorrente da lista negra estava presente nos seus grupos.`
+        };
+    } catch (e) {
+        console.error('❌ [ANTICONCORRÊNCIA EXPURGO GERAL ERRO]:', e.message);
+        return { success: false, mensagem: `Erro ao expulsar: ${e.message}` };
+    }
+}
+
+/**
  * Ativa ou desativa o modo de manutenção global.
  * Bloqueia compras em grupos E em privado para todos os não-admins.
  */
@@ -6157,6 +6219,9 @@ module.exports = {
     getGrupoNotificacoes,
     getGrupoErros,
     getGroups,
+    expurgarConcorrentesDeTodosGrupos,
+    carregarBlacklistConcorrentes,
+    salvarBlacklistConcorrentes,
     setModoManutencao,
     getModoManutencao,
     setBotSilenciado,

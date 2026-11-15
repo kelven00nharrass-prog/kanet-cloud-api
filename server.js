@@ -4124,6 +4124,9 @@ try {
 
 try {
   baileysAnticoncorrencia = require('./baileys_anticoncorrencia');
+  if (baileysEngine && typeof baileysAnticoncorrencia.setBaileysEngine === 'function') {
+    baileysAnticoncorrencia.setBaileysEngine(baileysEngine);
+  }
   baileysAnticoncorrencia.startWhatsApp(db);
   console.log('🛡️ [ANTICONCORRÊNCIA NUVEM] Motor WhatsApp Espião / Anticoncorrência inicializado com sucesso!');
 } catch (e) {

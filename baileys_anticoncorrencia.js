@@ -19,6 +19,11 @@ let connectedUser = null;
 let firestoreDbInstance = null;
 let isConnecting = false;
 let reconnectAttempts = 0;
+let mainBaileysEngine = null;
+
+function setBaileysEngine(engine) {
+    mainBaileysEngine = engine;
+}
 
 // Diretório de autenticação da sessão Anticoncorrência
 const AUTH_DIR = path.join(__dirname, 'auth_info_baileys_anticoncorrencia');
@@ -225,6 +230,20 @@ async function extrairMembrosGrupo(identificadorGrupo) {
 
         salvarConcorrentes(setAtual);
 
+        // 🚨 REMOÇÃO IMEDIATA: Executa a varredura e expulsão instantânea nos seus grupos agora mesmo!
+        let infoExpulsao = '';
+        if (mainBaileysEngine && typeof mainBaileysEngine.expurgarConcorrentesDeTodosGrupos === 'function') {
+            try {
+                console.log('🚨 [ANTICONCORRÊNCIA] Disparando expurgo imediato nos grupos do bot principal...');
+                const resExp = await mainBaileysEngine.expurgarConcorrentesDeTodosGrupos();
+                if (resExp && resExp.totalRemovidos > 0) {
+                    infoExpulsao = `\n\n🚨 *EXPULSÃO IMEDIATA REALIZADA:*\nForam encontrados e removidos *${resExp.totalRemovidos}* concorrentes que já estavam nos seus grupos!\n• ` + resExp.gruposAfetados.join('\n• ');
+                }
+            } catch (eExp) {
+                console.warn('⚠️ [ANTICONCORRÊNCIA] Falha no expurgo automático após extração:', eExp.message);
+            }
+        }
+
         return {
             success: true,
             grupoNome: meta.subject,
@@ -232,11 +251,12 @@ async function extrairMembrosGrupo(identificadorGrupo) {
             adicionados,
             totalBlacklist: setAtual.size,
             mensagem: `✅ *EXTRAÇÃO CONCLUÍDA COM SUCESSO!*\n\n` +
-                      `👥 *Grupo:* ${meta.subject}\n` +
-                      `📊 *Total de Membros Analisados:* ${participants.length}\n` +
-                      `🎯 *Novos Concorrentes Adicionados:* ${adicionados}\n` +
-                      `🛡️ *Total Geral na Blacklist:* ${setAtual.size} números.\n\n` +
-                      `_Estes números serão removidos na hora se entrarem ou falarem nos seus grupos!_`
+                      `👥 *Grupo Alvo:* ${meta.subject}\n` +
+                      `📊 *Total de Membros no Grupo:* ${participants.length}\n` +
+                      `🎯 *Novos Concorrentes Cadastrados:* ${adicionados}\n` +
+                      `🛡️ *Total Geral na Blacklist:* ${setAtual.size} números.\n` +
+                      `⚡ *Ação Imediata:* Qualquer um destes números foi ou será expulso na hora de todos os seus grupos!` +
+                      infoExpulsao
         };
     } catch (e) {
         console.error('❌ [ANTICONCORRÊNCIA] Erro na extração de membros:', e);
@@ -496,5 +516,6 @@ module.exports = {
     listarGruposDisponiveis,
     extrairMembrosGrupo,
     carregarConcorrentes,
-    salvarConcorrentes
+    salvarConcorrentes,
+    setBaileysEngine
 };
