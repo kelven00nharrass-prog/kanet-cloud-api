@@ -341,14 +341,20 @@
         "phone": "844965608",
         "historico": [
           {
+            "orderId": "AUTO-PP261112.2153.Q39605-1794503640000",
+            "valor": 23,
+            "mb": 1024,
+            "data": "2026-11-12T19:54:00.000Z"
+          },
+          {
             "orderId": "MANUAL-1790925218862",
             "valor": 25,
             "mb": 1024,
             "data": "2026-10-02T07:42:22.725Z"
           }
         ],
-        "ultimaCompra": "2026-10-02T07:42:22.725Z",
-        "totalCompras": 1
+        "ultimaCompra": "2026-11-12T19:54:00.000Z",
+        "totalCompras": 2
       }
     ],
     [
@@ -1980,6 +1986,15 @@
         "targetPhone": "847699162",
         "ownerJid": "258847699162@s.whatsapp.net",
         "registeredAt": "2026-11-15T14:17:02.402Z"
+      }
+    ],
+    [
+      "878814914",
+      {
+        "payerPhone": "878814914",
+        "targetPhone": "844965608",
+        "ownerJid": "258878814914@s.whatsapp.net",
+        "registeredAt": "2026-11-12T19:52:00.000Z"
       }
     ]
   ],

@@ -1,5 +1,27 @@
 [
   [
+    "AUTO-PP261112.2153.Q39605-1794503640000",
+    {
+      "id": "AUTO-PP261112.2153.Q39605-1794503640000",
+      "ref": "PP261112.2153.Q39605",
+      "numero": "844965608",
+      "volume": "1.0GB",
+      "quantidade": 1024,
+      "modo": "diario",
+      "status": "completed",
+      "porta": "8023",
+      "tentativas": 1,
+      "erro": null,
+      "criado_ha": "3d",
+      "processando_ha": null,
+      "fantasma": false,
+      "createdAt": "2026-11-12T19:54:00.000Z",
+      "completedAt": "2026-11-12T19:54:30.000Z",
+      "isSplit": false,
+      "splitPart": null
+    }
+  ],
+  [
     "WA-PP260921.1624.G61484-1790000711484",
     {
       "id": "WA-PP260921.1624.G61484-1790000711484",
