@@ -180,15 +180,20 @@ async function extrairMembrosGrupo(identificadorGrupo) {
         await listarGruposDisponiveis();
         
         let grupoAlvo = null;
-        const indice = parseInt(identificadorGrupo, 10);
+        // Limpar identificador: ".ext 1" -> "1", "grupo 1" -> "1", "#1" -> "1"
+        const cleanIdent = String(identificadorGrupo || '').replace(/^[.!/]?(ext extrair|extrair|ext|grupo)\s*/i, '').replace(/[^0-9a-zA-Z\s@.-]/g, '').trim();
+        const indice = parseInt(cleanIdent, 10);
+        
         if (!isNaN(indice) && indice > 0 && indice <= cachedGrupos.length) {
             grupoAlvo = cachedGrupos[indice - 1];
         } else {
-            // Busca por nome ou ID
-            const termo = String(identificadorGrupo).toLowerCase().trim();
+            // Busca por nome ou ID exato ou parcial
+            const termo = String(cleanIdent || identificadorGrupo).toLowerCase().trim();
             grupoAlvo = cachedGrupos.find(g => 
-                g.id === identificadorGrupo || 
-                g.subject.toLowerCase().includes(termo)
+                g.id === cleanIdent || 
+                g.id === identificadorGrupo ||
+                g.subject.toLowerCase().includes(termo) ||
+                termo.includes(g.subject.toLowerCase())
             );
         }
 
@@ -338,7 +343,13 @@ async function startWhatsApp(db = null) {
             try {
                 if (m.type !== 'notify') return;
                 for (const msg of m.messages) {
-                    if (msg.key.fromMe) continue;
+                    // Se a mensagem foi enviada pelo próprio aparelho (fromMe), permitir se for comando
+                    if (msg.key.fromMe) {
+                        const rawText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+                        if (!/^[.!/]?(ext|extrair|blacklist|concorrente|grupos)/i.test(rawText.trim()) && !/^\d+$/.test(rawText.trim())) {
+                            continue;
+                        }
+                    }
                     const jid = msg.key.remoteJid;
                     if (!jid) continue;
 
@@ -383,9 +394,16 @@ async function startWhatsApp(db = null) {
                         continue;
                     }
 
-                    // 2. EXTRAIR PARTICIPANTES DE UM GRUPO ESPECÍFICO
-                    if (cleanCmd.startsWith('.ext extrair ') || cleanCmd.startsWith('.extrair ')) {
-                        const param = text.replace(/^[.!/]?(ext extrair|extrair)\s+/i, '').trim();
+                    // 2. EXTRAIR PARTICIPANTES DE UM GRUPO ESPECÍFICO (Suporta .ext extrair 1, .ext 1, .extrair 1, etc.)
+                    const isExtrairCmd = 
+                        cleanCmd.startsWith('.ext extrair ') || 
+                        cleanCmd.startsWith('.extrair ') ||
+                        /^[.!/]?ext\s+\d+/i.test(cleanCmd) ||
+                        /^[.!/]?extrair\s+\d+/i.test(cleanCmd) ||
+                        /^[.!/]?ext\s+grupo\s+\d+/i.test(cleanCmd);
+
+                    if (isExtrairCmd) {
+                        const param = text.replace(/^[.!/]?(ext extrair|extrair|ext grupo|ext)\s+/i, '').trim();
                         if (!param) {
                             await reply('⚠️ Indique o número ou nome do grupo. Exemplo: *.ext extrair 1*');
                             continue;

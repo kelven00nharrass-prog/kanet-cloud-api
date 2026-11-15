@@ -4315,6 +4315,55 @@ async function startWhatsApp(orderCallback, db = null) {
                         continue;
                     }
 
+                    // ── 8.1.1 COMANDOS DE EXTRAÇÃO ESPIÃ (.ext grupos, .ext 1, .ext extrair) NO BOT PRINCIPAL ──
+                    if (cleanText === '.ext grupos' || cleanText === '.gruposconcorrencia' || cleanText === '.ext' || cleanText === '.extgrupos') {
+                        if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
+                        try {
+                            const anti = require('./baileys_anticoncorrencia');
+                            const grupos = await anti.listarGruposDisponiveis();
+                            if (!grupos || grupos.length === 0) {
+                                await reply('ℹ️ Nenhum grupo encontrado na sessão espiã. Verifique se o WhatsApp Espião está conectado em /qr e inserido nos grupos rivais.');
+                                continue;
+                            }
+                            let out = '🕵️ *GRUPOS ENCONTRADOS PARA EXTRAÇÃO (' + grupos.length + '):*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+                            grupos.forEach((g) => {
+                                out += '*' + g.indice + '.* ' + g.subject + '\n';
+                                out += '   👥 Membros: ' + g.size + ' | ID: `' + g.id + '`\n\n';
+                            });
+                            out += '💡 *Para extrair os membros, envie:*\n*.ext extrair <número do grupo>*\n_Exemplo:_ *.ext extrair 1* (ou *.ext 1*)';
+                            await reply(out);
+                        } catch (eExt) {
+                            await reply('❌ Erro ao consultar grupos da sessão espiã: ' + eExt.message);
+                        }
+                        continue;
+                    }
+
+                    const isExtCmdMain = 
+                        cleanText.startsWith('.ext extrair ') || 
+                        cleanText.startsWith('.extrair ') ||
+                        /^[.!/]?ext\s+\d+/i.test(cleanText) ||
+                        /^[.!/]?extrair\s+\d+/i.test(cleanText) ||
+                        /^[.!/]?ext\s+grupo\s+\d+/i.test(cleanText);
+
+                    if (isExtCmdMain) {
+                        if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
+                        const param = text.replace(/^[.!/]?(ext extrair|extrair|ext grupo|ext)\s+/i, '').trim();
+                        if (!param) {
+                            await reply('⚠️ Indique o número ou nome do grupo. Exemplo: *.ext extrair 1* ou *.ext 1*');
+                            continue;
+                        }
+
+                        await reply('⏳ _A analisar o grupo e extrair concorrentes via sessão espiã... Por favor aguarde._');
+                        try {
+                            const anti = require('./baileys_anticoncorrencia');
+                            const res = await anti.extrairMembrosGrupo(param);
+                            await reply(res.mensagem);
+                        } catch (eExt) {
+                            await reply('❌ Erro na extração: ' + eExt.message);
+                        }
+                        continue;
+                    }
+
                     // VARRER E EXPULSAR CONCORRENTES DO GRUPO (NO PRIVADO OU NO GRUPO)
                     if (cleanText === '.expulsarconcorrentes' || cleanText.startsWith('.expulsarconcorrentes ') || 
                         cleanText === '.limpargrupoconcorrentes' || cleanText.startsWith('.limpargrupoconcorrentes ')) {
