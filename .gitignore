@@ -3,5 +3,4 @@ node_modules/
 *.log
 .DS_Store
 *db.json
-*cache.json
 clients_store.json
