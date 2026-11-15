@@ -34,6 +34,8 @@ console.error = function(...args) { pushServerLog('ERROR', args); origErr.apply(
 
 const MASTER_TOKENS = new Set([
   process.env.MASTER_TOKEN || 'AxionKelven2026Secure',
+  'KaNetKelven2026Secure',
+  'KaNet-MASTER-KELVEN-2026',
   'GitoAquinoMasterToken2025'
 ]);
 
