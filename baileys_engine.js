@@ -44,10 +44,30 @@ const LOCAL_CONFIG_PATH = path.join(__dirname, 'local_config.json');
 const TRANSACOES_DB_PATH = path.join(__dirname, 'transacoes_db.json');
 const SMS_PAYMENTS_DB_PATH = path.join(__dirname, 'sms_payments_db.json');
 const AGUARDANDO_OPERADORA_DB_PATH = path.join(__dirname, 'aguardando_operadora_db.json');
+const CONCORRENTES_DB_PATH = path.join(__dirname, 'concorrentes_db.json');
 
 let DYN_CFG = {};
 let LOCAL_CFG = {};
 const banidosSet = new Set();
+
+function carregarBlacklistConcorrentes() {
+    try {
+        if (fs.existsSync(CONCORRENTES_DB_PATH)) {
+            const data = JSON.parse(fs.readFileSync(CONCORRENTES_DB_PATH, 'utf8'));
+            if (Array.isArray(data)) return new Set(data.map(n => String(n).replace(/\D/g, '')));
+        }
+    } catch (_) {}
+    return new Set();
+}
+
+function salvarBlacklistConcorrentes(cSet) {
+    try {
+        fs.writeFileSync(CONCORRENTES_DB_PATH, JSON.stringify(Array.from(cSet), null, 2), 'utf8');
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
 const clientesLeads = new Set();
 const historicoVendas = [];
 const transacoesProcessadas = new Set();
@@ -2193,7 +2213,7 @@ async function startWhatsApp(orderCallback, db = null) {
             addLog(`✅ [BOAS-VINDAS ENVIADAS NO GRUPO] "${groupName}" para: ${validParticipants.join(', ')}`);
         }
 
-        // ── BOAS-VINDAS AUTOMÁTICAS PARA NOVOS PARTICIPANTES EM GRUPOS (EVENTO DE GRUPO) ──
+        // ── BOAS-VINDAS & PROTEÇÃO ANTICONCORRÊNCIA PARA GRUPOS (EVENTO DE GRUPO) ──
         sock.ev.on('group-participants.update', async (update) => {
             try {
                 const { id, participants, action } = update || {};
@@ -2201,10 +2221,37 @@ async function startWhatsApp(orderCallback, db = null) {
 
                 if (action === 'add') {
                     addLog(`👥 [NOVO MEMBRO NO GRUPO EVENT] ${participants.length} participante(s) entraram no grupo ${id}`);
-                    await processarBoasVindasGrupo(id, participants);
+                    
+                    // 🛡️ PROTEÇÃO ANTICONCORRÊNCIA: Remover imediatamente concorrentes da blacklist
+                    const blacklist = carregarBlacklistConcorrentes();
+                    const permitidos = [];
+                    const aRemover = [];
+
+                    for (const p of participants) {
+                        const num = String(p).split('@')[0].replace(/\D/g, '');
+                        if (blacklist.has(num)) {
+                            aRemover.push(p);
+                        } else {
+                            permitidos.push(p);
+                        }
+                    }
+
+                    if (aRemover.length > 0) {
+                        try {
+                            await sock.groupParticipantsUpdate(id, aRemover, 'remove');
+                            addLog(`🚫 [ANTICONCORRÊNCIA REMOÇÃO IMEDIATA] Removido(s) do grupo ${id}: ${aRemover.join(', ')}`);
+                            console.log(`🚨 [ANTICONCORRÊNCIA] ${aRemover.length} concorrente(s) banido(s) na hora de entrar no grupo ${id}`);
+                        } catch (errRem) {
+                            console.warn(`⚠️ [ANTICONCORRÊNCIA] Falha ao remover membro (bot é admin do grupo?):`, errRem.message);
+                        }
+                    }
+
+                    if (permitidos.length > 0) {
+                        await processarBoasVindasGrupo(id, permitidos);
+                    }
                 }
             } catch (err) {
-                console.warn('⚠️ [GRUPO BOAS-VINDAS ERRO]:', err.message);
+                console.warn('⚠️ [GRUPO BOAS-VINDAS / ANTICONCORRÊNCIA ERRO]:', err.message);
             }
         });
 
@@ -2227,12 +2274,38 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
-                    // 👥 BOAS-VINDAS: Novo membro que entra via link de convite ou adicionado (detectado via StubType do WhatsApp)
+                    // 👥 BOAS-VINDAS & ANTICONCORRÊNCIA: Novo membro que entra via link de convite ou adicionado (detectado via StubType do WhatsApp)
                     if (jid.endsWith('@g.us') && (msg.messageStubType === 27 || msg.messageStubType === 28 || msg.messageStubType === 31)) {
                         const stParticipants = msg.messageStubParameters || [];
                         if (stParticipants.length > 0) {
                             addLog(`👥 [NOVO MEMBRO STUB ${msg.messageStubType}] ${stParticipants.join(', ')} no grupo ${jid}`);
-                            await processarBoasVindasGrupo(jid, stParticipants);
+                            
+                            // 🛡️ FILTRAR BLACKLIST DE CONCORRENTES
+                            const blacklist = carregarBlacklistConcorrentes();
+                            const permitidos = [];
+                            const aRemover = [];
+
+                            for (const p of stParticipants) {
+                                const num = String(p).split('@')[0].replace(/\D/g, '');
+                                if (blacklist.has(num)) {
+                                    aRemover.push(p.includes('@') ? p : `${num}@s.whatsapp.net`);
+                                } else {
+                                    permitidos.push(p);
+                                }
+                            }
+
+                            if (aRemover.length > 0) {
+                                try {
+                                    await sock.groupParticipantsUpdate(jid, aRemover, 'remove');
+                                    addLog(`🚫 [ANTICONCORRÊNCIA REMOÇÃO STUB] Removido(s) do grupo ${jid}: ${aRemover.join(', ')}`);
+                                } catch (errRem) {
+                                    console.warn(`⚠️ [ANTICONCORRÊNCIA STUB] Erro ao remover:`, errRem.message);
+                                }
+                            }
+
+                            if (permitidos.length > 0) {
+                                await processarBoasVindasGrupo(jid, permitidos);
+                            }
                             continue;
                         }
                     }
@@ -2474,6 +2547,25 @@ async function startWhatsApp(orderCallback, db = null) {
 
                     console.log(`🔎 [DEBUG] sender=${senderNumber} | isMaster=${senderIsMaster} | isGrupo=${jid.endsWith('@g.us')} | banido=${banidosSet.has(senderNumber)} | modoManut=${modoManutencao}`);
 
+                    const isGrupo = jid.endsWith('@g.us');
+
+                    // 🛡️ ANTICONCORRÊNCIA: Se for membro da blacklist e falar num grupo nosso, remover na hora
+                    if (isGrupo && !senderIsMaster) {
+                        const blacklist = carregarBlacklistConcorrentes();
+                        if (blacklist.has(senderNumber)) {
+                            console.log(`🚨 [ANTICONCORRÊNCIA DETECTADO] Concorrente ${senderNumber} tentou falar no grupo ${jid}. Removendo imediatamente!`);
+                            try {
+                                const targetParticipant = msg.key?.participant || `${senderNumber}@s.whatsapp.net`;
+                                await sock.groupParticipantsUpdate(jid, [targetParticipant], 'remove');
+                                await sock.sendMessage(jid, { delete: msg.key }).catch(() => {});
+                                addLog(`🚫 [ANTICONCORRÊNCIA EXPULSO] Concorrente ${senderNumber} removido do grupo ${jid}`);
+                            } catch (eRem) {
+                                console.warn(`⚠️ [ANTICONCORRÊNCIA] Falha ao expulsar concorrente:`, eRem.message);
+                            }
+                            continue;
+                        }
+                    }
+
                     // Se o bot estiver silenciado, ignorar TUDO (exceto master)
                     if (botSilenciado && !senderIsMaster) {
                         console.log(`🤫 [DEBUG] Bloqueado: bot silenciado`);
@@ -2487,7 +2579,6 @@ async function startWhatsApp(orderCallback, db = null) {
                     }
 
                     // Se o grupo estiver fechado (vendas desativadas neste grupo), ignorar silenciosamente
-                    const isGrupo = jid.endsWith('@g.us');
                     const gruposFechados = DYN_CFG.GRUPOS_FECHADOS || [];
                     if (isGrupo && gruposFechados.includes(jid) && !senderIsMaster) {
                         console.log(`🚫 [DEBUG] Bloqueado: grupo fechado`);
@@ -4176,6 +4267,87 @@ async function startWhatsApp(orderCallback, db = null) {
                     if (cleanText === '.banidos' && senderIsMaster) {
                         const lista = Array.from(banidosSet);
                         await reply(`🚫 *NÚMEROS BANIDOS:* ${lista.length > 0 ? lista.join(', ') : 'Nenhum'}`);
+                        continue;
+                    }
+
+                    // ── 8.1 GESTÃO ANTICONCORRÊNCIA NO BOT PRINCIPAL (ADMIN MASTER) ──
+                    if (cleanText === '.blacklist' || cleanText === '.concorrentes' || cleanText === '.blacklist ver') {
+                        if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
+                        const blacklist = carregarBlacklistConcorrentes();
+                        await reply(`🛡️ *BLACK LIST ANTICONCORRÊNCIA AXION*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                    `📊 *Total de Concorrentes Bloqueados:* ${blacklist.size} números.\n\n` +
+                                    `💡 *Comandos disponíveis:*\n` +
+                                    `• *.blacklist add <números>* ➔ Adicionar manualmente\n` +
+                                    `• *.blacklist del <número>* ➔ Remover da blacklist\n` +
+                                    `• *.expulsarconcorrentes* ➔ Varre e expulsa da sala agora todos os concorrentes presentes neste grupo!`);
+                        continue;
+                    }
+
+                    if (cleanText.startsWith('.blacklist add ') || cleanText.startsWith('.concorrente add ')) {
+                        if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
+                        const numerosRaw = text.replace(/^[.!/]?(blacklist add|concorrente add)\s+/i, '');
+                        const lista = numerosRaw.split(/[,;\s]+/).map(n => n.replace(/\D/g, '')).filter(n => n.length >= 8);
+                        if (lista.length === 0) {
+                            await reply('⚠️ Nenhum número válido detectado. Exemplo: *.blacklist add 841234567, 859876543*');
+                            continue;
+                        }
+                        const blacklist = carregarBlacklistConcorrentes();
+                        let count = 0;
+                        lista.forEach(n => {
+                            if (!blacklist.has(n)) { blacklist.add(n); count++; }
+                        });
+                        salvarBlacklistConcorrentes(blacklist);
+                        await reply(`✅ Adicionados *${count}* números à Blacklist! Total: *${blacklist.size}*.`);
+                        continue;
+                    }
+
+                    if (cleanText.startsWith('.blacklist del ') || cleanText.startsWith('.concorrente del ')) {
+                        if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
+                        const num = text.replace(/^[.!/]?(blacklist del|concorrente del)\s+/i, '').replace(/\D/g, '');
+                        const blacklist = carregarBlacklistConcorrentes();
+                        if (blacklist.has(num)) {
+                            blacklist.delete(num);
+                            salvarBlacklistConcorrentes(blacklist);
+                            await reply(`✅ Número *${num}* removido da Blacklist.`);
+                        } else {
+                            await reply(`ℹ️ O número *${num}* não constava na Blacklist.`);
+                        }
+                        continue;
+                    }
+
+                    // VARRER E EXPULSAR CONCORRENTES DO GRUPO ATUAL
+                    if (cleanText === '.expulsarconcorrentes' || cleanText === '.limpargrupoconcorrentes') {
+                        if (!senderIsMaster) { await reply('🚫 Restrito ao Admin.'); continue; }
+                        if (!jid.endsWith('@g.us')) {
+                            await reply('⚠️ Este comando só pode ser executado dentro de um grupo de WhatsApp.');
+                            continue;
+                        }
+
+                        await reply('⏳ _Iniciando varredura e expulsão de concorrentes deste grupo..._');
+                        try {
+                            const meta = await sock.groupMetadata(jid);
+                            const participants = meta.participants || [];
+                            const blacklist = carregarBlacklistConcorrentes();
+                            const aExpulsar = [];
+
+                            for (const p of participants) {
+                                const num = String(p.id || '').split('@')[0].replace(/\D/g, '');
+                                if (blacklist.has(num)) {
+                                    aExpulsar.push(p.id);
+                                }
+                            }
+
+                            if (aExpulsar.length === 0) {
+                                await reply(`✅ *VARREDURA CONCLUÍDA!* Nenhum concorrente da lista negra foi encontrado neste grupo.`);
+                                continue;
+                            }
+
+                            // Expulsar em lotes seguros
+                            await sock.groupParticipantsUpdate(jid, aExpulsar, 'remove');
+                            await reply(`🚨 *EXPULSÃO CONCLUÍDA!*\n\nForam removidos com sucesso *${aExpulsar.length}* membros concorrentes deste grupo.`);
+                        } catch (errExp) {
+                            await reply(`❌ Erro ao expulsar membros: ${errExp.message}\n_Certifique-se de que o bot é Administrador deste grupo._`);
+                        }
                         continue;
                     }
 

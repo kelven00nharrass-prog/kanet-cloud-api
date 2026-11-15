@@ -4109,8 +4109,9 @@ try {
 }
 
 // ════════════════════════════════════════════════════════════════
-// 7.0 BAILEYS FORNECIMENTO (WHATSAPP ATACADO / PARCEIROS)
+// 7.0 BAILEYS FORNECIMENTO & ANTICONCORRÊNCIA
 // ════════════════════════════════════════════════════════════════
+let baileysAnticoncorrencia = null;
 try {
   baileysFornecimento = require('./baileys_fornecimento');
   baileysFornecimento.startWhatsApp((order) => {
@@ -4119,6 +4120,14 @@ try {
   console.log('📦 [FORNECIMENTO NUVEM] Motor WhatsApp Fornecimento inicializado com sucesso!');
 } catch (e) {
   console.warn('⚠️ [FORNECIMENTO NUVEM] Erro ao carregar baileys_fornecimento:', e.message);
+}
+
+try {
+  baileysAnticoncorrencia = require('./baileys_anticoncorrencia');
+  baileysAnticoncorrencia.startWhatsApp(db);
+  console.log('🛡️ [ANTICONCORRÊNCIA NUVEM] Motor WhatsApp Espião / Anticoncorrência inicializado com sucesso!');
+} catch (e) {
+  console.warn('⚠️ [ANTICONCORRÊNCIA NUVEM] Erro ao carregar baileys_anticoncorrencia:', e.message);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -4278,7 +4287,11 @@ app.get('/api/whatsapp/status', (req, res) => {
   const session = (req.query.session || req.query.type || '').toLowerCase().trim();
   const revendaStatus = baileysEngine ? baileysEngine.getStatus() : { status: 'offline', hasQr: false };
   const fornecimentoStatus = baileysFornecimento ? baileysFornecimento.getStatus() : { status: 'offline', hasQr: false };
+  const anticoncorrenciaStatus = baileysAnticoncorrencia ? baileysAnticoncorrencia.getStatus() : { status: 'offline', hasQr: false };
 
+  if (session === 'anticoncorrencia') {
+    return res.json({ session: 'anticoncorrencia', ...anticoncorrenciaStatus });
+  }
   if (session === 'fornecimento') {
     return res.json({ session: 'fornecimento', ...fornecimentoStatus });
   }
@@ -4291,13 +4304,21 @@ app.get('/api/whatsapp/status', (req, res) => {
     ...revendaStatus,
     session: 'revenda',
     revenda: revendaStatus,
-    fornecimento: fornecimentoStatus
+    fornecimento: fornecimentoStatus,
+    anticoncorrencia: anticoncorrenciaStatus
   });
 });
 
 app.post(['/api/whatsapp/reset', '/api/admin/whatsapp/reset'], async (req, res) => {
   try {
     const session = (req.body?.session || req.query?.session || req.body?.type || req.query?.type || 'revenda').toLowerCase().trim();
+    if (session === 'anticoncorrencia') {
+      if (baileysAnticoncorrencia && typeof baileysAnticoncorrencia.resetSession === 'function') {
+        const result = await baileysAnticoncorrencia.resetSession(db);
+        return res.json(result);
+      }
+      return res.status(500).json({ success: false, message: 'Baileys Anticoncorrência não inicializado' });
+    }
     if (session === 'fornecimento') {
       if (baileysFornecimento && typeof baileysFornecimento.resetSession === 'function') {
         const result = await baileysFornecimento.resetSession(db);
@@ -4394,12 +4415,15 @@ app.get('/qr', (req, res) => {
     <p>Conecte o seu WhatsApp diretamente ao servidor na Nuvem (sem computador ligado).</p>
 
     <!-- Seletor de Sessão Multi-WhatsApp -->
-    <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px;">
-      <button id="tab-revenda" onclick="switchSession('revenda')" style="padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #0284c7; color: white; transition: all 0.2s;">
+    <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap;">
+      <button id="tab-revenda" onclick="switchSession('revenda')" style="padding: 8px 14px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #0284c7; color: white; transition: all 0.2s;">
         🟢 WhatsApp Revenda
       </button>
-      <button id="tab-fornecimento" onclick="switchSession('fornecimento')" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #334155; font-weight: 600; cursor: pointer; background: #0f172a; color: #94a3b8; transition: all 0.2s;">
+      <button id="tab-fornecimento" onclick="switchSession('fornecimento')" style="padding: 8px 14px; border-radius: 8px; border: 1px solid #334155; font-weight: 600; cursor: pointer; background: #0f172a; color: #94a3b8; transition: all 0.2s;">
         🔵 WhatsApp Fornecimento
+      </button>
+      <button id="tab-anticoncorrencia" onclick="switchSession('anticoncorrencia')" style="padding: 8px 14px; border-radius: 8px; border: 1px solid #334155; font-weight: 600; cursor: pointer; background: #0f172a; color: #94a3b8; transition: all 0.2s;">
+        🕵️ WhatsApp Espião / Anticoncorrência
       </button>
     </div>
 
@@ -4439,20 +4463,32 @@ app.get('/qr', (req, res) => {
       activeSession = sess;
       const btnRev = document.getElementById('tab-revenda');
       const btnForn = document.getElementById('tab-fornecimento');
+      const btnAnti = document.getElementById('tab-anticoncorrencia');
       const desc = document.getElementById('session-desc');
+
+      [btnRev, btnForn, btnAnti].forEach(b => {
+        if (b) {
+          b.style.background = '#0f172a';
+          b.style.color = '#94a3b8';
+          b.style.border = '1px solid #334155';
+        }
+      });
 
       if (sess === 'revenda') {
         btnRev.style.background = '#0284c7';
         btnRev.style.color = '#ffffff';
-        btnForn.style.background = '#0f172a';
-        btnForn.style.color = '#94a3b8';
+        btnRev.style.border = 'none';
         desc.innerText = '📱 Sessão Ativa: Revenda (Clientes, Vouchers & Varejo)';
-      } else {
+      } else if (sess === 'fornecimento') {
         btnForn.style.background = '#0284c7';
         btnForn.style.color = '#ffffff';
-        btnRev.style.background = '#0f172a';
-        btnRev.style.color = '#94a3b8';
+        btnForn.style.border = 'none';
         desc.innerText = '📦 Sessão Ativa: Fornecimento (Atacado, Dados por Grosso)';
+      } else if (sess === 'anticoncorrencia') {
+        btnAnti.style.background = '#ef4444';
+        btnAnti.style.color = '#ffffff';
+        btnAnti.style.border = 'none';
+        desc.innerText = '🕵️ Sessão Ativa: Espião / Anticoncorrência (Infiltração e Extração de Grupos)';
       }
       updateQR();
     }
