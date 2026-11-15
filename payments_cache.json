@@ -1438,5 +1438,51 @@
     "detalhes": "Pacote Ilimitado (450 MT)",
     "data": "2026-11-02T14:55:31.160Z",
     "timestamp": 1793631331160
+  },
+  {
+    "id": "AUTO-PP261115.1426.U64811-1794745604586",
+    "ref": "AUTO-PP261115.1426.U64811-1794745604586",
+    "operadora": "e-Mola",
+    "valor": 18,
+    "numero": "842594734",
+    "remetente": "Receptor Padrao (869101227)",
+    "timestamp": "2026-11-15T12:27:04.748Z",
+    "orderId": "AUTO-PP261115.1426.U64811-1794745604586",
+    "status": "ativado",
+    "detalhes": "696MB [24hrs]"
+  },
+  {
+    "id": "PP261115.1426.U64811",
+    "ref": "PP261115.1426.U64811",
+    "operadora": "e-Mola",
+    "valor": 18,
+    "numero": "869101227",
+    "remetente": "869101227",
+    "timestamp": "2026-11-15T12:26:44.585Z",
+    "status": "recebido",
+    "detalhes": "e-Mola Transfer"
+  },
+  {
+    "id": "MANUAL-1794746121187-563",
+    "ref": "MANUAL-1794746121187-563",
+    "operadora": "M-Pesa",
+    "valor": 140,
+    "numero": "857671564",
+    "remetente": "Admin Master (Manual)",
+    "timestamp": "2026-11-15T12:35:35.849Z",
+    "orderId": "MANUAL-1794746121187-563",
+    "status": "ativado",
+    "detalhes": "5427MB [semanal]"
+  },
+  {
+    "id": "DKFGMC1DE18",
+    "ref": "DKFGMC1DE18",
+    "operadora": "M-Pesa",
+    "valor": 232,
+    "numero": "847699162",
+    "remetente": "856268811",
+    "timestamp": "2026-11-15T03:45:00.000Z",
+    "status": "recebido",
+    "detalhes": "M-Pesa - Tia Olga (10GB Faseado Mensal)"
   }
 ]
