@@ -1,4 +1,4 @@
-﻿{
+{
   "loyalty": [
     [
       "821789661",
@@ -1070,7 +1070,10 @@
     ]
   ],
   "bonuses": [],
-  "savedAt": "2026-10-24T10:21:35.671Z",
+  "referrals": [],
+  "friendReferrers": [],
+  "referralCodes": [],
+  "lidMap": [],
   "subscriptions": [
     [
       "SUB_821974196_1793378435235",
@@ -1233,5 +1236,6 @@
         "createdAt": "2026-11-02T14:55:31.160Z"
       }
     ]
-  ]
+  ],
+  "savedAt": "2026-10-28T17:41:27.965Z"
 }
