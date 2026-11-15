@@ -3105,17 +3105,24 @@ async function startWhatsApp(orderCallback, db = null) {
                                 );
 
                                 if (orderDispatchCallback) {
-                                    orderDispatchCallback({
-                                        orderId,
-                                        numero: numDestino,
-                                        quantidade: pacote ? pacote.mb : 1024,
-                                        modo: pacote ? pacote.tipo : 'diario',
-                                        jid,
-                                        sender: pay.senderNumber || senderNumber,
-                                        senderName: pay.senderName || nomeCliente,
-                                        txn_id: combinedTxnId,
-                                        valor: valorFinal
-                                    });
+                                    try {
+                                        orderDispatchCallback({
+                                            orderId,
+                                            numero: numDestino,
+                                            quantidade: pacote ? pacote.mb : 1024,
+                                            modo: pacote ? pacote.tipo : 'diario',
+                                            jid,
+                                            sender: pay.senderNumber || senderNumber,
+                                            senderJid: pay.realSender || realSender || jid,
+                                            senderPhone: pay.senderNumber || senderNumber,
+                                            senderName: pay.senderName || nomeCliente,
+                                            txn_id: combinedTxnId,
+                                            valor: valorFinal
+                                        });
+                                        console.log(`🚀 [DESPACHO CELULARES SUCESSO] Ordem ${orderId} (${pacote ? pacote.mb : 1024}MB para ${numDestino}) enviada à fila de ativação!`);
+                                    } catch (dispErr) {
+                                        console.error(`❌ [ERRO DESPACHO CELULARES] Falha ao despachar ordem ${orderId}:`, dispErr);
+                                    }
                                 }
                                 if (geminiAI.isConfigured()) geminiAI.limparHistoricoConversa(senderNumber);
                                 continue;
@@ -5608,9 +5615,10 @@ function getJidForOrder(orderId) {
 /**
  * Processa a ativação quando a operadora confirma o pagamento (M-Pesa / e-Mola)
  */
-async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
+async function processarPedidoAguardandoConfirmado(item, valorPago, metodo, smsOperadoraParam = null) {
     try {
-        const smsRec = findSmsPayment(item.txn_id);
+        const smsOperadora = smsOperadoraParam || findSmsPayment(item.txn_id) || (item.ref ? findSmsPayment(item.ref) : null);
+        const smsRec = smsOperadora;
         if (smsRec) {
             smsRec.usado = true;
             smsRec.usadoPor = item.senderNumber;
@@ -5620,6 +5628,10 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
 
         const { supportNum } = getSuporteDetails();
         const metodoNome = (metodo || item.metodo) === 'emola' ? 'e-Mola' : 'M-Pesa';
+        const pacoteFinal = item.pacote || (typeof buscarPacotePorValor === 'function' ? buscarPacotePorValor(valorPago, item.jid) : null) || { nome: `${valorPago} MT`, mb: Math.round((Number(valorPago) / 25) * 1024), tipo: 'diario' };
+        const pacoteNome = (item.pacote && item.pacote.nome) || pacoteFinal.nome;
+        const pacoteMb = (item.pacote && item.pacote.mb) ? item.pacote.mb : pacoteFinal.mb;
+        const pacoteTipo = (item.pacote && item.pacote.tipo) ? item.pacote.tipo : (pacoteFinal.tipo || 'diario');
 
         if (item.numDestino) {
             const orderId = 'WA-' + item.txn_id + '-' + Date.now();
@@ -5628,7 +5640,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 await sock.sendMessage(item.jid, {
                     text: `✅ *PEDIDO RECEBIDO* ⚡\n` +
                         `━━━━━━━━━━━━━━━━━━\n` +
-                        `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                        `📦 *Pacote:* *${pacoteNome}*\n` +
                         `📲 *Destino:* *${item.numDestino}*\n` +
                         `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
                         `🔖 *Ref:* \`${item.txn_id}\`\n` +
@@ -5641,7 +5653,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             historicoVendas.push({
                 orderId,
                 numero: item.numDestino,
-                mb: item.pacote.mb,
+                mb: pacoteMb,
                 valor: valorPago,
                 timestamp: Date.now()
             });
@@ -5658,13 +5670,13 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             salvarTransacoes();
 
             const origemMsg = item.jid.endsWith('@g.us') ? 'Grupo WhatsApp' : 'Privado';
-            const tabelaOrigem = item.pacote.origem === 'grupo_especifico' ? 'Tabela Exclusiva deste Grupo' : 'Tabela Padrão Geral';
+            const tabelaOrigem = (item.pacote && item.pacote.origem === 'grupo_especifico') ? 'Tabela Exclusiva deste Grupo' : 'Tabela Padrão Geral';
             enviarNotificacaoGrupo(
                 `🔔 *NOVO PEDIDO VALIDADO PELA OPERADORA* ⚡\n` +
                 `━━━━━━━━━━━━━━━━━━\n` +
                 `📋 *Ref:* \`${orderId}\`\n` +
                 `📲 *Destino:* *${item.numDestino}*\n` +
-                `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                `📦 *Pacote:* *${pacoteNome}*\n` +
                 `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
                 `👤 *Cliente:* *${item.nomeCliente}* (${item.senderNumber})\n` +
                 `🏢 *Origem:* *${origemMsg}*\n` +
@@ -5675,27 +5687,39 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
             );
 
             if (orderDispatchCallback) {
-                if (item.rawLidClean && item.numDestino) {
-                    const fullDest = item.numDestino.startsWith('258') ? item.numDestino : '258' + item.numDestino;
-                    lidToPhoneMap.set(item.rawLidClean, fullDest);
-                    try { customerServices.vincularLidTelefone(item.rawLidClean, item.numDestino); } catch (_) { }
+                try {
+                    if (item.rawLidClean && item.numDestino) {
+                        const fullDest = item.numDestino.startsWith('258') ? item.numDestino : '258' + item.numDestino;
+                        lidToPhoneMap.set(item.rawLidClean, fullDest);
+                        customerServices.vincularLidTelefone(item.rawLidClean, item.numDestino);
+                    }
+                    if (item.rawLidClean && smsOperadora && smsOperadora.remetente) {
+                        customerServices.vincularLidTelefone(item.rawLidClean, smsOperadora.remetente);
+                    }
+                } catch (lidErr) {
+                    console.warn('⚠️ [LID VINCULAR] Erro ao vincular LID (ignorado):', lidErr.message);
                 }
-                if (item.rawLidClean && smsOperadora && smsOperadora.remetente) {
-                    try { customerServices.vincularLidTelefone(item.rawLidClean, smsOperadora.remetente); } catch (_) { }
+
+                try {
+                    orderDispatchCallback({
+                        orderId,
+                        numero: item.numDestino,
+                        quantidade: pacoteMb,
+                        modo: pacoteTipo,
+                        jid: item.jid,
+                        sender: item.senderNumber,
+                        senderJid: item.realSender || item.jid,
+                        senderPhone: item.senderNumber, // Cliente é quem compra/paga, NUNCA o destinatário
+                        senderName: item.nomeCliente,
+                        txn_id: item.txn_id,
+                        valor: valorPago
+                    });
+                    console.log(`🚀 [DESPACHO CELULARES SUCESSO] Ordem pós-operadora ${orderId} (${pacoteMb}MB para ${item.numDestino}) enviada à fila de ativação!`);
+                } catch (dispErr) {
+                    console.error(`❌ [ERRO DESPACHO CELULARES] Falha ao despachar ordem ${orderId}:`, dispErr);
                 }
-                orderDispatchCallback({
-                    orderId,
-                    numero: item.numDestino,
-                    quantidade: item.pacote.mb,
-                    modo: item.pacote.tipo,
-                    jid: item.jid,
-                    sender: item.senderNumber,
-                    senderJid: item.realSender || item.jid,
-                    senderPhone: item.senderNumber, // Cliente é quem compra/paga, NUNCA o destinatário
-                    senderName: item.nomeCliente,
-                    txn_id: item.txn_id,
-                    valor: valorPago
-                });
+            } else {
+                console.warn(`⚠️ [ORDER DISPATCH] orderDispatchCallback não está disponível para despachar ${orderId}!`);
             }
         } else {
             // ── VERIFICAR RECEPTOR CONFIGURADO VIA .configurar ──
@@ -5716,7 +5740,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 historicoVendas.push({
                     orderId,
                     numero: numReceptor,
-                    mb: item.pacote.mb,
+                    mb: pacoteMb,
                     valor: parseFloat(valorPago),
                     timestamp: Date.now()
                 });
@@ -5727,7 +5751,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                     `━━━━━━━━━━━━━━━━━━\n` +
                     `📋 *Ref:* \`${orderId}\`\n` +
                     `📲 *Destino (Receptor Fixo):* *${numReceptor}*\n` +
-                    `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                    `📦 *Pacote:* *${pacoteNome}*\n` +
                     `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
                     `👤 *Pagador:* *${item.nomeCliente}* (${item.senderNumber})\n` +
                     `🏢 *Origem:* *${origemMsg}*\n` +
@@ -5740,7 +5764,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                     await sock.sendMessage(item.jid, {
                         text: `✅ *PEDIDO AUTOMÁTICO CONFIRMADO* ⚡\n` +
                             `━━━━━━━━━━━━━━━━━━\n` +
-                            `📦 *Pacote:* *${item.pacote.nome}*\n` +
+                            `📦 *Pacote:* *${pacoteNome}*\n` +
                             `📲 *Receptor Fixo:* *${numReceptor}*\n` +
                             `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
                             `🔖 *Ref:* \`${item.txn_id}\`\n` +
@@ -5751,17 +5775,26 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 }
 
                 if (orderDispatchCallback) {
-                    orderDispatchCallback({
-                        orderId,
-                        numero: numReceptor,
-                        quantidade: item.pacote.mb,
-                        modo: item.pacote.tipo,
-                        jid: item.jid,
-                        sender: item.senderNumber,
-                        senderName: item.nomeCliente,
-                        txn_id: item.txn_id,
-                        valor: valorPago
-                    });
+                    try {
+                        orderDispatchCallback({
+                            orderId,
+                            numero: numReceptor,
+                            quantidade: pacoteMb,
+                            modo: pacoteTipo,
+                            jid: item.jid,
+                            sender: item.senderNumber,
+                            senderJid: item.realSender || item.jid,
+                            senderPhone: item.senderNumber,
+                            senderName: item.nomeCliente,
+                            txn_id: item.txn_id,
+                            valor: valorPago
+                        });
+                        console.log(`🚀 [DESPACHO CELULARES SUCESSO] Ordem auto-receptor ${orderId} (${pacoteMb}MB para ${numReceptor}) enviada à fila de ativação!`);
+                    } catch (dispErr) {
+                        console.error(`❌ [ERRO DESPACHO CELULARES] Falha ao despachar ordem auto-receptor ${orderId}:`, dispErr);
+                    }
+                } else {
+                    console.warn(`⚠️ [ORDER DISPATCH] orderDispatchCallback não está disponível para despachar auto-receptor ${orderId}!`);
                 }
                 return;
             }
@@ -5776,7 +5809,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                 senderNumber: item.senderNumber,
                 rawLidClean: item.rawLidClean,
                 realSender: item.realSender,
-                pacote: item.pacote,
+                pacote: item.pacote || pacoteFinal,
                 aguardando_numero: true
             });
 
@@ -5795,7 +5828,7 @@ async function processarPedidoAguardandoConfirmado(item, valorPago, metodo) {
                     text: `✅ *COMPROVATIVO VALIDADO* ⚡\n` +
                         `━━━━━━━━━━━━━━━━━━\n`
                         +
-                        `📦 *Pacote:* *${item.pacote.nome}* (${item.pacote.mb} MB)\n` +
+                        `📦 *Pacote:* *${pacoteNome}* (${pacoteMb} MB)\n` +
                         `💳 *Valor:* *${valorPago} MT* (${metodoNome})\n` +
                         `🔖 *Ref:* \`${item.txn_id}\`\n` +
                         `━━━━━━━━━━━━━━━━━━\n` +
@@ -5845,7 +5878,7 @@ function registrarSmsPayment({ txn_id, valor, remetente, metodo, raw_sms }) {
         }
 
         console.log(`🎉 [OPERADORA VALIDOU] Cliente ${item.senderNumber} estava aguardando ref ${item.txn_id || key} (SMS ref: ${cleanTxnId}). Processando imediatamente!`);
-        processarPedidoAguardandoConfirmado(item, vNum, metodo || item.metodo);
+        processarPedidoAguardandoConfirmado(item, vNum, metodo || item.metodo, existing);
     }
 }
 
