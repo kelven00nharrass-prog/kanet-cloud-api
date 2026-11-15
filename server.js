@@ -4975,15 +4975,15 @@ app.post('/api/sms/payment', (req, res) => {
             const volStr = mbQtd >= 1024 ? `${(mbQtd/1024).toFixed(1)}GB` : `${mbQtd}MB`;
             baileysEngine.enviarMensagemTexto(
               clientJid,
-              `?????????????━━━━━━━━━━━━━━━━━━\n` +
-              `  ? *RECARGA AUTOMÁTICA ENVIADA!* ??\n` +
-              `?????????????━━━━━━━━━━━━━━━━━━\n\n` +
+              `⚡⚡⚡━━━━━━━━━━━━━━━━━━\n` +
+              `  ⚡ *RECARGA AUTOMÁTICA ENVIADA!* ✅\n` +
+              `⚡⚡⚡━━━━━━━━━━━━━━━━━━\n\n` +
               `Detectamos a sua transferência de *${valor} MT* (${metodo || 'M-Pesa'}).\n\n` +
               `📲 *Destino:* *${defRec.targetPhone}*\n` +
-              `?? *Volume:* *${volStr}*\n` +
+              `📦 *Volume:* *${volStr}*\n` +
               `🔑 *Ref:* \`${cleanTxnId}\`\n\n` +
-              `?? *Os megas já estáo a ser ativados automaticamente no número de destino!*\n` +
-              `? _Não precisas de enviar comprovativo no WhatsApp._`
+              `🚀 *Os megas já estão a ser ativados automaticamente no número de destino!*\n` +
+              `✅ _Não precisas de enviar comprovativo no WhatsApp._`
             ).catch(() => {});
           }
           if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
