@@ -6673,20 +6673,33 @@ loadScheduledPlans();
 // -- Helper: Calcular pr�xima hora de entrega ----------------------------------
 function calcularProximaEntrega(plan, baseDate) {
   const now = baseDate || new Date();
-  const proxima = new Date(now);
-  proxima.setDate(proxima.getDate() + 1);
+
+  // Extrair hora e minutos em Maputo (UTC+2) de forma robusta
+  // — funciona independentemente do fuso local do servidor (Render usa UTC)
+  const maputoStr = now.toLocaleString('en-US', {
+    timeZone: 'Africa/Maputo',
+    hour: '2-digit', minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour12: false
+  });
+  // Formato en-US: MM/DD/YYYY, HH:MM
+  const parts = maputoStr.match(/(\d+)\/(\d+)\/(\d+),\s*(\d+):(\d+)/);
+  const horaMaputo = parseInt(parts[4]);
+  const minMaputo  = parseInt(parts[5]);
+  const diaMaputo  = parseInt(parts[2]);
+  const mesMaputo  = parseInt(parts[1]) - 1; // JS months 0-based
+  const anoMaputo  = parseInt(parts[3]);
 
   if (plan.hora_preferida) {
-    // Usar hora definida pelo cliente (ex: "07:00")
+    // Usar hora definida pelo cliente (ex: "07:00") em Maputo (UTC+2)
     const [h, m] = plan.hora_preferida.split(':').map(Number);
-    proxima.setHours(h, m || 0, 0, 0);
+    // Amanha as h:m de Maputo = UTC equivalente (Maputo = UTC+2)
+    return new Date(Date.UTC(anoMaputo, mesMaputo, diaMaputo + 1, h - 2, m || 0, 0, 0));
   } else {
-    // Padr�o: 1h antes da hora de compra, m�nimo 07h
-    const horaBase = now.getHours() - 1;
-    proxima.setHours(Math.max(7, horaBase), 0, 0, 0);
+    // Padrao: 1h antes da hora de compra (em Maputo), minimo 01:00 Maputo
+    const horaEntregaMaputo = Math.max(1, horaMaputo - 1);
+    return new Date(Date.UTC(anoMaputo, mesMaputo, diaMaputo + 1, horaEntregaMaputo - 2, minMaputo, 0, 0));
   }
-
-  return proxima;
 }
 
 // -- Criar Plano ---------------------------------------------------------------
