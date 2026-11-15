@@ -152,21 +152,64 @@ async function restoreAuthFromFirestore(db) {
 /**
  * Atualiza e lista grupos onde a sessão espiã participa
  */
-async function listarGruposDisponiveis() {
-    if (!sock) return [];
+// Arquivo de cache persistente para os índices dos grupos nunca mudarem entre listagem e extração
+const GRUPOS_CACHE_FILE = path.join(__dirname, 'cached_grupos_espião.json');
+
+function salvarCacheGrupos(lista) {
+    try {
+        fs.writeFileSync(GRUPOS_CACHE_FILE, JSON.stringify(lista, null, 2), 'utf8');
+    } catch (_) {}
+}
+
+function carregarCacheGrupos() {
+    try {
+        if (fs.existsSync(GRUPOS_CACHE_FILE)) {
+            const data = JSON.parse(fs.readFileSync(GRUPOS_CACHE_FILE, 'utf8'));
+            if (Array.isArray(data) && data.length > 0) return data;
+        }
+    } catch (_) {}
+    return [];
+}
+
+/**
+ * Atualiza e lista grupos onde a sessão espiã participa
+ * ORDENAÇÃO ALFABÉTICA ESTRITA para que o número 1, 2, 118 NUNCA mude!
+ */
+async function listarGruposDisponiveis(forceRefresh = false) {
+    if (!sock) {
+        if (cachedGrupos.length === 0) cachedGrupos = carregarCacheGrupos();
+        return cachedGrupos;
+    }
     try {
         const groups = await sock.groupFetchAllParticipating();
-        cachedGrupos = Object.values(groups).map((g, idx) => ({
+        
+        // 1. Converter em array
+        const rawList = Object.values(groups || {});
+        
+        // 2. ORDENAÇÃO DETERMINÍSTICA ABSOLUTA: por nome (subject) e desempate por id
+        rawList.sort((a, b) => {
+            const nameA = String(a.subject || '').trim().toLowerCase();
+            const nameB = String(b.subject || '').trim().toLowerCase();
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            return String(a.id || '').localeCompare(String(b.id || ''));
+        });
+
+        // 3. Atribuir índices fixos (1, 2, 3...)
+        cachedGrupos = rawList.map((g, idx) => ({
             indice: idx + 1,
             id: g.id,
             subject: g.subject || 'Grupo sem nome',
             size: g.size || (g.participants ? g.participants.length : 0),
             participants: g.participants || []
         }));
+
+        salvarCacheGrupos(cachedGrupos);
         return cachedGrupos;
     } catch (e) {
         console.error('❌ [ANTICONCORRÊNCIA] Erro ao listar grupos:', e.message);
-        return [];
+        if (cachedGrupos.length === 0) cachedGrupos = carregarCacheGrupos();
+        return cachedGrupos;
     }
 }
 
@@ -177,7 +220,13 @@ async function extrairMembrosGrupo(identificadorGrupo) {
     if (!sock) return { success: false, mensagem: 'Sessão espiã não está conectada!' };
 
     try {
-        await listarGruposDisponiveis();
+        // Usar cache existente ordenado se já tiver grupos; só buscar do WhatsApp se estiver vazio
+        if (!cachedGrupos || cachedGrupos.length === 0) {
+            cachedGrupos = carregarCacheGrupos();
+        }
+        if (!cachedGrupos || cachedGrupos.length === 0) {
+            await listarGruposDisponiveis(true);
+        }
         
         let grupoAlvo = null;
         // Limpar identificador: ".ext 1" -> "1", "grupo 1" -> "1", "#1" -> "1"

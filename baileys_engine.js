@@ -5419,6 +5419,11 @@ async function startWhatsApp(orderCallback, db = null) {
                         }
                     }
 
+                    // Não enviar menu de boas-vindas se for comando de administrador ou anticoncorrência
+                    if (/^[.!/]?(ext|extrair|blacklist|concorrente|expulsar)/i.test(cleanText)) {
+                        continue;
+                    }
+
                     // No privado, se o cliente mandar algo desconhecido, enviar as boas-vindas de suporte
                     await reply(gerarMensagemBoasVindas(nomeCliente, senderNumber, jid, rawLidClean));
                 }
