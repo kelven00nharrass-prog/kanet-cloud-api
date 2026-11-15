@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // -- INICIALIZAR REDIS --
-axionRedis.initRedis().then(ok => {
+Promise.resolve(axionRedis.initRedis()).then(ok => {
   if (ok) {
     console.log('✅ [REDIS] Upstash Redis conectado com sucesso!');
   } else {
