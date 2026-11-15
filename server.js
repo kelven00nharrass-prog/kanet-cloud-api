@@ -13,7 +13,7 @@ const geminiAI = require('./gemini_ai');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// -- CAPTURA DE LOGS DO SERVIDOR EM MEMÓRIA (ÚLTIMOS 150 EVENTOS) --
+// -- CAPTURA DE LOGS DO SERVIDOR EM MEMï¿½RIA (ï¿½LTIMOS 150 EVENTOS) --
 const recentServerLogs = [];
 const origLog = console.log;
 const origWarn = console.warn;
@@ -46,7 +46,7 @@ function authenticateAdmin(req, res, next) {
                 req.query.token ||
                 req.body?.token;
   if (!token || !MASTER_TOKENS.has(token)) {
-    return res.status(403).json({ success: false, error: 'Acesso não autorizado. Token Master inválido.' });
+    return res.status(403).json({ success: false, error: 'Acesso nï¿½o autorizado. Token Master invï¿½lido.' });
   }
   next();
 }
@@ -91,7 +91,7 @@ try {
     db = admin.firestore();
     try {
       rtdb = admin.database();
-    } catch (_) { console.warn('?? [FIREBASE] RTDB não disponível:', _.message || _); }
+    } catch (_) { console.warn('?? [FIREBASE] RTDB nï¿½o disponï¿½vel:', _.message || _); }
     console.log('?? [FIREBASE] Firestore Conectado:', serviceAccount.project_id || 'ka-net-math');
   } else {
     console.log('?? [FIREBASE] Sem credenciais no momento. Operando em modo Cloud Gateway.');
@@ -102,7 +102,7 @@ try {
 
 // In-Memory Device & Order Store (Fallback & Instant Sync)
 
-// In-Memory Device & Order Store (Dinâmico - sem dispositivos fantasmas)
+// In-Memory Device & Order Store (Dinï¿½mico - sem dispositivos fantasmas)
 let pendingBotCommand = null;
 let inMemoryMetrics = null;
 const inMemoryDevices = {};
@@ -121,7 +121,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const compression = require('compression');
-app.use(compression()); // Compressão gzip — reduz respostas JSON/HTML em 60-80%
+app.use(compression()); // Compressï¿½o gzip ï¿½ reduz respostas JSON/HTML em 60-80%
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
@@ -155,7 +155,7 @@ async function handleTransfer(req, res) {
     const { numero, quantidade, modo = 'data', remetente = 'Bot', porta = null, request_id = null } = req.body;
 
     if (!numero) {
-      return res.status(400).json({ success: false, status: 'erro', mensagem: 'Número obrigatório' });
+      return res.status(400).json({ success: false, status: 'erro', mensagem: 'Nï¿½mero obrigatï¿½rio' });
     }
 
     const numLimpo = String(numero).replace(/\D/g, '');
@@ -164,47 +164,47 @@ async function handleTransfer(req, res) {
     const qtyMb = Number(quantidade) || Number(req.body.input_val) || 0;
     const valPago = Number(req.body.valor) || Number(req.body.valor_pago) || getValorFromMb(qtyMb, modo);
 
-    // -- 1. PROTEÇÃO CONTRA DUPLICAÇÃO POR REFERÊNCIA / ID --
+    // -- 1. PROTEï¿½ï¿½O CONTRA DUPLICAï¿½ï¿½O POR REFERï¿½NCIA / ID --
     if (inMemoryOrders.has(orderId)) {
       const existing = inMemoryOrders.get(orderId);
       if (existing.status === 'completed' || existing.status === 'sucesso') {
-        console.warn(`??? [DEDUPLICAÇÃO] Pedido com referência ${orderId} já foi CONCLUÍDO. Bloqueando duplicação.`);
+        console.warn(`??? [DEDUPLICAï¿½ï¿½O] Pedido com referï¿½ncia ${orderId} jï¿½ foi CONCLUï¿½DO. Bloqueando duplicaï¿½ï¿½o.`);
         return res.status(200).json({
           status: 'concluido',
           success: true,
           duplicado: true,
           orderId,
-          mensagem: 'Pedido já concluído.'
+          mensagem: 'Pedido jï¿½ concluï¿½do.'
         });
       }
       if (existing.status === 'assigned' || existing.status === 'processing' || existing.status === 'pending') {
-        console.warn(`??? [DEDUPLICAÇÃO] Pedido com referência ${orderId} já está na fila (${existing.status}). Ignorando duplicação.`);
+        console.warn(`??? [DEDUPLICAï¿½ï¿½O] Pedido com referï¿½ncia ${orderId} jï¿½ estï¿½ na fila (${existing.status}). Ignorando duplicaï¿½ï¿½o.`);
         return res.status(200).json({
           status: 'processando',
           success: true,
           duplicado: true,
           orderId,
-          mensagem: `Este pedido (${orderId}) já está na fila e a ser atendido!`
+          mensagem: `Este pedido (${orderId}) jï¿½ estï¿½ na fila e a ser atendido!`
         });
       }
     }
 
-    // -- 2. PROTEÇÃO DE REFERÊNCIA NO CACHE PERSISTENTE (caso o servidor tenha reiniciado) --
+    // -- 2. PROTEï¿½ï¿½O DE REFERï¿½NCIA NO CACHE PERSISTENTE (caso o servidor tenha reiniciado) --
     if (fs.existsSync(ORDERS_CACHE_FILE)) {
       try {
         const cachedList = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
         const found = cachedList.find(([k, v]) => k === orderId);
         if (found && (found[1].status === 'completed' || found[1].status === 'sucesso')) {
-          console.warn(`??? [DEDUPLICAÇÃO CACHE] Referência ${orderId} já consta como CONCLUÍDA.`);
+          console.warn(`??? [DEDUPLICAï¿½ï¿½O CACHE] Referï¿½ncia ${orderId} jï¿½ consta como CONCLUï¿½DA.`);
           return res.status(200).json({
             status: 'concluido',
             success: true,
             duplicado: true,
             orderId,
-            mensagem: `Este pedido com a referência ${orderId} já foi atendido e concluído anteriormente!`
+            mensagem: `Este pedido com a referï¿½ncia ${orderId} jï¿½ foi atendido e concluï¿½do anteriormente!`
           });
         }
-      } catch(e) { console.warn('?? [DEDUPLICAÇÃO] Falha ao ler cache de pedidos:', e.message); }
+      } catch(e) { console.warn('?? [DEDUPLICAï¿½ï¿½O] Falha ao ler cache de pedidos:', e.message); }
     }
 
     const orderDoc = {
@@ -224,7 +224,7 @@ async function handleTransfer(req, res) {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
+    // Aplicar regra oficial Axion de divisï¿½o de pacotes Mensais (1ï¿½ oferta + resto diï¿½rio) e Diï¿½rios
     splitMensalOrderIfEligible(orderDoc);
     splitDailyOrderIfEligible(orderDoc);
 
@@ -240,7 +240,7 @@ async function handleTransfer(req, res) {
       }
     }
 
-    // Resposta imediata para o Bot não travar
+    // Resposta imediata para o Bot nï¿½o travar
     return res.status(200).json({
       status: 'sucesso',
       success: true,
@@ -261,7 +261,7 @@ app.post('/api/send/manual', async (req, res) => {
   try {
     const { numero, volume, quantidade, modo = 'diario', porta = null } = req.body || {};
     if (!numero) {
-      return res.status(400).json({ success: false, message: 'Número de telefone é obrigatório.' });
+      return res.status(400).json({ success: false, message: 'Nï¿½mero de telefone ï¿½ obrigatï¿½rio.' });
     }
 
     const numLimpo = String(numero).replace(/\D/g, '');
@@ -285,11 +285,11 @@ app.post('/api/send/manual', async (req, res) => {
       updatedAt: timestamp
     };
 
-    // Aplicar regra oficial de divisão mensal (se for mensal > 2867MB), Tudo Top (> 11GB) ou Diário
+    // Aplicar regra oficial de divisï¿½o mensal (se for mensal > 2867MB), Tudo Top (> 11GB) ou Diï¿½rio
     splitMensalOrderIfEligible(orderDoc);
     splitDailyOrderIfEligible(orderDoc);
 
-    // Aplicar detector e ativador de Planos Especiais (Renovável e Faseado)
+    // Aplicar detector e ativador de Planos Especiais (Renovï¿½vel e Faseado)
     handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(orderId, orderDoc);
@@ -332,7 +332,7 @@ app.get('/api/devices', async (req, res) => {
 app.post('/api/devices/:port/reset', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} nï¿½o encontrada.` });
 
   // Resetar flags de bloqueio
   dev.sem_saldo = false;
@@ -346,11 +346,11 @@ app.post('/api/devices/:port/reset', (req, res) => {
   dev._lastBlockLogTime = 0;
   dev.manual_saldo_override = Date.now();
 
-  // Enviar comando ao celular via próximo polling (/health)
+  // Enviar comando ao celular via prï¿½ximo polling (/health)
   dev.pending_commands = dev.pending_commands || {};
   dev.pending_commands.reset_counters = true;
 
-  // Se o body tiver saldos explícitos, actualizar
+  // Se o body tiver saldos explï¿½citos, actualizar
   if (req.body && req.body.sim1_saldo_mb !== undefined) dev.sim1_saldo_mb = Number(req.body.sim1_saldo_mb);
   if (req.body && req.body.sim2_saldo_mb !== undefined) dev.sim2_saldo_mb = Number(req.body.sim2_saldo_mb);
   if (req.body && req.body.saldo_mb !== undefined) dev.saldo_mb = Number(req.body.saldo_mb);
@@ -368,7 +368,7 @@ app.post('/api/devices/:port/reset', (req, res) => {
   return res.json({ success: true, mensagem: `Porta ${port} libertada e desbloqueada com sucesso!`, device: dev });
 });
 
-// -- FUNÇÃO DE DECREMENTO AUTOMÁTICO DE SALDO (MT NA 8077 / MB NAS DEMAIS PORTAS) --
+// -- FUNï¿½ï¿½O DE DECREMENTO AUTOMï¿½TICO DE SALDO (MT NA 8077 / MB NAS DEMAIS PORTAS) --
 function decrementDeviceSaldo(port, order) {
   const pNum = Number(port);
   const dev = inMemoryDevices[pNum];
@@ -393,7 +393,7 @@ function decrementDeviceSaldo(port, order) {
     dev.saldo_credito = `${newMt} MT`;
     dev.manual_saldo_override = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 dias de override
 
-    console.log(`?? [SALDO 8077 DECREMENTADO] Ativação de ${orderCostMt} MT no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newMt} MT`);
+    console.log(`?? [SALDO 8077 DECREMENTADO] Ativaï¿½ï¿½o de ${orderCostMt} MT no pedido ${order.id || order.orderId}! Saldo restante na Porta 8077: ${newMt} MT`);
 
     if (newMt <= 0) {
       dev.sem_saldo = true;
@@ -402,10 +402,10 @@ function decrementDeviceSaldo(port, order) {
 
       if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
         baileysEngine.enviarNotificacaoGrupo(
-          `?? *ALERTA CRÍTICO: SALDO 8077 ZERADO!* ??\n` +
+          `?? *ALERTA CRï¿½TICO: SALDO 8077 ZERADO!* ??\n` +
           `??????????????????\n` +
           `?? *Celular:* Porta 8077 (Tudo Top / Semanais / Mensais)\n` +
-          `?? *Última Ativação:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
+          `?? *ï¿½ltima Ativaï¿½ï¿½o:* ${orderCostMt} MT (Ref: \`${order.id || order.orderId}\`)\n` +
           `?? *Saldo Restante:* *0 MT (ESGOTADO)*\n` +
           `??????????????????\n` +
           `?? *Atendimento Pausado!* O saldo em MT esgotou. Por favor escreva o novo saldo em MT no Painel Admin para reativar.`
@@ -413,7 +413,7 @@ function decrementDeviceSaldo(port, order) {
       }
     }
   } else {
-    // -- DECREMENTO AUTOMÁTICO DE DADOS EM MEGAS (PORTAS 8021, 8022, ETC.) --
+    // -- DECREMENTO AUTOMï¿½TICO DE DADOS EM MEGAS (PORTAS 8021, 8022, ETC.) --
     const mbEnviados = Number(order.quantidade) || 0;
     if (mbEnviados > 0) {
       const slot = dev.active_sim_slot || 1;
@@ -433,7 +433,7 @@ function decrementDeviceSaldo(port, order) {
         if (otherSlotSaldo < 100) {
           dev.sem_saldo = true;
           dev.is_apto = false;
-          console.warn(`?? [SALDO ESGOTADO] Celular Porta ${pNum} ficou com saldo abaixo do mínimo (<100MB) em ambos os chips!`);
+          console.warn(`?? [SALDO ESGOTADO] Celular Porta ${pNum} ficou com saldo abaixo do mï¿½nimo (<100MB) em ambos os chips!`);
         }
       }
     }
@@ -444,7 +444,7 @@ function decrementDeviceSaldo(port, order) {
 app.post('/api/devices/:port/set-saldo', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} nï¿½o encontrada.` });
 
   const { sim1_saldo_mb, sim2_saldo_mb, saldo_mb, saldo_mt } = req.body || {};
   if (sim1_saldo_mb !== undefined) dev.sim1_saldo_mb = Number(sim1_saldo_mb);
@@ -494,7 +494,7 @@ app.post('/api/devices/:port/set-saldo', (req, res) => {
 app.post('/api/devices/:port/set-sim', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} nï¿½o encontrada.` });
 
   const slot = Number(req.body && req.body.slot);
   if (slot !== 1 && slot !== 2) {
@@ -514,29 +514,29 @@ app.post('/api/devices/:port/set-sim', (req, res) => {
 app.post('/api/devices/:port/toggle-pause', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} nï¿½o encontrada.` });
 
   dev.paused = !dev.paused;
   console.log(`?? [MANUSEIO PAINEL] Porta ${port} ${dev.paused ? 'PAUSADA' : 'RETOMADA'} pelo operador.`);
   return res.json({
     success: true,
     paused: dev.paused,
-    mensagem: dev.paused ? `Porta ${port} pausada. Não receberá pedidos até ser retomada.` : `Porta ${port} retomada e pronta para pedidos!`,
+    mensagem: dev.paused ? `Porta ${port} pausada. Nï¿½o receberï¿½ pedidos atï¿½ ser retomada.` : `Porta ${port} retomada e pronta para pedidos!`,
     device: dev
   });
 });
 
-// -- FORÇAR DESPACHO DE PEDIDO PARA ESTA PORTA (operador) --
+// -- FORï¿½AR DESPACHO DE PEDIDO PARA ESTA PORTA (operador) --
 app.post('/api/devices/:port/force-dispatch', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} nï¿½o encontrada.` });
 
   if (dev.pending_order) {
-    return res.status(400).json({ success: false, mensagem: `Porta ${port} já tem um pedido em processamento (${dev.pending_order.numero}).` });
+    return res.status(400).json({ success: false, mensagem: `Porta ${port} jï¿½ tem um pedido em processamento (${dev.pending_order.numero}).` });
   }
 
-  // Buscar primeiro pedido pendente compatível
+  // Buscar primeiro pedido pendente compatï¿½vel
   let targetOrder = null;
   let targetOrderId = null;
   for (const [orderId, order] of inMemoryOrders.entries()) {
@@ -551,7 +551,7 @@ app.post('/api/devices/:port/force-dispatch', (req, res) => {
   }
 
   if (!targetOrder) {
-    return res.json({ success: false, mensagem: `Nenhum pedido pendente compatível na fila para a Porta ${port}.` });
+    return res.json({ success: false, mensagem: `Nenhum pedido pendente compatï¿½vel na fila para a Porta ${port}.` });
   }
 
   targetOrder.status = 'assigned';
@@ -571,22 +571,22 @@ app.post('/api/devices/:port/force-dispatch', (req, res) => {
   };
 
   saveOrdersToCache();
-  console.log(`? [MANUSEIO PAINEL] Pedido ${targetOrderId} (${targetOrder.quantidade}MB -> ${targetOrder.numero}) despachado FORÇADO para Porta ${port}!`);
+  console.log(`? [MANUSEIO PAINEL] Pedido ${targetOrderId} (${targetOrder.quantidade}MB -> ${targetOrder.numero}) despachado FORï¿½ADO para Porta ${port}!`);
   return res.json({ success: true, mensagem: `Pedido ${targetOrderId} (${targetOrder.quantidade}MB) despachado para a Porta ${port}!`, order: targetOrder });
 });
 
-// -- FORÇAR DESPACHO OVERRIDE (ignora modo/compatibilidade) --
-// Usar quando portas normais estão sem saldo mas há outra porta disponível
+// -- FORï¿½AR DESPACHO OVERRIDE (ignora modo/compatibilidade) --
+// Usar quando portas normais estï¿½o sem saldo mas hï¿½ outra porta disponï¿½vel
 app.post('/api/devices/:port/force-dispatch-override', (req, res) => {
   const port = Number(req.params.port);
   const dev = inMemoryDevices[port];
-  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} não encontrada.` });
+  if (!dev) return res.status(404).json({ success: false, mensagem: `Porta ${port} nï¿½o encontrada.` });
 
   if (dev.pending_order) {
-    return res.status(400).json({ success: false, mensagem: `Porta ${port} já tem um pedido em processamento (${dev.pending_order.numero}).` });
+    return res.status(400).json({ success: false, mensagem: `Porta ${port} jï¿½ tem um pedido em processamento (${dev.pending_order.numero}).` });
   }
 
-  // Buscar pedido específico (por ID) ou primeiro pendente qualquer
+  // Buscar pedido especï¿½fico (por ID) ou primeiro pendente qualquer
   const targetOrderId = req.body && req.body.orderId;
   let foundOrder = null;
   let foundId = null;
@@ -650,7 +650,7 @@ app.post('/api/devices/reset-all', (req, res) => {
     count++;
   }
   console.log(`?? [MANUSEIO PAINEL] Todos os ${count} celulares foram libertados e desbloqueados.`);
-  return res.json({ success: true, mensagem: `Todos os ${count} celulares foram libertados e estão prontos!`, count });
+  return res.json({ success: true, mensagem: `Todos os ${count} celulares foram libertados e estï¿½o prontos!`, count });
 });
 
 function isDailyPort(port) {
@@ -660,7 +660,7 @@ function isDailyPort(port) {
 
 function isPortCompatibleWithModo(port, modo) {
   const p = Number(port);
-  if (p === 8090) return false; // ?? Porta 8090 é exclusiva para SMS e Leitura M-Pesa/e-Mola
+  if (p === 8090) return false; // ?? Porta 8090 ï¿½ exclusiva para SMS e Leitura M-Pesa/e-Mola
   const m = String(modo || '').toLowerCase().trim();
   if (m === 'saldo' || m === 'credito') {
     return p === 8777;
@@ -668,7 +668,7 @@ function isPortCompatibleWithModo(port, modo) {
   if (m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top')) {
     return p === 8077;
   }
-  // Pacotes Diários: compatível com qualquer celular diário (8021 a 8028)
+  // Pacotes Diï¿½rios: compatï¿½vel com qualquer celular diï¿½rio (8021 a 8028)
   return p !== 8077 && p !== 8777 && p !== 8090;
 }
 
@@ -679,13 +679,13 @@ function getPortForModo(modo, requiredMb = 0) {
 
   const reqMb = Number(requiredMb) || 0;
 
-  // Para diários: selecionar dinamicamente a melhor porta diária online e apta
+  // Para diï¿½rios: selecionar dinamicamente a melhor porta diï¿½ria online e apta
   const dailyDevs = Object.values(inMemoryDevices).filter(d => {
     const port = Number(d.porta);
     return port !== 8077 && port !== 8777 && port !== 8090 && isDeviceApto(d);
   });
   if (dailyDevs.length > 0) {
-    // 1. Se foi especificada uma quantidade de MB necessária, priorizar dispositivos que cobrem 100% da quantidade
+    // 1. Se foi especificada uma quantidade de MB necessï¿½ria, priorizar dispositivos que cobrem 100% da quantidade
     if (reqMb > 0) {
       const capableDevs = dailyDevs.filter(d => getDeviceAvailableMb(d) >= reqMb);
       if (capableDevs.length > 0) {
@@ -698,7 +698,7 @@ function getPortForModo(modo, requiredMb = 0) {
       }
     }
 
-    // 2. Se nenhuma cobre 100%, escolher a que tem MAIOR saldo disponível (e mais transferências livres)
+    // 2. Se nenhuma cobre 100%, escolher a que tem MAIOR saldo disponï¿½vel (e mais transferï¿½ncias livres)
     dailyDevs.sort((a, b) => {
       const balDiff = getDeviceAvailableMb(b) - getDeviceAvailableMb(a);
       if (balDiff !== 0) return balDiff;
@@ -706,21 +706,21 @@ function getPortForModo(modo, requiredMb = 0) {
     });
     return Number(dailyDevs[0].porta);
   }
-  // Se nenhuma porta diária estiver apta no momento, verificar qualquer porta diária registrada online
+  // Se nenhuma porta diï¿½ria estiver apta no momento, verificar qualquer porta diï¿½ria registrada online
   const anyDailyDev = Object.values(inMemoryDevices).find(d => {
     const port = Number(d.porta);
     return port !== 8077 && port !== 8777 && port !== 8090;
   });
   if (anyDailyDev) return Number(anyDailyDev.porta);
 
-  return 8025; // fallback padrão (Huawei)
+  return 8025; // fallback padrï¿½o (Huawei)
 }
 
-// -- REGRA OFICIAL AXION: DIVISÃO INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) --
+// -- REGRA OFICIAL AXION: DIVISï¿½O INTELIGENTE DE PACOTES ESPECIAIS (SPLIT) --
 // 1. Mensal: Vodacom *162# -> 5 -> 1 entrega 2.8GB (2867MB) por 95 MT.
-//    Se pedido > 2867MB (ex: 5GB, 8GB, 10GB): Parte 1 (2867MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
+//    Se pedido > 2867MB (ex: 5GB, 8GB, 10GB): Parte 1 (2867MB) via Porta 8077 + Parte 2 (Resto) via Portas Diï¿½rias.
 // 2. Tudo Top: Vodacom *111# -> 4 -> 3 -> 1 entrega 11GB (11264MB) + Minutos por 500 MT.
-//    Se pedido > 11264MB (ex: 15GB, 25GB): Parte 1 (11264MB) via Porta 8077 + Parte 2 (Resto) via Portas Diárias.
+//    Se pedido > 11264MB (ex: 15GB, 25GB): Parte 1 (11264MB) via Porta 8077 + Parte 2 (Resto) via Portas Diï¿½rias.
 const MENSAL_BASE_MB = 2867;     // 2.8 GB
 const TUDO_TOP_BASE_MB = 11264;  // 11 GB
 
@@ -745,7 +745,7 @@ function splitSpecialOrderIfEligible(orderDoc) {
     orderDoc.part2Id = part2Id;
     orderDoc.quantidade = parte1;
     orderDoc.targetPort = 8077;
-    orderDoc.input_val = '1'; // 1ª oferta mensal
+    orderDoc.input_val = '1'; // 1ï¿½ oferta mensal
 
     const orderPart2 = {
       id: part2Id,
@@ -783,8 +783,8 @@ function splitSpecialOrderIfEligible(orderDoc) {
     saveOrdersToCache();
 
     console.log(`?? [SPLIT MENSAL AXION] Pedido Mensal ${parentId} (${totalMb}MB) dividido automaticamente:`);
-    console.log(`   ?? Parte 1 (Mensal): ${parte1}MB -> Porta 8077 (1ª Oferta *162#)`);
-    console.log(`   ?? Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
+    console.log(`   ?? Parte 1 (Mensal): ${parte1}MB -> Porta 8077 (1ï¿½ Oferta *162#)`);
+    console.log(`   ?? Parte 2 (Diï¿½rio): ${parte2}MB -> Portas Diï¿½rias (Aguardando conclusï¿½o da Parte 1)`);
 
     return true;
   }
@@ -806,7 +806,7 @@ function splitSpecialOrderIfEligible(orderDoc) {
     orderDoc.part2Id = part2Id;
     orderDoc.quantidade = parte1;
     orderDoc.targetPort = 8077;
-    orderDoc.input_val = '1'; // 1ª oferta Tudo Top (11GB)
+    orderDoc.input_val = '1'; // 1ï¿½ oferta Tudo Top (11GB)
 
     const orderPart2 = {
       id: part2Id,
@@ -844,8 +844,8 @@ function splitSpecialOrderIfEligible(orderDoc) {
     saveOrdersToCache();
 
     console.log(`?? [SPLIT TUDO TOP AXION] Pedido Tudo Top ${parentId} (${totalMb}MB) dividido automaticamente:`);
-    console.log(`   ?? Parte 1 (Tudo Top): ${parte1}MB -> Porta 8077 (1ª Oferta *111# 11GB + Minutos)`);
-    console.log(`   ?? Parte 2 (Diário): ${parte2}MB -> Portas Diárias (Aguardando conclusão da Parte 1)`);
+    console.log(`   ?? Parte 1 (Tudo Top): ${parte1}MB -> Porta 8077 (1ï¿½ Oferta *111# 11GB + Minutos)`);
+    console.log(`   ?? Parte 2 (Diï¿½rio): ${parte2}MB -> Portas Diï¿½rias (Aguardando conclusï¿½o da Parte 1)`);
 
     return true;
   }
@@ -857,12 +857,12 @@ function splitMensalOrderIfEligible(orderDoc) {
   return splitSpecialOrderIfEligible(orderDoc);
 }
 
-// -- REGRA OFICIAL AXION: DIVISÃO INTELIGENTE DE PACOTES DIÁRIOS (SPLIT DIÁRIO) --
-// 1. Limite USSD da Vodacom: O valor máximo permitido por transferência é 10.240MB (10GB).
-//    Se pedido > 10240MB (ex: 15GB, 20GB): Parte 1 (máx 10240MB) + Parte 2 (Resto).
-// 2. Proteção de Saldo: Se nenhum celular diário tem saldo suficiente para cobrir o pedido inteiro,
-//    mas o melhor celular tem saldo >= 100MB e a sobra também é >= 100MB:
-//    Parte 1 (saldo disponível do melhor celular) + Parte 2 (Resto na fila aguardando).
+// -- REGRA OFICIAL AXION: DIVISï¿½O INTELIGENTE DE PACOTES DIï¿½RIOS (SPLIT DIï¿½RIO) --
+// 1. Limite USSD da Vodacom: O valor mï¿½ximo permitido por transferï¿½ncia ï¿½ 10.240MB (10GB).
+//    Se pedido > 10240MB (ex: 15GB, 20GB): Parte 1 (mï¿½x 10240MB) + Parte 2 (Resto).
+// 2. Proteï¿½ï¿½o de Saldo: Se nenhum celular diï¿½rio tem saldo suficiente para cobrir o pedido inteiro,
+//    mas o melhor celular tem saldo >= 100MB e a sobra tambï¿½m ï¿½ >= 100MB:
+//    Parte 1 (saldo disponï¿½vel do melhor celular) + Parte 2 (Resto na fila aguardando).
 function splitDailyOrderIfEligible(orderDoc) {
   if (!orderDoc || orderDoc.isSplit) return false;
   const modo = String(orderDoc.modo || 'diario').toLowerCase().trim();
@@ -870,9 +870,9 @@ function splitDailyOrderIfEligible(orderDoc) {
   if (!isDiario) return false;
 
   const qty = Number(orderDoc.quantidade) || 0;
-  if (qty < 200) return false; // Para dividir com mínimo de 100MB por parte, precisa de pelo menos 200MB
+  if (qty < 200) return false; // Para dividir com mï¿½nimo de 100MB por parte, precisa de pelo menos 200MB
 
-  // Buscar celulares diários online e aptos
+  // Buscar celulares diï¿½rios online e aptos
   const dailyDevs = Object.values(inMemoryDevices).filter(d => {
     const port = Number(d.porta);
     return port !== 8077 && port !== 8777 && port !== 8090 && isDeviceApto(d);
@@ -887,7 +887,7 @@ function splitDailyOrderIfEligible(orderDoc) {
   let parte1 = 0;
   let parte2 = 0;
 
-  // Caso 1: Pedido maior que o teto máximo permitido por envio USSD da Vodacom (10.240MB = 10GB)
+  // Caso 1: Pedido maior que o teto mï¿½ximo permitido por envio USSD da Vodacom (10.240MB = 10GB)
   if (qty > 10240) {
     const maxParte1 = 10240;
     parte1 = bestBalance >= 100 ? Math.min(maxParte1, Math.floor(bestBalance)) : maxParte1;
@@ -897,8 +897,8 @@ function splitDailyOrderIfEligible(orderDoc) {
       shouldSplit = true;
     }
   }
-  // Caso 2: Nenhum celular diário tem saldo suficiente para cobrir o pedido inteiro,
-  // mas o melhor celular tem saldo >= 100MB e a sobra também é >= 100MB
+  // Caso 2: Nenhum celular diï¿½rio tem saldo suficiente para cobrir o pedido inteiro,
+  // mas o melhor celular tem saldo >= 100MB e a sobra tambï¿½m ï¿½ >= 100MB
   else if (bestBalance < qty && bestBalance >= 100 && (qty - bestBalance) >= 100) {
     shouldSplit = true;
     parte1 = Math.floor(bestBalance);
@@ -954,9 +954,9 @@ function splitDailyOrderIfEligible(orderDoc) {
     inMemoryOrders.set(part2Id, orderPart2);
     saveOrdersToCache();
 
-    console.log(`?? [SPLIT DIÁRIO INTELIGENTE] Pedido Diário ${parentId} (${totalMb}MB) dividido automaticamente:`);
-    console.log(`   ?? Parte 1: ${parte1}MB -> Porta ${bestDev.porta} (Saldo disponível: ${bestBalance}MB)`);
-    console.log(`   ?? Parte 2: ${parte2}MB -> Fila de espera (Aguardando conclusão da Parte 1)`);
+    console.log(`?? [SPLIT DIï¿½RIO INTELIGENTE] Pedido Diï¿½rio ${parentId} (${totalMb}MB) dividido automaticamente:`);
+    console.log(`   ?? Parte 1: ${parte1}MB -> Porta ${bestDev.porta} (Saldo disponï¿½vel: ${bestBalance}MB)`);
+    console.log(`   ?? Parte 2: ${parte2}MB -> Fila de espera (Aguardando conclusï¿½o da Parte 1)`);
 
     return true;
   }
@@ -977,19 +977,19 @@ function isDeviceApto(dev) {
   const port = Number(dev.porta);
 
   // -- PORTA DEDICADA DE SMS & ATENDIMENTO (8090) --
-  // Nunca atende pacotes de dados USSD (diários, semanais ou mensais)
+  // Nunca atende pacotes de dados USSD (diï¿½rios, semanais ou mensais)
   if (port === 8090 || dev.tipo === 'sms_dedicated') {
     return false;
   }
 
-  // -- PORTAS ESPECIAIS (8077 - Semanais/Mensais/Ilimitados e 8777 - Saldo/Crédito) --
+  // -- PORTAS ESPECIAIS (8077 - Semanais/Mensais/Ilimitados e 8777 - Saldo/Crï¿½dito) --
   if (port === 8077 || port === 8777) {
     if (dev.sem_saldo === true) return false;
     if (dev.saldo_mt !== undefined && dev.saldo_mt <= 0) return false;
     return true;
   }
 
-  // -- PORTAS DIÁRIAS (todas as demais portas) --
+  // -- PORTAS DIï¿½RIAS (todas as demais portas) --
   if (dev.limite_atingido === true) return false;
   if (dev.sem_saldo === true) return false;
   if (dev.transfers_available !== undefined && dev.transfers_available <= 0) return false;
@@ -1001,7 +1001,7 @@ function isDeviceApto(dev) {
   const knownSaldos = [s1, s2, smb].filter(s => s !== null);
   if (knownSaldos.length > 0) {
     const maxSaldo = Math.max(...knownSaldos);
-    if (maxSaldo < 100) return false; // Sem saldo suficiente para transferência mínima de 100MB
+    if (maxSaldo < 100) return false; // Sem saldo suficiente para transferï¿½ncia mï¿½nima de 100MB
   }
 
   return true;
@@ -1068,23 +1068,23 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
   if (reqLicenseId) dev.licenseId = reqLicenseId;
   if (reqOpMode) dev.operationMode = reqOpMode;
 
-  // -- AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA (ROTEAMENTO ESTRITO & APTIDÃO) --
-  // - Portas Diárias (8025, 8023, 8024): Exclusivas para pacotes diários (24hrs)
-  // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados (NUNCA assume diários)
-  // - Porta 8777: Exclusiva para recargas de saldo/crédito
-  // - SÓ atribui pedidos se o celular estiver 100% APTO (com saldo >= 100MB e sem ter atingido limite diário)
+  // -- AUTO-DISPATCH DE PEDIDOS PENDENTES DA FILA (ROTEAMENTO ESTRITO & APTIDï¿½O) --
+  // - Portas Diï¿½rias (8025, 8023, 8024): Exclusivas para pacotes diï¿½rios (24hrs)
+  // - Porta 8077: Exclusiva para pacotes semanais, mensais e ilimitados (NUNCA assume diï¿½rios)
+  // - Porta 8777: Exclusiva para recargas de saldo/crï¿½dito
+  // - Sï¿½ atribui pedidos se o celular estiver 100% APTO (com saldo >= 100MB e sem ter atingido limite diï¿½rio)
   if (isDeviceApto(dev)) {
     for (const [orderId, order] of inMemoryOrders.entries()) {
         if (order.status !== 'pending') continue;
 
-        // -- FILTRO MULTI-TENANT DE LICENÇA (ISOLAMENTO DE CLIENTES) --
+        // -- FILTRO MULTI-TENANT DE LICENï¿½A (ISOLAMENTO DE CLIENTES) --
         const devLic = (dev.licenseId || 'master').toLowerCase().trim();
         const ordLic = (order.licenseId || 'master').toLowerCase().trim();
         if (devLic !== ordLic) {
-          continue; // Pedido pertence a outro cliente/licença!
+          continue; // Pedido pertence a outro cliente/licenï¿½a!
         }
 
-        // -- FILTRO RIGOROSO DE MODO DE OPERAÇÃO (REVENDA vs FORNECIMENTO) --
+        // -- FILTRO RIGOROSO DE MODO DE OPERAï¿½ï¿½O (REVENDA vs FORNECIMENTO) --
         const devMode = (dev.operationMode || (port === 8777 ? 'fornecimento' : 'revenda')).toLowerCase().trim();
         const m = String(order.modo || '').toLowerCase().trim();
         const isEspecial = m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top');
@@ -1093,19 +1093,19 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
         // Se for pacote especial (semanal, mensal, tudo top) e este celular for a porta 8077, aceita diretamente!
         if (port === 8077 && isEspecial) {
-          // Totalmente compatível: celular de ofertas especiais processa pacotes semanais/mensais/top
+          // Totalmente compatï¿½vel: celular de ofertas especiais processa pacotes semanais/mensais/top
         } else if (port === 8777 && isSaldo) {
-          // Totalmente compatível: celular de saldo processa transferências de saldo
+          // Totalmente compatï¿½vel: celular de saldo processa transferï¿½ncias de saldo
         } else {
           // Portas 8077 (especiais) e 8777 (saldo) respeitam estritamente seu modo.
-          // Para celulares diários (8021 a 8028), permitir atender pacotes de dados diários normais mesmo se configurados como fornecimento,
+          // Para celulares diï¿½rios (8021 a 8028), permitir atender pacotes de dados diï¿½rios normais mesmo se configurados como fornecimento,
           // garantindo que o failover entre portas funcione sempre!
           const isDedicatedPort = port === 8077 || port === 8777 || port === 8090;
           if (isDedicatedPort && devMode === 'fornecimento' && !isFornecOrder) {
             continue;
           }
           if (devMode === 'revenda' && isFornecOrder) {
-            continue; // Celular de revenda NÃO processa saldo ou atacado
+            continue; // Celular de revenda Nï¿½O processa saldo ou atacado
           }
         }
 
@@ -1116,24 +1116,24 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             order.status = 'expired';
             order.lastError = 'Pedido expirado (mais de 24 horas na fila sem saldo disponivel)';
             order.completedAt = new Date().toISOString();
-            console.warn(`? [EXPIRAÇÃO] Pedido ${orderId} (${order.quantidade}MB -> ${order.numero}) expirou apos 24h na fila.`);
+            console.warn(`? [EXPIRAï¿½ï¿½O] Pedido ${orderId} (${order.quantidade}MB -> ${order.numero}) expirou apos 24h na fila.`);
             continue;
           }
         }
 
-        // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
+        // Aplicar regra oficial Axion de divisï¿½o de pacotes Mensais (1ï¿½ oferta + resto diï¿½rio) e Diï¿½rios
         splitMensalOrderIfEligible(order);
         splitDailyOrderIfEligible(order);
 
         let isCompatible = isPortCompatibleWithModo(port, order.modo);
 
-        // Se este pedido já falhou ou deu timeout nesta porta, passar logo para outro celular
+        // Se este pedido jï¿½ falhou ou deu timeout nesta porta, passar logo para outro celular
         if (order.failedPorts && order.failedPorts.includes(port)) {
           const hasOtherApto = Object.values(inMemoryDevices).some(d =>
             Number(d.porta) !== port && isDeviceApto(d) && !d.isBusy && !order.failedPorts.includes(Number(d.porta))
           );
           if (hasOtherApto) {
-            continue; // Pula este celular e manda para o próximo!
+            continue; // Pula este celular e manda para o prï¿½ximo!
           }
         }
 
@@ -1143,16 +1143,16 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           const targetLastSeen = targetDev ? new Date(targetDev.lastSeen || 0).getTime() : 0;
           const targetOnline = targetDev && (nowMs - targetLastSeen < 90000);
           const targetApto = targetDev && isDeviceApto(targetDev);
-          // O celular alvo só impede outros se estiver online, apto, livre E sem nenhuma tarefa pendente atribuída
+          // O celular alvo sï¿½ impede outros se estiver online, apto, livre E sem nenhuma tarefa pendente atribuï¿½da
           const isTargetReallyFree = targetOnline && targetApto && !targetDev.isBusy && !targetDev.pending_order;
           if (isTargetReallyFree) {
             isCompatible = false;
           } else {
-            // Se o alvo não está livre ou ficou offline, limpar targetPort para liberar para qualquer porta apta
+            // Se o alvo nï¿½o estï¿½ livre ou ficou offline, limpar targetPort para liberar para qualquer porta apta
             order.targetPort = null;
           }
         }
-        // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA diários)
+        // GARANTIA ABSOLUTA: Porta 8077 aceita APENAS semanal, mensal ou ilimitado (NUNCA diï¿½rios)
         if (port === 8077) {
           const m = String(order.modo || '').toLowerCase().trim();
           const isEspecial = m === 'semanal' || m === 'mensal' || m === 'ilimitado' || m === 'ilimitados' || m.startsWith('esp') || m.includes('seman') || m.includes('mens') || m.includes('top');
@@ -1165,9 +1165,9 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           const availableMb = getDeviceAvailableMb(dev);
           const isDiarioMode = (order.modo || 'diario').toLowerCase().trim() === 'diario' || (order.modo || 'diario').toLowerCase().trim() === '24hrs';
 
-          // Se for modo diário e o celular atual NÃO tiver saldo suficiente para cobrir o pedido inteiro:
+          // Se for modo diï¿½rio e o celular atual Nï¿½O tiver saldo suficiente para cobrir o pedido inteiro:
           if (isDiarioMode && orderMb > availableMb) {
-            // Tentar divisão inteligente se este celular tiver pelo menos MIN_TRANSFER_MB (100MB) e sobra >= 100MB:
+            // Tentar divisï¿½o inteligente se este celular tiver pelo menos MIN_TRANSFER_MB (100MB) e sobra >= 100MB:
             // FIX: Permitir re-split mesmo em pedidos isSplit=true (ex: camada diaria do mensal/tudo-top)
             //    A flag isSplit indica apenas que eh uma fatia de um pedido maior; ela mesma pode ser
             //    subdividida entre multiplos celulares se nenhum tiver saldo suficiente para cobri-la inteira.
@@ -1194,7 +1194,7 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
               order.assignedToPort = port;
               order.processingAt = new Date().toISOString();
 
-              // Criar Parte 2 aguardando a conclusão da Parte 1
+              // Criar Parte 2 aguardando a conclusï¿½o da Parte 1
               const orderPart2 = {
                 id: part2Id,
                 orderId: part2Id,
@@ -1232,18 +1232,18 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
               };
 
               console.log(`?? [ENVIO INTELIGENTE DIVIDIDO] Pedido ${parentId} de ${totalMb}MB dividido em 2 partes:`);
-              console.log(`   ?? Parte 1: ${parte1}MB atribuído à Porta ${port} (Saldo disponível: ${availableMb}MB)`);
-              console.log(`   ?? Parte 2: ${parte2}MB aguardando conclusão da Parte 1 para despacho por outra porta.`);
+              console.log(`   ?? Parte 1: ${parte1}MB atribuï¿½do ï¿½ Porta ${port} (Saldo disponï¿½vel: ${availableMb}MB)`);
+              console.log(`   ?? Parte 2: ${parte2}MB aguardando conclusï¿½o da Parte 1 para despacho por outra porta.`);
 
               break;
             } else {
-              // ??? Celular não tem saldo para o pedido completo e não é elegível para split:
-              // NUNCA atribuir este pedido a esta porta! Pular para o próximo pedido da fila.
+              // ??? Celular nï¿½o tem saldo para o pedido completo e nï¿½o ï¿½ elegï¿½vel para split:
+              // NUNCA atribuir este pedido a esta porta! Pular para o prï¿½ximo pedido da fila.
               continue;
             }
           }
 
-          // Atribuição padrão (celular tem saldo suficiente para cobrir o pedido)
+          // Atribuiï¿½ï¿½o padrï¿½o (celular tem saldo suficiente para cobrir o pedido)
           order.status = 'assigned';
           order.targetPort = port;
           order.assignedToPort = port;
@@ -1265,10 +1265,10 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
         }
       }
   } else if (dev.limite_atingido || dev.sem_saldo || (dev.transfers_available !== undefined && dev.transfers_available <= 0)) {
-    // -- LÓGICA DE FALLBACK: redirecionar pedidos desta porta para outra porta disponível --
+    // -- Lï¿½GICA DE FALLBACK: redirecionar pedidos desta porta para outra porta disponï¿½vel --
     const now2 = Date.now();
     const lastBlockLog = dev._lastBlockLogTime || 0;
-    if (now2 - lastBlockLog > 30000) { // logar máx 1x a cada 30s por porta
+    if (now2 - lastBlockLog > 30000) { // logar mï¿½x 1x a cada 30s por porta
       dev._lastBlockLogTime = now2;
       console.log(`?? [PAUSA OPERACIONAL] Celular Porta ${port} sem saldo ou atingiu o limite. A verificar portas alternativas...`);
     }
@@ -1276,25 +1276,25 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
     for (const [orderId, order] of inMemoryOrders.entries()) {
       if (order.status === 'pending') {
         const designatedPort = order.targetPort || getPortForModo(order.modo, order.quantidade);
-        if (designatedPort !== port) continue; // não é desta porta, ignorar
+        if (designatedPort !== port) continue; // nï¿½o ï¿½ desta porta, ignorar
 
-        // Procurar outra porta disponível que suporte o mesmo modo
+        // Procurar outra porta disponï¿½vel que suporte o mesmo modo
         const modoOrder = (order.modo || 'diario').toLowerCase().trim();
         let fallbackDev = null;
         let fallbackPort = null;
 
         for (const [candidatePortStr, candidateDev] of Object.entries(inMemoryDevices)) {
           const candidatePort = Number(candidatePortStr);
-          if (candidatePort === port) continue; // não usar a porta esgotada
+          if (candidatePort === port) continue; // nï¿½o usar a porta esgotada
           if (!isDeviceApto(candidateDev)) continue; // deve estar apto
 
-          // Verificar se a porta candidata é compatível com o modo do pedido
+          // Verificar se a porta candidata ï¿½ compatï¿½vel com o modo do pedido
           const candidateDesignated = getPortForModo(modoOrder, order.quantidade);
           // Aceitar apenas se o candidato for a porta correta para esse modo
-          // Exceção: se a porta original for 8077 e não houver outra 8077, mas houver 8023 disponível e ambos forem vodacom
-          // ? Para pacotes diários (8023) ? fallback: outra porta vodacom disponível  
-          // ? Para semanais/mensais (8077) ? fallback: outra porta vodacom disponível
-          // ? Para saldo (8777) ? sem fallback (porta específica)
+          // Exceï¿½ï¿½o: se a porta original for 8077 e nï¿½o houver outra 8077, mas houver 8023 disponï¿½vel e ambos forem vodacom
+          // ? Para pacotes diï¿½rios (8023) ? fallback: outra porta vodacom disponï¿½vel  
+          // ? Para semanais/mensais (8077) ? fallback: outra porta vodacom disponï¿½vel
+          // ? Para saldo (8777) ? sem fallback (porta especï¿½fica)
           // FIX: Verificar saldo do candidato antes de aceitar como fallback (evitar deadlock)
           const cIsOrderDaily = modoOrder === 'diario' || modoOrder === '24hrs' || modoOrder === '24h';
           const cCandBalance = getDeviceAvailableMb(candidateDev);
@@ -1308,17 +1308,17 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
           }
 
           // -- FALLBACK ESTRITO: manter compatibilidade de modo --
-          // Diários (8024/8025/8023) ? só fallback para outras portas diárias (NUNCA 8077 nem 8777)
-          // Semanais/Mensais/Ilimitados (8077) ? só fallback para portas não-diárias e não-8777
+          // Diï¿½rios (8024/8025/8023) ? sï¿½ fallback para outras portas diï¿½rias (NUNCA 8077 nem 8777)
+          // Semanais/Mensais/Ilimitados (8077) ? sï¿½ fallback para portas nï¿½o-diï¿½rias e nï¿½o-8777
           // Saldo (8777) ? sem fallback
           const isOrderDaily = modoOrder === 'diario' || modoOrder === '24hrs' || modoOrder === '24h';
           const candidateIsDaily = candidatePort !== 8077 && candidatePort !== 8777;
           if (modoOrder !== 'saldo' && modoOrder !== 'credito' && candidatePort !== 8777) {
-            // Pedido diário ? candidato deve ser porta diária (não 8077)
-            if (isOrderDaily && !candidateIsDaily) continue; // ? BLOQUEAR 8077 para pedidos diários
-            // Pedido semanal/mensal ? candidato deve ser porta não-diária (8077 ou similar)
+            // Pedido diï¿½rio ? candidato deve ser porta diï¿½ria (nï¿½o 8077)
+            if (isOrderDaily && !candidateIsDaily) continue; // ? BLOQUEAR 8077 para pedidos diï¿½rios
+            // Pedido semanal/mensal ? candidato deve ser porta nï¿½o-diï¿½ria (8077 ou similar)
             if (!isOrderDaily && candidateIsDaily && candidatePort !== port) {
-              // aceitar só se não houver opção 8077 apta (já verificado acima)
+              // aceitar sï¿½ se nï¿½o houver opï¿½ï¿½o 8077 apta (jï¿½ verificado acima)
             }
             // FIX: So aceitar fallback com saldo suficiente
             if (!fallbackDev && cHasSaldo) {
@@ -1357,24 +1357,24 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
 
           console.log(`?? [REDIRECIONAMENTO] Pedido ${orderId} redirecionado: Porta ${port} (cheia/sem saldo) ? Porta ${fallbackPort} (apta)`);
 
-          // Notificar o grupo de notificações sobre o redirecionamento
+          // Notificar o grupo de notificaï¿½ï¿½es sobre o redirecionamento
           if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *REDIRECIONAMENTO AUTOMÁTICO DE PEDIDO*\n` +
+              `?? *REDIRECIONAMENTO AUTOMï¿½TICO DE PEDIDO*\n` +
               `??????????????????\n` +
               `?? *Ref:* \`${orderId}\`\n` +
               `?? *Destino:* *${order.numero}*\n` +
               `?? *Volume:* *${volStr}*\n` +
               `?? *Porta Original:* Celular ${port} (Sem saldo / Limite atingido)\n` +
-              `? *Redirecionado Para:* Celular ${fallbackPort} (Disponível)\n` +
+              `? *Redirecionado Para:* Celular ${fallbackPort} (Disponï¿½vel)\n` +
               `?? *Hora:* ${horaAgora}\n` +
               `??????????????????\n` +
-              `?? O pedido será processado automaticamente pelo celular alternativo.`
+              `?? O pedido serï¿½ processado automaticamente pelo celular alternativo.`
             );
           }
-          break; // só redirecionar 1 por vez
+          break; // sï¿½ redirecionar 1 por vez
         } else {
-          // Nenhuma porta disponível para este modo — avisar grupo (1x por pedido)
+          // Nenhuma porta disponï¿½vel para este modo ï¿½ avisar grupo (1x por pedido)
           // FIX DEADLOCK: Garantir que o pedido fica em 'pending' com targetPort=null
           // para que qualquer porta que recarregue saldo possa pega-lo imediatamente.
           order.status = 'pending';
@@ -1388,19 +1388,19 @@ app.get(['/api/devices/:port/health', '/:port/health'], (req, res) => {
             const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
             if (baileysEngine && typeof baileysEngine.enviarErroGrupo === 'function') {
               baileysEngine.enviarErroGrupo(
-                `?? *PEDIDO EM ESPERA — SEM CELULAR DISPONÍVEL* ??\n` +
+                `?? *PEDIDO EM ESPERA ï¿½ SEM CELULAR DISPONï¿½VEL* ??\n` +
                 `??????????????????\n` +
                 `?? *Ref:* \`${orderId}\`\n` +
                 `?? *Destino:* *${order.numero}*\n` +
                 `?? *Volume:* *${volStr}*\n` +
-                `?? *Porta Necessária:* Celular ${port}\n` +
+                `?? *Porta Necessï¿½ria:* Celular ${port}\n` +
                 `?? *Hora:* ${horaAgora}\n` +
                 `??????????????????\n` +
-                `?? Todos os celulares disponíveis para este tipo de pacote estão sem saldo ou atingiram o limite.\n` +
-                `?? *Solução:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cartões.`
+                `?? Todos os celulares disponï¿½veis para este tipo de pacote estï¿½o sem saldo ou atingiram o limite.\n` +
+                `?? *Soluï¿½ï¿½o:* Abra o *Slim SIM Card* para zerar os contadores ou troque os cartï¿½es.`
               );
             }
-            console.log(`?? [SEM FALLBACK] Pedido ${orderId} (${volStr}) em espera — nenhum celular disponível para Porta ${port}.`);
+            console.log(`?? [SEM FALLBACK] Pedido ${orderId} (${volStr}) em espera ï¿½ nenhum celular disponï¿½vel para Porta ${port}.`);
           }
           break;
         }
@@ -1434,15 +1434,15 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   const port = Number(req.params.port);
   const currentDev = inMemoryDevices[port] || {};
 
-  // Preservar pending_order existente se o heartbeat não enviou pending_order explicitamente
+  // Preservar pending_order existente se o heartbeat nï¿½o enviou pending_order explicitamente
   let pendingOrder = currentDev.pending_order;
   if ('pending_order' in req.body) {
     pendingOrder = req.body.pending_order;
   }
 
   // -- FIX SALDO NULL: Nunca sobrescrever saldo conhecido com null/undefined --
-  // O app Android envia null quando o saldo ainda não foi consultado via USSD.
-  // Preservar o último saldo real para não confundir o roteador de pedidos.
+  // O app Android envia null quando o saldo ainda nï¿½o foi consultado via USSD.
+  // Preservar o ï¿½ltimo saldo real para nï¿½o confundir o roteador de pedidos.
   const bodyClean = { ...req.body };
 
   const reqStatusLic = (req.body?.license_id || req.headers['x-license-id'] || req.query.license_id || '').trim();
@@ -1450,28 +1450,28 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   if (reqStatusLic) bodyClean.licenseId = reqStatusLic;
   if (reqStatusMode) bodyClean.operationMode = reqStatusMode;
 
-  // -- REGRA OBRIGATÓRIA PORTA 8077: Apenas 1 Cartão SIM (SIM 1) --
+  // -- REGRA OBRIGATï¿½RIA PORTA 8077: Apenas 1 Cartï¿½o SIM (SIM 1) --
   if (port === 8077) {
     bodyClean.sim2_saldo_mb = 0;
     bodyClean.sim2_envios = 0;
     bodyClean.active_sim_slot = 1;
-    bodyClean.carrier = 'Vodacom (1 Cartão - SIM 1)';
+    bodyClean.carrier = 'Vodacom (1 Cartï¿½o - SIM 1)';
   }
 
   const saldoFields = ['sim1_saldo_mb', 'sim2_saldo_mb', 'saldo_mb'];
   for (const field of saldoFields) {
     if (field in bodyClean && (bodyClean[field] === null || bodyClean[field] === undefined || bodyClean[field] < 0)) {
-      // Manter o valor anterior se existir; caso contrário remover para não poluir
+      // Manter o valor anterior se existir; caso contrï¿½rio remover para nï¿½o poluir
       if (currentDev[field] !== null && currentDev[field] !== undefined && currentDev[field] >= 0) {
         bodyClean[field] = currentDev[field]; // preservar saldo real anterior
       } else {
-        delete bodyClean[field]; // nunca havia saldo, não definir
+        delete bodyClean[field]; // nunca havia saldo, nï¿½o definir
       }
     }
   }
 
-  // Se o operador definiu o saldo manualmente pelo painel nos últimos 5 minutos,
-  // não deixar o celular sobrescrever com saldo menor/sem_saldo antes que o novo saldo seja aplicado
+  // Se o operador definiu o saldo manualmente pelo painel nos ï¿½ltimos 5 minutos,
+  // nï¿½o deixar o celular sobrescrever com saldo menor/sem_saldo antes que o novo saldo seja aplicado
   const isManualOverride = currentDev.manual_saldo_override && (Date.now() - currentDev.manual_saldo_override < 300000);
   if (isManualOverride) {
     if (bodyClean.sim1_saldo_mb !== undefined && bodyClean.sim1_saldo_mb < 100 && (currentDev.sim1_saldo_mb || 0) >= 100) {
@@ -1506,7 +1506,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
   // -- FIX PEDIDOS FANTASMA: TTL de 10 min para pedidos presos em 'assigned'/'processing' --
   // Se o celular pegou o pedido mas nunca reportou resultado (crash, offline, etc.),
-  // o pedido fica travado. Após 10 min sem resultado, volta automaticamente para 'pending'.
+  // o pedido fica travado. Apï¿½s 10 min sem resultado, volta automaticamente para 'pending'.
   const PROCESSING_TTL_MS = 10 * 60 * 1000; // 10 minutos
   for (const [orderId, order] of inMemoryOrders.entries()) {
     if ((order.status === 'assigned' || order.status === 'processing') &&
@@ -1517,12 +1517,12 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.assignedToPort = null;
         order.processingAt = null;
         order.targetPort = null;
-        order.lastError = `Timeout: celular porta ${port} não reportou resultado em ${Math.round(processingAge/60000)}min`;
+        order.lastError = `Timeout: celular porta ${port} nï¿½o reportou resultado em ${Math.round(processingAge/60000)}min`;
         order.retryCount = (order.retryCount || 0) + 1;
         order.notified = false;
         order.groupNotified = false;
         saveOrdersToCache();
-        console.warn(`? [TIMEOUT PEDIDO] Pedido ${orderId} estava em ${order.status} na Porta ${port} há ${Math.round(processingAge/60000)}min sem resultado. Devolvido à fila.`);
+        console.warn(`? [TIMEOUT PEDIDO] Pedido ${orderId} estava em ${order.status} na Porta ${port} hï¿½ ${Math.round(processingAge/60000)}min sem resultado. Devolvido ï¿½ fila.`);
       }
     }
   }
@@ -1534,13 +1534,13 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const order = inMemoryOrders.get(resId);
     let success = !!req.body.last_result.success;
     const resMsg = String(req.body.last_result.result || req.body.last_result.mensagem || req.body.last_result.error || '').toLowerCase();
-    const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
-                            (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
+    const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mï¿½nim')) &&
+                            (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferï¿½ncia') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
     const isTudoTopOrOffer = (
       resMsg.includes('recebeu') && (
         resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
-        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
-        resMsg.includes('validas') || resMsg.includes('válidas') ||
+        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('vï¿½lidos') ||
+        resMsg.includes('validas') || resMsg.includes('vï¿½lidas') ||
         resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote') ||
         resMsg.includes('dados') || resMsg.includes('mensal') || resMsg.includes('semanal')
       )
@@ -1548,16 +1548,16 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     resMsg.includes('dados mensal') || resMsg.includes('dados semanal') ||
     resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
     const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
-                          resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
+                          resMsg.includes('transferencia') || resMsg.includes('transferï¿½ncia') || resMsg.includes('tranferencia') ||
                           resMsg.includes('mmi') || resMsg.includes('concluid') || resMsg.includes('sucesso') ||
                           resMsg.includes('transferiste') || resMsg.includes('transferiu');
     const isErrorText = !isVodacomZeroMb && !isTudoTopOrOffer && (
       resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
-      resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
+      resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('invï¿½lido')
     );
     const isParcialReported = !!(req.body.last_result && req.body.last_result.parcial);
     if (!success && isSuccessText && !isErrorText && !isParcialReported) {
-      console.log(`? [USSD AUTO-OVERRIDE] Resposta contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
+      console.log(`? [USSD AUTO-OVERRIDE] Resposta contï¿½m confirmaï¿½ï¿½o Tudo Top/0MB/Transferï¿½ncia ('${resMsg}'). Marcando como SUCESSO!`);
       success = true;
       req.body.last_result.success = true;
     }
@@ -1566,7 +1566,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     const volStr = rawQty < 1024 ? `${rawQty} MB` : `${(rawQty / 1024).toFixed(rawQty % 1024 === 0 ? 0 : 1)} GB`;
     const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
 
-    // Resolver JID do cliente com máxima resiliência (do pedido em cache, do body ou do histórico Baileys)
+    // Resolver JID do cliente com mï¿½xima resiliï¿½ncia (do pedido em cache, do body ou do histï¿½rico Baileys)
     let clientJid = (order && order.jid) || req.body.last_result.jid || null;
     if (!clientJid && resId && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
       clientJid = baileysEngine.getJidForOrder(resId);
@@ -1597,7 +1597,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
 
         const isGroup = clientJid && clientJid.endsWith('@g.us');
         
-        // Validação rigorosa: NUNCA usar LID como menção de número
+        // Validaï¿½ï¿½o rigorosa: NUNCA usar LID como menï¿½ï¿½o de nï¿½mero
         let realPhone = null;
         const cleanSenderDigits = String(rawSender).replace(/\D/g, '');
         if (cleanSenderDigits.length === 12 && cleanSenderDigits.startsWith('258') && /^2588[2-7]\d{7}$/.test(cleanSenderDigits)) {
@@ -1606,7 +1606,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           realPhone = '258' + cleanSenderDigits;
         }
 
-        // Se o remetente for LID (sem telefone limpo direto), usar o número ativado (targetNum) para mencionar o comprador
+        // Se o remetente for LID (sem telefone limpo direto), usar o nï¿½mero ativado (targetNum) para mencionar o comprador
         if (!realPhone && targetNum) {
           const cleanTarget = String(targetNum).replace(/\D/g, '');
           if (cleanTarget.length === 9 && /^8[2-7]\d{7}$/.test(cleanTarget)) {
@@ -1636,7 +1636,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         const valorLinha = valorPago ? `?? *Valor:* *${valorPago} MT*\n` : '';
         const cleanRef = (order && (order.txn_id || order.sms_ref)) || (String(resId).startsWith('WA-') ? String(resId).split('-')[1] : resId);
 
-        // -- ?? NOTIFICAÇÃO ESPECÍFICA DE PACOTES EM PARTES (SPLIT) --
+        // -- ?? NOTIFICAï¿½ï¿½O ESPECï¿½FICA DE PACOTES EM PARTES (SPLIT) --
         if (order && order.isSplit && order.splitPart === 1) {
           const part1Mb = Number(order.quantidade) || 0;
           const part1Str = part1Mb < 1024 ? `${part1Mb} MB` : `${(part1Mb / 1024).toFixed(part1Mb % 1024 === 0 ? 0 : 1)} GB`;
@@ -1646,7 +1646,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           const totalStr = totalMb < 1024 ? `${totalMb} MB` : `${(totalMb / 1024).toFixed(totalMb % 1024 === 0 ? 0 : 1)} GB`;
 
           const msgParte1 = (
-            `?? *1ª PARTE ENTREGUE (1/2)* ?\n` +
+            `?? *1ï¿½ PARTE ENTREGUE (1/2)* ?\n` +
             `??????????????????\n` +
             saudacao +
             `? *Entregue agora:* *${part1Str}*\n` +
@@ -1655,22 +1655,22 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             valorLinha +
             `?? *Ref:* \`${cleanRef}\`\n` +
             `??????????????????\n` +
-            `?? _A 2ª parte já está a ser processada e entra em instantes!_`
+            `?? _A 2ï¿½ parte jï¿½ estï¿½ a ser processada e entra em instantes!_`
           );
 
           try {
             baileysEngine.sendTextMessage(clientJid, msgParte1, { mentions: mentionsList })
-              .catch(errSend => console.error(`? [NOTIFICAÇÃO WA PARTE 1 ERRO]:`, errSend.message));
-            console.log(`?? [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de 1ª PARTE (${part1Str} de ${totalStr}) no pedido ${resId}`);
+              .catch(errSend => console.error(`? [NOTIFICAï¿½ï¿½O WA PARTE 1 ERRO]:`, errSend.message));
+            console.log(`?? [NOTIFICAï¿½ï¿½O WA] Cliente ${clientJid} notificado de 1ï¿½ PARTE (${part1Str} de ${totalStr}) no pedido ${resId}`);
           } catch(errSendSync) {
-            console.error(`? [NOTIFICAÇÃO WA PARTE 1 CRASH]:`, errSendSync.message);
+            console.error(`? [NOTIFICAï¿½ï¿½O WA PARTE 1 CRASH]:`, errSendSync.message);
           }
         } else {
-          let headerConclusao = `? *RECARGA CONCLUÍDA* ?\n`;
+          let headerConclusao = `? *RECARGA CONCLUï¿½DA* ?\n`;
           let pacoteLinha = `?? *Pacote:* *${volStr}*${modoBadge}\n`;
 
           if (order && order.isSplit && order.splitPart === 2) {
-            headerConclusao = `? *RECARGA 100% CONCLUÍDA (2/2)* ?\n`;
+            headerConclusao = `? *RECARGA 100% CONCLUï¿½DA (2/2)* ?\n`;
             pacoteLinha = `?? *Pacote Total:* *${volStr}*${modoBadge} _(Entregue em 2 partes)_\n`;
           }
 
@@ -1688,21 +1688,21 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
               `_Obrigado por escolher a Axion!_`,
               { mentions: mentionsList }
             ).catch(errSend => {
-              console.error(`? [NOTIFICAÇÃO WA ERRO] Falha ao enviar para ${clientJid}:`, errSend.message);
+              console.error(`? [NOTIFICAï¿½ï¿½O WA ERRO] Falha ao enviar para ${clientJid}:`, errSend.message);
             });
-            console.log(`?? [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
+            console.log(`?? [NOTIFICAï¿½ï¿½O WA] Cliente ${clientJid} notificado de SUCESSO (${modoStr}) no pedido ${resId}`);
           } catch(errSendSync) {
-            console.error(`? [NOTIFICAÇÃO WA CRASH]:`, errSendSync.message);
+            console.error(`? [NOTIFICAï¿½ï¿½O WA CRASH]:`, errSendSync.message);
           }
         }
       } else {
         // ??? NUNCA enviar mensagem de aviso de instabilidade ao cliente no WhatsApp!
         // O reenvio acontece automaticamente no background. Enviar aviso assusta o cliente, que exige reembolso.
-        console.log(`?? [RETRY SILENCIOSO] Instabilidade temporária no pedido ${resId}. Cliente não notificado para evitar falsos alarmes.`);
+        console.log(`?? [RETRY SILENCIOSO] Instabilidade temporï¿½ria no pedido ${resId}. Cliente nï¿½o notificado para evitar falsos alarmes.`);
       }
     }
 
-    // -- NOTIFICAÇÕES PARA OS GRUPOS DO SISTEMA (Anti-duplicação) --
+    // -- NOTIFICAï¿½ï¿½ES PARA OS GRUPOS DO SISTEMA (Anti-duplicaï¿½ï¿½o) --
     if (order) {
       const isParcial = !!(req.body.last_result && req.body.last_result.parcial) || (!success && Number(req.body.last_result.quantidade) > 0 && Number(req.body.last_result.quantidade) < (Number(req.body.last_result.quantidade_solicitada) || Number(order.quantidade) || 0));
       const qtdEntregue = Number(req.body.last_result.quantidade) || 0;
@@ -1712,14 +1712,14 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.status = 'completed';
         order.completedAt = new Date().toISOString();
         order.lastError = null;
-        console.log(`?? [PEDIDO SUCESSO] Pedido ${resId} concluído com sucesso pelo Celular Porta ${port}!`);
+        console.log(`?? [PEDIDO SUCESSO] Pedido ${resId} concluï¿½do com sucesso pelo Celular Porta ${port}!`);
         decrementDeviceSaldo(port, order);
 
         if (smsSalesEngine) {
           smsSalesEngine.notifyOrderCompleted(order);
         }
 
-        // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
+        // Se este pedido foi a Parte 1 de uma divisï¿½o inteligente, liberar a Parte 2 na fila
         if (order.isSplit && order.splitPart === 1 && order.part2Id) {
           const part2Order = inMemoryOrders.get(order.part2Id);
           if (part2Order && part2Order.status === 'waiting_part1') {
@@ -1729,7 +1729,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           }
         }
       } else if (isParcial && qtdEntregue > 0 && qtdPedida > qtdEntregue) {
-        // ?? ENVIO PARCIAL CONCLUÍDO NO CELULAR: A primeira parte foi entregue!
+        // ?? ENVIO PARCIAL CONCLUï¿½DO NO CELULAR: A primeira parte foi entregue!
         const diffMb = qtdPedida - qtdEntregue;
         order.status = 'completed';
         order.quantidade = qtdEntregue;
@@ -1740,11 +1740,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           smsSalesEngine.notifyOrderCompleted(order);
         }
 
-        // ??? REGRA VODACOM: O envio mínimo por USSD é 100MB!
-        // Se a diferença for insignificante (< 50MB, ex: 23MB de 1001MB entregues num pedido de 1024MB):
-        // O cliente já recebeu ~98% do pacote (1GB). Não criar pedido de 23MB que ficaria preso na fila!
+        // ??? REGRA VODACOM: O envio mï¿½nimo por USSD ï¿½ 100MB!
+        // Se a diferenï¿½a for insignificante (< 50MB, ex: 23MB de 1001MB entregues num pedido de 1024MB):
+        // O cliente jï¿½ recebeu ~98% do pacote (1GB). Nï¿½o criar pedido de 23MB que ficaria preso na fila!
         if (diffMb < 50) {
-          console.log(`? [PARCIAL QUASE TOTAL] Pedido ${resId} entregou ${qtdEntregue}MB de ${qtdPedida}MB. Diferença de apenas ${diffMb}MB (< 50MB tolerância). Pedido considerado 100% satisfeito!`);
+          console.log(`? [PARCIAL QUASE TOTAL] Pedido ${resId} entregou ${qtdEntregue}MB de ${qtdPedida}MB. Diferenï¿½a de apenas ${diffMb}MB (< 50MB tolerï¿½ncia). Pedido considerado 100% satisfeito!`);
         } else {
           // Se faltar >= 50MB e < 100MB, arredondar para 100MB para que a operadora aceite o USSD!
           const restanteMb = diffMb < 100 ? 100 : diffMb;
@@ -1756,7 +1756,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             numero: order.numero,
             quantidade: restanteMb,
           modo: order.modo || 'diario',
-          input_val: '', // ?? Limpar input_val para que envie estritamente a diferença restante (restanteMb)
+          input_val: '', // ?? Limpar input_val para que envie estritamente a diferenï¿½a restante (restanteMb)
           jid: order.jid || null,
           sender: order.sender || null,
           senderPhone: order.senderPhone || null,
@@ -1781,9 +1781,9 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           groupNotified: false
         };
         inMemoryOrders.set(restanteId, orderRestante);
-        console.log(`?? [ENVIO PARCIAL REGISTADO] Pedido ${resId} entregou ${qtdEntregue}MB. Criado pedido ${restanteId} de ${restanteMb}MB na fila para conclusão!`);
+        console.log(`?? [ENVIO PARCIAL REGISTADO] Pedido ${resId} entregou ${qtdEntregue}MB. Criado pedido ${restanteId} de ${restanteMb}MB na fila para conclusï¿½o!`);
 
-        // Notificar cliente da 1ª parte parcial entregue no WhatsApp
+        // Notificar cliente da 1ï¿½ parte parcial entregue no WhatsApp
         if (clientJid && baileysEngine) {
           const part1Str = qtdEntregue < 1024 ? `${qtdEntregue} MB` : `${(qtdEntregue / 1024).toFixed(qtdEntregue % 1024 === 0 ? 0 : 1)} GB`;
           const part2Str = restanteMb < 1024 ? `${restanteMb} MB` : `${(restanteMb / 1024).toFixed(restanteMb % 1024 === 0 ? 0 : 1)} GB`;
@@ -1811,7 +1811,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           const valorLinha = valorPago ? `?? *Valor:* *${valorPago} MT*\n` : '';
 
           const msgParcial = (
-            `?? *1ª PARTE ENTREGUE (1/2)* ?\n` +
+            `?? *1ï¿½ PARTE ENTREGUE (1/2)* ?\n` +
             `??????????????????\n` +
             saudacao +
             `? *Entregue agora:* *${part1Str}*\n` +
@@ -1820,7 +1820,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
             valorLinha +
             `?? *Ref:* \`${cleanRef}\`\n` +
             `??????????????????\n` +
-            `?? _A 2ª parte já está na fila para envio imediato por outro terminal!_`
+            `?? _A 2ï¿½ parte jï¿½ estï¿½ na fila para envio imediato por outro terminal!_`
           );
 
           baileysEngine.sendTextMessage(clientJid, msgParcial, { mentions: mentionsList })
@@ -1834,10 +1834,10 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         order.failedPorts = order.failedPorts || [];
         if (!order.failedPorts.includes(port)) order.failedPorts.push(port);
 
-        // ??? PROTEÇÃO ANTI-DUPLICAÇÃO FINANCEIRA:
-        // Apenas repassar para outra porta se o celular reportou que NÃO TINHA SALDO ou limite atingido.
-        // NUNCA fazer reenvio automático se o celular chegou a discar USSD e deu timeout ou falha de leitura,
-        // pois a Vodacom frequentemente conclui o envio mesmo com timeout! Reenvio só manual pelo operador.
+        // ??? PROTEï¿½ï¿½O ANTI-DUPLICAï¿½ï¿½O FINANCEIRA:
+        // Apenas repassar para outra porta se o celular reportou que Nï¿½O TINHA SALDO ou limite atingido.
+        // NUNCA fazer reenvio automï¿½tico se o celular chegou a discar USSD e deu timeout ou falha de leitura,
+        // pois a Vodacom frequentemente conclui o envio mesmo com timeout! Reenvio sï¿½ manual pelo operador.
         const errorLower = errorMsg.toLowerCase();
         const isSaldoError = errorLower.includes('saldo') || errorLower.includes('limite') || errorLower.includes('inapto') || errorLower.includes('insuficiente');
 
@@ -1852,7 +1852,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         } else {
           order.status = 'failed';
           order.completedAt = new Date().toISOString();
-          console.warn(`?? [PROTEÇÃO ANTI-REPETIÇÃO] Pedido ${resId} marcado como falhado (${errorMsg}) para evitar repetição acidental de saldo. Reenvio apenas se o operador solicitar no painel.`);
+          console.warn(`?? [PROTEï¿½ï¿½O ANTI-REPETIï¿½ï¿½O] Pedido ${resId} marcado como falhado (${errorMsg}) para evitar repetiï¿½ï¿½o acidental de saldo. Reenvio apenas se o operador solicitar no painel.`);
 
           // Se a Parte 1 falhou, cancelar a Parte 2
           if (order.isSplit && order.splitPart === 1 && order.part2Id) {
@@ -1861,7 +1861,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
               part2Order.status = 'cancelled';
               part2Order.completedAt = new Date().toISOString();
               part2Order.lastError = 'Cancelado devido a falha na Parte 1';
-              console.warn(`?? [PARTE 2 CANCELADA] Parte 2 ${part2Order.id} cancelada devido à falha da Parte 1.`);
+              console.warn(`?? [PARTE 2 CANCELADA] Parte 2 ${part2Order.id} cancelada devido ï¿½ falha da Parte 1.`);
             }
           }
         }
@@ -1886,7 +1886,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
     }
 
     // ?? REGISTAR COMPRA NO SISTEMA DE FIDELIDADE & TXENECO
-    // REGRA FUNDAMENTAL: O cliente é EXCLUSIVAMENTE quem compra (envia comprovativo / paga), NUNCA o destinatário que apenas recebe os Megas!
+    // REGRA FUNDAMENTAL: O cliente ï¿½ EXCLUSIVAMENTE quem compra (envia comprovativo / paga), NUNCA o destinatï¿½rio que apenas recebe os Megas!
     // Evitar registrar 2x se for a Parte 2 de um pedido dividido (split)
     const isSplitPart2 = !!(order && order.isSplit && order.splitPart === 2);
     if (success && !isSplitPart2) {
@@ -1969,7 +1969,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
         if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
           if (order && order.isSplit && order.splitPart === 1) {
             baileysEngine.enviarNotificacaoGrupo(
-              `? *1ª PARTE ENTREGUE (1/2)* ??\n` +
+              `? *1ï¿½ PARTE ENTREGUE (1/2)* ??\n` +
               `??????????????????\n` +
               `?? *Ref:* \`${resId}\`\n` +
               `?? *Destino:* *${targetNum}*\n` +
@@ -1977,11 +1977,11 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
               `?? *Porta:* Celular ${port}\n` +
               `?? *Hora:* ${horaAgora}\n` +
               `??????????????????\n` +
-              `? *Status:* 1ª parte entregue! 2ª parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
+              `? *Status:* 1ï¿½ parte entregue! 2ï¿½ parte (${order.splitOtherPartMb} MB) liberada para envio imediato.`
             );
           } else if (order && order.isSplit && order.splitPart === 2) {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *PACOTE 100% CONCLUÍDO (2/2)* ??\n` +
+              `?? *PACOTE 100% CONCLUï¿½DO (2/2)* ??\n` +
               `??????????????????\n` +
               `?? *Ref:* \`${resId}\`\n` +
               `?? *Destino:* *${targetNum}*\n` +
@@ -2001,7 +2001,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
               `?? *Porta:* Celular ${port}\n` +
               `?? *Hora:* ${horaAgora}\n` +
               `??????????????????\n` +
-              `? *Status:* Concluído e confirmado pela operadora`
+              `? *Status:* Concluï¿½do e confirmado pela operadora`
             );
           }
         }
@@ -2011,15 +2011,15 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
           baileysEngine.enviarErroGrupo(
             `?? *ERRO DETECTADO [NORMAL]* ??\n` +
             `??????????????????\n` +
-            `?? *Referência:* \`${resId}\`\n` +
-            `?? *Número:* *${targetNum}*\n` +
+            `?? *Referï¿½ncia:* \`${resId}\`\n` +
+            `?? *Nï¿½mero:* *${targetNum}*\n` +
             `?? *Tipo:* ${(order && order.modo) || 'diario'}${order && order.isSplit ? ` (Parte ${order.splitPart}/2)` : ''}\n` +
             `?? *Porta:* Celular ${port}\n` +
             `?? *Volume:* ${volStr}\n` +
             `?? *Data/Hora:* ${horaAgora}\n` +
             `? *Erro:* ${errMsg}\n` +
             `??????????????????\n` +
-            `?? *Status:* Aguardando verificação / intervenção manual`
+            `?? *Status:* Aguardando verificaï¿½ï¿½o / intervenï¿½ï¿½o manual`
           );
         }
       }
@@ -2033,7 +2033,7 @@ app.post(['/api/devices/:port/status', '/api/devices/:port/heartbeat'], (req, re
   return res.json({ success: true, timestamp: new Date().toISOString() });
 });
 
-// Endpoint para o Aplicativo Android buscar transferências pendentes (sem cabo)
+// Endpoint para o Aplicativo Android buscar transferï¿½ncias pendentes (sem cabo)
 app.get('/api/devices/:port/tasks', async (req, res) => {
   const port = Number(req.params.port);
   
@@ -2042,7 +2042,7 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
     inMemoryDevices[port].lastSeen = new Date().toISOString();
   }
 
-  // Buscar próximo pedido pendente para esta porta ou genérico
+  // Buscar prï¿½ximo pedido pendente para esta porta ou genï¿½rico
   let task = null;
   const isPortDaily = isDailyPort(port);
 
@@ -2051,9 +2051,9 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
       const modo = (order.modo || 'diario').toLowerCase().trim();
       const isOrderDaily = modo === 'diario' || modo === '24hrs' || modo === '24h';
 
-      // ?? REGRA ESTRITA: Porta 8077 NUNCA pode pegar pedidos diários!
+      // ?? REGRA ESTRITA: Porta 8077 NUNCA pode pegar pedidos diï¿½rios!
       if (port === 8077 && isOrderDaily) continue;
-      // ?? REGRA ESTRITA: Portas diárias NUNCA podem pegar pedidos semanais, mensais ou saldo!
+      // ?? REGRA ESTRITA: Portas diï¿½rias NUNCA podem pegar pedidos semanais, mensais ou saldo!
       if (isPortDaily && !isOrderDaily) continue;
 
       if (!order.targetPort || order.targetPort === port) {
@@ -2074,19 +2074,19 @@ app.get('/api/devices/:port/tasks', async (req, res) => {
   return res.json({ hasTask: false });
 });
 
-// Endpoint para o Aplicativo Android confirmar conclusão de USSD
+// Endpoint para o Aplicativo Android confirmar conclusï¿½o de USSD
 app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   const { port, orderId } = req.params;
   let { success, mensagem, saldo_mb } = req.body;
 
   const resMsg = String(mensagem || '').toLowerCase();
-  const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mínim')) &&
-                          (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
+  const isVodacomZeroMb = (resMsg.includes('0mb') || resMsg.includes('0 mb') || resMsg.includes('minim') || resMsg.includes('mï¿½nim')) &&
+                          (resMsg.includes('tranferencia') || resMsg.includes('transferencia') || resMsg.includes('transferï¿½ncia') || resMsg.includes('ficar com') || resMsg.includes('obrigado'));
   const isTudoTopOrOffer = (
       resMsg.includes('recebeu') && (
         resMsg.includes('tudo top') || resMsg.includes('minutos') || resMsg.includes('sms') ||
-        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('válidos') ||
-        resMsg.includes('validas') || resMsg.includes('válidas') ||
+        resMsg.includes('ilimitad') || resMsg.includes('validos') || resMsg.includes('vï¿½lidos') ||
+        resMsg.includes('validas') || resMsg.includes('vï¿½lidas') ||
         resMsg.includes('mb') || resMsg.includes('gb') || resMsg.includes('oferta') || resMsg.includes('pacote') ||
         resMsg.includes('dados') || resMsg.includes('mensal') || resMsg.includes('semanal')
       )
@@ -2095,25 +2095,25 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
     resMsg.includes('minutos e sms ilimitados') || resMsg.includes('ilimitados p/ todas redes');
   // Anti-falso positivo: 'mmi' aparece em dialogos de carregamento ("A executar codigo MMI...")
   // 'concluid'/'sucesso' sozinhos podem estar em msgs de ERRO ("Operacao nao concluida com sucesso")
-  const hasNegationServer = resMsg.includes('nao ') || resMsg.includes('não ') ||
+  const hasNegationServer = resMsg.includes('nao ') || resMsg.includes('nï¿½o ') ||
                             resMsg.includes('sem sucesso') || resMsg.includes('sem saldo') ||
-                            resMsg.includes('nao foi') || resMsg.includes('não foi');
+                            resMsg.includes('nao foi') || resMsg.includes('nï¿½o foi');
   const isSuccessText = isVodacomZeroMb || isTudoTopOrOffer ||
-                        resMsg.includes('transferencia') || resMsg.includes('transferência') || resMsg.includes('tranferencia') ||
+                        resMsg.includes('transferencia') || resMsg.includes('transferï¿½ncia') || resMsg.includes('tranferencia') ||
                         resMsg.includes('transferiste') || resMsg.includes('transferiu') ||
-                        (!hasNegationServer && (resMsg.includes('codigo mmi concluido') || resMsg.includes('código mmi concluído') ||
-                          resMsg.includes('mmi concluido') || resMsg.includes('mmi concluído'))) ||
+                        (!hasNegationServer && (resMsg.includes('codigo mmi concluido') || resMsg.includes('cï¿½digo mmi concluï¿½do') ||
+                          resMsg.includes('mmi concluido') || resMsg.includes('mmi concluï¿½do'))) ||
                         (!hasNegationServer && resMsg.includes('concluid') &&
                           (resMsg.includes('transferen') || resMsg.includes('envio') || resMsg.includes('pedido') || resMsg.includes('operac'))) ||
                         (!hasNegationServer && resMsg.includes('com sucesso') &&
                           (resMsg.includes('transferen') || resMsg.includes('pedido') || resMsg.includes('operac') || resMsg.includes('recarga')));
   const isErrorText = !isVodacomZeroMb && !isTudoTopOrOffer && (
     resMsg.includes('saldo insuficiente') || resMsg.includes('sem saldo') ||
-    resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('inválido')
+    resMsg.includes('atingiste o limite') || resMsg.includes('invalido') || resMsg.includes('invï¿½lido')
   );
   const isTaskParcial = !!(req.body.parcial || req.body.isParcial);
   if (!success && isSuccessText && !isErrorText && !isTaskParcial) {
-    console.log(`? [TASKS AUTO-OVERRIDE] Mensagem contém confirmação Tudo Top/0MB/Transferência ('${resMsg}'). Marcando como SUCESSO!`);
+    console.log(`? [TASKS AUTO-OVERRIDE] Mensagem contï¿½m confirmaï¿½ï¿½o Tudo Top/0MB/Transferï¿½ncia ('${resMsg}'). Marcando como SUCESSO!`);
     success = true;
   }
 
@@ -2151,7 +2151,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
         customerServices.registrarCompra(clientPhone, orderId, order.valor || order.valor_pago || 0, order.quantidade || 0);
       }
 
-      // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
+      // Se este pedido foi a Parte 1 de uma divisï¿½o inteligente, liberar a Parte 2 na fila
       if (order.isSplit && order.splitPart === 1 && order.part2Id) {
         const part2Order = inMemoryOrders.get(order.part2Id);
         if (part2Order && part2Order.status === 'waiting_part1') {
@@ -2161,7 +2161,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
         }
       }
 
-      // Notificar cliente no WhatsApp caso ainda não tenha sido notificado
+      // Notificar cliente no WhatsApp caso ainda nï¿½o tenha sido notificado
       if (!order.notified && baileysEngine) {
         let clientJid = order.jid || null;
         if (!clientJid && typeof baileysEngine.getJidForOrder === 'function') {
@@ -2208,7 +2208,7 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
             const totalStr = totalMb < 1024 ? `${totalMb} MB` : `${(totalMb / 1024).toFixed(totalMb % 1024 === 0 ? 0 : 1)} GB`;
 
             const msgParte1 = (
-              `?? *1ª PARTE ENTREGUE (1/2)* ?\n` +
+              `?? *1ï¿½ PARTE ENTREGUE (1/2)* ?\n` +
               `??????????????????\n` +
               saudacao +
               `? *Entregue agora:* *${part1Str}*\n` +
@@ -2217,22 +2217,22 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
               valorLinha +
               `?? *Ref:* \`${cleanRef}\`\n` +
               `??????????????????\n` +
-              `?? _A 2ª parte já está a ser processada e entra em instantes!_`
+              `?? _A 2ï¿½ parte jï¿½ estï¿½ a ser processada e entra em instantes!_`
             );
 
             try {
               baileysEngine.sendTextMessage(clientJid, msgParte1, { mentions: mentionsList })
-                .catch(e => console.error('? [NOTIFICAÇÃO WA PARTE 1 ERRO]:', e.message));
-              console.log(`?? [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de 1ª PARTE no pedido ${orderId}`);
+                .catch(e => console.error('? [NOTIFICAï¿½ï¿½O WA PARTE 1 ERRO]:', e.message));
+              console.log(`?? [NOTIFICAï¿½ï¿½O WA] Cliente ${clientJid} notificado de 1ï¿½ PARTE no pedido ${orderId}`);
             } catch(e) {
-              console.error('? [NOTIFICAÇÃO WA PARTE 1 CRASH]:', e.message);
+              console.error('? [NOTIFICAï¿½ï¿½O WA PARTE 1 CRASH]:', e.message);
             }
           } else {
-            let headerConclusao = `? *RECARGA CONCLUÍDA* ?\n`;
+            let headerConclusao = `? *RECARGA CONCLUï¿½DA* ?\n`;
             let pacoteLinha = `?? *Pacote:* *${volStr}*\n`;
 
             if (order && order.isSplit && order.splitPart === 2) {
-              headerConclusao = `? *RECARGA 100% CONCLUÍDA (2/2)* ?\n`;
+              headerConclusao = `? *RECARGA 100% CONCLUï¿½DA (2/2)* ?\n`;
               pacoteLinha = `?? *Pacote Total:* *${volStr}* _(Entregue em 2 partes)_\n`;
             }
 
@@ -2249,10 +2249,10 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
                 `?? *Consultar Saldo:* \`*100*03#\`\n` +
                 `_Obrigado por escolher a Axion!_`,
                 { mentions: mentionsList }
-              ).catch(e => console.error('? [NOTIFICAÇÃO WA ERRO]:', e.message));
-              console.log(`?? [NOTIFICAÇÃO WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
+              ).catch(e => console.error('? [NOTIFICAï¿½ï¿½O WA ERRO]:', e.message));
+              console.log(`?? [NOTIFICAï¿½ï¿½O WA] Cliente ${clientJid} notificado de SUCESSO no pedido ${orderId}`);
             } catch(e) {
-              console.error('? [NOTIFICAÇÃO WA CRASH]:', e.message);
+              console.error('? [NOTIFICAï¿½ï¿½O WA CRASH]:', e.message);
             }
           }
         }
@@ -2266,16 +2266,16 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
       const isSaldoError = errorLower.includes('saldo') || errorLower.includes('limite') ||
                            errorLower.includes('inapto') || errorLower.includes('insuficiente');
 
-      // ??? PROTECÇÃO ANTI-DUPLA ACTIVAÇÃO:
-      // Tudo Top, Mensal e Semanal disparam USSD que a Vodacom pode processar mesmo após timeout.
-      // NUNCA fazer retry automático nesses modos a não ser que o erro seja claramente "sem saldo".
+      // ??? PROTECï¿½ï¿½O ANTI-DUPLA ACTIVAï¿½ï¿½O:
+      // Tudo Top, Mensal e Semanal disparam USSD que a Vodacom pode processar mesmo apï¿½s timeout.
+      // NUNCA fazer retry automï¿½tico nesses modos a nï¿½o ser que o erro seja claramente "sem saldo".
       const modoOrder = String(order.modo || '').toLowerCase();
       const isHighValueMode = modoOrder === 'tudo_top' || modoOrder === 'ilimitado' ||
                               modoOrder === 'mensal' || modoOrder === 'semanal';
 
       const isTimeoutError = errorLower.includes('timeout') || errorLower.includes('sem resposta') || errorLower.includes('tempo limite') || errorLower.includes('falha ussd');
 
-      // Se for erro de saldo OU erro de timeout, repassar imediatamente para o próximo celular
+      // Se for erro de saldo OU erro de timeout, repassar imediatamente para o prï¿½ximo celular
       if ((isSaldoError || isTimeoutError) && (order.retryCount || 0) < 5) {
         order.status = 'pending';
         order.assignedToPort = null;
@@ -2306,27 +2306,37 @@ app.post('/api/devices/:port/tasks/:orderId/result', async (req, res) => {
   return res.json({ success: true });
 });
 
-// -- PERSISTÊNCIA DE PEDIDOS EM CACHE LOCAL --
+// -- PERSISTï¿½NCIA DE PEDIDOS EM CACHE LOCAL --
 const ORDERS_CACHE_FILE = path.resolve(__dirname, 'orders_cache.json');
+const ORDERS_SEED_FILE = path.resolve(__dirname, 'orders_seed.json');
 
 function saveOrdersToCache() {
   try {
     const list = Array.from(inMemoryOrders.entries()).slice(-2000);
     fs.writeFileSync(ORDERS_CACHE_FILE, JSON.stringify(list), 'utf8');
-  } catch(e) { console.error('? [CACHE] Falha ao gravar orders_cache.json:', e.message); }
+  } catch(e) { console.error('âŒ [CACHE] Falha ao gravar orders_cache.json:', e.message); }
 }
 
 function loadOrdersFromCache() {
   try {
+    let loadedCount = 0;
     if (fs.existsSync(ORDERS_CACHE_FILE)) {
       const data = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
-      if (Array.isArray(data)) {
-        data.forEach(([k, v]) => inMemoryOrders.set(k, v));
-        console.log(`?? [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histórico local.`);
+      if (Array.isArray(data) && data.length > 0) {
+        data.forEach(([k, v]) => { inMemoryOrders.set(k, v); loadedCount++; });
+        console.log(`ðŸ“¦ [CACHE PEDIDOS] ${inMemoryOrders.size} pedidos restaurados do histÃ³rico local.`);
       }
     }
-  } catch(e) { console.error('? [CACHE] Falha ao carregar orders_cache.json:', e.message); }
+    if (loadedCount === 0 && fs.existsSync(ORDERS_SEED_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ORDERS_SEED_FILE, 'utf8'));
+      if (Array.isArray(data)) {
+        data.forEach(([k, v]) => inMemoryOrders.set(k, v));
+        console.log(`ðŸŒ± [SEED PEDIDOS] ${inMemoryOrders.size} pedidos restaurados da semente permanente.`);
+      }
+    }
+  } catch(e) { console.error('âŒ [CACHE] Falha ao carregar orders_cache.json:', e.message); }
 }
+
 
 async function restoreAllDataFromFirestore() {
   if (!db) return;
@@ -2347,7 +2357,7 @@ async function restoreAllDataFromFirestore() {
           clientRemindersSent.add(`${orderId}_D0`);
         }
       });
-      console.log(`?? [FIRESTORE RESTORE] ${count} pedidos de vendas históricos restaurados do Firestore.`);
+      console.log(`?? [FIRESTORE RESTORE] ${count} pedidos de vendas histï¿½ricos restaurados do Firestore.`);
       saveOrdersToCache();
     }
   } catch (err) {
@@ -2377,7 +2387,7 @@ async function restoreAllDataFromFirestore() {
           countP++;
         }
       });
-      console.log(`?? [FIRESTORE RESTORE] ${countP} extratos de pagamentos históricos restaurados do Firestore.`);
+      console.log(`?? [FIRESTORE RESTORE] ${countP} extratos de pagamentos histï¿½ricos restaurados do Firestore.`);
       savePaymentsToCache();
     }
   } catch (err) {
@@ -2395,7 +2405,7 @@ async function restoreAllDataFromFirestore() {
           countPlans++;
         }
       });
-      console.log(`?? [FIRESTORE RESTORE] ${countPlans} planos agendados (faseado/renovável) ativos restaurados.`);
+      console.log(`?? [FIRESTORE RESTORE] ${countPlans} planos agendados (faseado/renovï¿½vel) ativos restaurados.`);
       saveScheduledPlans();
     }
   } catch (err) {
@@ -2441,7 +2451,7 @@ app.get('/api/orders', (req, res) => {
     const mbVal = Number(o.quantidade) || 0;
     const volStr = mbVal < 1024 ? `${mbVal}MB` : `${(mbVal/1024).toFixed(1)}GB`;
 
-    // Detectar pedidos potencialmente fantasmas (assigned há mais de 5 min sem resultado)
+    // Detectar pedidos potencialmente fantasmas (assigned hï¿½ mais de 5 min sem resultado)
     const isPhantom = (o.status === 'assigned' || o.status === 'processing') &&
                       processingSeconds !== null && processingSeconds > 300;
 
@@ -2498,10 +2508,10 @@ app.get('/api/orders', (req, res) => {
     orders: displayOrders,
     all_orders: allOrders,
     active,      // Em processamento agora
-    pending,     // À espera de celular
-    waiting,     // À espera da parte 1 (split)
+    pending,     // ï¿½ espera de celular
+    waiting,     // ï¿½ espera da parte 1 (split)
     completed: completed.slice(0, 10),
-    failed: failed.slice(0, 10),   // Últimos falhados
+    failed: failed.slice(0, 10),   // ï¿½ltimos falhados
     phantoms     // Pedidos potencialmente travados (>5min sem resultado)
   });
 });
@@ -2513,7 +2523,7 @@ app.post('/api/orders/:orderId/retry', (req, res) => {
   const order = inMemoryOrders.get(orderId);
 
   if (!order) {
-    return res.status(404).json({ success: false, mensagem: 'Pedido não encontrado na fila.' });
+    return res.status(404).json({ success: false, mensagem: 'Pedido nï¿½o encontrado na fila.' });
   }
 
   // Desocupar qualquer celular que estivesse com este pedido preso
@@ -2529,7 +2539,7 @@ app.post('/api/orders/:orderId/retry', (req, res) => {
   order.processingAt = null;
   order.completedAt = null;
   order.lastError = null;
-  order.createdAt = new Date().toISOString(); // Resetar TTL para não expirar imediatamente após retry
+  order.createdAt = new Date().toISOString(); // Resetar TTL para nï¿½o expirar imediatamente apï¿½s retry
   if (targetPort) {
     order.targetPort = targetPort;
   }
@@ -2562,7 +2572,7 @@ app.post(['/api/orders/:orderId/cancel', '/api/orders/:orderId/cancelar'], (req,
   return res.json({ success: true, mensagem: `Pedido ${orderId} cancelado.` });
 });
 
-// Marcar pedido manualmente como Concluído (quando a operadora concluiu no chip mas deu timeout na tela)
+// Marcar pedido manualmente como Concluï¿½do (quando a operadora concluiu no chip mas deu timeout na tela)
 app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (req, res) => {
   const { orderId } = req.params;
   let order = inMemoryOrders.get(orderId);
@@ -2592,7 +2602,7 @@ app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (re
     }
   }
 
-  // Se este pedido foi a Parte 1 de uma divisão inteligente, liberar a Parte 2 na fila
+  // Se este pedido foi a Parte 1 de uma divisï¿½o inteligente, liberar a Parte 2 na fila
   if (order.isSplit && order.splitPart === 1 && order.part2Id) {
     const part2Order = inMemoryOrders.get(order.part2Id);
     if (part2Order && part2Order.status === 'waiting_part1') {
@@ -2624,8 +2634,8 @@ app.post(['/api/orders/:orderId/complete', '/api/orders/:orderId/concluir'], (re
     customerServices.registrarCompra(clientPhone, orderId, order.valor || order.valor_pago || 0, order.quantidade || 0);
   }
 
-  console.log(`? [PAINEL] Pedido ${orderId} marcado manualmente como CONCLUÍDO pelo operador.`);
-  return res.json({ success: true, mensagem: `Pedido ${orderId} marcado com sucesso como CONCLUÍDO!`, order });
+  console.log(`? [PAINEL] Pedido ${orderId} marcado manualmente como CONCLUï¿½DO pelo operador.`);
+  return res.json({ success: true, mensagem: `Pedido ${orderId} marcado com sucesso como CONCLUï¿½DO!`, order });
 });
 
 app.post('/api/orders/clear', (req, res) => {
@@ -2658,34 +2668,46 @@ app.delete('/api/orders/:orderId', (req, res) => {
   const existed = inMemoryOrders.has(orderId);
   if (existed) inMemoryOrders.delete(orderId);
   saveOrdersToCache();
-  return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido não encontrado.' });
+  return res.json({ success: existed, message: existed ? `Pedido ${orderId} removido.` : 'Pedido nï¿½o encontrado.' });
 });
 
 // ------------------------------------------------------------------
-// ?? AXION ADMIN MASTER API: RELATÓRIOS & EXTRATO DE RECEBIMENTOS
+// ?? AXION ADMIN MASTER API: RELATï¿½RIOS & EXTRATO DE RECEBIMENTOS
 // ------------------------------------------------------------------
 
 // In-Memory Payments store for M-Pesa & e-Mola receipts
 const adminReceiptsHistory = [];
 const PAYMENTS_CACHE_FILE = path.resolve(__dirname, 'payments_cache.json');
+const PAYMENTS_SEED_FILE = path.resolve(__dirname, 'payments_seed.json');
 
 function savePaymentsToCache() {
   try {
     const keep = adminReceiptsHistory.slice(-200);
     fs.writeFileSync(PAYMENTS_CACHE_FILE, JSON.stringify(keep), 'utf8');
-  } catch(e) { console.error('? [CACHE] Falha ao salvar payments_cache.json:', e.message); }
+  } catch(e) { console.error('âŒ [CACHE] Falha ao salvar payments_cache.json:', e.message); }
 }
 
 function loadPaymentsFromCache() {
   try {
+    let loadedCount = 0;
     if (fs.existsSync(PAYMENTS_CACHE_FILE)) {
       const data = JSON.parse(fs.readFileSync(PAYMENTS_CACHE_FILE, 'utf8'));
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         adminReceiptsHistory.push(...data);
+        loadedCount = data.length;
+        console.log(`ðŸ“¦ [CACHE PAGAMENTOS] ${adminReceiptsHistory.length} comprovativos restaurados.`);
       }
     }
-  } catch(e) { console.error('? [CACHE] Falha ao carregar payments_cache.json:', e.message); }
+    if (loadedCount === 0 && fs.existsSync(PAYMENTS_SEED_FILE)) {
+      const data = JSON.parse(fs.readFileSync(PAYMENTS_SEED_FILE, 'utf8'));
+      if (Array.isArray(data)) {
+        adminReceiptsHistory.push(...data);
+        console.log(`ðŸŒ± [SEED PAGAMENTOS] ${adminReceiptsHistory.length} comprovativos restaurados da semente permanente.`);
+      }
+    }
+  } catch(e) { console.error('âŒ [CACHE] Falha ao carregar payments_cache.json:', e.message); }
 }
+
 loadPaymentsFromCache();
 
 // -- ENDPOINT DEDICADO: RECEBIMENTOS POR OPERADORA (M-Pesa vs e-Mola) --
@@ -2715,7 +2737,7 @@ app.get('/api/admin/recebimentos', async (req, res) => {
       }
     }
 
-    // Complementar com dados em memória
+    // Complementar com dados em memï¿½ria
     const mapAll = new Map();
     docs.forEach(p => mapAll.set(p.txn_id || p.id, p));
     inMemoryPayments.forEach((v, k) => { if (!mapAll.has(k)) mapAll.set(k, v); });
@@ -2738,7 +2760,7 @@ app.get('/api/admin/recebimentos', async (req, res) => {
       const val = Number(p.valor) || 0;
       const met = String(p.metodo || p.operadora || '').toLowerCase();
       const txn = p.txn_id || p.id || '';
-      // Detecção por campo metodo (fiável após fix) + fallback por prefixo txn_id
+      // Detecï¿½ï¿½o por campo metodo (fiï¿½vel apï¿½s fix) + fallback por prefixo txn_id
       const isEmola = met.includes('emola') || met.includes('e-mola')
         || /^(ID|PP26)/i.test(txn) && !met.includes('mpesa');
 
@@ -2788,11 +2810,11 @@ app.get('/api/admin/payments', async (req, res) => {
       if (ref) map.set(ref, p);
     });
 
-    // 2. Incluir pagamentos de SMS em memória
+    // 2. Incluir pagamentos de SMS em memï¿½ria
     inMemoryPayments.forEach((p, k) => {
       const ref = p.txn_id || p.id || k;
       if (ref) {
-        const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
+        const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cï¿½][aï¿½]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
         map.set(ref, {
           id: ref,
           ref,
@@ -2812,7 +2834,7 @@ app.get('/api/admin/payments', async (req, res) => {
       for (const [k, p] of baileysEngine.smsPaymentsMap.entries()) {
         const ref = p.txn_id || p.id || k;
         if (ref && !map.has(ref)) {
-          const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
+          const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cï¿½][aï¿½]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
           map.set(ref, {
             id: ref,
             ref,
@@ -2828,7 +2850,7 @@ app.get('/api/admin/payments', async (req, res) => {
       }
     }
 
-    // 4. Buscar do Firestore sms_payments se disponível (persistência na nuvem)
+    // 4. Buscar do Firestore sms_payments se disponï¿½vel (persistï¿½ncia na nuvem)
     if (db) {
       try {
         const snap = await db.collection('sms_payments').orderBy('processedAt', 'desc').limit(150).get();
@@ -2836,7 +2858,7 @@ app.get('/api/admin/payments', async (req, res) => {
           const p = d.data();
           const ref = p.txn_id || p.id || d.id;
           if (ref && !map.has(ref)) {
-            const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
+            const isEmola = (p.metodo === 'emola' || /^(ID\s*(da\s*)?transa[cï¿½][aï¿½]o|Transaction\s*ID|ID\s*Trans)/i.test((p.raw_sms||'').trim()) || /PP2\d{5}\.\d{4}/i.test(ref));
             map.set(ref, {
               id: ref,
               ref,
@@ -2853,7 +2875,7 @@ app.get('/api/admin/payments', async (req, res) => {
       } catch (err) { console.warn('?? [FIREBASE] Falha ao consultar sms_payments em /admin/payments:', err.message); }
     }
 
-    // 5. Incluir também vendas concluídas que tenham valor
+    // 5. Incluir tambï¿½m vendas concluï¿½das que tenham valor
     const ordersList = Array.from(inMemoryOrders.values()).filter(o => o.valor || o.valor_pago);
     ordersList.forEach(o => {
       const ref = o.orderId || o.id;
@@ -2896,7 +2918,7 @@ app.get('/api/admin/payments', async (req, res) => {
 app.post('/api/admin/payments/register', (req, res) => {
   const { ref, operadora, valor, numero, remetente, status, detalhes } = req.body || {};
   if (!ref || !valor) {
-    return res.status(400).json({ success: false, mensagem: 'Ref e Valor são obrigatórios.' });
+    return res.status(400).json({ success: false, mensagem: 'Ref e Valor sï¿½o obrigatï¿½rios.' });
   }
 
   const paymentDoc = {
@@ -2922,7 +2944,7 @@ app.post('/api/admin/payments/register', (req, res) => {
   return res.json({ success: true, payment: paymentDoc });
 });
 
-// 2. Relatórios de Vendas (Diário, Semanal, Mensal, Trimestral, Semestral, Anual) para Axion Admin Master
+// 2. Relatï¿½rios de Vendas (Diï¿½rio, Semanal, Mensal, Trimestral, Semestral, Anual) para Axion Admin Master
 app.get('/api/admin/reports', async (req, res) => {
   try {
     const period = (req.query.period || 'today').toLowerCase(); // today, week, month, quarter, semester, year
@@ -2930,7 +2952,7 @@ app.get('/api/admin/reports', async (req, res) => {
     
     let startTime = new Date();
     if (period === 'today' || period === 'diario') {
-      // Começar às 00:00 no fuso de Moçambique
+      // Comeï¿½ar ï¿½s 00:00 no fuso de Moï¿½ambique
       const todayDateStr = now.toLocaleDateString('sv-SE', { timeZone: 'Africa/Maputo' });
       startTime = new Date(todayDateStr + 'T00:00:00+02:00');
     } else if (period === 'week' || period === 'semanal') {
@@ -2951,10 +2973,10 @@ app.get('/api/admin/reports', async (req, res) => {
     const startMs = startTime.getTime();
     const orderMap = new Map();
 
-    // Ler ordens em memória
+    // Ler ordens em memï¿½ria
     inMemoryOrders.forEach((v, k) => orderMap.set(k, v));
 
-    // Se Firestore estiver ativo, enriquecer com histórico persistente
+    // Se Firestore estiver ativo, enriquecer com histï¿½rico persistente
     if (db) {
       try {
         const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(200).get();
@@ -2965,7 +2987,7 @@ app.get('/api/admin/reports', async (req, res) => {
             orderMap.set(id, d);
           }
         });
-      } catch (_) { console.warn('?? [FIREBASE] Falha ao consultar ordens para relatório admin:', _.message); }
+      } catch (_) { console.warn('?? [FIREBASE] Falha ao consultar ordens para relatï¿½rio admin:', _.message); }
     }
 
     const allOrders = Array.from(orderMap.values());
@@ -3005,7 +3027,7 @@ app.get('/api/admin/reports', async (req, res) => {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // Formato compatível com Axion-Admin-Master (MainActivity.kt)
+    // Formato compatï¿½vel com Axion-Admin-Master (MainActivity.kt)
     const historicoFormatado = completed.slice(-30).reverse().map(o => {
       const qty = Number(o.quantidade) || 0;
       return {
@@ -3076,7 +3098,7 @@ function resolveDeviceConfig(portOrSerial) {
   return { port: pStr, serial: pStr, name: `Celular (${pStr})`, width: 720, height: 1280 };
 }
 
-// 1. Listar celulares disponíveis para controle remoto
+// 1. Listar celulares disponï¿½veis para controle remoto
 app.get('/api/remote/devices', (req, res) => {
   try {
     exec('adb devices -l', { timeout: 3000 }, (err, stdout, stderr) => {
@@ -3135,7 +3157,7 @@ app.get('/api/remote/:port/screen', (req, res) => {
     const adbCmd = `adb -s ${dev.serial} exec-out screencap -p`;
     exec(adbCmd, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024, timeout: 5000 }, (err, stdout, stderr) => {
       if (err || !stdout || stdout.length === 0) {
-        return res.status(503).json({ success: false, mensagem: `ADB indisponível ou celular (${dev.serial}) offline.` });
+        return res.status(503).json({ success: false, mensagem: `ADB indisponï¿½vel ou celular (${dev.serial}) offline.` });
       }
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
@@ -3153,7 +3175,7 @@ app.post('/api/remote/:port/touch', (req, res) => {
   const { x, y, width, height } = req.body;
 
   if (x === undefined || y === undefined) {
-    return res.status(400).json({ success: false, mensagem: 'Coordenadas (x, y) obrigatórias.' });
+    return res.status(400).json({ success: false, mensagem: 'Coordenadas (x, y) obrigatï¿½rias.' });
   }
 
   let realX = Math.round(x);
@@ -3202,7 +3224,7 @@ app.post('/api/remote/:port/swipe', (req, res) => {
   }
 });
 
-// 5. Teclas de Navegação e Sistema (Keyevent)
+// 5. Teclas de Navegaï¿½ï¿½o e Sistema (Keyevent)
 app.post('/api/remote/:port/key', (req, res) => {
   const { port } = req.params;
   const dev = resolveDeviceConfig(port);
@@ -3249,7 +3271,7 @@ app.post('/api/remote/:port/type', (req, res) => {
   const dev = resolveDeviceConfig(port);
   const { text } = req.body;
 
-  if (!text) return res.status(400).json({ success: false, mensagem: 'Texto não fornecido.' });
+  if (!text) return res.status(400).json({ success: false, mensagem: 'Texto nï¿½o fornecido.' });
 
   const safeText = String(text).replace(/\s/g, '%s').replace(/["`$\\]/g, '\\$&');
   try {
@@ -3268,7 +3290,7 @@ app.post('/api/remote/:port/ussd', (req, res) => {
   const dev = resolveDeviceConfig(port);
   const { code } = req.body;
 
-  if (!code) return res.status(400).json({ success: false, mensagem: 'Código USSD não fornecido.' });
+  if (!code) return res.status(400).json({ success: false, mensagem: 'Cï¿½digo USSD nï¿½o fornecido.' });
 
   const encoded = encodeURIComponent(String(code).trim());
   try {
@@ -3306,7 +3328,7 @@ app.post('/api/remote/:port/launch-scrcpy', (req, res) => {
   }
 });
 
-// -- TABELAS DE PREÇOS PARA O PAINEL --
+// -- TABELAS DE PREï¿½OS PARA O PAINEL --
 app.get(['/api/price-tables', '/api/prices', '/api/groups/prices'], (req, res) => {
   let cfg = {};
   if (baileysEngine && baileysEngine.DYN_CFG) {
@@ -3332,7 +3354,7 @@ app.get('/api/bot-status', (req, res) => {
       const status = engine.getConnectionStatus();
       return res.json({ success: true, ...status });
     }
-    // Tentar obter estado do módulo global
+    // Tentar obter estado do mï¿½dulo global
     const connected = global._waConnected || false;
     const phone = global._waPhone || null;
     const qr_pending = global._qrPending || false;
@@ -3341,7 +3363,7 @@ app.get('/api/bot-status', (req, res) => {
     return res.json({ success: false, connected: false, qr_pending: false, error: e.message });
   }
 });
-// -- RELATÓRIOS FINANCEIROS E VENDAS PARA O PAINEL --
+// -- RELATï¿½RIOS FINANCEIROS E VENDAS PARA O PAINEL --
 app.get('/api/reports', async (req, res) => {
   try {
     let all = Array.from(inMemoryOrders.values());
@@ -3374,7 +3396,7 @@ app.get('/api/reports', async (req, res) => {
       }
     });
 
-    // Fuso horário oficial de Moçambique (CAT / Africa/Maputo)
+    // Fuso horï¿½rio oficial de Moï¿½ambique (CAT / Africa/Maputo)
     function toMaputoDate(dateVal) {
       if (!dateVal) return '';
       try {
@@ -3389,7 +3411,7 @@ app.get('/api/reports', async (req, res) => {
     const todayStr = toMaputoDate(new Date());
     const monthStr = todayStr.slice(0, 7);
 
-    // Vendas concluídas
+    // Vendas concluï¿½das
     const completed = all.filter(o => o.status === 'completed' || o.success === true);
 
     // Vendas de hoje
@@ -3397,7 +3419,7 @@ app.get('/api/reports', async (req, res) => {
     const todayTotalMt = todaySales.reduce((acc, o) => acc + (Number(o.valor_pago || o.valor) || 0), 0);
     const todayTotalMb = todaySales.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
 
-    // Vendas do mês
+    // Vendas do mï¿½s
     const monthSales = completed.filter(o => toMaputoDate(o.completedAt || o.createdAt).startsWith(monthStr));
     const monthTotalMt = monthSales.reduce((acc, o) => acc + (Number(o.valor_pago || o.valor) || 0), 0);
     const monthTotalMb = monthSales.reduce((acc, o) => acc + (Number(o.quantidade) || 0), 0);
@@ -3490,7 +3512,7 @@ app.get('/api/reports', async (req, res) => {
   }
 });
 
-// -- CONFIGURAÇÃO DE CUSTO DE COMPRA DO GB (PARA CÁLCULO DE LUCRO LÍQUIDO) --
+// -- CONFIGURAï¿½ï¿½O DE CUSTO DE COMPRA DO GB (PARA Cï¿½LCULO DE LUCRO Lï¿½QUIDO) --
 app.get('/api/admin/config/custo-gb', (req, res) => {
   let custo = 20;
   try {
@@ -3504,7 +3526,7 @@ app.post('/api/admin/config/custo-gb', authenticateAdmin, async (req, res) => {
   try {
     const novoCusto = parseFloat(req.body?.custo_gb || req.body?.preco_gb);
     if (isNaN(novoCusto) || novoCusto <= 0) {
-      return res.status(400).json({ success: false, mensagem: 'Valor de custo do GB inválido.' });
+      return res.status(400).json({ success: false, mensagem: 'Valor de custo do GB invï¿½lido.' });
     }
     const cfgPath = path.resolve(__dirname, 'bot_config.js');
     let cfg = {};
@@ -3528,29 +3550,29 @@ app.post('/api/admin/config/custo-gb', authenticateAdmin, async (req, res) => {
 app.post('/api/admin/restart-bot', authenticateAdmin, (req, res) => {
   try {
     if (baileysEngine && typeof baileysEngine.startWhatsApp === 'function') {
-      console.log('?? [ADMIN] Reinicialização manual do Bot WhatsApp solicitada pelo Painel');
+      console.log('?? [ADMIN] Reinicializaï¿½ï¿½o manual do Bot WhatsApp solicitada pelo Painel');
       baileysEngine.startWhatsApp(null, db);
       return res.json({ success: true, mensagem: 'Bot WhatsApp a reiniciar na nuvem...' });
     }
-    return res.json({ success: false, mensagem: 'Módulo WhatsApp indisponível' });
+    return res.json({ success: false, mensagem: 'Mï¿½dulo WhatsApp indisponï¿½vel' });
   } catch(e) {
     return res.status(500).json({ success: false, mensagem: e.message });
   }
 });
 
-// -- ENDPOINT DE TESTE: Envia mensagem de teste para JID/número --
+// -- ENDPOINT DE TESTE: Envia mensagem de teste para JID/nï¿½mero --
 app.post('/api/whatsapp/test-send', async (req, res) => {
   try {
     const token = req.headers['x-master-token'] || req.query.token || req.body?.token;
-    if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
+    if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Nï¿½o autorizado' });
     
     const { jid, numero, mensagem } = req.body || {};
     const targetJid = jid || (numero ? `${String(numero).replace(/\D/g, '')}@s.whatsapp.net` : null);
     
-    if (!targetJid) return res.status(400).json({ error: 'Forneça jid ou numero' });
-    if (!baileysEngine || !baileysEngine.sendTextMessage) return res.status(503).json({ error: 'Bot não disponível' });
+    if (!targetJid) return res.status(400).json({ error: 'Forneï¿½a jid ou numero' });
+    if (!baileysEngine || !baileysEngine.sendTextMessage) return res.status(503).json({ error: 'Bot nï¿½o disponï¿½vel' });
     
-    await baileysEngine.sendTextMessage(targetJid, mensagem || '?? *Teste AXION* — Bot online e a responder correctamente!');
+    await baileysEngine.sendTextMessage(targetJid, mensagem || '?? *Teste AXION* ï¿½ Bot online e a responder correctamente!');
     return res.json({ success: true, jid: targetJid, mensagem: mensagem || 'Teste enviado' });
   } catch(e) {
     return res.status(500).json({ success: false, erro: e.message });
@@ -3561,7 +3583,7 @@ app.post('/api/whatsapp/test-send', async (req, res) => {
 app.get('/api/whatsapp/recent-logs', (req, res) => {
   try {
     const token = req.headers['x-master-token'] || req.query.token;
-    if (!MASTER_TOKENS.has(token) && token !== 'AxionKelven2026Secure') return res.status(403).json({ error: 'Não autorizado' });
+    if (!MASTER_TOKENS.has(token) && token !== 'AxionKelven2026Secure') return res.status(403).json({ error: 'Nï¿½o autorizado' });
     if (baileysEngine && typeof baileysEngine.getRecentLogs === 'function') {
       return res.json({ success: true, logs: baileysEngine.getRecentLogs() });
     }
@@ -3583,7 +3605,7 @@ app.get('/api/admin/server-logs', (req, res) => {
   }
 });
 
-// -- Consulta e Diagnóstico de Compras e Fidelidade do Cliente --
+// -- Consulta e Diagnï¿½stico de Compras e Fidelidade do Cliente --
 app.get('/api/client/compras/:phone', async (req, res) => {
   try {
     const raw = req.params.phone;
@@ -3635,7 +3657,7 @@ app.get('/api/groups', async (req, res) => {
       // Usar lista ao vivo como fonte principal
       finalGroups = liveGroups.map(g => {
         let tipo = 'Grupo de Clientes';
-        if (g.jid === jidNotif)  tipo = 'Canal de Notificações';
+        if (g.jid === jidNotif)  tipo = 'Canal de Notificaï¿½ï¿½es';
         if (g.jid === jidErros)  tipo = 'Canal de Erros';
 
         return {
@@ -3644,13 +3666,13 @@ app.get('/api/groups', async (req, res) => {
           autorizado: true,
           tipo,
           membros: g.participants_count || '?',
-          tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
+          tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrï¿½o (24h / Semanal / Mensal)'
         };
       });
     } else {
-      // Fallback: grupos conhecidos hardcoded quando WhatsApp está offline
+      // Fallback: grupos conhecidos hardcoded quando WhatsApp estï¿½ offline
       const fallback = [
-        { jid: jidNotif, nome: 'Axion Notificações', tipo: 'Canal de Notificações' },
+        { jid: jidNotif, nome: 'Axion Notificaï¿½ï¿½es', tipo: 'Canal de Notificaï¿½ï¿½es' },
         { jid: jidErros,  nome: 'Axion Alertas & Erros', tipo: 'Canal de Erros' },
         { jid: '120363424819563179@g.us', nome: 'Axion VIP Clientes', tipo: 'Grupo de Clientes' }
       ];
@@ -3658,7 +3680,7 @@ app.get('/api/groups', async (req, res) => {
         ...g,
         autorizado: true,
         membros: '?',
-        tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrão (24h / Semanal / Mensal)'
+        tabela_ativa: groupTables[g.jid] ? 'Tabela Personalizada' : 'Tabela Padrï¿½o (24h / Semanal / Mensal)'
       }));
     }
 
@@ -3670,12 +3692,12 @@ app.get('/api/groups', async (req, res) => {
 });
 
 
-// -- MANUTENÇÃO GLOBAL (fecha vendas em grupos + privado) --
+// -- MANUTENï¿½ï¿½O GLOBAL (fecha vendas em grupos + privado) --
 app.post('/api/maintenance', (req, res) => {
   try {
     const rawVal = req.body.ativo !== undefined ? req.body.ativo : req.body.active;
     if (rawVal === undefined || rawVal === null) {
-      return res.status(400).json({ success: false, error: 'Campo "ativo" ou "active" (boolean) é obrigatório.' });
+      return res.status(400).json({ success: false, error: 'Campo "ativo" ou "active" (boolean) ï¿½ obrigatï¿½rio.' });
     }
     const ativo = (rawVal === true || rawVal === 'true');
     let estado = ativo;
@@ -3686,7 +3708,7 @@ app.post('/api/maintenance', (req, res) => {
       success: true,
       modoManutencao: estado,
       active: estado,
-      mensagem: estado ? '?? Sistema em manutenção — vendas bloqueadas.' : '?? Sistema online — vendas liberadas.'
+      mensagem: estado ? '?? Sistema em manutenï¿½ï¿½o ï¿½ vendas bloqueadas.' : '?? Sistema online ï¿½ vendas liberadas.'
     });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -3717,14 +3739,14 @@ app.get('/api/system/status', (req, res) => {
       online: !manutencao,
       modoManutencao: manutencao,
       botSilenciado: silenciado,
-      mensagem: manutencao ? '?? Servidores em manutenção temporária' : '?? Servidores online e operacionais'
+      mensagem: manutencao ? '?? Servidores em manutenï¿½ï¿½o temporï¿½ria' : '?? Servidores online e operacionais'
     });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
 });
 
-// -- VERSÃO & AUTO-UPDATE DO CLIENT HUB --
+// -- VERSï¿½O & AUTO-UPDATE DO CLIENT HUB --
 app.get('/api/app/hub/version', (req, res) => {
   try {
     return res.json({
@@ -3733,7 +3755,7 @@ app.get('/api/app/hub/version', (req, res) => {
       versionCode: 22,
       pwaVersion: '2026.10.02-v2',
       apkUrl: 'https://kanet-cloud-api-f3le.onrender.com/hub/Axion-Client-Hub.apk',
-      changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automático de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
+      changelog: 'Suporte IA Inteligente, Chat Directo com Admin Kelven, Validador Automï¿½tico de Comprovativos M-Pesa/e-Mola e Acompanhamento de Pedidos ao Vivo.',
       releasedAt: new Date().toISOString()
     });
   } catch(e) {
@@ -3746,13 +3768,13 @@ app.post('/api/bot/silence', (req, res) => {
   try {
     const { silenciado } = req.body;
     if (typeof silenciado !== 'boolean') {
-      return res.status(400).json({ success: false, error: 'Campo "silenciado" (boolean) é obrigatório.' });
+      return res.status(400).json({ success: false, error: 'Campo "silenciado" (boolean) ï¿½ obrigatï¿½rio.' });
     }
     let estado = silenciado;
     if (baileysEngine && typeof baileysEngine.setBotSilenciado === 'function') {
       estado = baileysEngine.setBotSilenciado(silenciado);
     }
-    return res.json({ success: true, silenciado: estado, mensagem: estado ? '?? Bot silenciado — sem respostas automáticas.' : '?? Bot activo — a responder normalmente.' });
+    return res.json({ success: true, silenciado: estado, mensagem: estado ? '?? Bot silenciado ï¿½ sem respostas automï¿½ticas.' : '?? Bot activo ï¿½ a responder normalmente.' });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -3769,18 +3791,18 @@ app.get('/api/bot/silence/status', (req, res) => {
   }
 });
 
-// -- FECHAR / ABRIR GRUPO ESPECÍFICO --
+// -- FECHAR / ABRIR GRUPO ESPECï¿½FICO --
 app.post('/api/groups/:jid/fechar', (req, res) => {
   try {
     const jid = decodeURIComponent(req.params.jid);
     if (!jid || !jid.endsWith('@g.us')) {
-      return res.status(400).json({ success: false, error: 'JID de grupo inválido.' });
+      return res.status(400).json({ success: false, error: 'JID de grupo invï¿½lido.' });
     }
     let fechado = false;
     if (baileysEngine && typeof baileysEngine.toggleGrupoFechado === 'function') {
       fechado = baileysEngine.toggleGrupoFechado(jid);
     }
-    return res.json({ success: true, jid, fechado, mensagem: fechado ? '?? Grupo fechado — bot não responde neste grupo.' : '?? Grupo aberto — bot volta a responder normalmente.' });
+    return res.json({ success: true, jid, fechado, mensagem: fechado ? '?? Grupo fechado ï¿½ bot nï¿½o responde neste grupo.' : '?? Grupo aberto ï¿½ bot volta a responder normalmente.' });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -3791,10 +3813,10 @@ app.post('/api/admin/groups/close-with-reason', async (req, res) => {
   try {
     const { motivo, targetJids } = req.body || {};
     if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
-      return res.status(400).json({ success: false, error: 'O motivo / mensagem do fecho é obrigatório.' });
+      return res.status(400).json({ success: false, error: 'O motivo / mensagem do fecho ï¿½ obrigatï¿½rio.' });
     }
     if (!baileysEngine || typeof baileysEngine.closeGroupsWithReason !== 'function') {
-      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+      return res.status(503).json({ success: false, error: 'Serviï¿½o WhatsApp nï¿½o estï¿½ ativo.' });
     }
     const result = await baileysEngine.closeGroupsWithReason(motivo.trim(), targetJids);
     return res.json({
@@ -3812,7 +3834,7 @@ app.post('/api/admin/groups/open-all', async (req, res) => {
   try {
     const { targetJids } = req.body || {};
     if (!baileysEngine || typeof baileysEngine.openAllGroups !== 'function') {
-      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+      return res.status(503).json({ success: false, error: 'Serviï¿½o WhatsApp nï¿½o estï¿½ ativo.' });
     }
     const result = await baileysEngine.openAllGroups(targetJids);
     return res.json({
@@ -3825,15 +3847,15 @@ app.post('/api/admin/groups/open-all', async (req, res) => {
   }
 });
 
-// -- ENVIAR COMUNICADO / ANÚNCIO AOS GRUPOS NO WHATSAPP --
+// -- ENVIAR COMUNICADO / ANï¿½NCIO AOS GRUPOS NO WHATSAPP --
 app.post('/api/admin/groups/announce', async (req, res) => {
   try {
     const { mensagem, targetJids } = req.body || {};
     if (!mensagem || typeof mensagem !== 'string' || !mensagem.trim()) {
-      return res.status(400).json({ success: false, error: 'A mensagem do comunicado é obrigatória.' });
+      return res.status(400).json({ success: false, error: 'A mensagem do comunicado ï¿½ obrigatï¿½ria.' });
     }
     if (!baileysEngine || typeof baileysEngine.sendAnnouncementToGroups !== 'function') {
-      return res.status(503).json({ success: false, error: 'Serviço WhatsApp não está ativo.' });
+      return res.status(503).json({ success: false, error: 'Serviï¿½o WhatsApp nï¿½o estï¿½ ativo.' });
     }
     const result = await baileysEngine.sendAnnouncementToGroups(mensagem.trim(), targetJids);
     return res.json({
@@ -3978,7 +4000,7 @@ app.post('/api/admin/transfers/reset', async (req, res) => {
       await admin.database().ref('admin/metrics/today').set({ lucro: 0, vendas: 0, megas: 0 });
       await admin.database().ref('bot_commands/pending').set({ cmd: 'reset_transfers', issued_at: new Date().toISOString() });
     }
-    res.json({ success: true, message: 'Contador de transferências zerado!' });
+    res.json({ success: true, message: 'Contador de transferï¿½ncias zerado!' });
   } catch(e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -3988,7 +4010,7 @@ app.post('/api/admin/bot/command', async (req, res) => {
   try {
     const { cmd } = req.body;
     if (!['start','stop','restart','reset_whatsapp'].includes(cmd)) {
-      return res.status(400).json({ success: false, error: 'Comando inválido' });
+      return res.status(400).json({ success: false, error: 'Comando invï¿½lido' });
     }
     pendingBotCommand = { cmd, issued_at: new Date().toISOString() };
     if (admin.apps.length) await fbSet('bot_commands/pending', pendingBotCommand);
@@ -4058,10 +4080,10 @@ try {
       createdAt: new Date().toISOString()
     };
 
-    // Aplicar regra oficial Axion de divisão de pacotes Mensais (1ª oferta + resto diário) e Diários
+    // Aplicar regra oficial Axion de divisï¿½o de pacotes Mensais (1ï¿½ oferta + resto diï¿½rio) e Diï¿½rios
     splitMensalOrderIfEligible(orderDoc);
     splitDailyOrderIfEligible(orderDoc);
-    // Aplicar ativação de Planos Especiais (Renovável & Faseado)
+    // Aplicar ativaï¿½ï¿½o de Planos Especiais (Renovï¿½vel & Faseado)
     handleSpecialPlanIfApplicable(orderDoc);
 
     inMemoryOrders.set(order.orderId, orderDoc);
@@ -4074,7 +4096,7 @@ try {
     }
 
     // Roteamento Estrito e Inteligente de Portas baseado em Saldo Real:
-    // - Portas Diárias (8025, 8023, 8026): Diários (24hrs) selecionando a porta com saldo >= quantidade
+    // - Portas Diï¿½rias (8025, 8023, 8026): Diï¿½rios (24hrs) selecionando a porta com saldo >= quantidade
     // - 8077: Semanais, Mensais e Ilimitados
     // - 8777: Saldo
     const targetPort = getPortForModo(orderDoc.modo, orderDoc.quantidade);
@@ -4112,7 +4134,7 @@ try {
 }
 
 // ----------------------------------------------------------------
-// 7.0 BAILEYS FORNECIMENTO & ANTICONCORRÊNCIA
+// 7.0 BAILEYS FORNECIMENTO & ANTICONCORRï¿½NCIA
 // ----------------------------------------------------------------
 let baileysAnticoncorrencia = null;
 try {
@@ -4131,13 +4153,13 @@ try {
     baileysAnticoncorrencia.setBaileysEngine(baileysEngine);
   }
   baileysAnticoncorrencia.startWhatsApp(db);
-  console.log('??? [ANTICONCORRÊNCIA NUVEM] Motor WhatsApp Espião / Anticoncorrência inicializado com sucesso!');
+  console.log('??? [ANTICONCORRï¿½NCIA NUVEM] Motor WhatsApp Espiï¿½o / Anticoncorrï¿½ncia inicializado com sucesso!');
 } catch (e) {
-  console.warn('?? [ANTICONCORRÊNCIA NUVEM] Erro ao carregar baileys_anticoncorrencia:', e.message);
+  console.warn('?? [ANTICONCORRï¿½NCIA NUVEM] Erro ao carregar baileys_anticoncorrencia:', e.message);
 }
 
 // ----------------------------------------------------------------
-// 7.1 SMS SALES BOT ENGINE (VENDAS E ATENDIMENTO AUTOMÁTICO VIA SMS)
+// 7.1 SMS SALES BOT ENGINE (VENDAS E ATENDIMENTO AUTOMï¿½TICO VIA SMS)
 // ----------------------------------------------------------------
 let smsSalesEngine = null;
 try {
@@ -4226,9 +4248,9 @@ try {
   console.warn('?? [SMS ENGINE] Falha ao carregar sms_sales_engine:', e.message);
 }
 
-// -- ROTA DO QR CODE (PÁGINA WEB PARA ESCANEAR NO CELULAR) ---
+// -- ROTA DO QR CODE (Pï¿½GINA WEB PARA ESCANEAR NO CELULAR) ---
 // ----------------------------------------------------------------
-// 7.2 CUSTOMER SERVICES & LOYALTY ENGINE (TXENECO, BÔNUS, RECEPTOR PADRÃO)
+// 7.2 CUSTOMER SERVICES & LOYALTY ENGINE (TXENECO, Bï¿½NUS, RECEPTOR PADRï¿½O)
 // ----------------------------------------------------------------
 try {
   customerServices = require('./customer_services');
@@ -4284,7 +4306,7 @@ try {
       orderDoc.status = 'pending';
     }
   }, (mb, modo) => getValorFromMb(mb, modo));
-  console.log('?? [CUSTOMER SERVICES] Motor de Fidelidade, Txeneco e Bônus inicializado com sucesso!');
+  console.log('?? [CUSTOMER SERVICES] Motor de Fidelidade, Txeneco e Bï¿½nus inicializado com sucesso!');
 } catch (e) {
   console.warn('?? [CUSTOMER SERVICES] Erro ao carregar customer_services:', e.message);
 }
@@ -4305,7 +4327,7 @@ app.get('/api/whatsapp/status', (req, res) => {
     return res.json({ session: 'revenda', ...revendaStatus });
   }
 
-  // Resumo compatível por defeito (retorna revenda no nível raiz para apps antigas, mais objetos separados)
+  // Resumo compatï¿½vel por defeito (retorna revenda no nï¿½vel raiz para apps antigas, mais objetos separados)
   return res.json({
     ...revendaStatus,
     session: 'revenda',
@@ -4323,21 +4345,21 @@ app.post(['/api/whatsapp/reset', '/api/admin/whatsapp/reset'], async (req, res) 
         const result = await baileysAnticoncorrencia.resetSession(db);
         return res.json(result);
       }
-      return res.status(500).json({ success: false, message: 'Baileys Anticoncorrência não inicializado' });
+      return res.status(500).json({ success: false, message: 'Baileys Anticoncorrï¿½ncia nï¿½o inicializado' });
     }
     if (session === 'fornecimento') {
       if (baileysFornecimento && typeof baileysFornecimento.resetSession === 'function') {
         const result = await baileysFornecimento.resetSession(db);
         return res.json(result);
       }
-      return res.status(500).json({ success: false, message: 'Baileys Fornecimento não inicializado' });
+      return res.status(500).json({ success: false, message: 'Baileys Fornecimento nï¿½o inicializado' });
     }
 
     if (baileysEngine && typeof baileysEngine.resetSession === 'function') {
       const result = await baileysEngine.resetSession(db);
       return res.json(result);
     }
-    return res.status(500).json({ success: false, message: 'Baileys Revenda não inicializado' });
+    return res.status(500).json({ success: false, message: 'Baileys Revenda nï¿½o inicializado' });
   } catch(e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -4353,7 +4375,7 @@ app.get('/qr', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Axion WhatsApp Cloud — Conectar</title>
+  <title>Axion WhatsApp Cloud ï¿½ Conectar</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -4420,7 +4442,7 @@ app.get('/qr', (req, res) => {
     <h1>? Axion WhatsApp Cloud</h1>
     <p>Conecte o seu WhatsApp diretamente ao servidor na Nuvem (sem computador ligado).</p>
 
-    <!-- Seletor de Sessão Multi-WhatsApp -->
+    <!-- Seletor de Sessï¿½o Multi-WhatsApp -->
     <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap;">
       <button id="tab-revenda" onclick="switchSession('revenda')" style="padding: 8px 14px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #0284c7; color: white; transition: all 0.2s;">
         ?? WhatsApp Revenda
@@ -4429,12 +4451,12 @@ app.get('/qr', (req, res) => {
         ?? WhatsApp Fornecimento
       </button>
       <button id="tab-anticoncorrencia" onclick="switchSession('anticoncorrencia')" style="padding: 8px 14px; border-radius: 8px; border: 1px solid #334155; font-weight: 600; cursor: pointer; background: #0f172a; color: #94a3b8; transition: all 0.2s;">
-        ??? WhatsApp Espião / Anticoncorrência
+        ??? WhatsApp Espiï¿½o / Anticoncorrï¿½ncia
       </button>
     </div>
 
     <div id="session-desc" style="font-size: 13px; color: #38bdf8; margin-bottom: 12px; font-weight: 500;">
-      ?? Sessão Ativa: Revenda (Clientes, Vouchers & Varejo)
+      ?? Sessï¿½o Ativa: Revenda (Clientes, Vouchers & Varejo)
     </div>
 
     <div id="status-container" class="status status-waiting">
@@ -4455,7 +4477,7 @@ app.get('/qr', (req, res) => {
       <strong>Como conectar:</strong>
       <ol>
         <li>Abra o <b>WhatsApp</b> no celular do Bot</li>
-        <li>Toque em <b>Definições / Menu (?)</b></li>
+        <li>Toque em <b>Definiï¿½ï¿½es / Menu (?)</b></li>
         <li>Selecione <b>Aparelhos Conectados</b></li>
         <li>Toque em <b>Conectar um Aparelho</b> e aponte para o QR Code acima</li>
       </ol>
@@ -4484,23 +4506,23 @@ app.get('/qr', (req, res) => {
         btnRev.style.background = '#0284c7';
         btnRev.style.color = '#ffffff';
         btnRev.style.border = 'none';
-        desc.innerText = '?? Sessão Ativa: Revenda (Clientes, Vouchers & Varejo)';
+        desc.innerText = '?? Sessï¿½o Ativa: Revenda (Clientes, Vouchers & Varejo)';
       } else if (sess === 'fornecimento') {
         btnForn.style.background = '#0284c7';
         btnForn.style.color = '#ffffff';
         btnForn.style.border = 'none';
-        desc.innerText = '?? Sessão Ativa: Fornecimento (Atacado, Dados por Grosso)';
+        desc.innerText = '?? Sessï¿½o Ativa: Fornecimento (Atacado, Dados por Grosso)';
       } else if (sess === 'anticoncorrencia') {
         btnAnti.style.background = '#ef4444';
         btnAnti.style.color = '#ffffff';
         btnAnti.style.border = 'none';
-        desc.innerText = '??? Sessão Ativa: Espião / Anticoncorrência (Infiltração e Extração de Grupos)';
+        desc.innerText = '??? Sessï¿½o Ativa: Espiï¿½o / Anticoncorrï¿½ncia (Infiltraï¿½ï¿½o e Extraï¿½ï¿½o de Grupos)';
       }
       updateQR();
     }
 
     async function resetCurrentSession() {
-      if (!confirm('Deseja realmente gerar um novo QR Code / reiniciar a sessão ' + activeSession.toUpperCase() + '?')) return;
+      if (!confirm('Deseja realmente gerar um novo QR Code / reiniciar a sessï¿½o ' + activeSession.toUpperCase() + '?')) return;
       try {
         await fetch('/api/whatsapp/reset', {
           method: 'POST',
@@ -4526,7 +4548,7 @@ app.get('/qr', (req, res) => {
           qrBox.innerHTML = '<div style="padding: 60px 20px; color: #10b981; font-weight: bold; font-size: 18px;">? ' + activeSession.toUpperCase() + ' Conectado 24h na Nuvem!</div>';
         } else if (data.hasQr && data.qrImage) {
           statusBox.className = 'status status-waiting';
-          statusBox.innerHTML = '?? Aponte a câmara do WhatsApp (' + activeSession.toUpperCase() + ') para o QR Code';
+          statusBox.innerHTML = '?? Aponte a cï¿½mara do WhatsApp (' + activeSession.toUpperCase() + ') para o QR Code';
           qrBox.innerHTML = '<img src="' + data.qrImage + '" alt="QR Code WhatsApp ' + activeSession + '" />';
         } else {
           statusBox.className = 'status status-waiting';
@@ -4547,7 +4569,7 @@ app.get('/qr', (req, res) => {
 // 8. SMS PAYMENT RECEIVER (M-Pesa / e-Mola ? Auto Transfer)
 // ----------------------------------------------------------------
 
-// Tabela de preços: valor_pago_MT ? MB a enviar
+// Tabela de preï¿½os: valor_pago_MT ? MB a enviar
 const PRICE_TABLE = [
   { valor: 10,  mb: 250  },
   { valor: 15,  mb: 400  },
@@ -4560,17 +4582,17 @@ const PRICE_TABLE = [
   { valor: 200, mb: 10240 }
 ];
 
-// Anti-duplicação: armazena txn_ids já processados (máx 1000 itens em memória)
+// Anti-duplicaï¿½ï¿½o: armazena txn_ids jï¿½ processados (mï¿½x 1000 itens em memï¿½ria)
 const inMemoryPayments = new Map();
 
-// Armazena pedidos do Client Hub aguardando confirmação real da rede (M-Pesa / e-Mola)
+// Armazena pedidos do Client Hub aguardando confirmaï¿½ï¿½o real da rede (M-Pesa / e-Mola)
 const hubAguardandoOperadora = new Map(); // cleanTxnId -> { orderId, orderDoc, preco, timer }
 
 async function findOperatorPayment(cleanTxnId) {
   if (!cleanTxnId) return null;
   const tid = String(cleanTxnId).trim().toUpperCase().replace(/\.$/, '');
 
-  // 1. Procurar em memória no server.js
+  // 1. Procurar em memï¿½ria no server.js
   if (inMemoryPayments.has(tid)) return inMemoryPayments.get(tid);
 
   // 2. Procurar no baileys_engine (smsPaymentsMap)
@@ -4578,7 +4600,7 @@ async function findOperatorPayment(cleanTxnId) {
     return baileysEngine.smsPaymentsMap.get(tid);
   }
 
-  // 3. Procurar no Firestore sms_payments se disponível
+  // 3. Procurar no Firestore sms_payments se disponï¿½vel
   if (db) {
     try {
       const snap = await db.collection('sms_payments').doc(tid).get();
@@ -4586,7 +4608,7 @@ async function findOperatorPayment(cleanTxnId) {
     } catch (_) { console.warn(`?? [FIREBASE] Falha ao buscar pagamento ${tid} no Firestore:`, _.message); }
   }
 
-  // 4. Busca flexível (prefixos ou sufixos comuns do código)
+  // 4. Busca flexï¿½vel (prefixos ou sufixos comuns do cï¿½digo)
   const all = new Map();
   for (const [k, v] of inMemoryPayments.entries()) all.set(k, v);
   if (baileysEngine && baileysEngine.smsPaymentsMap) {
@@ -4627,9 +4649,9 @@ function getMbFromValor(valor) {
     if (cfg.PLANOS_ESPECIAIS && cfg.PLANOS_ESPECIAIS[vStr]) {
       return cfg.PLANOS_ESPECIAIS[vStr].quantidade_mb || cfg.PLANOS_ESPECIAIS[vStr].quantidade || 1024;
     }
-  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de preços em getMbFromValor:', e.message); }
+  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de preï¿½os em getMbFromValor:', e.message); }
 
-  // 2. Chamar o calculador proporcional do baileys_engine se disponível
+  // 2. Chamar o calculador proporcional do baileys_engine se disponï¿½vel
   if (baileysEngine && typeof baileysEngine.calcularPacoteProporcional === 'function') {
     try {
       const calc = baileysEngine.calcularPacoteProporcional(v);
@@ -4642,7 +4664,7 @@ function getMbFromValor(valor) {
     }
   }
 
-  // 3. Fallback de cálculo proporcional interno direto (para qualquer valor >= 5 MT)
+  // 3. Fallback de cï¿½lculo proporcional interno direto (para qualquer valor >= 5 MT)
   const vNum = Math.round(v);
   if (vNum >= 5) {
     const pontos = [
@@ -4680,7 +4702,7 @@ function getMbFromValor(valor) {
     return mbEst > 0 ? mbEst : 100;
   }
 
-  // 4. Último fallback pela PRICE_TABLE
+  // 4. ï¿½ltimo fallback pela PRICE_TABLE
   const exact = PRICE_TABLE.find(p => p.valor === v);
   if (exact) return exact.mb;
   const match = [...PRICE_TABLE].reverse().find(p => p.valor <= v);
@@ -4717,7 +4739,7 @@ function getValorFromMb(mb, modo = 'diario') {
       }
       if (closestVal > 0 && closestDiff <= numMb * 0.45) return closestVal;
     }
-  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de preços em getValorFromMb:', e.message); }
+  } catch (e) { console.warn('?? [CONFIG] Falha ao ler tabelas de preï¿½os em getValorFromMb:', e.message); }
 
   const exact = PRICE_TABLE.find(p => p.mb === numMb);
   if (exact) return exact.valor;
@@ -4746,7 +4768,7 @@ app.post('/api/sms/payment', (req, res) => {
     if (!txn_id || !valor) {
       return res.status(400).json({
         success: false,
-        mensagem: 'Campos obrigatórios: txn_id, valor'
+        mensagem: 'Campos obrigatï¿½rios: txn_id, valor'
       });
     }
     if (!remetente || String(remetente).trim() === '') {
@@ -4756,42 +4778,42 @@ app.post('/api/sms/payment', (req, res) => {
     let cleanTxnId = String(txn_id || '').trim().toUpperCase();
     if (cleanTxnId.endsWith('.')) cleanTxnId = cleanTxnId.slice(0, -1);
 
-    // ?? REGRA ESTRITA: Apenas M-Pesa e e-Mola são aceitos como pagamento!
+    // ?? REGRA ESTRITA: Apenas M-Pesa e e-Mola sï¿½o aceitos como pagamento!
     const cleanMetodo = String(metodo || '').toLowerCase().trim();
     const isMpesa = cleanMetodo === 'mpesa' || cleanMetodo === 'm-pesa';
     const isEmola = cleanMetodo === 'emola' || cleanMetodo === 'e-mola';
 
     if (!isMpesa && !isEmola) {
-      console.warn(`?? [SMS PAYMENT REJEITADO] Método "${metodo}" não é M-Pesa nem e-Mola. Ignorando.`);
+      console.warn(`?? [SMS PAYMENT REJEITADO] Mï¿½todo "${metodo}" nï¿½o ï¿½ M-Pesa nem e-Mola. Ignorando.`);
       return res.status(400).json({
         success: false,
-        mensagem: 'Apenas pagamentos M-Pesa e e-Mola são aceitos pelo sistema.'
+        mensagem: 'Apenas pagamentos M-Pesa e e-Mola sï¿½o aceitos pelo sistema.'
       });
     }
 
-    // Se o SMS bruto foi enviado, validar que não é mensagem de saldo de recarga/voz/txuna/empréstimo
+    // Se o SMS bruto foi enviado, validar que nï¿½o ï¿½ mensagem de saldo de recarga/voz/txuna/emprï¿½stimo
     if (raw_sms) {
       const rawLower = String(raw_sms).toLowerCase();
-      if (/(?:saldo\s+(?:de\s+)?(?:voz|dados|megas|internet|recarga|principal)|transferiste\s+saldo|recebeste\s+saldo|partilha\s+de\s+saldo|txuna|empr[eé]stimo|recarga\s+(?:de\s+)?\d|b[oó]nus)/i.test(rawLower)) {
-        console.warn(`?? [SMS PAYMENT REJEITADO] SMS bruto é transferência de saldo/recarga/txuna, não é pagamento: "${raw_sms.slice(0, 70)}"`);
+      if (/(?:saldo\s+(?:de\s+)?(?:voz|dados|megas|internet|recarga|principal)|transferiste\s+saldo|recebeste\s+saldo|partilha\s+de\s+saldo|txuna|empr[eï¿½]stimo|recarga\s+(?:de\s+)?\d|b[oï¿½]nus)/i.test(rawLower)) {
+        console.warn(`?? [SMS PAYMENT REJEITADO] SMS bruto ï¿½ transferï¿½ncia de saldo/recarga/txuna, nï¿½o ï¿½ pagamento: "${raw_sms.slice(0, 70)}"`);
         return res.status(400).json({
           success: false,
-          mensagem: 'Transferências de saldo, recargas ou txuna não são aceitas como pagamento.'
+          mensagem: 'Transferï¿½ncias de saldo, recargas ou txuna nï¿½o sï¿½o aceitas como pagamento.'
         });
       }
     }
 
-    // Anti-fraude: verificar duplicação
+    // Anti-fraude: verificar duplicaï¿½ï¿½o
     if (inMemoryPayments.has(cleanTxnId)) {
-      console.warn(`?? [SMS PAYMENT] Transação duplicada ignorada no cache geral: ${cleanTxnId}`);
-      // Notificar Baileys caso haja algum cliente aguardando confirmação desta transação
+      console.warn(`?? [SMS PAYMENT] Transaï¿½ï¿½o duplicada ignorada no cache geral: ${cleanTxnId}`);
+      // Notificar Baileys caso haja algum cliente aguardando confirmaï¿½ï¿½o desta transaï¿½ï¿½o
       if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
         baileysEngine.registrarSmsPayment({ txn_id: cleanTxnId, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
       }
       return res.json({
         success: false,
         duplicado: true,
-        mensagem: `Transação ${cleanTxnId} já foi processada`
+        mensagem: `Transaï¿½ï¿½o ${cleanTxnId} jï¿½ foi processada`
       });
     }
 
@@ -4820,13 +4842,13 @@ app.post('/api/sms/payment', (req, res) => {
       });
     }
 
-    // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Confirmação da Operadora" (WhatsApp)
+    // Validar imediatamente pedidos de clientes que estejam no status "Aguardando Confirmaï¿½ï¿½o da Operadora" (WhatsApp)
     if (baileysEngine && typeof baileysEngine.registrarSmsPayment === 'function') {
       baileysEngine.registrarSmsPayment({ txn_id: cleanTxnId, valor, remetente, metodo: metodo || 'mpesa', raw_sms });
     }
 
-    // Validar pedidos do Bot de Vendas por SMS aguardando confirmação da operadora
-    // -- ?? AUTOMAÇÃO DE RECEPTOR PADRÃO (ENVIO DIRETO SEM COMPROVATIVO) ------
+    // Validar pedidos do Bot de Vendas por SMS aguardando confirmaï¿½ï¿½o da operadora
+    // -- ?? AUTOMAï¿½ï¿½O DE RECEPTOR PADRï¿½O (ENVIO DIRETO SEM COMPROVATIVO) ------
     if (customerServices && typeof customerServices.obterReceptorPadrao === 'function') {
       let payerPhone = customerServices.normalizarTelefone(remetente);
       if (!payerPhone || payerPhone.length !== 9) {
@@ -4838,7 +4860,7 @@ app.post('/api/sms/payment', (req, res) => {
 
       const defRec = payerPhone ? customerServices.obterReceptorPadrao(payerPhone) : null;
       if (defRec && defRec.targetPhone) {
-        console.log(`? [RECEPTOR PADRÃO DETECTADO] Pagador: ${payerPhone} -> Receptor Fixo: ${defRec.targetPhone} | Valor: ${valor} MT`);
+        console.log(`? [RECEPTOR PADRï¿½O DETECTADO] Pagador: ${payerPhone} -> Receptor Fixo: ${defRec.targetPhone} | Valor: ${valor} MT`);
         let pacote = null;
         if (baileysEngine && typeof baileysEngine.buscarPacotePorValor === 'function') {
           pacote = baileysEngine.buscarPacotePorValor(Number(valor));
@@ -4858,7 +4880,7 @@ app.post('/api/sms/payment', (req, res) => {
           origem: 'receptor_padrao_automatico',
           sender: payerPhone,
           senderPhone: payerPhone,
-          remetente: `Receptor Padrão (${payerPhone})`,
+          remetente: `Receptor Padrï¿½o (${payerPhone})`,
           isAutoReceptor: true,
           txn_id: cleanTxnId,
           createdAt: new Date().toISOString()
@@ -4890,7 +4912,7 @@ app.post('/api/sms/payment', (req, res) => {
             jid: autoOrder.jid || (defRec && defRec.ownerJid) || null,
             timestamp: Date.now()
           };
-          console.log(`?? [RECEPTOR PADRÃO] Ordem entregue ao Celular Apto ${targetPort}`);
+          console.log(`?? [RECEPTOR PADRï¿½O] Ordem entregue ao Celular Apto ${targetPort}`);
         }
 
         if (baileysEngine) {
@@ -4903,19 +4925,19 @@ app.post('/api/sms/payment', (req, res) => {
             baileysEngine.enviarMensagemTexto(
               clientJid,
               `???????????????????????????????\n` +
-              `  ? *RECARGA AUTOMÁTICA ENVIADA!* ??\n` +
+              `  ? *RECARGA AUTOMï¿½TICA ENVIADA!* ??\n` +
               `???????????????????????????????\n\n` +
-              `Detectamos a sua transferência de *${valor} MT* (${metodo || 'M-Pesa'}).\n\n` +
+              `Detectamos a sua transferï¿½ncia de *${valor} MT* (${metodo || 'M-Pesa'}).\n\n` +
               `?? *Destino:* *${defRec.targetPhone}*\n` +
               `?? *Volume:* *${volStr}*\n` +
               `?? *Ref:* \`${cleanTxnId}\`\n\n` +
-              `?? *Os megas já estão a ser ativados automaticamente no número de destino!*\n` +
-              `? _Não precisas de enviar comprovativo no WhatsApp._`
+              `?? *Os megas jï¿½ estï¿½o a ser ativados automaticamente no nï¿½mero de destino!*\n` +
+              `? _Nï¿½o precisas de enviar comprovativo no WhatsApp._`
             ).catch(() => {});
           }
           if (typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
             baileysEngine.enviarNotificacaoGrupo(
-              `?? *RECARGA AUTOMÁTICA (RECEPTOR PADRÃO)* ?\n` +
+              `?? *RECARGA AUTOMï¿½TICA (RECEPTOR PADRï¿½O)* ?\n` +
               `??????????????????\n` +
               `?? *Ref:* \`${cleanTxnId}\`\n` +
               `?? *Destino:* *${defRec.targetPhone}*\n` +
@@ -4933,7 +4955,7 @@ app.post('/api/sms/payment', (req, res) => {
       smsSalesEngine.onOperadoraSmsPaymentReceived({ txn_id: cleanTxnId, valor });
     }
 
-    // Validar pedidos do Aplicativo Client Hub que estejam aguardando esta confirmação da operadora
+    // Validar pedidos do Aplicativo Client Hub que estejam aguardando esta confirmaï¿½ï¿½o da operadora
     let hubMatch = null;
     let hubKey = null;
     if (hubAguardandoOperadora.has(cleanTxnId)) {
@@ -4994,7 +5016,7 @@ app.post('/api/sms/payment', (req, res) => {
             jid: item.orderDoc.jid || null,
             timestamp: Date.now()
           };
-          console.log(`?? [CLIENT HUB NUVEM] Pedido ${item.orderId} entregue diretamente à Porta ${targetPort}!`);
+          console.log(`?? [CLIENT HUB NUVEM] Pedido ${item.orderId} entregue diretamente ï¿½ Porta ${targetPort}!`);
         }
 
         clientSupportMessages.push({
@@ -5002,7 +5024,7 @@ app.post('/api/sms/payment', (req, res) => {
           clientPhone: String(item.orderDoc.cliente_solicitante).replace(/\D/g, ''),
           clientName: 'Sistema Axion',
           sender: 'admin',
-          text: `?? Pagamento de ${vNum} MT confirmado pela rede (${metodo || 'M-Pesa'})! O seu pacote de ${item.orderDoc.quantidade}MB foi aprovado e está a ser entregue para +258 ${item.orderDoc.numero}.`,
+          text: `?? Pagamento de ${vNum} MT confirmado pela rede (${metodo || 'M-Pesa'})! O seu pacote de ${item.orderDoc.quantidade}MB foi aprovado e estï¿½ a ser entregue para +258 ${item.orderDoc.numero}.`,
           createdAt: new Date().toISOString(),
           read: false
         });
@@ -5019,19 +5041,19 @@ app.post('/api/sms/payment', (req, res) => {
     // Determinar quantos MB enviar
     const mbAEnviar = getMbFromValor(valor);
     if (!mbAEnviar) {
-      console.warn(`?? [SMS PAYMENT] Valor ${valor} MT não corresponde a nenhum plano. Txn: ${txn_id}`);
+      console.warn(`?? [SMS PAYMENT] Valor ${valor} MT nï¿½o corresponde a nenhum plano. Txn: ${txn_id}`);
       return res.json({
         success: false,
-        mensagem: `Valor ${valor} MT não corresponde a nenhum plano disponível`,
+        mensagem: `Valor ${valor} MT nï¿½o corresponde a nenhum plano disponï¿½vel`,
         planos_disponiveis: PRICE_TABLE.map(p => p.valor + ' MT = ' + p.mb + ' MB')
       });
     }
 
-    // Notificar Grupo de Notificações e aguardar que o cliente envie o comprovativo no WhatsApp com o número de destino
+    // Notificar Grupo de Notificaï¿½ï¿½es e aguardar que o cliente envie o comprovativo no WhatsApp com o nï¿½mero de destino
     const volStr = mbAEnviar < 1024 ? `${mbAEnviar} MB` : `${mbAEnviar / 1024} GB`;
     const horaAgora = new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' });
 
-    console.log(`?? [SMS PAYMENT RECEBIDO] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT (${volStr}) de ${remetente}. Aguardando cliente enviar número de destino.`);
+    console.log(`?? [SMS PAYMENT RECEBIDO] ${metodo || 'M-Pesa'} ${txn_id}: ${valor} MT (${volStr}) de ${remetente}. Aguardando cliente enviar nï¿½mero de destino.`);
 
     if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       baileysEngine.enviarNotificacaoGrupo(
@@ -5043,7 +5065,7 @@ app.post('/api/sms/payment', (req, res) => {
         `?? *Remetente:* *${remetente}*\n` +
         `?? *Hora:* ${horaAgora}\n` +
         `??????????????????\n` +
-        `? *Status:* Registado. A aguardar que o cliente envie o comprovativo com o número de destino no WhatsApp.`
+        `? *Status:* Registado. A aguardar que o cliente envie o comprovativo com o nï¿½mero de destino no WhatsApp.`
       );
     }
 
@@ -5052,7 +5074,7 @@ app.post('/api/sms/payment', (req, res) => {
       txn_id,
       mb_correspondente: mbAEnviar,
       status: 'aguardando_cliente',
-      mensagem: `Pagamento ${txn_id} de ${valor} MT (${volStr}) registado. A aguardar número de destino pelo cliente.`
+      mensagem: `Pagamento ${txn_id} de ${valor} MT (${volStr}) registado. A aguardar nï¿½mero de destino pelo cliente.`
     });
   } catch (err) {
     console.error('? [SMS PAYMENT ERRO]:', err);
@@ -5061,9 +5083,9 @@ app.post('/api/sms/payment', (req, res) => {
 });
 
 // ----------------------------------------------------------------
-// Pesquisa de referências SMS (M-Pesa / e-Mola)
-// GET /api/sms/payments          ? lista últimos 50 (aceita ?q= para filtrar)
-// GET /api/sms/payments/:txn_id  ? procura por ID exacto (em memória + Firestore)
+// Pesquisa de referï¿½ncias SMS (M-Pesa / e-Mola)
+// GET /api/sms/payments          ? lista ï¿½ltimos 50 (aceita ?q= para filtrar)
+// GET /api/sms/payments/:txn_id  ? procura por ID exacto (em memï¿½ria + Firestore)
 // ----------------------------------------------------------------
 app.get('/api/sms/payments', (req, res) => {
   try {
@@ -5093,27 +5115,27 @@ app.get('/api/sms/payments', (req, res) => {
   }
 });
 
-// Pesquisar referência específica por txn_id
+// Pesquisar referï¿½ncia especï¿½fica por txn_id
 app.get('/api/sms/payments/:txn_id', async (req, res) => {
   try {
     const txnId = req.params.txn_id;
     let payment = null;
 
-    // 1. Procurar em memória
+    // 1. Procurar em memï¿½ria
     if (inMemoryPayments.has(txnId)) payment = inMemoryPayments.get(txnId);
     if (!payment && baileysEngine && baileysEngine.smsPaymentsMap && baileysEngine.smsPaymentsMap.has(txnId)) {
       payment = baileysEngine.smsPaymentsMap.get(txnId);
     }
 
-    // 2. Procurar no Firestore (se disponível)
+    // 2. Procurar no Firestore (se disponï¿½vel)
     if (!payment && db) {
       try {
         const snap = await db.collection('sms_payments').doc(txnId).get();
         if (snap.exists) payment = snap.data();
-      } catch (_) { console.warn(`?? [FIREBASE] Falha ao buscar transação SMS ${txnId} no Firestore:`, _.message); }
+      } catch (_) { console.warn(`?? [FIREBASE] Falha ao buscar transaï¿½ï¿½o SMS ${txnId} no Firestore:`, _.message); }
     }
 
-    // 3. Pesquisa parcial (contém) nos pagamentos em memória
+    // 3. Pesquisa parcial (contï¿½m) nos pagamentos em memï¿½ria
     let similarResults = [];
     if (!payment) {
       const all = new Map();
@@ -5130,10 +5152,10 @@ app.get('/api/sms/payments/:txn_id', async (req, res) => {
       return res.json({ success: true, encontrado: true, payment });
     } else if (similarResults.length > 0) {
       return res.json({ success: true, encontrado: false, similares: similarResults,
-        mensagem: `Referência exacta não encontrada. ${similarResults.length} resultado(s) similar(es).` });
+        mensagem: `Referï¿½ncia exacta nï¿½o encontrada. ${similarResults.length} resultado(s) similar(es).` });
     } else {
       return res.status(404).json({ success: false, encontrado: false,
-        mensagem: `Referência ${txnId} não encontrada em memória ou base de dados.` });
+        mensagem: `Referï¿½ncia ${txnId} nï¿½o encontrada em memï¿½ria ou base de dados.` });
     }
   } catch (err) {
     return res.status(500).json({ success: false, mensagem: err.message });
@@ -5143,7 +5165,7 @@ app.get('/api/sms/payments/:txn_id', async (req, res) => {
 // -- ADMIN: Corrigir duplicatas em TABELAS e TABELAS_GRUPO --
 app.all('/api/admin/fix-duplicates', (req, res) => {
   const token = req.headers['x-master-token'] || req.query.token;
-  if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Não autorizado' });
+  if (!MASTER_TOKENS.has(token)) return res.status(403).json({ error: 'Nï¿½o autorizado' });
 
   if (baileysEngine && typeof baileysEngine.limparDuplicatasTabelas === 'function') {
     const alterado = baileysEngine.limparDuplicatasTabelas();
@@ -5158,17 +5180,17 @@ app.all('/api/admin/fix-duplicates', (req, res) => {
     });
   }
 
-  return res.status(500).json({ ok: false, error: 'Motor Baileys não carregado' });
+  return res.status(500).json({ ok: false, error: 'Motor Baileys nï¿½o carregado' });
 });
 
 // ----------------------------------------------------
 // 20. AXION CLIENT HUB API (APP DO CLIENTE & CRM)
 // ----------------------------------------------------
 
-// Armazenamento em memória para Clientes, Suporte e Mensagens
+// Armazenamento em memï¿½ria para Clientes, Suporte e Mensagens
 const clientUsers = new Map(); // phone -> { phone, name, password, pin, biometricEnabled, createdAt, lastLogin }
 const clientSupportMessages = []; // { id, clientPhone, clientName, sender: 'client'|'admin', text, createdAt, read: boolean }
-const clientSmsHistory = new Set(); // txn_ids já usados para evitar fraude
+const clientSmsHistory = new Set(); // txn_ids jï¿½ usados para evitar fraude
 
 // Carregar clientes salvos em cache local
 const CLIENTS_CACHE_FILE = path.resolve(__dirname, 'clients_store.json');
@@ -5197,11 +5219,11 @@ app.post('/api/client/auth/register', (req, res) => {
   try {
     const { phone, name, password, pin } = req.body || {};
     if (!phone || !password) {
-      return res.status(400).json({ success: false, mensagem: 'Telefone e senha são obrigatórios.' });
+      return res.status(400).json({ success: false, mensagem: 'Telefone e senha sï¿½o obrigatï¿½rios.' });
     }
     const cleanPhone = String(phone).replace(/\D/g, '');
     if (clientUsers.has(cleanPhone)) {
-      return res.status(400).json({ success: false, mensagem: 'Este número já possui cadastro. Faça login.' });
+      return res.status(400).json({ success: false, mensagem: 'Este nï¿½mero jï¿½ possui cadastro. Faï¿½a login.' });
     }
     const user = {
       phone: cleanPhone,
@@ -5236,7 +5258,7 @@ app.post('/api/client/auth/login', (req, res) => {
     const user = clientUsers.get(cleanPhone);
 
     if (!user) {
-      return res.status(404).json({ success: false, mensagem: 'Cliente não encontrado. Por favor registe-se.' });
+      return res.status(404).json({ success: false, mensagem: 'Cliente nï¿½o encontrado. Por favor registe-se.' });
     }
 
     if (!isBiometric && !verifyPassword(password, user.password)) {
@@ -5265,7 +5287,7 @@ app.post('/api/client/auth/biometric-toggle', (req, res) => {
   const { phone, enabled } = req.body || {};
   const cleanPhone = String(phone || '').replace(/\D/g, '');
   const user = clientUsers.get(cleanPhone);
-  if (!user) return res.status(404).json({ success: false, mensagem: 'Usuário não encontrado.' });
+  if (!user) return res.status(404).json({ success: false, mensagem: 'Usuï¿½rio nï¿½o encontrado.' });
 
   user.biometricEnabled = Boolean(enabled);
   saveClientsStore();
@@ -5287,7 +5309,7 @@ app.get('/api/client/system-status', (req, res) => {
     };
   });
 
-  // Verificar Portas Diárias (8024, 8023, 8025)
+  // Verificar Portas Diï¿½rias (8024, 8023, 8025)
   const dailyDevs = devices.filter(d => d.porta !== 8077 && d.porta !== 8777);
   const dailyOnline = dailyDevs.some(d => d.online && !d.sem_saldo);
 
@@ -5300,11 +5322,11 @@ app.get('/api/client/system-status', (req, res) => {
     sistema_operacional: dailyOnline || specialOnline,
     diario: {
       disponivel: dailyOnline,
-      mensagem: dailyOnline ? 'Pronto para envios diários 24h' : 'Portas diárias temporariamente ocupadas'
+      mensagem: dailyOnline ? 'Pronto para envios diï¿½rios 24h' : 'Portas diï¿½rias temporariamente ocupadas'
     },
     saldo_especial: {
       disponivel: specialOnline,
-      mensagem: specialOnline ? 'Porta 8077 pronta para Semanal / Mensal / Tudo Top' : 'Porta 8077 aguardando reposição de crédito'
+      mensagem: specialOnline ? 'Porta 8077 pronta para Semanal / Mensal / Tudo Top' : 'Porta 8077 aguardando reposiï¿½ï¿½o de crï¿½dito'
     },
     titulares: {
       mpesa: {
@@ -5359,14 +5381,14 @@ const DEFAULT_SERVER_PACKAGES = {
     { preco: 850, nome: "25 GB + Minutos", quantidade_mb: 25600, display_size: "25 GB + Voz", periodo: "?? Vodacom (30 Dias)", modo: "diamante" }
   ],
   especiais: [
-    { preco: 76, nome: "?? 3GB+700 (Renovação)", quantidade_mb: 3772, display_size: "3.7 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
-    { preco: 120, nome: "?? 5GB+700 (Renovação)", quantidade_mb: 5820, display_size: "5.8 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
-    { preco: 130, nome: "?? 5GB Faseado (1GB/dia)", quantidade_mb: 5120, display_size: "5.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" },
-    { preco: 195, nome: "?? 8GB+700 (Renovação)", quantidade_mb: 8892, display_size: "8.8 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
-    { preco: 240, nome: "?? 10GB+700 (Renovação)", quantidade_mb: 10940, display_size: "10.9 GB", periodo: "Renovação (+100MB/dia)", modo: "renovavel" },
-    { preco: 255, nome: "?? 10GB Faseado (1GB/dia)", quantidade_mb: 10240, display_size: "10.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" },
-    { preco: 381, nome: "?? 15GB Faseado (1GB/dia)", quantidade_mb: 15360, display_size: "15.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" },
-    { preco: 510, nome: "?? 20GB Faseado (1GB/dia)", quantidade_mb: 20480, display_size: "20.0 GB", periodo: "Diário Faseado (1GB/dia)", modo: "faseado" }
+    { preco: 76, nome: "?? 3GB+700 (Renovaï¿½ï¿½o)", quantidade_mb: 3772, display_size: "3.7 GB", periodo: "Renovaï¿½ï¿½o (+100MB/dia)", modo: "renovavel" },
+    { preco: 120, nome: "?? 5GB+700 (Renovaï¿½ï¿½o)", quantidade_mb: 5820, display_size: "5.8 GB", periodo: "Renovaï¿½ï¿½o (+100MB/dia)", modo: "renovavel" },
+    { preco: 130, nome: "?? 5GB Faseado (1GB/dia)", quantidade_mb: 5120, display_size: "5.0 GB", periodo: "Diï¿½rio Faseado (1GB/dia)", modo: "faseado" },
+    { preco: 195, nome: "?? 8GB+700 (Renovaï¿½ï¿½o)", quantidade_mb: 8892, display_size: "8.8 GB", periodo: "Renovaï¿½ï¿½o (+100MB/dia)", modo: "renovavel" },
+    { preco: 240, nome: "?? 10GB+700 (Renovaï¿½ï¿½o)", quantidade_mb: 10940, display_size: "10.9 GB", periodo: "Renovaï¿½ï¿½o (+100MB/dia)", modo: "renovavel" },
+    { preco: 255, nome: "?? 10GB Faseado (1GB/dia)", quantidade_mb: 10240, display_size: "10.0 GB", periodo: "Diï¿½rio Faseado (1GB/dia)", modo: "faseado" },
+    { preco: 381, nome: "?? 15GB Faseado (1GB/dia)", quantidade_mb: 15360, display_size: "15.0 GB", periodo: "Diï¿½rio Faseado (1GB/dia)", modo: "faseado" },
+    { preco: 510, nome: "?? 20GB Faseado (1GB/dia)", quantidade_mb: 20480, display_size: "20.0 GB", periodo: "Diï¿½rio Faseado (1GB/dia)", modo: "faseado" }
   ]
 };
 
@@ -5386,7 +5408,7 @@ function loadDynamicPackages() {
 }
 loadDynamicPackages();
 
-// Restaurar pacotes do RTDB se arquivo local não existir (após restart do Render)
+// Restaurar pacotes do RTDB se arquivo local nï¿½o existir (apï¿½s restart do Render)
 async function restoreDynamicPackagesFromRTDB() {
   if (!rtdb) return;
   try {
@@ -5395,7 +5417,7 @@ async function restoreDynamicPackagesFromRTDB() {
     if (data && typeof data === 'object' && (data.diario || data.semanal || data.mensal)) {
       currentDynamicPackages = { ...DEFAULT_SERVER_PACKAGES, ...data };
       saveDynamicPackages();
-      console.log('?? [RTDB RESTORE] Pacotes dinâmicos restaurados do Firebase RTDB.');
+      console.log('?? [RTDB RESTORE] Pacotes dinï¿½micos restaurados do Firebase RTDB.');
     }
   } catch (e) {
     console.warn('?? [RTDB RESTORE] Erro ao restaurar pacotes:', e.message);
@@ -5413,7 +5435,7 @@ function saveDynamicPackages() {
   }
 }
 
-// -- 20.3 Catálogo Completo de Pacotes Dinâmicos (Sincronizado com Admin & Apps) --
+// -- 20.3 Catï¿½logo Completo de Pacotes Dinï¿½micos (Sincronizado com Admin & Apps) --
 app.get('/api/client/packages', (req, res) => {
   return res.json({
     success: true,
@@ -5433,7 +5455,7 @@ app.post('/api/admin/packages/save', (req, res) => {
   try {
     const { packages } = req.body || {};
     if (!packages || typeof packages !== 'object') {
-      return res.status(400).json({ success: false, mensagem: 'Estrutura de pacotes inválida.' });
+      return res.status(400).json({ success: false, mensagem: 'Estrutura de pacotes invï¿½lida.' });
     }
 
     if (Array.isArray(packages.diario)) currentDynamicPackages.diario = packages.diario;
@@ -5451,7 +5473,7 @@ app.post('/api/admin/packages/save', (req, res) => {
       rtdb.ref('system_packages').set(currentDynamicPackages).catch(e => console.warn('?? [RTDB] Erro ao salvar system_packages:', e.message));
     }
 
-    console.log('? [ADMIN] Tabelas de pacotes atualizadas dinamicamente pelo Admin! Versão:', currentDynamicPackages.version);
+    console.log('? [ADMIN] Tabelas de pacotes atualizadas dinamicamente pelo Admin! Versï¿½o:', currentDynamicPackages.version);
 
     return res.json({
       success: true,
@@ -5464,13 +5486,13 @@ app.post('/api/admin/packages/save', (req, res) => {
   }
 });
 
-// -- 20.3.1 Sistema de Anúncios e Alertas para Clientes (Axion Broadcast) --
+// -- 20.3.1 Sistema de Anï¿½ncios e Alertas para Clientes (Axion Broadcast) --
 const ANNOUNCEMENT_CACHE_FILE = path.resolve(__dirname, 'cache_announcement.json');
 
 let currentAnnouncement = {
   id: 'ANN-DEFAULT',
   title: '?? Bem-vindo ao Axion Client Hub!',
-  message: 'Recarregue pacotes de megas com ativação imediata via M-Pesa e e-Mola sem filas!',
+  message: 'Recarregue pacotes de megas com ativaï¿½ï¿½o imediata via M-Pesa e e-Mola sem filas!',
   type: 'promo', // 'promo' | 'alert' | 'news' | 'info'
   active: false,
   sendNotification: true,
@@ -5492,7 +5514,7 @@ function loadAnnouncement() {
 }
 loadAnnouncement();
 
-// Restaurar anúncio do RTDB se arquivo local não existir (após restart do Render)
+// Restaurar anï¿½ncio do RTDB se arquivo local nï¿½o existir (apï¿½s restart do Render)
 async function restoreAnnouncementFromRTDB() {
   if (!rtdb) return;
   try {
@@ -5501,10 +5523,10 @@ async function restoreAnnouncementFromRTDB() {
     if (data && typeof data === 'object' && data.id) {
       currentAnnouncement = { ...currentAnnouncement, ...data };
       saveAnnouncement();
-      console.log('?? [RTDB RESTORE] Anúncio restaurado do Firebase RTDB.');
+      console.log('?? [RTDB RESTORE] Anï¿½ncio restaurado do Firebase RTDB.');
     }
   } catch (e) {
-    console.warn('?? [RTDB RESTORE] Erro ao restaurar anúncio:', e.message);
+    console.warn('?? [RTDB RESTORE] Erro ao restaurar anï¿½ncio:', e.message);
   }
 }
 if (!fs.existsSync(ANNOUNCEMENT_CACHE_FILE)) {
@@ -5519,7 +5541,7 @@ function saveAnnouncement() {
   }
 }
 
-// Endpoint para os clientes (Client Hub) obterem o anúncio atual
+// Endpoint para os clientes (Client Hub) obterem o anï¿½ncio atual
 app.get('/api/client/announcement', (req, res) => {
   return res.json({
     success: true,
@@ -5527,7 +5549,7 @@ app.get('/api/client/announcement', (req, res) => {
   });
 });
 
-// Endpoint Admin para ler o anúncio
+// Endpoint Admin para ler o anï¿½ncio
 app.get('/api/admin/announcement', (req, res) => {
   return res.json({
     success: true,
@@ -5535,7 +5557,7 @@ app.get('/api/admin/announcement', (req, res) => {
   });
 });
 
-// Endpoint Admin para salvar/publicar o anúncio
+// Endpoint Admin para salvar/publicar o anï¿½ncio
 app.post('/api/admin/announcement', (req, res) => {
   try {
     const { title, message, type, active, sendNotification } = req.body || {};
@@ -5557,9 +5579,9 @@ app.post('/api/admin/announcement', (req, res) => {
       rtdb.ref('system_announcement').set(currentAnnouncement).catch(e => console.warn('?? [RTDB] Erro ao salvar system_announcement:', e.message));
     }
 
-    console.log(`?? [ADMIN] Anúncio publicado para os clientes! Ativo: ${currentAnnouncement.active} | Título: ${currentAnnouncement.title}`);
+    console.log(`?? [ADMIN] Anï¿½ncio publicado para os clientes! Ativo: ${currentAnnouncement.active} | Tï¿½tulo: ${currentAnnouncement.title}`);
 
-    // Se o bot WhatsApp estiver conectado e o admin marcar para enviar notificação
+    // Se o bot WhatsApp estiver conectado e o admin marcar para enviar notificaï¿½ï¿½o
     if (currentAnnouncement.active && baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       const emojiType = currentAnnouncement.type === 'alert' ? '??' : currentAnnouncement.type === 'promo' ? '??' : '??';
       baileysEngine.enviarNotificacaoGrupo(
@@ -5575,41 +5597,41 @@ app.post('/api/admin/announcement', (req, res) => {
     return res.json({
       success: true,
       mensagem: currentAnnouncement.active 
-        ? '?? Anúncio publicado com sucesso! Todos os clientes receberão alerta no aplicativo.' 
-        : 'Anúncio desativado no aplicativo dos clientes.',
+        ? '?? Anï¿½ncio publicado com sucesso! Todos os clientes receberï¿½o alerta no aplicativo.' 
+        : 'Anï¿½ncio desativado no aplicativo dos clientes.',
       announcement: currentAnnouncement
     });
   } catch(e) {
-    return res.status(500).json({ success: false, mensagem: 'Erro ao salvar anúncio: ' + e.message });
+    return res.status(500).json({ success: false, mensagem: 'Erro ao salvar anï¿½ncio: ' + e.message });
   }
 });
 
-// -- 20.4 Compra via Confirmação de SMS (M-Pesa / e-Mola) --
-// As MESMAS regras do WhatsApp: confirmações que foram REALMENTE recebidas no nosso M-Pesa ou e-Mola
+// -- 20.4 Compra via Confirmaï¿½ï¿½o de SMS (M-Pesa / e-Mola) --
+// As MESMAS regras do WhatsApp: confirmaï¿½ï¿½es que foram REALMENTE recebidas no nosso M-Pesa ou e-Mola
 app.post('/api/client/purchase', async (req, res) => {
   try {
     const { clientPhone, recipientPhone, smsText, packagePrice, packageModo, packageMb, packageName } = req.body || {};
 
-    // -- 1. Campos obrigatórios --
+    // -- 1. Campos obrigatï¿½rios --
     if (!recipientPhone || !smsText || !packagePrice || !packageMb) {
-      return res.status(400).json({ success: false, mensagem: 'Preencha todos os campos: número destinatário, comprovativo de pagamento e pacote escolhido.' });
+      return res.status(400).json({ success: false, mensagem: 'Preencha todos os campos: nï¿½mero destinatï¿½rio, comprovativo de pagamento e pacote escolhido.' });
     }
 
     const smsClean = String(smsText).trim();
 
-    // -- 2. Validar que é um comprovativo M-Pesa / e-Mola --
-    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transação|Transacao|ID\s*(?:da)?\s*transa|ID\s*Trans|PP2\d{5})/i.test(smsClean);
+    // -- 2. Validar que ï¿½ um comprovativo M-Pesa / e-Mola --
+    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transaï¿½ï¿½o|Transacao|ID\s*(?:da)?\s*transa|ID\s*Trans|PP2\d{5})/i.test(smsClean);
     const temValor    = /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(smsClean);
     if (!temIndicador || !temValor) {
       return res.status(400).json({
         success: false,
-        mensagem: '? Texto inválido. Deve colar a mensagem de confirmação real recebida no M-Pesa ou e-Mola (com valor em MT e código de transação).'
+        mensagem: '? Texto invï¿½lido. Deve colar a mensagem de confirmaï¿½ï¿½o real recebida no M-Pesa ou e-Mola (com valor em MT e cï¿½digo de transaï¿½ï¿½o).'
       });
     }
 
-    // -- 3. Extrair ID de transação --
+    // -- 3. Extrair ID de transaï¿½ï¿½o --
     function extrairTxIdLocal(texto) {
-      const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[cç][aã]o|ID\s*Trans|TxId|Ref(?:er[eê]ncia)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
+      const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[cï¿½][aï¿½]o|ID\s*Trans|TxId|Ref(?:er[eï¿½]ncia)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
       if (mExplicit && mExplicit[1] && mExplicit[1].length >= 6) return mExplicit[1].toUpperCase().replace(/\.$/, '');
       const mPP = texto.match(/\b(PP[0-9]{6}\.[0-9]{4}\.[A-Z0-9]{4,8})\b/i);
       if (mPP) return mPP[1].toUpperCase();
@@ -5641,17 +5663,17 @@ app.post('/api/client/purchase', async (req, res) => {
     const valorSMS = extrairValorLocal(smsClean);
     const preco    = Number(packagePrice);
 
-    // -- 5. Verificar se o pagamento foi feito para os nossos números oficiais (M-Pesa 856268811 / e-Mola 864882152) --
+    // -- 5. Verificar se o pagamento foi feito para os nossos nï¿½meros oficiais (M-Pesa 856268811 / e-Mola 864882152) --
     const NOSSOS_NUMEROS = ['856268811', '879691565', '864882152'];
     const destinoPagamento = NOSSOS_NUMEROS.find(n => smsClean.includes(n) || smsClean.includes('258' + n));
     if (!destinoPagamento) {
       return res.status(400).json({
         success: false,
-        mensagem: `? Pagamento não reconhecido. O comprovativo deve mostrar transferência para uma das contas oficiais Axion:\n?? M-Pesa: 856268811 (Kelven Junior)\n?? e-Mola: 879691565 (Kelven Junior Anabela Nharrava)\n\nCertifique-se de que transferiu para a nossa conta correta.`
+        mensagem: `? Pagamento nï¿½o reconhecido. O comprovativo deve mostrar transferï¿½ncia para uma das contas oficiais Axion:\n?? M-Pesa: 856268811 (Kelven Junior)\n?? e-Mola: 879691565 (Kelven Junior Anabela Nharrava)\n\nCertifique-se de que transferiu para a nossa conta correta.`
       });
     }
 
-    // -- 6. Verificar valor compatível com o preço do pacote (tolerância ±1 MT) --
+    // -- 6. Verificar valor compatï¿½vel com o preï¿½o do pacote (tolerï¿½ncia ï¿½1 MT) --
     if (valorSMS !== null && (preco - valorSMS) > 1) {
       return res.status(400).json({
         success: false,
@@ -5659,21 +5681,21 @@ app.post('/api/client/purchase', async (req, res) => {
       });
     }
 
-    // -- 7. Verificar número destinatário de megas (Vodacom/Movitel/Tmcel) --
+    // -- 7. Verificar nï¿½mero destinatï¿½rio de megas (Vodacom/Movitel/Tmcel) --
     const cleanDest = String(recipientPhone).replace(/\D/g, '').slice(-9);
     if (!cleanDest.startsWith('84') && !cleanDest.startsWith('85') && !cleanDest.startsWith('86') && !cleanDest.startsWith('87') && !cleanDest.startsWith('82') && !cleanDest.startsWith('83')) {
-      return res.status(400).json({ success: false, mensagem: 'Número destinatário de Moçambique inválido (deve ser Vodacom, Movitel ou Tmcel).' });
+      return res.status(400).json({ success: false, mensagem: 'Nï¿½mero destinatï¿½rio de Moï¿½ambique invï¿½lido (deve ser Vodacom, Movitel ou Tmcel).' });
     }
 
-    // -- 8. Anti-fraude: bloquear reutilização do mesmo comprovativo --
+    // -- 8. Anti-fraude: bloquear reutilizaï¿½ï¿½o do mesmo comprovativo --
     if (clientSmsHistory.has(txnId) && !txnId.startsWith('TXN-')) {
-      return res.status(400).json({ success: false, mensagem: '? Este comprovativo/referência já foi utilizado anteriormente no sistema. Cada confirmação é válida apenas para 1 compra.' });
+      return res.status(400).json({ success: false, mensagem: '? Este comprovativo/referï¿½ncia jï¿½ foi utilizado anteriormente no sistema. Cada confirmaï¿½ï¿½o ï¿½ vï¿½lida apenas para 1 compra.' });
     }
 
-    // -- 9. VALIDAÇÃO REAL: A CONFIRMAÇÃO FOI REALMENTE RECEBIDA NO NOSSO M-PESA OU E-MOLA? --
+    // -- 9. VALIDAï¿½ï¿½O REAL: A CONFIRMAï¿½ï¿½O FOI REALMENTE RECEBIDA NO NOSSO M-PESA OU E-MOLA? --
     let realPay = await findOperatorPayment(txnId);
 
-    // Se ainda não caiu no servidor, aguarda ativamente até 10 segundos (polling de 1s) para cobrir o atraso normal de rede SMS
+    // Se ainda nï¿½o caiu no servidor, aguarda ativamente atï¿½ 10 segundos (polling de 1s) para cobrir o atraso normal de rede SMS
     if (!realPay && !txnId.startsWith('TXN-')) {
       for (let i = 0; i < 10; i++) {
         await new Promise(r => setTimeout(r, 1000));
@@ -5688,12 +5710,12 @@ app.post('/api/client/purchase', async (req, res) => {
     const metodo  = (destinoPagamento === '879691565' || destinoPagamento === '864882152') ? 'emola' : 'mpesa';
     const metodoNome = metodo === 'emola' ? 'e-Mola' : 'M-Pesa';
 
-    // CASO A: OPERADORA JÁ CONFIRMOU O RECEBIMENTO NO NOSSO TELEFONE!
+    // CASO A: OPERADORA Jï¿½ CONFIRMOU O RECEBIMENTO NO NOSSO TELEFONE!
     if (realPay) {
       if (realPay.usado) {
         return res.status(400).json({
           success: false,
-          mensagem: '? Este comprovativo já foi confirmado e utilizado anteriormente por outro pedido.'
+          mensagem: '? Este comprovativo jï¿½ foi confirmado e utilizado anteriormente por outro pedido.'
         });
       }
 
@@ -5701,7 +5723,7 @@ app.post('/api/client/purchase', async (req, res) => {
       if (valOperadora < (preco - 1)) {
         return res.status(400).json({
           success: false,
-          mensagem: `? Valor recebido pela rede (${valOperadora} MT) é menor que o preço do pacote (${preco} MT).`
+          mensagem: `? Valor recebido pela rede (${valOperadora} MT) ï¿½ menor que o preï¿½o do pacote (${preco} MT).`
         });
       }
 
@@ -5759,14 +5781,14 @@ app.post('/api/client/purchase', async (req, res) => {
           `?? *Origem:* Axion Client Hub App\n` +
           `?? *Hora:* ${new Date().toLocaleString('pt-PT', { timeZone: 'Africa/Maputo' })}\n` +
           `??????????????????\n` +
-          `? *Status:* Confirmado pelo SMS da rede. Enviado para ativação imediata!`
+          `? *Status:* Confirmado pelo SMS da rede. Enviado para ativaï¿½ï¿½o imediata!`
         );
       }
 
       return res.json({
         success: true,
         status: 'confirmed',
-        mensagem: `? Pagamento de ${valOperadora} MT confirmado oficialmente pela rede ${metodoNome}! Os seus megas estão a ser enviados imediatamente para +258 ${cleanDest}.`,
+        mensagem: `? Pagamento de ${valOperadora} MT confirmado oficialmente pela rede ${metodoNome}! Os seus megas estï¿½o a ser enviados imediatamente para +258 ${cleanDest}.`,
         orderId,
         destinatario: cleanDest,
         quantidade_mb: qtyMb,
@@ -5776,9 +5798,9 @@ app.post('/api/client/purchase', async (req, res) => {
       });
     }
 
-    // CASO B: A CONFIRMAÇÃO DA OPERADORA AINDA NÃO ENTROU NO SISTEMA (DELAYS DE REDE SMS)
-    // Regra idêntica ao WhatsApp: status 'aguardando_operadora' por até 3 minutos
-    console.log(`? [CLIENT HUB] Ref ${txnId} aguardando SMS da operadora... Iniciando fila de validação.`);
+    // CASO B: A CONFIRMAï¿½ï¿½O DA OPERADORA AINDA Nï¿½O ENTROU NO SISTEMA (DELAYS DE REDE SMS)
+    // Regra idï¿½ntica ao WhatsApp: status 'aguardando_operadora' por atï¿½ 3 minutos
+    console.log(`? [CLIENT HUB] Ref ${txnId} aguardando SMS da operadora... Iniciando fila de validaï¿½ï¿½o.`);
 
     const orderDoc = {
       id: orderId,
@@ -5789,7 +5811,7 @@ app.post('/api/client/purchase', async (req, res) => {
       valor: preco,
       valor_pago: valorSMS || preco,
       modo,
-      status: 'aguardando_operadora', // Não envia megas até a confirmação real entrar!
+      status: 'aguardando_operadora', // Nï¿½o envia megas atï¿½ a confirmaï¿½ï¿½o real entrar!
       origem: 'client_hub',
       metodo,
       sms_ref: txnId,
@@ -5814,11 +5836,11 @@ app.post('/api/client/purchase', async (req, res) => {
       if (hubAguardandoOperadora.has(txnId)) {
         hubAguardandoOperadora.delete(txnId);
         orderDoc.status = 'failed';
-        orderDoc.motivo = 'Confirmação por SMS da operadora não foi recebida no tempo limite (10 min).';
+        orderDoc.motivo = 'Confirmaï¿½ï¿½o por SMS da operadora nï¿½o foi recebida no tempo limite (10 min).';
         orderDoc.updatedAt = new Date().toISOString();
         inMemoryOrders.set(orderId, orderDoc);
         saveOrdersToCache();
-        console.warn(`? [HUB TIMEOUT] Pedido ${orderId} cancelado: SMS da operadora não entrou em 10 minutos.`);
+        console.warn(`? [HUB TIMEOUT] Pedido ${orderId} cancelado: SMS da operadora nï¿½o entrou em 10 minutos.`);
       }
     }, 10 * 60 * 1000);
 
@@ -5832,7 +5854,7 @@ app.post('/api/client/purchase', async (req, res) => {
     return res.json({
       success: true,
       status: 'aguardando_operadora',
-      mensagem: `? Comprovativo registado! Estamos a aguardar a confirmação oficial da rede (${metodoNome}). Assim que o SMS da operadora entrar no sistema (geralmente em 30 a 60 segundos), os seus megas serão enviados automaticamente. Pode acompanhar na aba 'Meus Pedidos'.`,
+      mensagem: `? Comprovativo registado! Estamos a aguardar a confirmaï¿½ï¿½o oficial da rede (${metodoNome}). Assim que o SMS da operadora entrar no sistema (geralmente em 30 a 60 segundos), os seus megas serï¿½o enviados automaticamente. Pode acompanhar na aba 'Meus Pedidos'.`,
       orderId,
       destinatario: cleanDest,
       quantidade_mb: qtyMb,
@@ -5847,7 +5869,7 @@ app.post('/api/client/purchase', async (req, res) => {
   }
 });
 
-// -- 20.5 Histórico de Compras do Cliente --
+// -- 20.5 Histï¿½rico de Compras do Cliente --
 app.get('/api/client/orders/:phone', (req, res) => {
   const cleanPhone = String(req.params.phone || '').replace(/\D/g, '');
   const orders = [...inMemoryOrders.values()]
@@ -5876,7 +5898,7 @@ app.get('/api/client/support/messages/:phone', (req, res) => {
 
 app.post('/api/client/support/send', (req, res) => {
   const { phone, name, text, sender, isDirectAdmin, hasPaymentProof, paymentDetails } = req.body || {};
-  if (!phone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e mensagem são obrigatórios.' });
+  if (!phone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e mensagem sï¿½o obrigatï¿½rios.' });
 
   const cleanPhone = String(phone).replace(/\D/g, '');
   const msgObj = {
@@ -5906,26 +5928,26 @@ app.post('/api/client/support/send', (req, res) => {
 app.post('/api/client/support/process-proof', async (req, res) => {
   try {
     const { phone, name, smsText } = req.body || {};
-    if (!smsText) return res.status(400).json({ success: false, mensagem: 'Texto do comprovativo é obrigatório.' });
+    if (!smsText) return res.status(400).json({ success: false, mensagem: 'Texto do comprovativo ï¿½ obrigatï¿½rio.' });
 
     const smsClean = String(smsText).trim();
     const cleanPhone = String(phone || '').replace(/\D/g, '');
 
-    // 1. Detectar se é realmente um SMS de pagamento
-    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transa[çc][ãa]o|Ref|PP2\d{5})/i.test(smsClean);
+    // 1. Detectar se ï¿½ realmente um SMS de pagamento
+    const temIndicador = /(Confirmado|Recebeu|Recebeste|Transferiste|Transferiu|e-Mola|eMola|M-Pesa|MPesa|TxId|Transa[ï¿½c][ï¿½a]o|Ref|PP2\d{5})/i.test(smsClean);
     const temValor = /[\d.,]+\s*(?:MT|MZN|Mts?)\b/i.test(smsClean);
 
     if (!temIndicador && !temValor) {
       return res.json({
         success: false,
         recognized: false,
-        mensagem: 'Não foi possível reconhecer este texto como um comprovativo M-Pesa ou e-Mola.'
+        mensagem: 'Nï¿½o foi possï¿½vel reconhecer este texto como um comprovativo M-Pesa ou e-Mola.'
       });
     }
 
     // 2. Extrair TxId
     function extrairTxIdChat(texto) {
-      const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[çc][ãa]o|ID\s*Trans|TxId|Ref(?:er[êe]ncia)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
+      const mExplicit = texto.match(/(?:ID\s*(?:da)?\s*transa[ï¿½c][ï¿½a]o|ID\s*Trans|TxId|Ref(?:er[ï¿½e]ncia)?)\s*[:.]?\s*([A-Z0-9]+(?:\.[A-Z0-9]+)*)/i);
       if (mExplicit && mExplicit[1] && mExplicit[1].length >= 6) return mExplicit[1].toUpperCase().replace(/\.$/, '');
       const mPP = texto.match(/\b(PP[0-9]{6}\.[0-9]{4}\.[A-Z0-9]{4,8})\b/i);
       if (mPP) return mPP[1].toUpperCase();
@@ -5955,13 +5977,13 @@ app.post('/api/client/support/process-proof', async (req, res) => {
 
     const txnId = extrairTxIdChat(smsClean);
     const valor = extrairValorChat(smsClean) || 0;
-    // Detecção fiável por prefixo: e-Mola começa com "ID da transacao", M-Pesa com "Confirmado DJDXXXXX"
-    const isEmolaPrefix = /^(ID\s*(da\s*)?transa[cç][aã]o|Transaction\s*ID|ID\s*Trans)/i.test(smsClean.trim());
+    // Detecï¿½ï¿½o fiï¿½vel por prefixo: e-Mola comeï¿½a com "ID da transacao", M-Pesa com "Confirmado DJDXXXXX"
+    const isEmolaPrefix = /^(ID\s*(da\s*)?transa[cï¿½][aï¿½]o|Transaction\s*ID|ID\s*Trans)/i.test(smsClean.trim());
     const isMpesaPrefix = /^Confirmado\s+[A-Z0-9]{8,}|PP2\d{5}\.\d{4}/i.test(smsClean.trim());
     const isEmola = isEmolaPrefix ? true : isMpesaPrefix ? false : /e-?mola|879691565|864882152/i.test(smsClean);
     const metodo = isEmola ? 'e-Mola' : 'M-Pesa';
 
-    // 4. Verificar se a operadora já confirmou no gateway
+    // 4. Verificar se a operadora jï¿½ confirmou no gateway
     let realPay = await findOperatorPayment(txnId);
 
     const paymentDetails = {
@@ -5991,16 +6013,16 @@ app.post('/api/client/support/process-proof', async (req, res) => {
     let respostaTexto = '';
     if (realPay) {
       respostaTexto = `? <b>Comprovativo M-Pesa/e-Mola Reconhecido e Validado!</b><br><br>` +
-        `• <b>Código/Ref:</b> <code class="text-cyan-400 font-bold">${txnId}</code><br>` +
-        `• <b>Valor Recebido:</b> <b>${realPay.valor || valor} MT</b> (${metodo})<br>` +
-        `• <b>Status:</b> Confirmado pelo nosso gateway de rede!<br><br>` +
-        `?? O seu pagamento já está aprovado no sistema! O Administrador Kelven foi notificado para despachar ou você pode ir na aba <b>Loja</b> e concluir a compra com esse comprovativo.`;
+        `ï¿½ <b>Cï¿½digo/Ref:</b> <code class="text-cyan-400 font-bold">${txnId}</code><br>` +
+        `ï¿½ <b>Valor Recebido:</b> <b>${realPay.valor || valor} MT</b> (${metodo})<br>` +
+        `ï¿½ <b>Status:</b> Confirmado pelo nosso gateway de rede!<br><br>` +
+        `?? O seu pagamento jï¿½ estï¿½ aprovado no sistema! O Administrador Kelven foi notificado para despachar ou vocï¿½ pode ir na aba <b>Loja</b> e concluir a compra com esse comprovativo.`;
     } else {
       respostaTexto = `? <b>Comprovativo de Pagamento Detectado!</b><br><br>` +
-        `• <b>Código/Ref:</b> <code class="text-amber-400 font-bold">${txnId}</code><br>` +
-        `• <b>Valor Identificado:</b> <b>${valor} MT</b> (${metodo})<br>` +
-        `• <b>Status:</b> Registado no sistema! A aguardar o SMS oficial da operadora entrar no telemóvel gateway.<br><br>` +
-        `?? <b>Atenção:</b> O sistema e o Administrador Kelven já receberam a sua confirmação. Assim que a rede entregar o SMS (30 a 60 segundos), o envio é liberado!`;
+        `ï¿½ <b>Cï¿½digo/Ref:</b> <code class="text-amber-400 font-bold">${txnId}</code><br>` +
+        `ï¿½ <b>Valor Identificado:</b> <b>${valor} MT</b> (${metodo})<br>` +
+        `ï¿½ <b>Status:</b> Registado no sistema! A aguardar o SMS oficial da operadora entrar no telemï¿½vel gateway.<br><br>` +
+        `?? <b>Atenï¿½ï¿½o:</b> O sistema e o Administrador Kelven jï¿½ receberam a sua confirmaï¿½ï¿½o. Assim que a rede entregar o SMS (30 a 60 segundos), o envio ï¿½ liberado!`;
     }
 
     return res.json({
@@ -6018,12 +6040,12 @@ app.post('/api/client/support/process-proof', async (req, res) => {
   }
 });
 
-// -- ENDPOINT: Listar Números Configurados pelos Clientes (Receptores Padrão) --
+// -- ENDPOINT: Listar Nï¿½meros Configurados pelos Clientes (Receptores Padrï¿½o) --
 app.get(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'Não autorizado' });
+    return res.status(403).json({ error: 'Nï¿½o autorizado' });
   }
 
   let receptores = customerServices && typeof customerServices.listarTodosReceptores === 'function'
@@ -6046,12 +6068,12 @@ app.get(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   return res.json({ success: true, count: receptores.length, receptores });
 });
 
-// -- ENDPOINT: Configurar Receptor Padrão Manualmente (Admin / API) --
+// -- ENDPOINT: Configurar Receptor Padrï¿½o Manualmente (Admin / API) --
 app.post(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token || req.body?.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'Não autorizado' });
+    return res.status(403).json({ error: 'Nï¿½o autorizado' });
   }
 
   const { pagador, pagadores, receptor, destino, ownerJid } = req.body || {};
@@ -6059,7 +6081,7 @@ app.post(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
   const listPagadores = pagadores || (pagador ? [pagador] : [targetReceptor]);
 
   if (!targetReceptor) {
-    return res.status(400).json({ success: false, error: 'Receptor obrigatório' });
+    return res.status(400).json({ success: false, error: 'Receptor obrigatï¿½rio' });
   }
 
   if (customerServices && typeof customerServices.definirReceptorPadrao === 'function') {
@@ -6067,15 +6089,15 @@ app.post(['/api/admin/recipients', '/api/recipients'], async (req, res) => {
     return res.json(result);
   }
 
-  return res.status(500).json({ success: false, error: 'Customer services não inicializado' });
+  return res.status(500).json({ success: false, error: 'Customer services nï¿½o inicializado' });
 });
 
-// -- ENDPOINT: Remover Receptor Padrão (Admin / API) --
+// -- ENDPOINT: Remover Receptor Padrï¿½o (Admin / API) --
 app.delete(['/api/admin/recipients/:phone', '/api/recipients/:phone'], async (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token || req.body?.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'Não autorizado' });
+    return res.status(403).json({ error: 'Nï¿½o autorizado' });
   }
 
   const phone = req.params.phone;
@@ -6084,7 +6106,7 @@ app.delete(['/api/admin/recipients/:phone', '/api/recipients/:phone'], async (re
     return res.json(result);
   }
 
-  return res.status(500).json({ success: false, error: 'Customer services não inicializado' });
+  return res.status(500).json({ success: false, error: 'Customer services nï¿½o inicializado' });
 });
 
 // -- 20.7 CRM & Suporte no Axion Admin Master --
@@ -6092,7 +6114,7 @@ app.get('/api/admin/crm/stats', (req, res) => {
   const token = req.headers['authorization'] || req.headers['x-master-token'] || req.query.token;
   const cleanTok = String(token || '').replace('Bearer ', '').trim();
   if (!MASTER_TOKENS.has(cleanTok) && cleanTok !== 'AxionKelven2026Secure') {
-    return res.status(403).json({ error: 'Não autorizado' });
+    return res.status(403).json({ error: 'Nï¿½o autorizado' });
   }
 
   const now = Date.now();
@@ -6155,7 +6177,7 @@ app.get('/api/admin/crm/stats', (req, res) => {
 });
 
 app.get('/api/admin/crm/support-tickets', (req, res) => {
-  // Agrupa mensagens não lidas por cliente para o Admin responder
+  // Agrupa mensagens nï¿½o lidas por cliente para o Admin responder
   const grouped = {};
   clientSupportMessages.forEach(m => {
     if (!grouped[m.clientPhone]) {
@@ -6190,7 +6212,7 @@ app.get('/api/admin/crm/support-tickets', (req, res) => {
 app.post('/api/admin/crm/support-reply', (req, res) => {
   const clientPhone = req.body?.clientPhone || req.body?.phone;
   const text = req.body?.text || req.body?.reply || req.body?.message;
-  if (!clientPhone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e resposta obrigatórios.' });
+  if (!clientPhone || !text) return res.status(400).json({ success: false, mensagem: 'Telefone e resposta obrigatï¿½rios.' });
 
   const cleanPhone = String(clientPhone).replace(/\D/g, '');
   const msgObj = {
@@ -6210,7 +6232,7 @@ app.post('/api/admin/crm/support-reply', (req, res) => {
 
   clientSupportMessages.push(msgObj);
 
-  // Se solicitado envio também via SMS de hardware (Porta 8077 do Gateway)
+  // Se solicitado envio tambï¿½m via SMS de hardware (Porta 8077 do Gateway)
   if (req.body.sendViaSms || req.body.sendSms) {
     const gatewayPort = req.body.port || process.env.SMS_GATEWAY_PORT || 8077;
     const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
@@ -6221,7 +6243,7 @@ app.post('/api/admin/crm/support-reply', (req, res) => {
     }, { timeout: 6000 }).then(smsRes => {
       console.log(`?? [SMS SUPORTE ENVIADO] Porta ${gatewayPort} -> ${cleanPhone}:`, smsRes.data?.mensagem || 'OK');
     }).catch(err => {
-      console.warn(`?? [SMS SUPORTE AVISO] Não foi possível despachar SMS na porta ${gatewayPort}:`, err.message);
+      console.warn(`?? [SMS SUPORTE AVISO] Nï¿½o foi possï¿½vel despachar SMS na porta ${gatewayPort}:`, err.message);
     });
   }
 
@@ -6239,7 +6261,7 @@ app.get(['/api/sms/status', '/api/sms/gateway/status'], async (req, res) => {
     return res.json({
       success: false,
       porta: Number(gatewayPort),
-      mensagem: `Gateway SMS inacessível na porta ${gatewayPort}: ${err.message}`,
+      mensagem: `Gateway SMS inacessï¿½vel na porta ${gatewayPort}: ${err.message}`,
       status: 'offline'
     });
   }
@@ -6276,7 +6298,7 @@ app.post(['/api/sms/send', '/api/sms/gateway/send'], async (req, res) => {
   const gatewayHost = process.env.SMS_GATEWAY_HOST || '127.0.0.1';
 
   if (!targetNum || !targetText) {
-    return res.status(400).json({ success: false, mensagem: 'Número de telefone e texto do SMS são obrigatórios.' });
+    return res.status(400).json({ success: false, mensagem: 'Nï¿½mero de telefone e texto do SMS sï¿½o obrigatï¿½rios.' });
   }
 
   try {
@@ -6287,10 +6309,10 @@ app.post(['/api/sms/send', '/api/sms/gateway/send'], async (req, res) => {
     }, { timeout: 7000 });
     return res.json(response.data);
   } catch (err) {
-    console.warn(`?? [SMS GATEWAY SEND] Envio direto HTTP falhou (${err.message}). Adicionando à fila da Nuvem.`);
+    console.warn(`?? [SMS GATEWAY SEND] Envio direto HTTP falhou (${err.message}). Adicionando ï¿½ fila da Nuvem.`);
     if (smsSalesEngine && typeof smsSalesEngine.sendSms === 'function') {
       const qRes = await smsSalesEngine.sendSms(targetNum, targetText, Number(sim_slot) || 0);
-      return res.json({ success: true, queued: true, mensagem: 'SMS adicionado à fila da Nuvem para despacho pelo celular Gateway', ...qRes });
+      return res.json({ success: true, queued: true, mensagem: 'SMS adicionado ï¿½ fila da Nuvem para despacho pelo celular Gateway', ...qRes });
     }
     return res.status(502).json({
       success: false,
@@ -6299,7 +6321,7 @@ app.post(['/api/sms/send', '/api/sms/gateway/send'], async (req, res) => {
   }
 });
 
-// -- 20.7.1 CONFIRMAÇÃO DE ENVIO DE SMS PELO GATEWAY ANDROID (PORTA 8090) --
+// -- 20.7.1 CONFIRMAï¿½ï¿½O DE ENVIO DE SMS PELO GATEWAY ANDROID (PORTA 8090) --
 app.post(['/api/sms/outgoing/confirm', '/api/sms/confirm'], (req, res) => {
   const { id, success, error } = req.body || {};
   if (smsSalesEngine && typeof smsSalesEngine.confirmSmsSent === 'function') {
@@ -6317,8 +6339,8 @@ app.get('/api/sms/outgoing/pending', (req, res) => {
   return res.json({ success: true, pending_sms: null });
 });
 
-// -- 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOMÁTICO) --
-// -- CHAMADA PERDIDA: Registo e resposta SMS automático ----------------------
+// -- 20.7.2 WEBHOOK DE RECEBIMENTO DE SMS DOS CLIENTES (BOT DE VENDAS AUTOMï¿½TICO) --
+// -- CHAMADA PERDIDA: Registo e resposta SMS automï¿½tico ----------------------
 // POST /api/calls/missed  ? recebe chamada perdida do gateway Android
 app.post('/api/calls/missed', async (req, res) => {
   try {
@@ -6346,13 +6368,13 @@ app.post('/api/calls/missed', async (req, res) => {
     // Notificar grupo WhatsApp (se baileys estiver activo)
     if (baileysEngine && typeof baileysEngine.enviarNotificacaoGrupo === 'function') {
       baileysEngine.enviarNotificacaoGrupo(
-        `?? *CHAMADA PERDIDA* — Axion\n` +
+        `?? *CHAMADA PERDIDA* ï¿½ Axion\n` +
         `??????????????????\n` +
-        `?? *Número:* *${cleanNum}*\n` +
+        `?? *Nï¿½mero:* *${cleanNum}*\n` +
         `?? *Porta:* ${originPort || 'Auto'}\n` +
         `?? *Hora:* ${new Date(ts).toLocaleTimeString('pt-MZ')}\n` +
         `??????????????????\n` +
-        `? SMS automático enviado ao cliente!`
+        `? SMS automï¿½tico enviado ao cliente!`
       );
     }
 
@@ -6369,7 +6391,7 @@ app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
   const cleanBody = body || text || mensagem;
 
   if (!cleanSender || !cleanBody) {
-    return res.status(400).json({ success: false, mensagem: 'Remetente e mensagem são obrigatórios.' });
+    return res.status(400).json({ success: false, mensagem: 'Remetente e mensagem sï¿½o obrigatï¿½rios.' });
   }
 
   const originPort = port ? Number(port) : null;
@@ -6392,7 +6414,7 @@ app.post(['/api/sms/incoming', '/api/sms/webhook'], async (req, res) => {
   return res.json({ success: true, mensagem: 'SMS processado pelo Bot de Vendas Axion!' });
 });
 
-// -- 20.8 Motor de Alertas de Expiração (D-3 e D-0) & Planos Faseados/Renováveis --
+// -- 20.8 Motor de Alertas de Expiraï¿½ï¿½o (D-3 e D-0) & Planos Faseados/Renovï¿½veis --
 const clientRemindersSent = new Set(); // chave: `${orderId}_D3` ou `${orderId}_D0`
 
 function processClientPackageReminders() {
@@ -6403,12 +6425,12 @@ function processClientPackageReminders() {
     if (!order.createdAt) continue;
     const modo = (order.modo || '').toLowerCase();
     
-    // Determinar duração do pacote em dias
+    // Determinar duraï¿½ï¿½o do pacote em dias
     let duracaoDias = 0;
     if (modo === 'semanal') duracaoDias = 7;
     else if (modo === 'mensal') duracaoDias = 30;
     else if (modo === 'tudo_top' || modo === 'ilimitado') duracaoDias = 30;
-    else continue; // diários não precisam de lembrete D-3
+    else continue; // diï¿½rios nï¿½o precisam de lembrete D-3
 
     const createdAtTime = new Date(order.createdAt).getTime();
     const dataExpiracaoTime = createdAtTime + (duracaoDias * ONE_DAY_MS);
@@ -6423,13 +6445,13 @@ function processClientPackageReminders() {
       if (!clientRemindersSent.has(reminderKey)) {
         clientRemindersSent.add(reminderKey);
 
-        const textoD3 = `?? [Axion Lembrete]: Olá! O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira em 3 dias. Para continuar conectado sem interrupções, renove já no seu Axion Client Hub ou via WhatsApp!`;
+        const textoD3 = `?? [Axion Lembrete]: Olï¿½! O seu pacote ${order.quantidade}MB (${modo.toUpperCase()}) expira em 3 dias. Para continuar conectado sem interrupï¿½ï¿½es, renove jï¿½ no seu Axion Client Hub ou via WhatsApp!`;
 
         // Salvar mensagem no chat de suporte do app para o cliente ver imediatamente
         clientSupportMessages.push({
           id: `REMINDER-${Date.now()}`,
           clientPhone,
-          clientName: 'Axion Notificações',
+          clientName: 'Axion Notificaï¿½ï¿½es',
           sender: 'admin',
           text: textoD3,
           createdAt: new Date().toISOString(),
@@ -6445,7 +6467,7 @@ function processClientPackageReminders() {
       }
     }
 
-    // 2. Alerta no Próprio Dia de Expiração (D-0) — APENAS no próprio dia (não em pedidos antigos)
+    // 2. Alerta no Prï¿½prio Dia de Expiraï¿½ï¿½o (D-0) ï¿½ APENAS no prï¿½prio dia (nï¿½o em pedidos antigos)
     if (diasRestantes === 0 && (now - createdAtTime) <= (duracaoDias + 1) * ONE_DAY_MS) {
       const reminderKey = `${order.id || order.orderId}_D0`;
       if (!clientRemindersSent.has(reminderKey)) {
@@ -6456,7 +6478,7 @@ function processClientPackageReminders() {
         clientSupportMessages.push({
           id: `REMINDER-D0-${Date.now()}`,
           clientPhone,
-          clientName: 'Axion Notificações',
+          clientName: 'Axion Notificaï¿½ï¿½es',
           sender: 'admin',
           text: textoD0,
           createdAt: new Date().toISOString(),
@@ -6473,23 +6495,23 @@ function processClientPackageReminders() {
   }
 }
 
-// Executar verificação de lembretes a cada 1 hora
+// Executar verificaï¿½ï¿½o de lembretes a cada 1 hora
 setInterval(processClientPackageReminders, 60 * 60 * 1000);
-// Executar primeira checagem após 15 segundos do boot
+// Executar primeira checagem apï¿½s 15 segundos do boot
 setTimeout(processClientPackageReminders, 15000);
 
 // ------------------------------------------------------------------------------
-// --- 20.9 MOTOR DE PLANOS AGENDADOS: RENOVÁVEL & FASEADO --------------------
+// --- 20.9 MOTOR DE PLANOS AGENDADOS: RENOVï¿½VEL & FASEADO --------------------
 // ------------------------------------------------------------------------------
 //
-// RENOVÁVEL: Envia MB inicial no momento da compra + MB_diaria cada dia seguinte
+// RENOVï¿½VEL: Envia MB inicial no momento da compra + MB_diaria cada dia seguinte
 //            1 hora mais cedo que o dia anterior.
-//            Ex: Compra 3GB+700 às 10h ? agora envia 3072MB inicial
+//            Ex: Compra 3GB+700 ï¿½s 10h ? agora envia 3072MB inicial
 //                Dia 1 ? 09h ? 100MB | Dia 2 ? 08h ? 100MB | ... por 7 dias
 //
-// FASEADO:   Envia 1GB por dia até esgotar o total.
+// FASEADO:   Envia 1GB por dia atï¿½ esgotar o total.
 //            Dia 0 ? agora ? 1024MB | Dia 1 ? 1h antes ? 1024MB | ...
-//            Ex: 5GB Faseado (5×1024MB) | 10GB Faseado (10×1024MB)
+//            Ex: 5GB Faseado (5ï¿½1024MB) | 10GB Faseado (10ï¿½1024MB)
 // ------------------------------------------------------------------------------
 
 const PLANS_CACHE_FILE = path.join(__dirname, 'cache_scheduled_plans.json');
@@ -6497,18 +6519,18 @@ const scheduledPlans   = new Map(); // planId ? planDoc
 
 // -- Tabela Oficial de Planos Especiais com Fallback Permanente ---------------
 const DEFAULT_PLANOS_ESPECIAIS = {
-  // -- Renovável -------------------------------------------------------------
-  "76":   { nome: "?? 3GB+700 (Renovação)",   tipo: "renovavel",      total: 3772,  inicial: 3072,  diaria: 100  },
-  "120":  { nome: "?? 5GB+700 (Renovação)",   tipo: "renovavel",      total: 5820,  inicial: 5120,  diaria: 100  },
-  "195":  { nome: "?? 8GB+700 (Renovação)",   tipo: "renovavel",      total: 8892,  inicial: 8192,  diaria: 100  },
-  "240":  { nome: "?? 10GB+700 (Renovação)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100  },
-  // -- Faseado Automático ----------------------------------------------------
+  // -- Renovï¿½vel -------------------------------------------------------------
+  "76":   { nome: "?? 3GB+700 (Renovaï¿½ï¿½o)",   tipo: "renovavel",      total: 3772,  inicial: 3072,  diaria: 100  },
+  "120":  { nome: "?? 5GB+700 (Renovaï¿½ï¿½o)",   tipo: "renovavel",      total: 5820,  inicial: 5120,  diaria: 100  },
+  "195":  { nome: "?? 8GB+700 (Renovaï¿½ï¿½o)",   tipo: "renovavel",      total: 8892,  inicial: 8192,  diaria: 100  },
+  "240":  { nome: "?? 10GB+700 (Renovaï¿½ï¿½o)",  tipo: "renovavel",      total: 10940, inicial: 10240, diaria: 100  },
+  // -- Faseado Automï¿½tico ----------------------------------------------------
   "130":  { nome: "?? 5GB Faseado (1GB/dia)",  tipo: "faseado",        total: 5120,  inicial: 1024,  diaria: 1024 },
   "255":  { nome: "?? 10GB Faseado (1GB/dia)", tipo: "faseado",        total: 10240, inicial: 1024,  diaria: 1024 },
   "381":  { nome: "?? 15GB Faseado (1GB/dia)", tipo: "faseado",        total: 15360, inicial: 1024,  diaria: 1024 },
   "510":  { nome: "?? 20GB Faseado (1GB/dia)", tipo: "faseado",        total: 20480, inicial: 1024,  diaria: 1024 },
   // -- Faseado Mensal Interativo (cliente define quanto quer por dia) ----------
-  // Base: 1GB/dia — cliente pode definir outra quantidade ao subscrever
+  // Base: 1GB/dia ï¿½ cliente pode definir outra quantidade ao subscrever
   "232": { nome: "?? 10GB Faseado Mensal", tipo: "faseado_mensal", total: 10240, inicial: 1024, diaria: 1024 },
   "461": { nome: "?? 20GB Faseado Mensal", tipo: "faseado_mensal", total: 20480, inicial: 1024, diaria: 1024 },
   "700": { nome: "?? 30GB Faseado Mensal", tipo: "faseado_mensal", total: 30720, inicial: 1024, diaria: 1024 }
@@ -6537,7 +6559,7 @@ function getPlanosEspeciaisConfig() {
   return { ...DEFAULT_PLANOS_ESPECIAIS, ...planos };
 }
 
-// -- Persistência --------------------------------------------------------------
+// -- Persistï¿½ncia --------------------------------------------------------------
 function loadScheduledPlans() {
   try {
     if (fs.existsSync(PLANS_CACHE_FILE)) {
@@ -6567,7 +6589,7 @@ function saveScheduledPlans() {
 
 loadScheduledPlans();
 
-// -- Helper: Calcular próxima hora de entrega ----------------------------------
+// -- Helper: Calcular prï¿½xima hora de entrega ----------------------------------
 function calcularProximaEntrega(plan, baseDate) {
   const now = baseDate || new Date();
   const proxima = new Date(now);
@@ -6578,7 +6600,7 @@ function calcularProximaEntrega(plan, baseDate) {
     const [h, m] = plan.hora_preferida.split(':').map(Number);
     proxima.setHours(h, m || 0, 0, 0);
   } else {
-    // Padrão: 1h antes da hora de compra, mínimo 07h
+    // Padrï¿½o: 1h antes da hora de compra, mï¿½nimo 07h
     const horaBase = now.getHours() - 1;
     proxima.setHours(Math.max(7, horaBase), 0, 0, 0);
   }
@@ -6591,10 +6613,10 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
   const planId   = `PLAN-${tipo.toUpperCase()}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const now      = new Date();
 
-  // Total de entregas diárias adicionais após a entrega inicial
+  // Total de entregas diï¿½rias adicionais apï¿½s a entrega inicial
   const entregas_diarias_total = Math.max(1, Math.round((total_mb - (mb_inicial || mb_diaria)) / mb_diaria));
 
-  // Próxima entrega usando o helper (respeita hora_preferida do cliente)
+  // Prï¿½xima entrega usando o helper (respeita hora_preferida do cliente)
   const proxima = calcularProximaEntrega({ hora_preferida }, now);
   proxima.setSeconds(0);
   proxima.setMilliseconds(0);
@@ -6610,12 +6632,12 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
     hora_preferida: hora_preferida || null,  // ex: "07:00" (faseado_mensal)
     entregas_diarias_total,
     entregas_feitas: 0,
-    saldo_mb:    total_mb - (mb_inicial || mb_diaria), // saldo após entrega inicial
+    saldo_mb:    total_mb - (mb_inicial || mb_diaria), // saldo apï¿½s entrega inicial
     valor,
     sms_ref:     sms_ref || '',
     hora_compra: now.toISOString(),
     proxima_entrega: proxima.toISOString(),
-    // Campos específicos do faseado_mensal
+    // Campos especï¿½ficos do faseado_mensal
     aguardando_confirmacao: false,
     confirmacao_expira_em:  null,
     historico: [],
@@ -6625,12 +6647,12 @@ function criarPlano({ numero, tipo, total_mb, mb_inicial, mb_diaria, valor, sms_
 
   scheduledPlans.set(planId, plan);
   saveScheduledPlans();
-  console.log(`? [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | Total: ${total_mb}MB | Inicial: ${mb_inicial}MB | Diária: ${mb_diaria}MB/dia | Total dias: ${entregas_diarias_total} | Próxima: ${proxima.toISOString()}`);
+  console.log(`? [PLANO ${tipo.toUpperCase()}] Criado: ${planId} | Total: ${total_mb}MB | Inicial: ${mb_inicial}MB | Diï¿½ria: ${mb_diaria}MB/dia | Total dias: ${entregas_diarias_total} | Prï¿½xima: ${proxima.toISOString()}`);
   return plan;
 }
 
 
-// -- Detector e Ativador Automático de Planos Especiais ------------------------
+// -- Detector e Ativador Automï¿½tico de Planos Especiais ------------------------
 function handleSpecialPlanIfApplicable(orderDoc) {
   if (!orderDoc || orderDoc.isSpecialPlanHandled) return false;
   const val = Number(orderDoc.valor) || Number(orderDoc.valor_pago);
@@ -6660,10 +6682,10 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     const mbInicial = plano.inicial || 1024;
     const mbDiaria  = plano.diaria  || 1024;
     const totalMb   = plano.total   || (mbInicial + (mbDiaria * (tipo === 'renovavel' ? 7 : 4)));
-    const labelTipo = tipo === 'faseado_mensal' ? 'Faseado Mensal' : tipo === 'faseado' ? 'Faseado' : 'Renovável';
+    const labelTipo = tipo === 'faseado_mensal' ? 'Faseado Mensal' : tipo === 'faseado' ? 'Faseado' : 'Renovï¿½vel';
 
-    // ?? CRÍTICO: Todos os planos especiais enviam a Fase 1 como pacote DIÁRIO normal
-    // pelas portas diárias disponíveis (8023, 8025, etc.)
+    // ?? CRï¿½TICO: Todos os planos especiais enviam a Fase 1 como pacote DIï¿½RIO normal
+    // pelas portas diï¿½rias disponï¿½veis (8023, 8025, etc.)
     orderDoc.quantidade = mbInicial;
     orderDoc.origem = tipo;
     orderDoc.modo = 'diario';
@@ -6671,7 +6693,7 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     orderDoc.input_val = '';
     orderDoc.remetente = `Axion ${labelTipo} (Fase 1)`;
 
-    // Criar o plano agendado para as próximas entregas
+    // Criar o plano agendado para as prï¿½ximas entregas
     const plan = criarPlano({
       numero: orderDoc.numero,
       tipo,
@@ -6684,11 +6706,11 @@ function handleSpecialPlanIfApplicable(orderDoc) {
     });
 
     console.log(`? [PLANO ESPECIAL DETECTADO] Ordem ${orderDoc.orderId} (${val || 0}MT) configurada como ${tipo.toUpperCase()}!`);
-    console.log(`   ?? Entrega Inicial: ${mbInicial}MB (enviando agora via celular diário)`);
-    console.log(`   ? Próximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias | Próxima: ${plan.proxima_entrega}`);
+    console.log(`   ?? Entrega Inicial: ${mbInicial}MB (enviando agora via celular diï¿½rio)`);
+    console.log(`   ? Prï¿½ximas entregas: ${plan.mb_diaria}MB/dia | Total: ${plan.entregas_diarias_total} dias | Prï¿½xima: ${plan.proxima_entrega}`);
 
 
-    // Notificar cliente no WhatsApp com explicação detalhada, clara e tranquilizadora do plano
+    // Notificar cliente no WhatsApp com explicaï¿½ï¿½o detalhada, clara e tranquilizadora do plano
     let clientJid = orderDoc.jid;
     if (!clientJid && baileysEngine && typeof baileysEngine.getJidForOrder === 'function') {
       clientJid = baileysEngine.getJidForOrder(orderDoc.id || orderDoc.orderId);
@@ -6704,32 +6726,32 @@ function handleSpecialPlanIfApplicable(orderDoc) {
         ? `???????????????????????????????\n` +
           `  ?? *PLANO FASEADO ACTIVADO!* ?\n` +
           `???????????????????????????????\n\n` +
-          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
-          `1?? *1ª Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
-          `?? *Próximas Fases:* *${plan.entregas_diarias_total} entregas diárias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
-          `? *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
+          `Olï¿½! Muito obrigado pela sua preferï¿½ncia. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `1?? *1ï¿½ Fase (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
+          `?? *Prï¿½ximas Fases:* *${plan.entregas_diarias_total} entregas diï¿½rias de ${(mbDiaria/1024).toFixed(1)} GB*\n` +
+          `? *Prï¿½ximo Envio:* *Amanhï¿½ ï¿½s ${horaProx}*\n` +
           `?? *Destino:* *${orderDoc.numero}*\n` +
           `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
           `?? *Como funciona o Plano Faseado?*\n` +
-          `• A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
-          `• O envio é feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
-          `• Você receberá uma notificação aqui no WhatsApp a cada fase entregue!\n\n` +
-          `?? *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
+          `ï¿½ A cada dia, o nosso sistema envia uma nova fase de ${(mbDiaria/1024).toFixed(1)} GB para si.\n` +
+          `ï¿½ O envio ï¿½ feito automaticamente *1 hora antes* do anterior expirar, para que os seus megas acumulem e nunca fique sem internet.\n` +
+          `ï¿½ Vocï¿½ receberï¿½ uma notificaï¿½ï¿½o aqui no WhatsApp a cada fase entregue!\n\n` +
+          `?? *Dï¿½vidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`
         : `???????????????????????????????\n` +
-          `  ?? *PLANO RENOVÁVEL ACTIVADO!* ?\n` +
+          `  ?? *PLANO RENOVï¿½VEL ACTIVADO!* ?\n` +
           `???????????????????????????????\n\n` +
-          `Olá! Muito obrigado pela sua preferência. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
+          `Olï¿½! Muito obrigado pela sua preferï¿½ncia. O seu plano *${plano.nome}* foi configurado com sucesso:\n\n` +
           `1?? *Carga Inicial (Hoje):* *${(mbInicial/1024).toFixed(1)} GB* (Acaba de ser enviado para a sua linha!)\n` +
-          `?? *Renovações Diárias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
-          `? *Próximo Envio:* *Amanhã às ${horaProx}*\n` +
+          `?? *Renovaï¿½ï¿½es Diï¿½rias:* *${plan.entregas_diarias_total} dias de ${mbDiaria} MB/dia*\n` +
+          `? *Prï¿½ximo Envio:* *Amanhï¿½ ï¿½s ${horaProx}*\n` +
           `?? *Destino:* *${orderDoc.numero}*\n` +
           `? *Total Contratado:* *${(totalMb/1024).toFixed(1)} GB*\n\n` +
-          `?? *Como funciona o Plano Renovável?*\n` +
-          `• Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
-          `• Durante os próximos 7 dias, o sistema transfere *${mbDiaria} MB diários* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
-          `• Assim, os seus dados duram a semana toda sem expirar!\n` +
-          `• Você receberá uma notificação aqui no WhatsApp a cada renovação diária.\n\n` +
-          `?? *Dúvidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`;
+          `?? *Como funciona o Plano Renovï¿½vel?*\n` +
+          `ï¿½ Enviamos hoje a sua carga principal de ${(mbInicial/1024).toFixed(1)} GB.\n` +
+          `ï¿½ Durante os prï¿½ximos 7 dias, o sistema transfere *${mbDiaria} MB diï¿½rios* cerca de 1 hora antes de expirar para renovar e acumular a validade do seu saldo.\n` +
+          `ï¿½ Assim, os seus dados duram a semana toda sem expirar!\n` +
+          `ï¿½ Vocï¿½ receberï¿½ uma notificaï¿½ï¿½o aqui no WhatsApp a cada renovaï¿½ï¿½o diï¿½ria.\n\n` +
+          `?? *Dï¿½vidas ou Suporte:* Responda a esta mensagem ou envie *Suporte*.`;
 
       baileysEngine.enviarMensagemTexto(clientJid, msgTexto).catch(() => {});
     }
@@ -6739,7 +6761,7 @@ function handleSpecialPlanIfApplicable(orderDoc) {
   return false;
 }
 
-// -- Executar entrega diária agendada ------------------------------------------
+// -- Executar entrega diï¿½ria agendada ------------------------------------------
 async function executarEntregaPlano(planId) {
   const plan = scheduledPlans.get(planId);
   if (!plan || plan.status !== 'ativo') return;
@@ -6748,34 +6770,34 @@ async function executarEntregaPlano(planId) {
   const orderId  = `${planId}-D${entregaN}`;
   const timestamp = new Date().toISOString();
 
-  // Resetar flags de confirmação (faseado_mensal)
+  // Resetar flags de confirmaï¿½ï¿½o (faseado_mensal)
   plan.aguardando_confirmacao = false;
   plan.confirmacao_expira_em  = null;
 
   const isFaseadoMensal = plan.tipo === 'faseado_mensal';
-  const labelTipo = isFaseadoMensal ? 'Faseado Mensal' : plan.tipo === 'faseado' ? 'Faseado' : 'Renovável';
+  const labelTipo = isFaseadoMensal ? 'Faseado Mensal' : plan.tipo === 'faseado' ? 'Faseado' : 'Renovï¿½vel';
 
-  // Criar ordem diária normal na fila de processamento
+  // Criar ordem diï¿½ria normal na fila de processamento
   const orderDoc = {
     orderId,
     id:       orderId,
     numero:   plan.numero,
     quantidade: plan.mb_diaria,
-    valor:    0, // já pago na compra inicial
+    valor:    0, // jï¿½ pago na compra inicial
     valor_pago: 0,
-    modo:     'diario', // USSD diário padrão
-    targetPort: null,   // Qualquer porta diária apta pega na hora
+    modo:     'diario', // USSD diï¿½rio padrï¿½o
+    targetPort: null,   // Qualquer porta diï¿½ria apta pega na hora
     status:   'pending',
     origem:   plan.tipo,
     planId,
-    remetente: `Axion Auto (${isFaseadoMensal ? `${labelTipo} - Entrega ${entregaN}` : plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renovação ${entregaN}`})`,
+    remetente: `Axion Auto (${isFaseadoMensal ? `${labelTipo} - Entrega ${entregaN}` : plan.tipo === 'faseado' ? `Fase ${entregaN + 1}` : `Renovaï¿½ï¿½o ${entregaN}`})`,
     createdAt: timestamp,
     updatedAt: timestamp
   };
 
   inMemoryOrders.set(orderId, orderDoc);
 
-  // Guardar referência da última entrega para monitorizar se foi bem sucedida
+  // Guardar referï¿½ncia da ï¿½ltima entrega para monitorizar se foi bem sucedida
   plan.ultima_entrega_orderId = orderId;
   plan.ultima_entrega_tentativas = 0;
 
@@ -6786,7 +6808,7 @@ async function executarEntregaPlano(planId) {
       console.warn('Firebase plan order err:', e.message));
   }
 
-  // Registar no histórico do plano
+  // Registar no histï¿½rico do plano
   plan.historico.push({ entrega: entregaN, orderId, timestamp, mb: plan.mb_diaria });
   plan.entregas_feitas = entregaN;
 
@@ -6804,10 +6826,10 @@ async function executarEntregaPlano(planId) {
     ? `Entrega ${entregaN} (Saldo: ${plan.saldo_mb !== undefined ? (plan.saldo_mb >= 1024 ? (plan.saldo_mb/1024).toFixed(1)+'GB' : plan.saldo_mb+'MB') : 'N/A'})`
     : plan.tipo === 'faseado'
       ? `Fase ${entregaN + 1}/${plan.entregas_diarias_total + 1}`
-      : `Renovação ${entregaN}/${plan.entregas_diarias_total}`;
+      : `Renovaï¿½ï¿½o ${entregaN}/${plan.entregas_diarias_total}`;
   console.log(`?? [PLANO ${plan.tipo.toUpperCase()}] ${label} ? ${plan.mb_diaria}MB ? ${plan.numero} | Ordem: ${orderId}`);
 
-  // Calcular próxima hora de envio usando o helper (respeita hora_preferida)
+  // Calcular prï¿½xima hora de envio usando o helper (respeita hora_preferida)
   const proxima = calcularProximaEntrega(plan);
   proxima.setSeconds(0);
   proxima.setMilliseconds(0);
@@ -6825,77 +6847,77 @@ async function executarEntregaPlano(planId) {
   if (plan.tipo === 'faseado_mensal') {
     if (isFinal) {
       textoNotif = `???????????????????????????????\n` +
-                   `  ?? *PLANO FASEADO MENSAL CONCLUÍDO!* ??\n` +
+                   `  ?? *PLANO FASEADO MENSAL CONCLUï¿½DO!* ??\n` +
                    `???????????????????????????????\n\n` +
-                   `Olá! Acabámos de enviar os seus últimos *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*!\n\n` +
+                   `Olï¿½! Acabï¿½mos de enviar os seus ï¿½ltimos *${(plan.mb_diaria/1024).toFixed(1)} GB* para o nï¿½mero *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
-                   `? O seu Plano Faseado Mensal foi concluído com sucesso.\n\n` +
-                   `Muito obrigado pela confiança na *Axion Internet*!`;
+                   `? O seu Plano Faseado Mensal foi concluï¿½do com sucesso.\n\n` +
+                   `Muito obrigado pela confianï¿½a na *Axion Internet*!`;
     } else {
       textoNotif = `???????????????????????????????\n` +
                    `  ?? *ENTREGA FASEADA MENSAL REALIZADA!* ??\n` +
                    `???????????????????????????????\n\n` +
-                   `Olá! Acabámos de enviar *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*.\n\n` +
+                   `Olï¿½! Acabï¿½mos de enviar *${(plan.mb_diaria/1024).toFixed(1)} GB* para o nï¿½mero *${plan.numero}*.\n\n` +
                    `?? *Estado do seu Plano:*\n` +
-                   `• *Saldo Restante:* ${saldoFormatado || 'N/A'}\n` +
-                   `• *Aprox. dias restantes:* ${restantes} dia(s)\n` +
-                   `• *Próxima confirmação:* Amanhã às *${horaProx}*\n\n` +
-                   `?? *Lembre-se:* Amanhã vamos perguntar se quer receber. Responda *SIM*, *NÃO*, ou use *sacar Xgb* para sacar quando quiser.\n\n` +
-                   `? _Boa navegação!_`;
+                   `ï¿½ *Saldo Restante:* ${saldoFormatado || 'N/A'}\n` +
+                   `ï¿½ *Aprox. dias restantes:* ${restantes} dia(s)\n` +
+                   `ï¿½ *Prï¿½xima confirmaï¿½ï¿½o:* Amanhï¿½ ï¿½s *${horaProx}*\n\n` +
+                   `?? *Lembre-se:* Amanhï¿½ vamos perguntar se quer receber. Responda *SIM*, *Nï¿½O*, ou use *sacar Xgb* para sacar quando quiser.\n\n` +
+                   `? _Boa navegaï¿½ï¿½o!_`;
     }
   } else if (plan.tipo === 'faseado') {
 
     if (isFinal) {
       textoNotif = `???????????????????????????????\n` +
-                   `  ?? *PLANO FASEADO CONCLUÍDO!* ??\n` +
+                   `  ?? *PLANO FASEADO CONCLUï¿½DO!* ??\n` +
                    `???????????????????????????????\n\n` +
-                   `Olá! Acabámos de enviar a *Última Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o número *${plan.numero}*!\n\n` +
+                   `Olï¿½! Acabï¿½mos de enviar a *ï¿½ltima Fase (${label})* de *${(plan.mb_diaria/1024).toFixed(1)} GB* para o nï¿½mero *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
-                   `? Todas as fases foram concluídas com sucesso.\n\n` +
-                   `Muito obrigado pela confiança na *Axion Internet*!`;
+                   `? Todas as fases foram concluï¿½das com sucesso.\n\n` +
+                   `Muito obrigado pela confianï¿½a na *Axion Internet*!`;
     } else {
       textoNotif = `???????????????????????????????\n` +
                    `  ?? *${label.toUpperCase()} ENTREGUE!* ??\n` +
                    `???????????????????????????????\n\n` +
-                   `Olá! Acabámos de transferir mais *${(plan.mb_diaria/1024).toFixed(1)} GB* para o seu número *${plan.numero}*.\n\n` +
+                   `Olï¿½! Acabï¿½mos de transferir mais *${(plan.mb_diaria/1024).toFixed(1)} GB* para o seu nï¿½mero *${plan.numero}*.\n\n` +
                    `?? *Progresso do seu Plano Faseado:*\n` +
-                   `• *Fases Concluídas:* ${entregaN + 1} de ${plan.entregas_diarias_total + 1}\n` +
-                   `• *Fases Restantes:* ${restantes} fase(s)\n` +
-                   `• *Próximo Envio:* Amanhã às *${horaProx}* (1 hora antes de expirar a anterior)\n\n` +
-                   `? _Os dados acumularam com o saldo anterior. Boa navegação!_`;
+                   `ï¿½ *Fases Concluï¿½das:* ${entregaN + 1} de ${plan.entregas_diarias_total + 1}\n` +
+                   `ï¿½ *Fases Restantes:* ${restantes} fase(s)\n` +
+                   `ï¿½ *Prï¿½ximo Envio:* Amanhï¿½ ï¿½s *${horaProx}* (1 hora antes de expirar a anterior)\n\n` +
+                   `? _Os dados acumularam com o saldo anterior. Boa navegaï¿½ï¿½o!_`;
     }
   } else {
-    // Renovável
+    // Renovï¿½vel
     if (isFinal) {
       textoNotif = `???????????????????????????????\n` +
-                   `  ?? *PLANO RENOVÁVEL CONCLUÍDO!* ??\n` +
+                   `  ?? *PLANO RENOVï¿½VEL CONCLUï¿½DO!* ??\n` +
                    `???????????????????????????????\n\n` +
-                   `Olá! Acabámos de enviar a *Última Renovação (${label})* de *+${plan.mb_diaria} MB* para o número *${plan.numero}*!\n\n` +
+                   `Olï¿½! Acabï¿½mos de enviar a *ï¿½ltima Renovaï¿½ï¿½o (${label})* de *+${plan.mb_diaria} MB* para o nï¿½mero *${plan.numero}*!\n\n` +
                    `? *Total Entregue:* *${(plan.total_mb/1024).toFixed(1)} GB*\n` +
-                   `? O ciclo de 7 dias de renovações automáticas foi concluído com sucesso.\n\n` +
-                   `Muito obrigado pela confiança na *Axion Internet*!`;
+                   `? O ciclo de 7 dias de renovaï¿½ï¿½es automï¿½ticas foi concluï¿½do com sucesso.\n\n` +
+                   `Muito obrigado pela confianï¿½a na *Axion Internet*!`;
     } else {
       textoNotif = `???????????????????????????????\n` +
                    `  ?? *${label.toUpperCase()} ENTREGUE!* ??\n` +
                    `???????????????????????????????\n\n` +
-                   `Olá! Acabámos de transferir *+${plan.mb_diaria} MB* de renovação para o seu número *${plan.numero}*.\n\n` +
-                   `?? *Progresso da sua Renovação:*\n` +
-                   `• *Renovações Concluídas:* ${entregaN} de ${plan.entregas_diarias_total}\n` +
-                   `• *Renovações Restantes:* ${restantes} dia(s)\n` +
-                   `• *Próxima Renovação:* Amanhã às *${horaProx}* (1 hora antes de expirar)\n\n` +
-                   `? _A validade dos seus megas foi renovada com sucesso para não expirar!_`;
+                   `Olï¿½! Acabï¿½mos de transferir *+${plan.mb_diaria} MB* de renovaï¿½ï¿½o para o seu nï¿½mero *${plan.numero}*.\n\n` +
+                   `?? *Progresso da sua Renovaï¿½ï¿½o:*\n` +
+                   `ï¿½ *Renovaï¿½ï¿½es Concluï¿½das:* ${entregaN} de ${plan.entregas_diarias_total}\n` +
+                   `ï¿½ *Renovaï¿½ï¿½es Restantes:* ${restantes} dia(s)\n` +
+                   `ï¿½ *Prï¿½xima Renovaï¿½ï¿½o:* Amanhï¿½ ï¿½s *${horaProx}* (1 hora antes de expirar)\n\n` +
+                   `? _A validade dos seus megas foi renovada com sucesso para nï¿½o expirar!_`;
     }
   }
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
-    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar renovação:', e.message));
+    baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, textoNotif).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar renovaï¿½ï¿½o:', e.message));
   }
 
   // Guardar mensagem no suporte do app
   clientSupportMessages.push({
     id: `PLAN-MSG-${Date.now()}`,
     clientPhone: plan.clientPhone,
-    clientName: 'Axion Automático',
+    clientName: 'Axion Automï¿½tico',
     sender: 'admin',
     text: textoNotif,
     createdAt: timestamp,
@@ -6906,16 +6928,16 @@ async function executarEntregaPlano(planId) {
   if (isFinal) {
     plan.status = 'concluido';
     plan.concluido_em = timestamp;
-    console.log(`?? [PLANO ${plan.tipo.toUpperCase()}] ${planId} CONCLUÍDO! Total entregue: ${plan.total_mb}MB ao ${plan.numero}`);
+    console.log(`?? [PLANO ${plan.tipo.toUpperCase()}] ${planId} CONCLUï¿½DO! Total entregue: ${plan.total_mb}MB ao ${plan.numero}`);
     saveScheduledPlans();
     return;
   }
 
   saveScheduledPlans();
-  console.log(`? [PLANO] Próxima entrega agendada: ${plan.proxima_entrega}`);
+  console.log(`? [PLANO] Prï¿½xima entrega agendada: ${plan.proxima_entrega}`);
 }
 
-// -- Enviar pedido de confirmação ao cliente (faseado_mensal) ------------------
+// -- Enviar pedido de confirmaï¿½ï¿½o ao cliente (faseado_mensal) ------------------
 async function enviarPedidoConfirmacao(planId) {
   const plan = scheduledPlans.get(planId);
   if (!plan || plan.status !== 'ativo' || plan.aguardando_confirmacao) return;
@@ -6929,22 +6951,22 @@ async function enviarPedidoConfirmacao(planId) {
 
   const msg =
     `???????????????????????????????\n` +
-    `  ?? *FASEADO MENSAL — ENTREGA DO DIA* ??\n` +
+    `  ?? *FASEADO MENSAL ï¿½ ENTREGA DO DIA* ??\n` +
     `???????????????????????????????\n\n` +
-    `Olá! Os seus *${mbF}* de hoje estão prontos para ser enviados para o *${plan.numero}*.\n\n` +
+    `Olï¿½! Os seus *${mbF}* de hoje estï¿½o prontos para ser enviados para o *${plan.numero}*.\n\n` +
     `?? *Saldo Restante:* *${sldF}*\n\n` +
     `Quer receber os seus dados agora?\n\n` +
     `? Responda *SIM* para receber agora\n` +
-    `?? Responda *NÃO* para adiar para amanhã\n` +
+    `?? Responda *Nï¿½O* para adiar para amanhï¿½\n` +
     `?? Responda *sacar Xgb* para sacar uma quantidade diferente\n\n` +
-    `_Esta pergunta expira em 2 horas. Se não responder, a entrega será adiada automaticamente._`;
+    `_Esta pergunta expira em 2 horas. Se nï¿½o responder, a entrega serï¿½ adiada automaticamente._`;
 
   // Enviar via WhatsApp
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msg).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar plano:', e.message));
   }
 
-  // Guardar notificação para o Hub (clientSupportMessages)
+  // Guardar notificaï¿½ï¿½o para o Hub (clientSupportMessages)
   if (typeof clientSupportMessages !== 'undefined') {
     clientSupportMessages.push({
       id:          `PLAN-CONF-${planId}-${Date.now()}`,
@@ -6960,14 +6982,14 @@ async function enviarPedidoConfirmacao(planId) {
   }
 
   saveScheduledPlans();
-  console.log(`? [PLANO MENSAL] ${planId}: confirmação enviada. Expira: ${plan.confirmacao_expira_em}`);
+  console.log(`? [PLANO MENSAL] ${planId}: confirmaï¿½ï¿½o enviada. Expira: ${plan.confirmacao_expira_em}`);
 }
 
-// -- Processar resposta SIM/NÃO do cliente -------------------------------------
+// -- Processar resposta SIM/Nï¿½O do cliente -------------------------------------
 // Retorna { success, acao, mensagem }
 async function handleConfirmacaoPlano(numero, resposta) {
   const numLimpo = String(numero).replace(/\D/g, '').slice(-9);
-  // Encontrar plano activo do número
+  // Encontrar plano activo do nï¿½mero
   let plan = null;
   let planId = null;
   for (const [pid, p] of scheduledPlans.entries()) {
@@ -6981,12 +7003,12 @@ async function handleConfirmacaoPlano(numero, resposta) {
 
   if (['sim', 's', 'yes', '1'].includes(resp)) {
     if (!plan.aguardando_confirmacao) {
-      return { success: false, error: 'Não há entrega pendente de confirmação neste momento.' };
+      return { success: false, error: 'Nï¿½o hï¿½ entrega pendente de confirmaï¿½ï¿½o neste momento.' };
     }
     await executarEntregaPlano(planId);
     return { success: true, acao: 'entrega_iniciada', mensagem: `? A sua entrega de ${plan.mb_diaria >= 1024 ? (plan.mb_diaria/1024).toFixed(1)+'GB' : plan.mb_diaria+'MB'} foi iniciada!` };
 
-  } else if (['nao', 'não', 'n', 'no', '0'].includes(resp)) {
+  } else if (['nao', 'nï¿½o', 'n', 'no', '0'].includes(resp)) {
     plan.aguardando_confirmacao = false;
     plan.confirmacao_expira_em  = null;
     const proxima = calcularProximaEntrega(plan);
@@ -6994,10 +7016,10 @@ async function handleConfirmacaoPlano(numero, resposta) {
     saveScheduledPlans();
     const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
     const sldF = plan.saldo_mb >= 1024 ? `${(plan.saldo_mb/1024).toFixed(1)}GB` : `${plan.saldo_mb}MB`;
-    return { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: *${sldF}*. Voltaremos a perguntar amanhã às *${horaProx}*.\n\nUse *sacar Xgb* sempre que quiser sacar.` };
+    return { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: *${sldF}*. Voltaremos a perguntar amanhï¿½ ï¿½s *${horaProx}*.\n\nUse *sacar Xgb* sempre que quiser sacar.` };
 
   } else {
-    return { success: false, error: 'Resposta inválida. Responda SIM ou NÃO.' };
+    return { success: false, error: 'Resposta invï¿½lida. Responda SIM ou Nï¿½O.' };
   }
 }
 
@@ -7017,7 +7039,7 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
   if (!plan.saldo_mb || plan.saldo_mb <= 0) return { success: false, error: 'Saldo esgotado.' };
 
   const mbReal = Math.min(Number(mbSolicitado), plan.saldo_mb);
-  if (mbReal < 100) return { success: false, error: 'Saque mínimo: 100MB.' };
+  if (mbReal < 100) return { success: false, error: 'Saque mï¿½nimo: 100MB.' };
 
   const targetDestino = numeroDestino ? String(numeroDestino).replace(/\D/g, '').slice(-9) : plan.numero;
 
@@ -7041,7 +7063,7 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
   saveOrdersToCache();
   if (db) db.collection('orders').doc(orderId).set(orderDoc).catch(e => console.warn('?? [FIRESTORE] Erro ao salvar pedido plano:', e.message));
 
-  // Descontar saldo e actualizar histórico
+  // Descontar saldo e actualizar histï¿½rico
   plan.saldo_mb = Math.max(0, plan.saldo_mb - mbReal);
   if (plan.saldo_mb === 0) { plan.status = 'concluido'; plan.concluido_em = timestamp; }
   plan.historico.push({ tipo: 'saque', orderId, timestamp, mb: mbReal, destino: targetDestino });
@@ -7057,7 +7079,7 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
     `???????????????????????????????\n\n` +
     `? *${mbF}* activados para o *${targetDestino}*!\n` +
     `?? *Saldo Restante:* *${sldF}*\n\n` +
-    `Use *sacar Xgb* para sacar mais, ou aguarde a próxima entrega diária.`;
+    `Use *sacar Xgb* para sacar mais, ou aguarde a prï¿½xima entrega diï¿½ria.`;
 
   if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
     baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgCliente).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar cliente:', e.message));
@@ -7067,17 +7089,17 @@ async function executarSaquePlano(numero, mbSolicitado, numeroDestino = null) {
   return { success: true, orderId, mb_sacado: mbReal, saldo_restante: plan.saldo_mb, mensagem: msgCliente };
 }
 
-// -- Motor de verificação (a cada 1 minuto) ------------------------------------
+// -- Motor de verificaï¿½ï¿½o (a cada 1 minuto) ------------------------------------
 function checkScheduledPlans() {
   const now = Date.now();
   for (const [planId, plan] of scheduledPlans.entries()) {
     if (plan.status !== 'ativo') continue;
 
-    // -- FASEADO MENSAL: verificar confirmação expirada --
+    // -- FASEADO MENSAL: verificar confirmaï¿½ï¿½o expirada --
     if (plan.tipo === 'faseado_mensal' && plan.aguardando_confirmacao && plan.confirmacao_expira_em) {
       const confirmaExpira = new Date(plan.confirmacao_expira_em).getTime();
       if (now >= confirmaExpira) {
-        // Sem resposta em 2h ? adiar para amanhã
+        // Sem resposta em 2h ? adiar para amanhï¿½
         plan.aguardando_confirmacao = false;
         plan.confirmacao_expira_em  = null;
         const proxima = calcularProximaEntrega(plan);
@@ -7085,16 +7107,16 @@ function checkScheduledPlans() {
         saveScheduledPlans();
         const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
         const sldF = (plan.saldo_mb || 0) >= 1024 ? `${((plan.saldo_mb||0)/1024).toFixed(1)}GB` : `${plan.saldo_mb||0}MB`;
-        const msgAdiado = `?? A entrega de hoje foi adiada por falta de resposta. Saldo: *${sldF}*. Voltaremos amanhã às *${horaProx}*. Use *sacar Xgb* quando quiser.`;
+        const msgAdiado = `?? A entrega de hoje foi adiada por falta de resposta. Saldo: *${sldF}*. Voltaremos amanhï¿½ ï¿½s *${horaProx}*. Use *sacar Xgb* quando quiser.`;
         if (baileysEngine && typeof baileysEngine.enviarMensagemTexto === 'function') {
           baileysEngine.enviarMensagemTexto(`258${plan.clientPhone.slice(-9)}@s.whatsapp.net`, msgAdiado).catch(e => console.warn('?? [WHATSAPP] Erro ao notificar adiamento:', e.message));
         }
-        console.log(`?? [PLANO MENSAL] ${planId}: confirmação expirou ? adiado para ${plan.proxima_entrega}`);
+        console.log(`?? [PLANO MENSAL] ${planId}: confirmaï¿½ï¿½o expirou ? adiado para ${plan.proxima_entrega}`);
       }
-      continue; // Não verificar proxima_entrega enquanto aguarda/processou confirmação
+      continue; // Nï¿½o verificar proxima_entrega enquanto aguarda/processou confirmaï¿½ï¿½o
     }
 
-    // -- RETRY: Verificar se a última entrega falhou e recolocar na fila --------
+    // -- RETRY: Verificar se a ï¿½ltima entrega falhou e recolocar na fila --------
     if (plan.ultima_entrega_orderId) {
       const ultOrdem = inMemoryOrders.get(plan.ultima_entrega_orderId);
       const MAX_RETRY_PLAN = 3;
@@ -7115,10 +7137,10 @@ function checkScheduledPlans() {
             console.log(`?? [PLANO RETRY] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou ? Tentativa ${tentativas + 1}/${MAX_RETRY_PLAN} re-enfileirada`);
             continue;
           }
-          continue; // Aguardar delay antes do próximo retry
+          continue; // Aguardar delay antes do prï¿½ximo retry
         } else {
-          // Esgotou tentativas ? notificar admin e avançar
-          console.warn(`?? [PLANO FALHA DEFINITIVA] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou após ${MAX_RETRY_PLAN} tentativas. Avançando plano.`);
+          // Esgotou tentativas ? notificar admin e avanï¿½ar
+          console.warn(`?? [PLANO FALHA DEFINITIVA] ${planId}: Entrega ${plan.ultima_entrega_orderId} falhou apï¿½s ${MAX_RETRY_PLAN} tentativas. Avanï¿½ando plano.`);
           plan.ultima_entrega_orderId = null;
           plan.ultima_entrega_tentativas = 0;
           saveScheduledPlans();
@@ -7126,7 +7148,7 @@ function checkScheduledPlans() {
       } else if (ultOrdem && (ultOrdem.status === 'pending' || ultOrdem.status === 'assigned' || ultOrdem.status === 'processing')) {
         continue; // Entrega ainda em curso, aguardar
       } else {
-        // Concluída (completed) ou não encontrada ? limpar referência
+        // Concluï¿½da (completed) ou nï¿½o encontrada ? limpar referï¿½ncia
         plan.ultima_entrega_orderId = null;
         plan.ultima_entrega_tentativas = 0;
       }
@@ -7135,9 +7157,9 @@ function checkScheduledPlans() {
     const nextMs = new Date(plan.proxima_entrega).getTime();
     if (now >= nextMs) {
       if (plan.tipo === 'faseado_mensal') {
-        // Enviar pedido de confirmação ao cliente em vez de entregar directamente
+        // Enviar pedido de confirmaï¿½ï¿½o ao cliente em vez de entregar directamente
         enviarPedidoConfirmacao(planId).catch(e =>
-          console.error(`? [PLANO MENSAL] Erro ao enviar confirmação ${planId}:`, e.message));
+          console.error(`? [PLANO MENSAL] Erro ao enviar confirmaï¿½ï¿½o ${planId}:`, e.message));
       } else {
         executarEntregaPlano(planId).catch(e =>
           console.error(`? [PLANO] Erro na entrega ${planId}:`, e.message));
@@ -7147,12 +7169,12 @@ function checkScheduledPlans() {
 }
 
 setInterval(checkScheduledPlans, 60 * 1000); // Verificar a cada 1 minuto
-setTimeout(checkScheduledPlans, 5000);        // Primeira checagem 5s após boot
+setTimeout(checkScheduledPlans, 5000);        // Primeira checagem 5s apï¿½s boot
 
 
 // -- ENDPOINT: Listar Planos Agendados Activos --------------------------------
 // ------------------------------------------------------------------
-// ?? API: GESTÃO DE PACOTES ILIMITADOS (30 DIAS)
+// ?? API: GESTï¿½O DE PACOTES ILIMITADOS (30 DIAS)
 // ------------------------------------------------------------------
 app.get('/api/ilimitados', (req, res) => {
   const filtro = req.query.filtro || 'todas';
@@ -7164,64 +7186,64 @@ app.get('/api/ilimitados', (req, res) => {
 
 app.post('/api/ilimitados', (req, res) => {
   if (!customerServices || typeof customerServices.cadastrarOuRenovarAssinaturaIlimitada !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+    return res.status(500).json({ success: false, erro: 'customerServices nï¿½o disponï¿½vel' });
   }
   const sub = customerServices.cadastrarOuRenovarAssinaturaIlimitada(req.body);
-  if (!sub) return res.status(400).json({ success: false, erro: 'Dados inválidos' });
+  if (!sub) return res.status(400).json({ success: false, erro: 'Dados invï¿½lidos' });
   res.json({ success: true, mensagem: 'Assinatura ilimitada registada com sucesso!', assinatura: sub });
 });
 
 app.post('/api/ilimitados/:id/renovar', (req, res) => {
   if (!customerServices || typeof customerServices.renovarAssinaturaIlimitadaManual !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+    return res.status(500).json({ success: false, erro: 'customerServices nï¿½o disponï¿½vel' });
   }
   const dias = parseInt(req.body.dias, 10) || 30;
   const sub = customerServices.renovarAssinaturaIlimitadaManual(req.params.id, dias);
-  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
+  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura nï¿½o encontrada' });
   res.json({ success: true, mensagem: `Assinatura renovada por mais ${dias} dias!`, assinatura: sub });
 });
 
 app.post('/api/ilimitados/:id/cancelar', (req, res) => {
   if (!customerServices || typeof customerServices.cancelarAssinaturaIlimitada !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+    return res.status(500).json({ success: false, erro: 'customerServices nï¿½o disponï¿½vel' });
   }
   const ok = customerServices.cancelarAssinaturaIlimitada(req.params.id);
-  if (!ok) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
+  if (!ok) return res.status(404).json({ success: false, erro: 'Assinatura nï¿½o encontrada' });
   res.json({ success: true, mensagem: 'Assinatura cancelada com sucesso.' });
 });
 
-// Actualizar campos de uma assinatura (correcção manual de datas, etc.)
+// Actualizar campos de uma assinatura (correcï¿½ï¿½o manual de datas, etc.)
 app.put('/api/ilimitados/:id', authenticateAdmin, (req, res) => {
   if (!customerServices || typeof customerServices.atualizarAssinaturaIlimitada !== 'function') {
-    return res.status(500).json({ success: false, erro: 'customerServices não disponível' });
+    return res.status(500).json({ success: false, erro: 'customerServices nï¿½o disponï¿½vel' });
   }
   const campos = req.body || {};
-  delete campos.id; // Não deixar mudar o ID
+  delete campos.id; // Nï¿½o deixar mudar o ID
   const sub = customerServices.atualizarAssinaturaIlimitada(req.params.id, campos);
-  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura não encontrada' });
+  if (!sub) return res.status(404).json({ success: false, erro: 'Assinatura nï¿½o encontrada' });
   res.json({ success: true, mensagem: 'Assinatura actualizada com sucesso!', assinatura: sub });
 });
 
-// Sincronização manual: redescobrir assinaturas ilimitadas dos últimos 28 dias a partir de orders
+// Sincronizaï¿½ï¿½o manual: redescobrir assinaturas ilimitadas dos ï¿½ltimos 28 dias a partir de orders
 app.post('/api/ilimitados/sync', async (req, res) => {
   if (!customerServices || typeof customerServices.restaurarDoFirestoreIlimitados !== 'function') {
-    return res.json({ success: true, mensagem: 'Sincronização agendada no próximo reinício (função dedicada não disponível).' });
+    return res.json({ success: true, mensagem: 'Sincronizaï¿½ï¿½o agendada no prï¿½ximo reinï¿½cio (funï¿½ï¿½o dedicada nï¿½o disponï¿½vel).' });
   }
-  // Reinjectar db se customerServices ainda não o tem (pode acontecer se Firebase demorou a inicializar)
+  // Reinjectar db se customerServices ainda nï¿½o o tem (pode acontecer se Firebase demorou a inicializar)
   if (db && typeof customerServices.initCustomerServices === 'function') {
     try { customerServices.initCustomerServices(db, null, null); } catch(_) {}
   }
   try {
     await customerServices.restaurarDoFirestoreIlimitados();
     const list = customerServices.listarAssinaturasIlimitadas('todas');
-    res.json({ success: true, mensagem: 'Sincronização concluída!', total: list.length });
+    res.json({ success: true, mensagem: 'Sincronizaï¿½ï¿½o concluï¿½da!', total: list.length });
   } catch (e) {
-    // Se Firestore ainda não init, tentar restaurarDoFirestore completo
+    // Se Firestore ainda nï¿½o init, tentar restaurarDoFirestore completo
     if (e.message && e.message.includes('Firestore') && db) {
       try {
         await customerServices.restaurarDoFirestore();
         const list = customerServices.listarAssinaturasIlimitadas('todas');
-        return res.json({ success: true, mensagem: 'Sincronização completa concluída!', total: list.length });
+        return res.json({ success: true, mensagem: 'Sincronizaï¿½ï¿½o completa concluï¿½da!', total: list.length });
       } catch (e2) {
         return res.status(500).json({ success: false, erro: e2.message });
       }
@@ -7235,15 +7257,15 @@ app.get('/api/plans/scheduled', (req, res) => {
   res.json({ success: true, count: plans.length, plans });
 });
 
-// -- API: Criar plano renovável / faseado -------------------------------------
+// -- API: Criar plano renovï¿½vel / faseado -------------------------------------
 app.post('/api/subscribe/plan', async (req, res) => {
   try {
     const { numero, planoKey, sms_ref, clientPhone, recipientPhone } = req.body || {};
     if (!numero && !recipientPhone) {
-      return res.status(400).json({ success: false, error: 'Número de destino obrigatório.' });
+      return res.status(400).json({ success: false, error: 'Nï¿½mero de destino obrigatï¿½rio.' });
     }
     if (!planoKey) {
-      return res.status(400).json({ success: false, error: 'Chave do plano obrigatória.' });
+      return res.status(400).json({ success: false, error: 'Chave do plano obrigatï¿½ria.' });
     }
 
     // Ler plano do bot_config
@@ -7259,7 +7281,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
     const planos = botCfg.PLANOS_ESPECIAIS || {};
     const plano  = planos[String(planoKey)];
     if (!plano) {
-      return res.status(404).json({ success: false, error: `Plano "${planoKey}" não encontrado.` });
+      return res.status(404).json({ success: false, error: `Plano "${planoKey}" nï¿½o encontrado.` });
     }
 
     const tipo         = plano.tipo; // 'renovavel' | 'faseado' | 'faseado_mensal'
@@ -7269,12 +7291,12 @@ app.post('/api/subscribe/plan', async (req, res) => {
     const destino      = String(recipientPhone || numero).replace(/\D/g, '').slice(-9);
 
     if (tipo !== 'renovavel' && tipo !== 'renovacao' && tipo !== 'faseado' && tipo !== 'faseado_mensal') {
-      return res.status(400).json({ success: false, error: 'Tipo de plano inválido. Use renovavel, faseado ou faseado_mensal.' });
+      return res.status(400).json({ success: false, error: 'Tipo de plano invï¿½lido. Use renovavel, faseado ou faseado_mensal.' });
     }
 
     // -- Para faseado_mensal: cliente pode definir mb_diaria personalizado ------
     // O cliente envia mb_diaria (em MB) ou gb_diaria (em GB) no body
-    // Se não enviar, usa o padrão do plano (1GB)
+    // Se nï¿½o enviar, usa o padrï¿½o do plano (1GB)
     let mb_diaria = plano.diaria || 1024;
     if (tipo === 'faseado_mensal') {
       const clientMbDiaria = req.body.mb_diaria ? Number(req.body.mb_diaria)
@@ -7283,14 +7305,14 @@ app.post('/api/subscribe/plan', async (req, res) => {
       if (clientMbDiaria >= 100 && clientMbDiaria <= total_mb) {
         mb_diaria = clientMbDiaria;
       }
-      // Se não especificou, mantém default (1GB)
+      // Se nï¿½o especificou, mantï¿½m default (1GB)
     }
     const mb_inicial = mb_diaria; // Primeira fase = mesma quantidade que as seguintes
 
 
-    // Prevenção de SMS duplicado
+    // Prevenï¿½ï¿½o de SMS duplicado
     if (sms_ref && clientSmsHistory.has(sms_ref)) {
-      return res.status(400).json({ success: false, error: 'Comprovativo já utilizado.' });
+      return res.status(400).json({ success: false, error: 'Comprovativo jï¿½ utilizado.' });
     }
     if (sms_ref) clientSmsHistory.add(sms_ref);
 
@@ -7305,7 +7327,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
       modo:    'diario',
       status:  'pending',
       origem:  tipo,
-      remetente: `Axion ${tipo === 'faseado' ? 'Faseado' : 'Renovável'} (Fase 1)`,
+      remetente: `Axion ${tipo === 'faseado' ? 'Faseado' : 'Renovï¿½vel'} (Fase 1)`,
       sms_ref: sms_ref || '',
       createdAt: timestamp, updatedAt: timestamp
     };
@@ -7330,7 +7352,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
 
     return res.json({
       success:   true,
-      mensagem:  `? Plano "${plano.nome}" iniciado! ${mb_inicial}MB activados agora. As próximas entregas de ${mb_diaria}MB/dia serão automáticas.`,
+      mensagem:  `? Plano "${plano.nome}" iniciado! ${mb_inicial}MB activados agora. As prï¿½ximas entregas de ${mb_diaria}MB/dia serï¿½o automï¿½ticas.`,
       planId:    plan.planId,
       orderInit: orderId0,
       plano:     plano.nome,
@@ -7348,7 +7370,7 @@ app.post('/api/subscribe/plan', async (req, res) => {
 app.get('/api/admin/plans', (req, res) => {
   const all = [...scheduledPlans.values()];
 
-  // Incluir também assinaturas ilimitadas ativas/recentes para visualização no App Admin e Painel
+  // Incluir tambï¿½m assinaturas ilimitadas ativas/recentes para visualizaï¿½ï¿½o no App Admin e Painel
   if (customerServices && typeof customerServices.listarAssinaturasIlimitadas === 'function') {
     try {
       const subs = customerServices.listarAssinaturasIlimitadas('todas');
@@ -7387,7 +7409,7 @@ app.delete('/api/admin/plans/:planId', (req, res) => {
       const ok = customerServices.cancelarAssinaturaIlimitada(planId);
       if (ok) return res.json({ success: true, mensagem: `Assinatura ilimitada ${planId} cancelada.` });
     }
-    return res.status(404).json({ success: false, error: 'Plano ou assinatura não encontrado.' });
+    return res.status(404).json({ success: false, error: 'Plano ou assinatura nï¿½o encontrado.' });
   }
   plan.status = 'cancelado';
   plan.cancelado_em = new Date().toISOString();
@@ -7396,12 +7418,12 @@ app.delete('/api/admin/plans/:planId', (req, res) => {
   return res.json({ success: true, mensagem: `Plano ${planId} cancelado.` });
 });
 
-// -- API: Disparar Próxima Entrega Manualmente (Admin) -------------------------
+// -- API: Disparar Prï¿½xima Entrega Manualmente (Admin) -------------------------
 app.post('/api/admin/plans/:planId/trigger', async (req, res) => {
   const { planId } = req.params;
   const plan = scheduledPlans.get(planId);
-  if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
-  if (plan.status !== 'ativo') return res.status(400).json({ success: false, error: 'Plano não está activo.' });
+  if (!plan) return res.status(404).json({ success: false, error: 'Plano nï¿½o encontrado.' });
+  if (plan.status !== 'ativo') return res.status(400).json({ success: false, error: 'Plano nï¿½o estï¿½ activo.' });
   try {
     await executarEntregaPlano(planId);
     return res.json({ success: true, mensagem: `Entrega disparada com sucesso para o plano ${planId}!` });
@@ -7418,14 +7440,14 @@ app.post('/api/admin/plans/:planId/trigger', async (req, res) => {
 app.post('/api/plans/confirmar', async (req, res) => {
   try {
     const { numero, planId } = req.body || {};
-    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatório.' });
+    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatï¿½rio.' });
 
     let result;
     if (planId) {
       // Confirmar por planId directo (usado pelo Hub)
       const plan = scheduledPlans.get(planId);
-      if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
-      if (!plan.aguardando_confirmacao) return res.status(400).json({ success: false, error: 'Sem entrega pendente de confirmação.' });
+      if (!plan) return res.status(404).json({ success: false, error: 'Plano nï¿½o encontrado.' });
+      if (!plan.aguardando_confirmacao) return res.status(400).json({ success: false, error: 'Sem entrega pendente de confirmaï¿½ï¿½o.' });
       await executarEntregaPlano(planId);
       const mbF = plan.mb_diaria >= 1024 ? `${(plan.mb_diaria/1024).toFixed(1)}GB` : `${plan.mb_diaria}MB`;
       result = { success: true, acao: 'entrega_iniciada', mensagem: `? A sua entrega de ${mbF} foi iniciada!` };
@@ -7444,12 +7466,12 @@ app.post('/api/plans/confirmar', async (req, res) => {
 app.post('/api/plans/pular', async (req, res) => {
   try {
     const { numero, planId } = req.body || {};
-    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatório.' });
+    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatï¿½rio.' });
 
     let result;
     if (planId) {
       const plan = scheduledPlans.get(planId);
-      if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
+      if (!plan) return res.status(404).json({ success: false, error: 'Plano nï¿½o encontrado.' });
       plan.aguardando_confirmacao = false;
       plan.confirmacao_expira_em  = null;
       const proxima = calcularProximaEntrega(plan);
@@ -7457,7 +7479,7 @@ app.post('/api/plans/pular', async (req, res) => {
       saveScheduledPlans();
       const horaProx = proxima.toLocaleTimeString('pt-PT', { timeZone: 'Africa/Maputo', hour: '2-digit', minute: '2-digit' });
       const sldF = (plan.saldo_mb || 0) >= 1024 ? `${((plan.saldo_mb||0)/1024).toFixed(1)}GB` : `${plan.saldo_mb||0}MB`;
-      result = { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: ${sldF}. Voltamos amanhã às ${horaProx}.`, proxima_entrega: plan.proxima_entrega };
+      result = { success: true, acao: 'dia_pulado', mensagem: `?? Entrega adiada! Saldo: ${sldF}. Voltamos amanhï¿½ ï¿½s ${horaProx}.`, proxima_entrega: plan.proxima_entrega };
     } else {
       result = await handleConfirmacaoPlano(numero, 'nao');
     }
@@ -7473,11 +7495,11 @@ app.post('/api/plans/pular', async (req, res) => {
 app.post('/api/plans/saque', async (req, res) => {
   try {
     const { numero, mb, gb, planId, numero_destino, destino } = req.body || {};
-    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatório.' });
+    if (!numero && !planId) return res.status(400).json({ success: false, error: 'numero ou planId obrigatï¿½rio.' });
 
     const mbSolicitado = mb ? Number(mb) : gb ? Math.round(Number(gb) * 1024) : 0;
     if (!mbSolicitado || mbSolicitado < 100) {
-      return res.status(400).json({ success: false, error: 'Quantidade inválida. Mínimo 100MB. Use mb ou gb no body.' });
+      return res.status(400).json({ success: false, error: 'Quantidade invï¿½lida. Mï¿½nimo 100MB. Use mb ou gb no body.' });
     }
 
     let numParaBusca = numero;
@@ -7485,7 +7507,7 @@ app.post('/api/plans/saque', async (req, res) => {
       const p = scheduledPlans.get(planId);
       numParaBusca = p ? p.clientPhone : null;
     }
-    if (!numParaBusca) return res.status(400).json({ success: false, error: 'Número não encontrado.' });
+    if (!numParaBusca) return res.status(400).json({ success: false, error: 'Nï¿½mero nï¿½o encontrado.' });
 
     const targetDestino = numero_destino || destino || null;
     const result = await executarSaquePlano(numParaBusca, mbSolicitado, targetDestino);
@@ -7530,11 +7552,11 @@ app.post('/api/plans/hora-preferida', (req, res) => {
   try {
     const { numero, planId, hora } = req.body || {};
     if (!hora || !/^\d{1,2}:\d{2}$/.test(hora)) {
-      return res.status(400).json({ success: false, error: 'Hora inválida. Use formato HH:MM (ex: 07:00).' });
+      return res.status(400).json({ success: false, error: 'Hora invï¿½lida. Use formato HH:MM (ex: 07:00).' });
     }
     const [h, m] = hora.split(':').map(Number);
     if (h < 6 || h > 22) {
-      return res.status(400).json({ success: false, error: 'Hora fora do intervalo permitido (06:00–22:00).' });
+      return res.status(400).json({ success: false, error: 'Hora fora do intervalo permitido (06:00ï¿½22:00).' });
     }
 
     let updated = 0;
@@ -7545,7 +7567,7 @@ app.post('/api/plans/hora-preferida', (req, res) => {
                     (numLimpo && (plan.clientPhone.slice(-9) === numLimpo || plan.numero.slice(-9) === numLimpo));
       if (match && plan.status === 'ativo') {
         plan.hora_preferida = hora;
-        // Recalcular próxima entrega com nova hora
+        // Recalcular prï¿½xima entrega com nova hora
         if (!plan.aguardando_confirmacao) {
           const proxima = calcularProximaEntrega(plan);
           plan.proxima_entrega = proxima.toISOString();
@@ -7556,14 +7578,14 @@ app.post('/api/plans/hora-preferida', (req, res) => {
 
     if (updated === 0) return res.status(404).json({ success: false, error: 'Nenhum plano activo encontrado.' });
     saveScheduledPlans();
-    return res.json({ success: true, mensagem: `? Hora preferida actualizada para ${hora}. As entregas serão feitas a essa hora.`, planos_actualizados: updated });
+    return res.json({ success: true, mensagem: `? Hora preferida actualizada para ${hora}. As entregas serï¿½o feitas a essa hora.`, planos_actualizados: updated });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
 
-// -- Axion Licensing System (3 linhas — não altera nada existente) --
+// -- Axion Licensing System (3 linhas ï¿½ nï¿½o altera nada existente) --
 app.use('/licensing', require('./licensing/license_routes'));
 require('./licensing/license_checker').startChecker();
 
@@ -7574,8 +7596,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`?? [WHATSAPP QR CODE] Aceda a http://localhost:${PORT}/qr para conectar`);
   console.log('==================================================================');
 
-  // -- KEEP-ALIVE: evita que o Render adormeça no plano gratuito --
-  // O Render dorme após 15 min de inatividade ? auto-ping a cada 14 min
+  // -- KEEP-ALIVE: evita que o Render adormeï¿½a no plano gratuito --
+  // O Render dorme apï¿½s 15 min de inatividade ? auto-ping a cada 14 min
   const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
   const PING_INTERVAL_MS = 14 * 60 * 1000; // 14 minutos
 
@@ -7594,7 +7616,7 @@ app.listen(PORT, '0.0.0.0', () => {
   }, PING_INTERVAL_MS);
 
   // -- RESTAURAR DADOS DO FIRESTORE AO ARRANCAR ------------------------
-  // Após o boot, aguarda 5s para o Firebase autenticar e restaura dados
+  // Apï¿½s o boot, aguarda 5s para o Firebase autenticar e restaura dados
   if (db) {
     setTimeout(async () => {
       try {
