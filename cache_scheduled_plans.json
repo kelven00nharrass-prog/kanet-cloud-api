@@ -7,18 +7,28 @@
     "total_mb": 10240,
     "mb_inicial": 1024,
     "mb_diaria": 1024,
-    "hora_preferida": null,
+    "hora_preferida": "08:00",
     "entregas_diarias_total": 9,
-    "entregas_feitas": 0,
-    "saldo_mb": 9216,
+    "entregas_feitas": 1,
+    "saldo_mb": 8192,
     "valor": 232,
     "sms_ref": "DKFGMC1DE18",
     "hora_compra": "2026-11-15T03:45:00.000Z",
-    "proxima_entrega": "2026-11-16T02:45:00.000Z",
+    "proxima_entrega": "2026-11-17T06:00:00.000Z",
     "aguardando_confirmacao": false,
     "confirmacao_expira_em": null,
-    "historico": [],
+    "historico": [
+      {
+        "entrega": 1,
+        "orderId": "MANUAL-ENTREGA-2026-11-16",
+        "timestamp": "2026-11-16T18:35:00.000Z",
+        "mb": 1024,
+        "tipo": "entrega_manual_confirmada",
+        "nota": "Entrega realizada e confirmada pelo administrador Kelven"
+      }
+    ],
     "status": "ativo",
-    "createdAt": "2026-11-15T03:45:00.000Z"
+    "createdAt": "2026-11-15T03:45:00.000Z",
+    "updatedAt": "2026-11-16T16:37:22.566Z"
   }
 }

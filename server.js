@@ -7526,6 +7526,25 @@ app.post('/api/admin/plans/:planId/trigger', async (req, res) => {
   }
 });
 
+// -- API: Atualizar Plano Manualmente (Admin) --------------------------------
+app.all(['/api/admin/plans/:planId/update', '/api/admin/plans/:planId'], authenticateAdmin, (req, res) => {
+  if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') {
+    return res.status(405).json({ success: false, error: 'Método não permitido. Use POST, PUT ou PATCH.' });
+  }
+  const { planId } = req.params;
+  const plan = scheduledPlans.get(planId);
+  if (!plan) return res.status(404).json({ success: false, error: 'Plano não encontrado.' });
+
+  const campos = req.body || {};
+  delete campos.planId;
+  delete campos.id;
+
+  Object.assign(plan, campos);
+  saveScheduledPlans();
+  console.log(`✅ [ADMIN PLAN UPDATE] Plano ${planId} atualizado: Saldo ${plan.saldo_mb}MB | Entregas ${plan.entregas_feitas}/${plan.entregas_diarias_total}`);
+  return res.json({ success: true, mensagem: `Plano ${planId} atualizado com sucesso!`, plan });
+});
+
 // ------------------------------------------------------------------------------
 // --- ROTAS DO FASEADO MENSAL INTERATIVO ---------------------------------------
 // ------------------------------------------------------------------------------
